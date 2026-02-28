@@ -1,0 +1,87 @@
+"""Unit tests for Mneme agent — commit message generation."""
+
+from __future__ import annotations
+
+from unittest.mock import AsyncMock, patch
+
+import pytest
+
+from agents.mneme.agent import SYSTEM_PROMPT
+
+
+class TestMnemeSystemPrompt:
+    """Verify the system prompt contains required constraints."""
+
+    def test_includes_commit_types(self):
+        for commit_type in ["test", "docs", "fix", "feat", "chore", "refactor"]:
+            assert f"- {commit_type}(" in SYSTEM_PROMPT
+
+    def test_forbids_git_commit(self):
+        assert "NEVER run git commit" in SYSTEM_PROMPT
+
+    def test_ignores_claude_dir(self):
+        assert ".claude/" in SYSTEM_PROMPT
+
+    def test_present_tense_headlines(self):
+        assert "Present tense headlines" in SYSTEM_PROMPT
+
+    def test_past_tense_bullets(self):
+        assert "Past tense bullet points" in SYSTEM_PROMPT
+
+    def test_no_marketing_language(self):
+        assert "NO marketing language" in SYSTEM_PROMPT
+
+
+class TestMnemeGenerate:
+    """Test the generate functions with mocked LLM calls."""
+
+    @pytest.mark.asyncio
+    async def test_generate_calls_llm_with_git_output(self):
+        mock_response = "feat(auth): add login endpoint\n\n- Added POST /login\n\nFiles: auth.py"
+        with patch("agents.mneme.agent.chat", new_callable=AsyncMock) as mock_chat:
+            mock_chat.return_value = mock_response
+            from agents.mneme.agent import generate_commit_messages
+
+            result = await generate_commit_messages("M auth.py")
+            assert result == mock_response
+            mock_chat.assert_called_once()
+            # Verify it used the "mneme" agent name
+            assert mock_chat.call_args[0][0] == "mneme"
+
+    @pytest.mark.asyncio
+    async def test_generate_stream_yields_chunks(self):
+        async def mock_stream(*args, **kwargs):
+            for chunk in ["feat(auth)", ": add login", " endpoint\n"]:
+                yield chunk
+
+        with patch("agents.mneme.agent.chat_stream", side_effect=mock_stream):
+            from agents.mneme.agent import generate_commit_messages_stream
+
+            chunks = []
+            async for chunk in generate_commit_messages_stream("M auth.py"):
+                chunks.append(chunk)
+            assert "".join(chunks) == "feat(auth): add login endpoint\n"
+
+
+class TestMnemeAgentCard:
+    """Test the agent card configuration."""
+
+    def test_card_has_required_fields(self):
+        from agents.mneme.__main__ import build_agent_card
+
+        card = build_agent_card()
+        assert card.name
+        assert card.description
+        assert card.url
+        assert card.version == "0.1.0"
+        assert card.capabilities.streaming is True
+        assert len(card.skills) == 1
+        assert card.skills[0].id == "generate_commits"
+
+    def test_card_skill_has_examples(self):
+        from agents.mneme.__main__ import build_agent_card
+
+        card = build_agent_card()
+        skill = card.skills[0]
+        assert len(skill.examples) >= 1
+        assert "git" in skill.tags
