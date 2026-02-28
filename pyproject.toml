@@ -1,0 +1,39 @@
+[project]
+name = "kourai-khryseai"
+version = "0.1.0"
+description = "Multi-agent A2A development system — Golden Maidens of Hephaestus"
+requires-python = ">=3.12"
+readme = "IMPLEMENTATION_PLAN.md"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.9",
+]
+
+[tool.uv.workspace]
+members = [
+    "shared",
+    "agents/*",
+    "hosts/*",
+    "mcp_servers/*",
+]
+
+[tool.uv.sources]
+kourai-common = { workspace = true }
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Virtual env
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Git
+.git/
+.gitignore
+
+# Docker
+docker-compose*.yml
+Dockerfile
+
+# CI/CD
+.github/
+
+# Docs / planning
+*.md
+!shared/README.md
+
+# Env (secrets — never ship into image)
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Claude
+.claude/
+
+# Tests (not needed in prod images)
+tests/
+
+# A2A samples repo
+a2a-samples/
