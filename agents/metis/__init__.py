@@ -1,0 +1,1 @@
+"""Metis — Strategist agent for planning and coordinating other agents."""

@@ -1,0 +1,1 @@
+"""Dokimasia — Validator agent for checking code quality and correctness."""

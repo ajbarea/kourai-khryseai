@@ -1,0 +1,135 @@
+"""A2A bridge for Hephaestus — orchestrator executor with streaming progress."""
+
+from __future__ import annotations
+
+import logging
+
+from a2a.server.agent_execution import AgentExecutor, RequestContext
+from a2a.server.events import EventQueue
+from a2a.server.tasks import TaskUpdater
+from a2a.types import (
+    InternalError,
+    Part,
+    TaskState,
+    TextPart,
+    UnsupportedOperationError,
+)
+from a2a.utils import new_agent_text_message, new_task
+from a2a.utils.errors import ServerError
+
+from kourai_common.tracing import create_span
+
+from agents.hephaestus.routing_agent import determine_pipeline, execute_pipeline
+
+log = logging.getLogger(__name__)
+
+# Emoji map for status messages
+AGENT_EMOJI = {
+    "hephaestus": "\U0001f525",  # fire
+    "metis": "\U0001f4d0",       # triangular ruler
+    "techne": "\u2699\ufe0f",    # gear
+    "dokimasia": "\U0001f9ea",   # test tube
+    "kallos": "\u2728",          # sparkles
+    "mneme": "\U0001f4dc",       # scroll
+}
+
+
+class HephaestusAgentExecutor(AgentExecutor):
+    """A2A executor for the Hephaestus orchestrator."""
+
+    async def execute(
+        self,
+        context: RequestContext,
+        event_queue: EventQueue,
+    ) -> None:
+        with create_span("hephaestus.execute", {"a2a.method": "execute"}):
+            user_input = context.get_user_input()
+            task = context.current_task
+
+            if not task:
+                task = new_task(context.message)
+                await event_queue.enqueue_event(task)
+
+            updater = TaskUpdater(event_queue, task.id, task.context_id)
+
+            if not user_input or not user_input.strip():
+                await updater.update_status(
+                    TaskState.input_required,
+                    new_agent_text_message(
+                        "What would you like me to help with? "
+                        "I can route your request to the right specialist agents.",
+                        task.context_id,
+                        task.id,
+                    ),
+                    final=True,
+                )
+                return
+
+            try:
+                # Step 1: Determine the pipeline
+                await updater.update_status(
+                    TaskState.working,
+                    new_agent_text_message(
+                        f"{AGENT_EMOJI['hephaestus']} Analyzing request...",
+                        task.context_id,
+                        task.id,
+                    ),
+                )
+
+                pipeline = await determine_pipeline(user_input)
+
+                # Handle clarification request
+                if isinstance(pipeline, str):
+                    clarification = pipeline.replace("ASK_USER:", "").strip()
+                    await updater.update_status(
+                        TaskState.input_required,
+                        new_agent_text_message(clarification, task.context_id, task.id),
+                        final=True,
+                    )
+                    return
+
+                # Step 2: Report the pipeline
+                pipeline_display = " -> ".join(pipeline)
+                await updater.update_status(
+                    TaskState.working,
+                    new_agent_text_message(
+                        f"{AGENT_EMOJI['hephaestus']} Pipeline: {pipeline_display}",
+                        task.context_id,
+                        task.id,
+                    ),
+                )
+
+                # Step 3: Execute pipeline with real-time status updates
+                final_output = ""
+                async for agent_name, status in execute_pipeline(
+                    pipeline, user_input, task.context_id
+                ):
+                    emoji = AGENT_EMOJI.get(agent_name, "")
+                    await updater.update_status(
+                        TaskState.working,
+                        new_agent_text_message(
+                            f"{emoji} {status}",
+                            task.context_id,
+                            task.id,
+                        ),
+                    )
+                    final_output = status
+
+                # Step 4: Emit final artifact with accumulated results
+                await updater.add_artifact(
+                    [Part(root=TextPart(text=final_output))],
+                    name="pipeline_result",
+                )
+                await updater.complete()
+                log.info("Hephaestus pipeline completed: %s", pipeline_display)
+
+            except Exception as e:
+                log.error("Hephaestus execution failed: %s", e)
+                raise ServerError(error=InternalError()) from e
+
+    async def cancel(
+        self,
+        context: RequestContext,
+        event_queue: EventQueue,
+    ) -> None:
+        raise ServerError(error=UnsupportedOperationError())
