@@ -1,0 +1,152 @@
+# Kourai Khryseai — Multi-Agent A2A System
+# Usage:
+#   docker compose up                    # all services
+#   docker compose up jaeger             # observability only
+#   docker compose --profile agents up   # agents + infra
+#   docker compose up mneme              # single agent + deps
+
+x-agent-common: &agent-common
+  build:
+    context: .
+    dockerfile: docker/agent.Dockerfile
+  env_file: .env
+  environment:
+    OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+    KOURAI_LOG_LEVEL: ${KOURAI_LOG_LEVEL:-INFO}
+    KOURAI_USE_LOCAL_MODELS: ${KOURAI_USE_LOCAL_MODELS:-false}
+    KOURAI_STREAM_ENABLED: ${KOURAI_STREAM_ENABLED:-true}
+  networks:
+    - kourai
+  restart: unless-stopped
+  depends_on:
+    jaeger:
+      condition: service_started
+
+services:
+  # ──────────────── Infrastructure ────────────────
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - "16686:16686"   # Jaeger UI
+      - "4317:4317"     # OTLP gRPC
+      - "4318:4318"     # OTLP HTTP
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    networks:
+      - kourai
+    restart: unless-stopped
+
+  # ──────────────── Specialist Agents ────────────────
+  mneme:
+    <<: *agent-common
+    build:
+      context: .
+      dockerfile: docker/agent.Dockerfile
+      args:
+        AGENT_NAME: mneme
+        PORT: 10005
+    ports:
+      - "10005:10005"
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      PORT: 10005
+    profiles: ["agents", "full"]
+
+  kallos:
+    <<: *agent-common
+    build:
+      context: .
+      dockerfile: docker/agent.Dockerfile
+      args:
+        AGENT_NAME: kallos
+        PORT: 10004
+    ports:
+      - "10004:10004"
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      PORT: 10004
+    profiles: ["agents", "full"]
+
+  techne:
+    <<: *agent-common
+    build:
+      context: .
+      dockerfile: docker/agent.Dockerfile
+      args:
+        AGENT_NAME: techne
+        PORT: 10002
+    ports:
+      - "10002:10002"
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      PORT: 10002
+    profiles: ["agents", "full"]
+
+  dokimasia:
+    <<: *agent-common
+    build:
+      context: .
+      dockerfile: docker/agent.Dockerfile
+      args:
+        AGENT_NAME: dokimasia
+        PORT: 10003
+    ports:
+      - "10003:10003"
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      PORT: 10003
+    profiles: ["agents", "full"]
+
+  metis:
+    <<: *agent-common
+    build:
+      context: .
+      dockerfile: docker/agent.Dockerfile
+      args:
+        AGENT_NAME: metis
+        PORT: 10001
+    ports:
+      - "10001:10001"
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      PORT: 10001
+    profiles: ["agents", "full"]
+
+  # ──────────────── Orchestrator ────────────────
+  hephaestus:
+    <<: *agent-common
+    build:
+      context: .
+      dockerfile: docker/agent.Dockerfile
+      args:
+        AGENT_NAME: hephaestus
+        PORT: 10000
+    ports:
+      - "10000:10000"
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      PORT: 10000
+      # In Docker, agents talk via service names not localhost
+      KOURAI_AGENT_HOST: "true"
+    depends_on:
+      jaeger:
+        condition: service_started
+      mneme:
+        condition: service_healthy
+      kallos:
+        condition: service_healthy
+      techne:
+        condition: service_healthy
+      dokimasia:
+        condition: service_healthy
+      metis:
+        condition: service_healthy
+    profiles: ["full"]
+
+networks:
+  kourai:
+    driver: bridge
+
+volumes:
+  workspace:
+    driver: local
