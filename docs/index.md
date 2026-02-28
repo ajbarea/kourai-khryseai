@@ -6,15 +6,15 @@ hide:
 
 <div class="hero" markdown>
 
-# :material-robot: Kourai Khryseai
+# KOURAI KHRYSEAI
 
-**A multi-agent system framework for AI-accelerated development**
+**The Forge of Hephaestus: Autonomous Intelligence in Perfect Form**
 { .hero-subtitle }
 
 <div class="hero-buttons" markdown>
 
-[:octicons-rocket-24: A2A Protocol](a2a.md){ .md-button .md-button--primary }
-[:octicons-book-24: Implementation](implementation-plan.md){ .md-button }
+[:octicons-rocket-24: Command the Maidens](getting-started.md){ .md-button .md-button--primary }
+[:octicons-book-24: Sacred Styles](python-style-guide.md){ .md-button }
 
 </div>
 
@@ -22,65 +22,65 @@ hide:
 
 ---
 
-## :material-compass-outline: Explore the system
+## :material-compass-outline: THE HIERARCHY OF INTELLIGENCE
 
 <div class="grid cards" markdown>
 
--   :material-rocket-launch:{ .lg .middle } __A2A Protocol__
+-   :material-rocket-launch:{ .lg .middle } __THE ASCENT__
 
     ---
 
-    Discovery, Negotiation, Task & State Management for agent collaboration.
+    Awaken the Golden Maidens. Master the installation, configuration, and orchestration of your autonomous team.
 
-    [:octicons-arrow-right-24: Details](a2a.md)
+    [:octicons-arrow-right-24: BEGIN THE RITUAL](getting-started.md)
 
--   :material-sitemap:{ .lg .middle } __Implementation Plan__
-
-    ---
-
-    Roadmap for building the Golden Maidens MAS.
-
-    [:octicons-arrow-right-24: Plan](implementation-plan.md)
-
--   :material-robot-industrial:{ .lg .middle } __Agents__
+-   :material-book-open-variant:{ .lg .middle } __THE SACRED TEXTS__
 
     ---
 
-    Hephaestus (Coding), Metis (Planning), Mneme (Memory), Techne (Style).
+    Divine standards for Python, Shell, and Frontend craft. Perfection in every line, beauty in every function.
 
-    [:octicons-arrow-right-24: Browse agents](#)
+    [:octicons-arrow-right-24: VIEW THE LAWS](python-style-guide.md)
+
+-   :material-robot-industrial:{ .lg .middle } __THE ASSEMBLY__
+
+    ---
+
+    Hephaestus, Metis, Techne, and their sisters. Discover the specialized spirits that power your development.
+
+    [:octicons-arrow-right-24: MEET THE MAIDENS](getting-started.md#the-golden-maiden-architecture)
 
 </div>
 
 ---
 
-## :material-star-shooting: Key features
+## :material-star-shooting: DIVINE CAPABILITIES
 
 <div class="grid" markdown>
 
-!!! tip "A2A & MCP Integration"
+!!! tip "A2A & MCP CONVERGENCE"
 
-    Leverages Model Context Protocol for tool use and Agent-to-Agent protocol for complex orchestration.
+    The absolute integration of Model Context Protocol for tool mastery and Agent-to-Agent protocol for celestial orchestration.
 
-!!! danger "Fast Development"
+!!! danger "PRIMED FOR VELOCITY"
 
-    Specifically tuned to accelerate software engineering tasks with specialized sub-agents.
+    A system specifically forged to accelerate the craft of software engineering through high-performance, specialized sub-agents.
 
-!!! info "Golden Maiden Architecture"
+!!! info "HOMERIC ARCHITECTURE"
 
-    Inspired by Homeric mythology — woman-shaped, gold automata crafted for high-performance assistance.
+    Inspired by the gold automata of legend—woman-shaped, autonomous, and forged for the highest performance.
 
 </div>
 
 ---
 
-## :material-layers-outline: Technology stack
+## :material-layers-outline: THE FOUNDATION
 
-| Layer | Technology |
+| STRATUM | ESSENCE |
 |---|---|
-| :material-api: Protocols | A2A, MCP |
-| :material-fire: Language | Python 3.10+ |
-| :material-tray-full: Infrastructure | AgentStack, Docker |
-| :material-book-open-variant: Documentation | [Zensical](https://zensical.org/) |
+| :material-api: PROTOCOLS | A2A (0.4.0) · MCP (FastMCP) |
+| :material-fire: LANGUAGE | PYTHON 3.12+ (THE MODERN STANDARD) |
+| :material-tray-full: INFRASTRUCTURE | DOCKER · UV WORKSPACES · TERRAFORM |
+| :material-book-open-variant: DOCS | [ZENSICAL](https://zensical.org/) |
 
 ---
