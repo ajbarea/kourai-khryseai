@@ -4,10 +4,12 @@ site_description = "A multi-agent system framework for AI-accelerated developmen
 site_author = "AJ Barea"
 copyright = "AJ Barea &middot; 2026"
 
+# ---------------------------------------------------------------------------
+# Navigation
+# ---------------------------------------------------------------------------
 nav = [
   { "Home" = "index.md" },
-  { "A2A Protocol" = "a2a.md" },
-  { "Implementation Plan" = "implementation-plan.md" },
+  { "Getting Started" = "getting-started.md" },
   { "Style Guides" = [
       { "Python" = "python-style-guide.md" },
       { "Shell" = "shell-style-guide.md" },
@@ -15,29 +17,24 @@ nav = [
   ]},
 ]
 
-extra_css = ["stylesheets/extra.css"]
-
 # ---------------------------------------------------------------------------
-# Theme
+# Theme & Visuals
 # ---------------------------------------------------------------------------
 [project.theme]
+name = "material" # Zensical uses 'material' as the foundation
 language = "en"
+icon.logo = "material/robot"
+font.text = "Inter"
+font.code = "JetBrains Mono"
 
 features = [
-    # Announcement bar
     "announce.dismiss",
-
-    # Code blocks
     "content.code.annotate",
     "content.code.copy",
     "content.code.select",
-
-    # Content features
     "content.footnote.tooltips",
     "content.tabs.link",
     "content.tooltips",
-
-    # Navigation
     "navigation.footer",
     "navigation.indexes",
     "navigation.instant",
@@ -46,14 +43,11 @@ features = [
     "navigation.sections",
     "navigation.top",
     "navigation.tracking",
-
-    # Search
     "search.highlight",
+    "search.suggest",
+    "search.share",
 ]
 
-# ---------------------------------------------------------------------------
-# Color palette — light/dark toggle
-# ---------------------------------------------------------------------------
 [[project.theme.palette]]
 scheme = "default"
 primary = "amber"
@@ -69,23 +63,24 @@ toggle.icon = "lucide/moon"
 toggle.name = "Switch to light mode"
 
 # ---------------------------------------------------------------------------
-# Fonts
+# Plugins & Extensions
 # ---------------------------------------------------------------------------
-[project.theme.font]
-text = "Inter"
-code = "JetBrains Mono"
+[project.plugins]
+search = { engine = "disco" } # Enable the 2026 'Disco' search engine
+social = {}
 
 # ---------------------------------------------------------------------------
-# Icon
+# Extra Assets
 # ---------------------------------------------------------------------------
-[project.theme.icon]
-logo = "material/robot"
+extra_css = ["stylesheets/extra.css"]
 
 # ---------------------------------------------------------------------------
-# Social links (footer)
+# Social & Metadata
 # ---------------------------------------------------------------------------
 [project.extra]
 generator = false
-social = [
-    { icon = "fontawesome/brands/github", link = "https://github.com/ajbarea/Kourai_Khryseai", name = "Kourai Khryseai on GitHub" },
-]
+
+[[project.extra.social]]
+icon = "fontawesome/brands/github"
+link = "https://github.com/ajbarea/Kourai_Khryseai"
+name = "Kourai Khryseai on GitHub"
