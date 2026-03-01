@@ -14,10 +14,9 @@ from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore
 from a2a.types import AgentCapabilities, AgentCard, AgentSkill
 
+from agents.metis.agent_executor import MetisAgentExecutor
 from kourai_common.config import AGENT_PORTS, OTEL_ENDPOINT
 from kourai_common.tracing import setup_tracing
-
-from agents.metis.agent_executor import MetisAgentExecutor
 
 logging.basicConfig(
     level=os.getenv("KOURAI_LOG_LEVEL", "INFO"),

@@ -7,6 +7,7 @@ structured specifications with file lists, steps, and acceptance criteria.
 from __future__ import annotations
 
 import asyncio
+import datetime
 import logging
 from collections.abc import AsyncIterable
 from pathlib import Path
@@ -15,15 +16,18 @@ from kourai_common.llm import chat, chat_stream
 
 log = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """\
+CURRENT_DATE = datetime.date.today().strftime("%B %Y")
+
+SYSTEM_PROMPT = f"""\
 You are Metis, the planning specialist of Kourai Khryseai.
-You transform rough ideas into detailed, implementable specifications.
+You transform rough ideas into detailed, implementable specifications
+following {CURRENT_DATE} Best Practices.
 
 Your output format:
 1. Summary — one paragraph, what we're building and why
 2. Files to Modify — existing files that need changes (PREFER editing over creating)
 3. Files to Create — only if absolutely necessary
-4. Implementation Steps — numbered, specific, actionable
+4. Implementation Steps — numbered, specific, actionable (must use `uv` and Python 3.12+ idioms)
 5. Acceptance Criteria — testable conditions for "done"
 6. Edge Cases — things that could go wrong
 7. Testing Notes — what Dokimasia should test
@@ -81,20 +85,21 @@ async def get_project_context(project_root: str | None = None) -> str:
 
     # Recent commits
     code, stdout, _ = await run_command(
-        ["git", "log", "--oneline", "-10"], cwd=project_root,
+        ["git", "log", "--oneline", "-10"],
+        cwd=project_root,
     )
     if code == 0 and stdout.strip():
         parts.append(f"Recent commits:\n{stdout.strip()}")
 
     # Project structure (top-level only)
-    if project_root:
-        root = Path(project_root)
-    else:
-        root = Path(".")
+    root = Path(project_root) if project_root else Path(".")
     if root.exists():
         entries = sorted(
-            [p.name + ("/" if p.is_dir() else "") for p in root.iterdir()
-             if not p.name.startswith(".") and p.name != "__pycache__"],
+            [
+                p.name + ("/" if p.is_dir() else "")
+                for p in root.iterdir()
+                if not p.name.startswith(".") and p.name != "__pycache__"
+            ],
         )
         parts.append(f"Project root:\n{chr(10).join(entries[:30])}")
 
@@ -133,8 +138,7 @@ async def create_spec(
         {
             "role": "user",
             "content": (
-                f"Create an implementation spec for this idea:\n\n"
-                f"{idea}\n\n{context_block}"
+                f"Create an implementation spec for this idea:\n\n{idea}\n\n{context_block}"
             ),
         },
     ]
@@ -165,8 +169,7 @@ async def create_spec_stream(
         {
             "role": "user",
             "content": (
-                f"Create an implementation spec for this idea:\n\n"
-                f"{idea}\n\n{context_block}"
+                f"Create an implementation spec for this idea:\n\n{idea}\n\n{context_block}"
             ),
         },
     ]

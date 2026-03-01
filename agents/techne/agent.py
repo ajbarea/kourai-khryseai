@@ -7,8 +7,8 @@ LLM for code generation. Understands existing code before modifying it.
 from __future__ import annotations
 
 import asyncio
+import datetime
 import logging
-import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -16,18 +16,21 @@ from kourai_common.llm import chat, chat_stream
 
 log = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """\
+CURRENT_DATE = datetime.date.today().strftime("%B %Y")
+
+SYSTEM_PROMPT = f"""\
 You are Techne, the coding specialist of Kourai Khryseai.
 You write production code following AJ's exact standards.
 
-Python Standards:
-- Python 3.10-3.13, 100 char line limit
-- Modern type hints: X | None (not Optional[X]), lowercase generics
+Python Standards ({CURRENT_DATE} Best Practices):
+- Python 3.12+ features (match statements, contextlib.suppress, modern typing)
+- Modern type hints: X | None (not Optional[X]), lowercase generics (list, dict)
+- Dependency Management: ALWAYS use `uv` (no pip/venv), understand `uv.lock` and workspaces.
 - Google-style docstrings: public = one-liner + Args/Returns, private = one-liner, inner = none
 - Comments: WHY not WHAT. Add Research: citations for algorithms with paper URLs.
-- Specific exceptions only, never bare except:
+- Specific exceptions only, never bare except. Raise from None when appropriate.
 - logging over print, use log = logging.getLogger(__name__)
-- Tools: ruff, isort, mypy
+- Tools: ONLY use `ruff` for formatting and linting (no `isort`), `mypy` for typing.
 
 Frontend Standards:
 - React 19+, TypeScript strict mode, Vite 7+
@@ -174,7 +177,8 @@ async def get_git_context(cwd: str | None = None) -> str:
         parts.append(f"Git status:\n{stdout.strip()}")
 
     code, stdout, _ = await run_command(
-        ["git", "diff", "--stat", "HEAD~3..HEAD"], cwd=cwd,
+        ["git", "diff", "--stat", "HEAD~3..HEAD"],
+        cwd=cwd,
     )
     if code == 0 and stdout.strip():
         parts.append(f"Recent changes:\n{stdout.strip()}")
@@ -288,7 +292,7 @@ def parse_file_paths(user_input: str) -> list[str]:
     paths = []
 
     # Match common source file extensions (longest first to avoid partial matches)
-    pattern = r'[\w./\\-]+\.(?:tsx|jsx|json|yaml|toml|html|css|sql|cfg|ini|yml|py|ts|js|md|sh)'
+    pattern = r"[\w./\\-]+\.(?:tsx|jsx|json|yaml|toml|html|css|sql|cfg|ini|yml|py|ts|js|md|sh)"
     matches = re.findall(pattern, user_input)
     for match in matches:
         # Skip obvious non-paths

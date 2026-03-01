@@ -8,9 +8,12 @@ import uuid
 import httpx
 from a2a.client import A2ACardResolver, A2AClient
 from a2a.types import (
+    AgentCard,
     Message,
+    MessageSendConfiguration,
     MessageSendParams,
     Part,
+    Role,
     SendMessageRequest,
     TaskState,
     TextPart,
@@ -41,15 +44,16 @@ class RemoteAgentConnection:
             timeout=httpx.Timeout(connect=5.0, read=120.0, write=10.0, pool=5.0),
         )
         self.client: A2AClient | None = None
-        self.card = None
+        self.card: AgentCard | None = None
 
     async def connect(self) -> None:
         """Fetch agent card and initialize A2A client."""
         with create_span(f"a2a.connect.{self.agent_name}", {"url": self.agent_url}):
             resolver = A2ACardResolver(base_url=self.agent_url, httpx_client=self.http)
             self.card = await resolver.get_agent_card()
-            self.client = A2AClient(httpx_client=self.http, agent_card=self.card)
-            log.info("Connected to %s at %s", self.card.name, self.agent_url)
+            if self.card:
+                self.client = A2AClient(httpx_client=self.http, agent_card=self.card)
+                log.info("Connected to %s at %s", self.card.name, self.agent_url)
 
     @with_retry(max_attempts=3, base_delay=1.0)
     async def send(self, text: str, context_id: str) -> str:
@@ -74,17 +78,17 @@ class RemoteAgentConnection:
                 id=message_id,
                 params=MessageSendParams(
                     message=Message(
-                        role="user",
+                        role=Role.user,
                         parts=[Part(root=TextPart(text=text))],
-                        messageId=message_id,
-                        contextId=context_id,
+                        message_id=message_id,
+                        context_id=context_id,
                         metadata=get_trace_context(),
                     ),
-                    configuration={"blocking": True},
+                    configuration=MessageSendConfiguration(blocking=True),
                 ),
             )
             log.info("Sending to %s: %d chars", self.agent_name, len(text))
-            response = await self.client.send_message(message_request=request)
+            response = await self.client.send_message(request)
             result = self._extract_text(response)
             log.info("Received from %s: %d chars", self.agent_name, len(result))
             return result
@@ -104,7 +108,8 @@ class RemoteAgentConnection:
                     question = ""
                     if result.status.message and hasattr(result.status.message, "parts"):
                         question = "\n".join(
-                            p.root.text for p in result.status.message.parts
+                            p.root.text
+                            for p in result.status.message.parts
                             if hasattr(p.root, "text")
                         )
                     raise AgentInputRequired(self.agent_name, question or "Additional input needed")
@@ -119,9 +124,7 @@ class RemoteAgentConnection:
             if hasattr(result, "status") and result.status.message:
                 msg = result.status.message
                 if hasattr(msg, "parts"):
-                    return "\n".join(
-                        p.root.text for p in msg.parts if hasattr(p.root, "text")
-                    )
+                    return "\n".join(p.root.text for p in msg.parts if hasattr(p.root, "text"))
                 return str(msg)
         except AgentInputRequired:
             raise

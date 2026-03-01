@@ -6,6 +6,7 @@ returns structured commit messages following AJ's exact format.
 
 from __future__ import annotations
 
+import datetime
 import logging
 from collections.abc import AsyncIterable
 
@@ -13,9 +14,11 @@ from kourai_common.llm import chat, chat_stream
 
 log = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """\
+CURRENT_DATE = datetime.date.today().strftime("%B %Y")
+
+SYSTEM_PROMPT = f"""\
 You are Mneme, the commit message specialist of Kourai Khryseai.
-You generate commit message groups following AJ's EXACT format.
+You generate commit message groups following AJ's EXACT format. ({CURRENT_DATE} Best Practices)
 
 Workflow:
 1. Analyze the provided git status and diff output
@@ -38,10 +41,10 @@ Commit Types:
 - docs(_): Documentation updates
 - fix(_): Bug fixes
 - feat(_): New functionality
-- chore(_): Config, deps, maintenance
+- chore(_): Config, dependencies (uv.lock, pyproject.toml), maintenance
 - refactor(_): Structure/clarity improvements (no behavior change)
 - perf(_): Performance improvements
-- style(_): Formatting, linting, whitespace (no logic change)
+- style(_): Formatting (ruff), whitespace (no logic change)
 - ci(_): CI/CD pipeline changes
 - build(_): Build system changes
 
@@ -80,8 +83,7 @@ async def generate_commit_messages(git_output: str) -> str:
         {
             "role": "user",
             "content": (
-                "Generate commit message groups for these changes:\n\n"
-                f"```\n{git_output}\n```"
+                f"Generate commit message groups for these changes:\n\n```\n{git_output}\n```"
             ),
         },
     ]
@@ -103,8 +105,7 @@ async def generate_commit_messages_stream(git_output: str) -> AsyncIterable[str]
         {
             "role": "user",
             "content": (
-                "Generate commit message groups for these changes:\n\n"
-                f"```\n{git_output}\n```"
+                f"Generate commit message groups for these changes:\n\n```\n{git_output}\n```"
             ),
         },
     ]

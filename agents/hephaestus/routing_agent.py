@@ -6,21 +6,23 @@ then executes the pipeline by calling specialists sequentially.
 
 from __future__ import annotations
 
+import datetime
 import logging
 import uuid
 from collections.abc import AsyncIterable
 from dataclasses import dataclass, field
 
+from agents.hephaestus.remote_connections import AgentInputRequired, RemoteAgentConnection
 from kourai_common.config import MAX_ITERATIONS, get_agent_url
 from kourai_common.llm import chat
 from kourai_common.tracing import create_span
 
-from agents.hephaestus.remote_connections import AgentInputRequired, RemoteAgentConnection
-
 log = logging.getLogger(__name__)
 
-ROUTING_PROMPT = """\
-You are Hephaestus, the orchestrator of Kourai Khryseai.
+CURRENT_YEAR = datetime.date.today().year
+
+ROUTING_PROMPT = f"""\
+You are Hephaestus, the orchestrator of Kourai Khryseai ({CURRENT_YEAR} Edition).
 Analyze the user's request and decide which specialist agents to call.
 
 Available agents (call in this order when applicable):
@@ -148,7 +150,8 @@ async def execute_pipeline(
             try:
                 await conn.connect()
                 connections[agent_name] = conn
-                yield (agent_name, f"Connected to {conn.card.name}")
+                if conn.card:
+                    yield (agent_name, f"Connected to {conn.card.name}")
             except Exception as e:
                 skipped.add(agent_name)
                 yield (agent_name, f"Skipped (unreachable): {e}")
@@ -165,7 +168,12 @@ async def execute_pipeline(
             step_num = i + 1
             total = len(active_agents)
 
-            yield (agent_name, f"[{step_num}/{total}] Sending task to {conn.card.name}...")
+            if not conn.card:
+                log.error("No agent card for %s", agent_name)
+                return
+
+            card_name = conn.card.name
+            yield (agent_name, f"[{step_num}/{total}] Sending task to {card_name}...")
 
             with create_span(
                 f"hephaestus.pipeline.step.{agent_name}",
@@ -174,7 +182,7 @@ async def execute_pipeline(
                 try:
                     result = await conn.send(accumulated_context, context_id)
                     accumulated_context += f"\n\n--- Output from {agent_name} ---\n{result}"
-                    yield (agent_name, f"[{step_num}/{total}] {conn.card.name} completed")
+                    yield (agent_name, f"[{step_num}/{total}] {card_name} completed")
 
                 except AgentInputRequired as e:
                     # Propagate clarification request back to the user
@@ -243,10 +251,11 @@ async def execute_pipeline(
                             break
 
                 if iteration >= MAX_ITERATIONS and _kallos_found_issues(result):
-                    yield (
-                        "hephaestus",
-                        f"Max fix iterations ({MAX_ITERATIONS}) reached — proceeding with remaining issues",
+                    msg = (
+                        f"Max fix iterations ({MAX_ITERATIONS}) reached — "
+                        "proceeding with remaining issues"
                     )
+                    yield ("hephaestus", msg)
 
         # Final result is the last agent's output
         yield ("hephaestus", "Pipeline complete")

@@ -14,10 +14,9 @@ from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore
 from a2a.types import AgentCapabilities, AgentCard, AgentSkill
 
+from agents.hephaestus.agent_executor import HephaestusAgentExecutor
 from kourai_common.config import AGENT_PORTS, OTEL_ENDPOINT
 from kourai_common.tracing import setup_tracing
-
-from agents.hephaestus.agent_executor import HephaestusAgentExecutor
 
 logging.basicConfig(
     level=os.getenv("KOURAI_LOG_LEVEL", "INFO"),
@@ -36,8 +35,7 @@ def build_agent_card() -> AgentCard:
         id="route_request",
         name="Route Development Request",
         description=(
-            "Analyze user request and route to the right specialist agents "
-            "in the correct order"
+            "Analyze user request and route to the right specialist agents in the correct order"
         ),
         tags=["orchestration", "routing", "pipeline"],
         examples=[
@@ -50,9 +48,7 @@ def build_agent_card() -> AgentCard:
     pipeline_skill = AgentSkill(
         id="pipeline_execution",
         name="Execute Development Pipeline",
-        description=(
-            "Run multi-step workflows: plan -> code -> test -> style -> commit"
-        ),
+        description=("Run multi-step workflows: plan -> code -> test -> style -> commit"),
         tags=["pipeline", "workflow", "automation"],
         examples=[
             "full pipeline for feature X",

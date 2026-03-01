@@ -17,9 +17,8 @@ from a2a.types import (
 from a2a.utils import new_agent_text_message, new_task
 from a2a.utils.errors import ServerError
 
-from kourai_common.tracing import create_span
-
 from agents.metis.agent import create_spec, get_project_context
+from kourai_common.tracing import create_span
 
 log = logging.getLogger(__name__)
 
@@ -36,9 +35,13 @@ class MetisAgentExecutor(AgentExecutor):
             user_input = context.get_user_input()
             task = context.current_task
 
-            if not task:
+            if not task and context.message:
                 task = new_task(context.message)
                 await event_queue.enqueue_event(task)
+
+            if not task:
+                log.error("No task or message in request context")
+                raise ServerError(error=InternalError())
 
             updater = TaskUpdater(event_queue, task.id, task.context_id)
 

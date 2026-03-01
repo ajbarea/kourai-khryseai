@@ -7,18 +7,23 @@ reports structured results. Priority: unit > integration > performance.
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import datetime
 import logging
 import sys
 from collections.abc import AsyncIterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from kourai_common.llm import chat, chat_stream
 
 log = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """\
+CURRENT_DATE = datetime.date.today().strftime("%B %Y")
+
+SYSTEM_PROMPT = f"""\
 You are Dokimasia, the testing specialist of Kourai Khryseai.
-You write and run pytest test suites following AJ's testing standards.
+You write and run pytest test suites following AJ's testing standards
+({CURRENT_DATE} Best Practices).
 
 Priority Order:
 1. Unit tests (fast, isolated — tests/unit/)
@@ -28,10 +33,10 @@ Priority Order:
 Target: 80%+ code coverage
 
 Test File Pattern:
-- File: tests/unit/test_{module_name}.py
+- File: tests/unit/test_{{module_name}}.py
 - Class: TestClassName (groups related tests)
-- Methods: test_{description} (descriptive names)
-- Fixtures: @pytest.fixture with type hints and one-liner docstrings
+- Methods: test_{{description}} (descriptive names)
+- Fixtures: @pytest.fixture with type hints (Python 3.12+) and one-liner docstrings
 
 Docstring Style (same as production code):
 - Public: one-liner + Args, private: one-liner, inner: none
@@ -50,8 +55,8 @@ When reporting test results, use this format:
 | Category | Tests | Passed | Failed | Skipped | Time |
 |----------|-------|--------|--------|---------|------|
 
-Commands: make test, pytest specific paths
-Always use .venv virtual environment.
+Commands: make test, uv run pytest specific paths
+ALWAYS use `uv` for running tools. Do not use legacy pip.
 
 === UNIVERSAL RULES (AJ's Preferences) ===
 1. MINIMAL CHANGES: Keep modifications small and focused
@@ -120,36 +125,29 @@ async def run_pytest(
         line = line.strip()
         if "passed" in line or "failed" in line or "error" in line:
             if "passed" in line:
-                try:
+                with contextlib.suppress(ValueError, IndexError):
                     result.passed = int(line.split("passed")[0].strip().split()[-1])
-                except (ValueError, IndexError):
-                    pass
             if "failed" in line:
-                try:
+                with contextlib.suppress(ValueError, IndexError):
                     result.failed = int(line.split("failed")[0].strip().split()[-1])
-                except (ValueError, IndexError):
-                    pass
             if "skipped" in line:
-                try:
+                with contextlib.suppress(ValueError, IndexError):
                     result.skipped = int(line.split("skipped")[0].strip().split()[-1])
-                except (ValueError, IndexError):
-                    pass
             if "error" in line and "errors" not in line:
-                try:
+                with contextlib.suppress(ValueError, IndexError):
                     result.errors = int(line.split("error")[0].strip().split()[-1])
-                except (ValueError, IndexError):
-                    pass
             if " in " in line and "s" in line.split(" in ")[-1]:
-                try:
+                with contextlib.suppress(ValueError, IndexError):
                     time_str = line.split(" in ")[-1].replace("s", "").strip()
                     result.duration = float(time_str)
-                except (ValueError, IndexError):
-                    pass
 
     result.total = result.passed + result.failed + result.skipped + result.errors
     log.info(
         "pytest: %d passed, %d failed, %d skipped in %.2fs",
-        result.passed, result.failed, result.skipped, result.duration,
+        result.passed,
+        result.failed,
+        result.skipped,
+        result.duration,
     )
     return result
 

@@ -17,20 +17,19 @@ from a2a.types import (
 from a2a.utils import new_agent_text_message, new_task
 from a2a.utils.errors import ServerError
 
-from kourai_common.tracing import create_span
-
 from agents.hephaestus.routing_agent import determine_pipeline, execute_pipeline
+from kourai_common.tracing import create_span
 
 log = logging.getLogger(__name__)
 
 # Emoji map for status messages
 AGENT_EMOJI = {
     "hephaestus": "\U0001f525",  # fire
-    "metis": "\U0001f4d0",       # triangular ruler
-    "techne": "\u2699\ufe0f",    # gear
-    "dokimasia": "\U0001f9ea",   # test tube
-    "kallos": "\u2728",          # sparkles
-    "mneme": "\U0001f4dc",       # scroll
+    "metis": "\U0001f4d0",  # triangular ruler
+    "techne": "\u2699\ufe0f",  # gear
+    "dokimasia": "\U0001f9ea",  # test tube
+    "kallos": "\u2728",  # sparkles
+    "mneme": "\U0001f4dc",  # scroll
 }
 
 
@@ -46,9 +45,13 @@ class HephaestusAgentExecutor(AgentExecutor):
             user_input = context.get_user_input()
             task = context.current_task
 
-            if not task:
+            if not task and context.message:
                 task = new_task(context.message)
                 await event_queue.enqueue_event(task)
+
+            if not task:
+                log.error("No task or message in request context")
+                raise ServerError(error=InternalError())
 
             updater = TaskUpdater(event_queue, task.id, task.context_id)
 
