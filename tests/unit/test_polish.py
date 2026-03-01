@@ -42,6 +42,7 @@ class TestChatTimeout:
             mock_litellm.acompletion = slow_completion
             with patch("kourai_common.llm.AGENT_TIMEOUTS", {"mneme": 0.01}):
                 from kourai_common.llm import chat
+
                 with pytest.raises(LLMTimeoutError) as exc_info:
                     await chat("mneme", [{"role": "user", "content": "hi"}])
                 assert exc_info.value.agent_name == "mneme"
@@ -55,6 +56,7 @@ class TestChatTimeout:
         with patch("kourai_common.llm.litellm") as mock_litellm:
             mock_litellm.acompletion = AsyncMock(return_value=mock_response)
             from kourai_common.llm import chat
+
             with pytest.raises(LLMResponseError):
                 await chat("mneme", [{"role": "user", "content": "hi"}])
 
@@ -67,6 +69,7 @@ class TestChatTimeout:
         with patch("kourai_common.llm.litellm") as mock_litellm:
             mock_litellm.acompletion = AsyncMock(return_value=mock_response)
             from kourai_common.llm import chat
+
             result = await chat("mneme", [{"role": "user", "content": "hi"}])
             assert result == "Hello!"
 
@@ -90,9 +93,11 @@ class TestGracefulDegradation:
                 conn.connect = AsyncMock(side_effect=ConnectionError("refused"))
             else:
                 conn.connect = AsyncMock()
+
                 async def send_fn(text, ctx_id, _name=agent_name):
                     call_order.append(_name)
                     return f"output from {_name}"
+
                 conn.send = AsyncMock(side_effect=send_fn)
             return conn
 
@@ -124,6 +129,7 @@ class TestGracefulDegradation:
     @pytest.mark.asyncio
     async def test_aborts_when_all_agents_unreachable(self):
         """Pipeline aborts if no agents can be reached."""
+
         def make_conn(agent_name, url):
             conn = AsyncMock()
             conn.card = MagicMock()
@@ -138,9 +144,7 @@ class TestGracefulDegradation:
             from agents.hephaestus.routing_agent import execute_pipeline
 
             statuses = []
-            async for agent, status in execute_pipeline(
-                ["techne", "kallos"], "implement X"
-            ):
+            async for agent, status in execute_pipeline(["techne", "kallos"], "implement X"):
                 statuses.append((agent, status))
 
             abort_msgs = [s for s in statuses if "No agents reachable" in s[1]]
@@ -153,6 +157,7 @@ class TestCLIVerboseFlag:
     def test_main_accepts_verbose(self):
         """CLI main command accepts --verbose flag."""
         from hosts.cli.__main__ import main
+
         # Verify the click command has the verbose parameter
         param_names = [p.name for p in main.params]
         assert "verbose" in param_names
@@ -160,6 +165,7 @@ class TestCLIVerboseFlag:
     def test_main_accepts_v_shorthand(self):
         """CLI main command accepts -v shorthand."""
         from hosts.cli.__main__ import main
+
         for p in main.params:
             if p.name == "verbose":
                 assert "-v" in (p.opts or []) or any("-v" in o for o in (p.secondary_opts or []))

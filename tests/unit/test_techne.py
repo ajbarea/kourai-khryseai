@@ -23,7 +23,7 @@ class TestTechneSystemPrompt:
     """Verify the system prompt contains required standards."""
 
     def test_includes_python_standards(self):
-        assert "100 char line limit" in SYSTEM_PROMPT
+        assert "100 char lines" in SYSTEM_PROMPT
         assert "X | None" in SYSTEM_PROMPT
         assert "Google-style docstrings" in SYSTEM_PROMPT
 

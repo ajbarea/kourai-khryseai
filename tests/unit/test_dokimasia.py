@@ -65,7 +65,10 @@ class TestFormatTestResults:
 
     def test_failing_results(self):
         r = PytestRunResult(
-            passed=8, failed=2, total=10, success=False,
+            passed=8,
+            failed=2,
+            total=10,
+            success=False,
             output="FAILED test_foo - AssertionError",
         )
         text = format_test_results(r)

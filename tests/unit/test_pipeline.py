@@ -104,7 +104,9 @@ class TestExecutePipelineIterativeLoop:
                 statuses.append((agent, status))
 
             # Should see fix loop messages
-            fix_messages = [s for s in statuses if "auto-fix" in s[1].lower() or "[fix" in s[1].lower()]
+            fix_messages = [
+                s for s in statuses if "auto-fix" in s[1].lower() or "[fix" in s[1].lower()
+            ]
             assert len(fix_messages) > 0, f"No fix messages found in: {statuses}"
 
             # Should see "All clean" at end of loop
@@ -169,9 +171,7 @@ class TestExecutePipelineIterativeLoop:
             from agents.hephaestus.routing_agent import execute_pipeline
 
             statuses = []
-            async for agent, status in execute_pipeline(
-                ["kallos", "mneme"], "clean up code"
-            ):
+            async for agent, status in execute_pipeline(["kallos", "mneme"], "clean up code"):
                 statuses.append((agent, status))
 
             fix_messages = [s for s in statuses if "auto-fix" in s[1].lower()]
@@ -207,9 +207,7 @@ class TestExecutePipelineInputRequired:
             from agents.hephaestus.routing_agent import execute_pipeline
 
             statuses = []
-            async for agent, status in execute_pipeline(
-                ["metis", "techne"], "plan something"
-            ):
+            async for agent, status in execute_pipeline(["metis", "techne"], "plan something"):
                 statuses.append((agent, status))
 
             input_msgs = [s for s in statuses if "INPUT_REQUIRED:" in s[1]]
