@@ -22,7 +22,7 @@ make test    # Run pytest
 
 ## Type Hints
 
-Use modern 3.10+ syntax everywhere:
+Use modern 3.12+ syntax everywhere:
 
 ```python
 # ✅ Modern
