@@ -101,17 +101,23 @@ body.hero-page .md-content__inner {
   -webkit-background-clip: text !important;
   -webkit-text-fill-color: transparent !important;
   color: transparent !important;
-  filter: drop-shadow(0 2px 8px rgba(212, 175, 55, 0.4));
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.9))
+    drop-shadow(0 0 3px rgba(0, 0, 0, 0.7))
+    drop-shadow(0 2px 8px rgba(212, 175, 55, 0.4));
   animation: shimmer 3s ease-in-out infinite alternate;
 }
 
 @keyframes shimmer {
   0% {
-    filter: drop-shadow(0 2px 8px rgba(212, 175, 55, 0.3));
+    filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.9))
+      drop-shadow(0 0 3px rgba(0, 0, 0, 0.7))
+      drop-shadow(0 2px 8px rgba(212, 175, 55, 0.3));
   }
 
   100% {
-    filter: drop-shadow(0 2px 16px rgba(212, 175, 55, 0.6));
+    filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.9))
+      drop-shadow(0 0 3px rgba(0, 0, 0, 0.6))
+      drop-shadow(0 2px 16px rgba(212, 175, 55, 0.6));
   }
 }
 
@@ -123,6 +129,7 @@ body.hero-page .md-content__inner {
   color: var(--gold-light);
   opacity: 0.8;
   margin-bottom: 1rem;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.9), 0 0 8px rgba(0, 0, 0, 0.6);
   max-width: 700px;
   margin-left: auto;
   margin-right: auto;
@@ -290,4 +297,62 @@ body.hero-page .md-header {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--gold-light);
+}
+
+/* ==========================================================================
+   Mobile Responsive — Hero
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  .hero {
+    /* Switch to cover so maidens fill the frame; offset down to clear navbar */
+    background:
+      linear-gradient(to bottom,
+        rgba(1, 2, 1, 0.5) 0%,
+        rgba(1, 2, 1, 0.15) 25%,
+        rgba(1, 2, 1, 0.6) 60%,
+        rgba(1, 2, 1, 0.9) 80%,
+        var(--obsidian) 95%),
+      url('../assets/golden-maidens.png') center 48px / contain no-repeat;
+    padding: 1rem 1.2rem 2rem;
+  }
+
+  .md-typeset .hero h1,
+  .hero h1 {
+    font-size: clamp(1.6rem, 8vw, 2.4rem);
+    margin-bottom: 0.2rem;
+  }
+
+  .hero-subtitle {
+    font-size: clamp(0.65rem, 2.5vw, 0.85rem);
+    margin-bottom: 0.6rem;
+  }
+
+  .hero-buttons {
+    flex-direction: column;
+    gap: 0.5rem;
+    width: 100%;
+    align-items: center;
+  }
+
+  .hero-buttons .md-button {
+    min-width: 0;
+    width: 60%;
+    max-width: 240px;
+    padding: 0.55rem 1.2rem !important;
+    font-size: 0.75rem !important;
+  }
+}
+
+/* Extra-small screens (< 400px) */
+@media (max-width: 400px) {
+  .hero {
+    padding: 0.5rem 1rem 1.5rem;
+  }
+
+  .hero-buttons .md-button {
+    width: 60%;
+    padding: 0.5rem 1rem !important;
+    font-size: 0.7rem !important;
+  }
 }
