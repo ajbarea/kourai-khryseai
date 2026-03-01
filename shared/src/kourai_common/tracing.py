@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 import os
-from contextlib import contextmanager
 from collections.abc import Generator
+from contextlib import contextmanager
 
 from opentelemetry import trace
+from opentelemetry.context import Context
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.propagate import extract, inject
+from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.propagate import inject, extract
-from opentelemetry.context import Context
 
 _tracer: trace.Tracer | None = None
 
@@ -30,16 +30,16 @@ def setup_tracing(
     Returns:
         The configured TracerProvider.
     """
-    resource = Resource.create({
-        "service.name": service_name,
-        "service.version": os.getenv("SERVICE_VERSION", "0.1.0"),
-        "deployment.environment": os.getenv("ENVIRONMENT", "development"),
-    })
+    resource = Resource.create(
+        {
+            "service.name": service_name,
+            "service.version": os.getenv("SERVICE_VERSION", "0.1.0"),
+            "deployment.environment": os.getenv("ENVIRONMENT", "development"),
+        }
+    )
     provider = TracerProvider(resource=resource)
 
-    endpoint = otlp_endpoint or os.getenv(
-        "OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318"
-    )
+    endpoint = otlp_endpoint or os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318")
     try:
         exporter = OTLPSpanExporter(endpoint=f"{endpoint}/v1/traces")
         provider.add_span_processor(BatchSpanProcessor(exporter))

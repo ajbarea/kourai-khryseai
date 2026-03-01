@@ -27,6 +27,7 @@ def with_retry(
         base_delay: Base delay in seconds (doubles each attempt).
         retryable_exceptions: Exception types that trigger a retry.
     """
+
     def decorator(fn: Any) -> Any:
         @wraps(fn)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -36,12 +37,14 @@ def with_retry(
                     return await fn(*args, **kwargs)
                 except retryable_exceptions as e:
                     last_exc = e
-                    delay = base_delay * (2 ** attempt)
+                    delay = base_delay * (2**attempt)
                     log.warning(
                         f"{fn.__name__} failed (attempt {attempt + 1}/{max_attempts}), "
                         f"retrying in {delay:.1f}s: {e}"
                     )
                     await asyncio.sleep(delay)
             raise last_exc  # type: ignore[misc]
+
         return wrapper
+
     return decorator

@@ -72,8 +72,8 @@ async def chat(
             ),
             timeout=timeout,
         )
-    except asyncio.TimeoutError:
-        raise LLMTimeoutError(agent_name, timeout)
+    except TimeoutError:
+        raise LLMTimeoutError(agent_name, timeout) from None
 
     content = response.choices[0].message.content
     if not content:
@@ -116,8 +116,8 @@ async def chat_stream(
             ),
             timeout=timeout,
         )
-    except asyncio.TimeoutError:
-        raise LLMTimeoutError(agent_name, timeout)
+    except TimeoutError:
+        raise LLMTimeoutError(agent_name, timeout) from None
 
     async for chunk in response:
         delta = chunk.choices[0].delta
