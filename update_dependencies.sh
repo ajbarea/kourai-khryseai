@@ -57,7 +57,7 @@ uv lock --upgrade -q
 log_success "Lock file updated"
 
 log_info "Syncing local environment..."
-uv sync --frozen -q
+uv sync --frozen --all-packages -q
 log_success "Environment synced"
 
 log_info "Regenerating requirements.txt..."
