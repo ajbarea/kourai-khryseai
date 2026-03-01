@@ -1,174 +1,185 @@
 # Python Style Guide
 
-This guide documents the established patterns for Python code in the **Kourai Khryseai** project. All Python code should follow these conventions to maintain consistency across the multi-agent system.
+Standards for all Python code in Kourai Khryseai. Enforced by [ruff](https://docs.astral.sh/ruff/) and Kallos.
 
 ## Quick Reference
 
-- **Python version:** 3.10-3.13
-- **Line length:** 100 characters max
-- **Type hints:** Modern syntax (`X | None`, lowercase generics)
-- **Docstrings:** Google style
-- **Comments:** WHY not WHAT
+| | |
+|---|---|
+| **Python** | 3.12+ |
+| **Line length** | 100 characters |
+| **Type hints** | Modern syntax (`X | None`, lowercase generics) |
+| **Docstrings** | Google style |
+| **Comments** | WHY not WHAT |
+| **Linter** | ruff (check + format) |
 
-## Tools and Configuration
-
-The project uses these tools for code quality:
-
-| Tool | Purpose | Config Location |
-|------|---------|-----------------|
-| ruff | Linting + formatting | `pyproject.toml` |
-| isort | Import sorting | `pyproject.toml` |
-| mypy | Type checking | `pyproject.toml` |
-
-Run all checks with:
 ```bash
-make lint           # Linting only
-make test           # Linting + tests
+make lint    # Run ruff check + format
+make test    # Run pytest
 ```
+
+---
 
 ## Type Hints
 
-### Modern Syntax (Python 3.10+)
-
-Use modern type hint syntax throughout the codebase:
+Use modern 3.10+ syntax everywhere:
 
 ```python
-# ✅ Correct (modern 3.10+ style)
+# ✅ Modern
 def process(items: list[dict[str, Any]], name: str | None = None) -> dict[str, int]:
     ...
 
-def get_value(key: str) -> int | str:
+# ❌ Legacy — don't use
+from typing import Optional, List
+def process(items: List[Dict[str, Any]], name: Optional[str] = None) -> Dict[str, int]:
     ...
 ```
 
-### Pattern Reference
+| Pattern | Use? |
+|---------|------|
+| `list[str]`, `dict[str, int]` | ✅ Always |
+| `str \| None` | ✅ Preferred |
+| `Optional[str]`, `Union[int, str]` | ❌ Legacy |
 
-| Pattern | Status | Use? |
-|---------|--------|------|
-| `list[str]`, `dict[str, int]` | ✅ | ✅ |
-| `str \| None` | ✅ | ✅ Preferred |
-| `int \| str` | ✅ | ✅ Preferred |
-| `Optional[str]` | ✅ | ⚠️ Legacy |
-| `Union[int, str]` | ✅ | ⚠️ Legacy |
+---
 
-## Docstrings (Google Style)
+## Docstrings
 
-### Public Functions
-
-One-liner + Args (+ Returns if non-None):
+### Public functions — one-liner + Args + Returns
 
 ```python
-def generate_agent_response(
-    query: str,
-    context_id: str,
-    max_tokens: int = 1000,
-) -> str:
-    """Generate a response from the specialized agent.
+def generate_commit_messages(git_output: str) -> str:
+    """Generate commit message groups from git status/diff output.
 
     Args:
-        query: The user query to process.
-        context_id: Unique session identifier for tracing.
-        max_tokens: Maximum tokens for the LLM output.
+        git_output: Combined output of git status + git diff.
 
     Returns:
-        The generated text response.
+        Formatted commit message groups.
     """
 ```
 
-### Private/Helper Functions
-
-One-liner only (or skip if obvious):
+### Private helpers — one-liner only
 
 ```python
 def _calculate_backoff(attempt: int) -> float:
     """Compute exponential backoff delay."""
 ```
 
-## Comment Quality
-
-### Remove WHAT Comments
-
-Comments that restate what the code does provide no value:
+### Inner functions — no docstring
 
 ```python
-# ❌ BAD: Restates the code
-# Initialize the agent
+def process():
+    def _validate(item):  # No docstring needed
+        return item.is_valid
+```
+
+---
+
+## Comments
+
+### Remove WHAT comments
+
+```python
+# ❌ Restates the code — remove it
+# Create the agent
 agent = TechneAgent()
+
+# ❌ Restates the value — remove it
+DEFAULT_TIMEOUT = 30  # 30 seconds
 ```
 
-### Keep WHY Comments
-
-Comments that explain rationale, context, or design decisions are valuable:
+### Keep WHY comments
 
 ```python
-# ✅ GOOD: Research context
-# Research: Krum requires n > 2f + 2 (Blanchard et al., NeurIPS 2017)
-# https://proceedings.neurips.cc/paper_files/paper/2017/file/f4b9ec30ad9f68f89b29639786cb62ef-Paper.pdf
-if num_of_malicious_clients > max_malicious_for_krum:
-    raise ValueError(...)
+# ✅ Explains rationale
+# Cache to avoid recomputation on every request
+_cached_models: dict[str, str] = {}
+
+# ✅ Constraints
+# Max 3 iterations to prevent infinite Kallos ↔ Techne loops
+MAX_ITERATIONS = int(os.getenv("KOURAI_MAX_ITERATIONS", "3"))
 ```
 
-## Research Citations
+### Research citations
 
-### Format
+When implementing algorithms or using non-obvious thresholds, add a citation:
+
+```python
+# Research: Krum requires n > 2f + 2 (Blanchard et al., NeurIPS 2017)
+# https://proceedings.neurips.cc/paper/2017/file/f4b9ec30ad9f68f89b29639786cb62ef-Paper.pdf
+if num_clients <= 2 * num_malicious + 2:
+    raise ValueError("Not enough clients for Krum aggregation")
+```
+
+**Format:**
 
 ```python
 # Research: [Algorithm/concept] [key constraint] (Author et al., Venue Year)
 # [URL to paper]
 ```
 
+---
+
 ## Imports
 
-### Order (enforced by isort)
+Ordered by ruff — stdlib, third-party, local:
 
 ```python
 # 1. Standard library
-import json
 import logging
-from pathlib import Path
+from collections.abc import AsyncIterable
 
-# 2. Third-party packages
-from litellm import completion
-from pydantic import BaseModel
+# 2. Third-party
+from a2a.server.agent_execution import AgentExecutor, RequestContext
+from litellm import acompletion
 
-# 3. Local imports
-from kourai_common.config import AGENT_MODELS
+# 3. Local
+from kourai_common.config import get_model
+from kourai_common.tracing import create_span
 ```
 
-## Classes
-
-### Pydantic Models
-
-Use Pydantic for configuration and data validation:
-
-```python
-from pydantic import BaseModel, ConfigDict
-
-class AgentConfig(BaseModel):
-    """Configuration for a specialized agent."""
-    model_config = ConfigDict(extra="forbid")
-
-    name: str
-    model: str
-    port: int
-```
+---
 
 ## Logging
 
-### Use logging, Not print
+Use `logging`, never `print`:
 
 ```python
 import logging
 
 log = logging.getLogger(__name__)
 
-# ✅ Use logging
-log.info("Starting agent process...")
+log.info("Starting agent on port %d", port)
+log.error("Pipeline failed: %s", error)
 ```
 
-## Testing
+---
 
-### Test Naming
+## Error Handling
+
+Specific exceptions only. Never bare `except:`.
+
+```python
+# ✅ Specific
+try:
+    response = await client.send_message(request)
+except httpx.ConnectError as e:
+    log.error("Agent unreachable: %s", e)
+    raise
+except httpx.TimeoutException:
+    log.warning("Agent timed out, retrying...")
+
+# ❌ Never
+try:
+    ...
+except:
+    pass
+```
+
+---
+
+## Testing
 
 ```python
 # File: tests/unit/test_mneme.py
@@ -176,25 +187,29 @@ log.info("Starting agent process...")
 class TestMnemeAgent:
     """Tests for commit message generation."""
 
-    def test_generate_commit_with_valid_diff(self):
+    def test_generate_with_valid_diff(self):
         """Valid git diff produces formatted commit groups."""
+        ...
+
+    def test_rejects_empty_input(self):
+        """Empty diff returns INPUT_REQUIRED state."""
         ...
 ```
 
-## Cleanup Checklist
-
-1. ✅ Remove WHAT comments
-2. ✅ Keep WHY comments (rationale, research refs)
-3. ✅ Add Research citations where missing
-4. ✅ Modern type hints (`X | None` syntax)
-5. ✅ No marketing language ("robust", "comprehensive")
-
-## Cross-Reference
-
-- [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html)
-- [Shell Style Guide](shell-style-guide.md)
-- [Frontend Style Guide](frontend-style-guide.md)
+**Priority:** unit → integration → performance. Target 80%+ coverage.
 
 ---
 
-*Last Updated: 2026-02-28*
+## Cleanup Checklist
+
+- [x] Remove WHAT comments
+- [x] Keep WHY comments (rationale, research refs)
+- [x] Add Research citations where missing
+- [x] Modern type hints (`X | None` syntax)
+- [x] No marketing language ("robust", "comprehensive")
+- [x] `logging` over `print`
+- [x] Specific exceptions only
+
+---
+
+**References:** [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html) · [Shell Guide](shell-style-guide.md) · [Frontend Guide](frontend-style-guide.md)

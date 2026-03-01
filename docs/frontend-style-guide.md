@@ -1,31 +1,31 @@
 # Frontend Style Guide
 
-This guide documents best practices for React + TypeScript development in the **Kourai Khryseai** project. All frontend code should follow these conventions for maintainability and performance.
+Standards for React + TypeScript development in Kourai Khryseai.
 
 ## Quick Reference
 
-- **React version:** 19+ (functional components + hooks)
-- **React Compiler:** Enabled (minimizes manual `useMemo`/`useCallback`)
-- **TypeScript:** Strict mode enabled
-- **Build tool:** Vite 7+
-- **Line length:** 100 characters max
-- **Formatting:** Prettier (2 spaces, single quotes, semicolons)
+| | |
+|---|---|
+| **React** | 19+ (functional components + hooks) |
+| **React Compiler** | Enabled — no manual `useMemo`/`useCallback` |
+| **TypeScript** | Strict mode |
+| **Build tool** | Vite 7+ |
+| **Line length** | 100 characters |
+| **Formatter** | Prettier (2 spaces, single quotes, semicolons) |
 
-## Tools and Configuration
+| Tool | Config |
+|------|--------|
+| TypeScript | `tsconfig.json` |
+| Vite | `vite.config.ts` |
+| ESLint | `eslint.config.js` |
+| Prettier | `.prettierrc` |
+| Vitest | `vitest.config.ts` |
 
-| Tool | Purpose | Config Location |
-|------|---------|-----------------|
-| TypeScript | Type safety and tooling | `tsconfig.json` |
-| Vite | Build tool + dev server | `vite.config.ts` |
-| ESLint | Linting | `eslint.config.js` |
-| Prettier | Code formatting | `.prettierrc` |
-| Vitest | Unit/component testing | `vitest.config.ts` |
+---
 
-## TypeScript Fundamentals
+## TypeScript
 
-### Strict Mode Configuration
-
-TypeScript strict mode must be enabled to catch errors at compile time.
+### Strict mode required
 
 ```json
 {
@@ -38,123 +38,124 @@ TypeScript strict mode must be enabled to catch errors at compile time.
 }
 ```
 
-### Type Safety Patterns
+### Type safety patterns
 
 ```typescript
-// ✅ GOOD: Type safety with strict null checks
+// ✅ Null-safe access
 function getAgentName(agent: Agent | null): string {
   return agent?.name ?? 'Unknown Agent';
 }
+
+// ✅ Discriminated unions for agent states
+type AgentStatus =
+  | { state: 'idle' }
+  | { state: 'working'; taskId: string }
+  | { state: 'failed'; error: string };
 ```
 
-## Component Structure
+---
 
-### Component Anatomy
+## Components
+
+### Structure
 
 ```typescript
-import { useState, type ChangeEvent } from 'react';
-import { StatusBadge } from '@/components/common/Badge/StatusBadge';
+import { useState } from 'react';
+import { StatusBadge } from '@/components/StatusBadge';
 
-// 1. Type definitions
+// 1. Types
 interface AgentCardProps {
-  id: string;
   name: string;
+  port: number;
   status: 'active' | 'idle' | 'failed';
 }
 
-// 2. Component function
-export function AgentCard({ id, name, status }: AgentCardProps) {
+// 2. Component (named export only)
+export function AgentCard({ name, port, status }: AgentCardProps) {
   // 3. Hooks at the top
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
-  // 4. Main JSX return
+  // 4. Return JSX
   return (
     <div className="agent-card">
       <h3>{name}</h3>
       <StatusBadge status={status} />
+      <code>:{port}</code>
     </div>
   );
 }
 ```
 
-### Named Exports Only
-
-**Google TypeScript Style Guide mandates no default exports.**
+### Named exports only
 
 ```typescript
-// ✅ GOOD: Named exports
+// ✅ Named export
 export function AgentList() { ... }
 
-// ❌ BAD: Default exports
+// ❌ No default exports
 export default function AgentList() { ... }
 ```
 
+---
+
 ## React Patterns
 
-### Performance (2026 Standard)
+### Performance — let the Compiler work
 
-With the **React Compiler** (standard in React 19), manual memoization is legacy.
+With **React Compiler** (React 19 standard), manual memoization is legacy:
 
 ```typescript
-// ❌ LEGACY: Manual memoization
-const filteredAgents = useMemo(
-  () => agents.filter(a => a.active),
-  [agents]
-);
+// ❌ Legacy
+const filtered = useMemo(() => agents.filter(a => a.active), [agents]);
 
-// ✅ MODERN: React Compiler handles optimization automatically
-const filteredAgents = agents.filter(a => a.active);
+// ✅ Modern — Compiler handles optimization
+const filtered = agents.filter(a => a.active);
 ```
 
-### Server State (TanStack Query)
+### Server state — TanStack Query
 
 ```typescript
-// ✅ GOOD: Typed query with 2026 'isPending' syntax
 export function useAgents() {
   return useQuery<Agent[]>({
     queryKey: ['agents'],
-    queryFn: getAgents,
-    staleTime: 30 * 1000,
+    queryFn: fetchAgents,
+    staleTime: 30_000,
   });
 }
+
+// Use isPending, not isLoading
+const { data, isPending, error } = useAgents();
 ```
+
+---
 
 ## Accessibility
 
-### Semantic HTML
+Semantic HTML with ARIA labels on interactive elements:
 
 ```typescript
-// ✅ GOOD: Semantic elements with ARIA labels
-export function CloseButton({ onClose }: CloseButtonProps) {
+export function CloseButton({ onClose }: { onClose: () => void }) {
   return (
-    <button
-      type="button"
-      aria-label="Close dialog"
-      onClick={onClose}
-    >
+    <button type="button" aria-label="Close dialog" onClick={onClose}>
       <CloseIcon />
     </button>
   );
 }
 ```
 
+---
+
 ## Cleanup Checklist
 
-1. ✅ Remove WHAT comments
-2. ✅ Keep WHY comments (rationale, design decisions)
-3. ✅ Named exports ONLY
-4. ✅ Path aliases (`@/components`) instead of relative imports
-5. ✅ Functional components (no class components)
-6. ✅ TanStack Query for server state
-7. ✅ No manual `useMemo`/`useCallback` (let the Compiler work)
-
-## Cross-Reference
-
-- [Google TypeScript Style Guide](https://google.github.io/styleguide/tsguide.html)
-- [React Official Documentation](https://react.dev/)
-- [Python Style Guide](python-style-guide.md)
-- [Shell Style Guide](shell-style-guide.md)
+- [x] Remove WHAT comments
+- [x] Keep WHY comments (rationale, design decisions)
+- [x] Named exports only
+- [x] Path aliases (`@/components`) instead of relative imports
+- [x] Functional components (no class components)
+- [x] TanStack Query for server state
+- [x] No manual `useMemo`/`useCallback`
+- [x] `isPending` not `isLoading`
 
 ---
 
-*Last Updated: 2026-02-28*
+**References:** [Google TypeScript Style Guide](https://google.github.io/styleguide/tsguide.html) · [React Docs](https://react.dev/) · [Python Guide](python-style-guide.md) · [Shell Guide](shell-style-guide.md)
