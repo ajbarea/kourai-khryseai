@@ -8,6 +8,7 @@ Usage: python -m hosts.cli [--agent URL] [--verbose]
 
 from __future__ import annotations
 
+import asyncio
 import sys
 import time
 from uuid import uuid4
@@ -21,6 +22,7 @@ from a2a.types import (
     MessageSendConfiguration,
     MessageSendParams,
     Part,
+    Role,
     SendStreamingMessageRequest,
     Task,
     TaskArtifactUpdateEvent,
@@ -100,11 +102,11 @@ async def send_and_stream(
     """
     t0 = time.monotonic()
     message = Message(
-        role="user",
+        role=Role.user,
         parts=[Part(root=TextPart(text=user_text))],
-        messageId=str(uuid4()),
-        taskId=task_id,
-        contextId=context_id,
+        message_id=str(uuid4()),
+        task_id=task_id,
+        context_id=context_id,
     )
 
     payload = MessageSendParams(
@@ -134,7 +136,8 @@ async def send_and_stream(
                 return True, context_id, task_id
 
             event = result.root.result
-            context_id = event.context_id
+            if event.context_id:
+                context_id = event.context_id
 
             if isinstance(event, Task):
                 task_id = event.id
@@ -177,7 +180,7 @@ async def send_and_stream(
 
     # Handle input_required — prompt user for follow-up
     if final_state == TaskState.input_required:
-        follow_up = click.prompt(f"\n{_GOLD}↳ Your response{_RESET}")
+        follow_up: str = await click.prompt(f"\n{_GOLD}↳ Your response{_RESET}")
         if follow_up.strip().lower() in (":q", "quit"):
             return False, context_id, task_id
         return await send_and_stream(client, follow_up, context_id, task_id, verbose)
@@ -197,7 +200,8 @@ async def send_and_stream(
     help="Request timeout in seconds",
 )
 @click.option(
-    "--verbose", "-v",
+    "--verbose",
+    "-v",
     is_flag=True,
     default=False,
     help="Show timing and debug details",
@@ -225,15 +229,17 @@ async def main(agent: str | None, timeout: int, verbose: bool) -> None:
         click.echo(f"Connected to {card.name} v{card.version}")
         click.echo(f"Skills: {', '.join(s.name for s in card.skills)}")
         if verbose:
-            click.echo(f"{_DIM}[verbose] URL={agent} streaming={card.capabilities.streaming}{_RESET}")
+            click.echo(
+                f"{_DIM}[verbose] URL={agent} streaming={card.capabilities.streaming}{_RESET}"
+            )
         click.echo("")
 
         client = A2AClient(httpx_client, agent_card=card)
-        context_id = uuid4().hex
+        context_id: str = uuid4().hex
 
         while True:
             try:
-                prompt = click.prompt(f"{_CYAN}kourai{_RESET}")
+                prompt: str = await click.prompt(f"{_CYAN}kourai{_RESET}")
             except (EOFError, KeyboardInterrupt):
                 click.echo("\nGoodbye!")
                 break
@@ -254,7 +260,10 @@ async def main(agent: str | None, timeout: int, verbose: bool) -> None:
 
             click.echo("")
             keep_going, context_id, _ = await send_and_stream(
-                client, prompt, context_id, verbose=verbose,
+                client,
+                prompt,
+                context_id,
+                verbose=verbose,
             )
             click.echo("")
 
@@ -264,4 +273,4 @@ async def main(agent: str | None, timeout: int, verbose: bool) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
