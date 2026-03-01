@@ -15,23 +15,10 @@ set -euo pipefail
 # Output
 # ============================================================================
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$SCRIPT_DIR/scripts/common.sh"
 
-# Log an informational message.
-log_info() { echo -e "${BLUE}ℹ${NC} $1"; }
-
-# Log a success message.
-log_success() { echo -e "${GREEN}✓${NC} $1"; }
-
-# Log a warning message.
-log_warning() { echo -e "${YELLOW}⚠${NC} $1"; }
-
-# Log an error message.
-log_error() { echo -e "${RED}✗${NC} $1"; }
+setup_unicode_env
 
 # ============================================================================
 # Main
