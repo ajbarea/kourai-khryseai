@@ -3,6 +3,7 @@
 # Usage: ./scripts/lint.sh [--test]
 
 set -e
+trap 'echo ""; log_warning "Interrupted."; exit 130' INT
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/common.sh"
@@ -26,12 +27,15 @@ log_info "🔍 Running mypy..."
 uv run mypy --config-file=pyproject.toml . || log_warning "mypy found some issues"
 
 if [ "$TEST_MODE" = true ]; then
+    COV_ARGS="--cov=. --cov-report=xml:logs/coverage.xml --cov-report=term-missing"
+    mkdir -p logs
+
     log_info "🧪 Running unit tests in parallel (12 workers)..."
-    uv run pytest -n auto tests/unit/ -v --tb=short
+    uv run pytest -n auto tests/unit/ -v --tb=short $COV_ARGS
 
     if [ -d "tests/integration" ]; then
         log_info "🧪 Running integration tests serially..."
-        uv run pytest tests/integration/ -v --tb=short
+        uv run pytest tests/integration/ -v --tb=short --cov=. --cov-append --cov-report=xml:logs/coverage.xml --cov-report=term-missing --ignore-glob="**/conftest.py" || [ $? -eq 5 ]
     fi
 fi
 
