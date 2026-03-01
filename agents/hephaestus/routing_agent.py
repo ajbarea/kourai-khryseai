@@ -15,7 +15,7 @@ from kourai_common.config import MAX_ITERATIONS, get_agent_url
 from kourai_common.llm import chat
 from kourai_common.tracing import create_span
 
-from agents.hephaestus.remote_connections import RemoteAgentConnection
+from agents.hephaestus.remote_connections import AgentInputRequired, RemoteAgentConnection
 
 log = logging.getLogger(__name__)
 
@@ -102,6 +102,12 @@ async def determine_pipeline(user_request: str) -> list[str] | str:
         return agents
 
 
+def _kallos_found_issues(output: str) -> bool:
+    """Check if Kallos output indicates lint failures."""
+    lower = output.lower()
+    return "fail" in lower and "all clean" not in lower
+
+
 async def execute_pipeline(
     agents: list[str],
     user_request: str,
@@ -112,6 +118,10 @@ async def execute_pipeline(
     Each agent receives the user request plus the accumulated output
     from previous agents. Yields (agent_name, status_message) tuples
     for real-time progress updates.
+
+    When both kallos and techne are in the pipeline and kallos finds
+    lint issues, the pipeline loops techne→kallos up to MAX_ITERATIONS
+    times to auto-fix style violations.
 
     Args:
         agents: Ordered list of agent names to call.
@@ -126,9 +136,12 @@ async def execute_pipeline(
 
     connections: dict[str, RemoteAgentConnection] = {}
     accumulated_context = f"Original request: {user_request}"
+    has_techne = "techne" in agents
+    has_kallos = "kallos" in agents
 
     try:
-        # Connect to all needed agents
+        # Connect to all needed agents (skip unreachable ones)
+        skipped: set[str] = set()
         for agent_name in agents:
             url = get_agent_url(agent_name)
             conn = RemoteAgentConnection(agent_name, url)
@@ -137,15 +150,20 @@ async def execute_pipeline(
                 connections[agent_name] = conn
                 yield (agent_name, f"Connected to {conn.card.name}")
             except Exception as e:
-                yield (agent_name, f"Failed to connect: {e}")
-                log.error("Failed to connect to %s: %s", agent_name, e)
-                return
+                skipped.add(agent_name)
+                yield (agent_name, f"Skipped (unreachable): {e}")
+                log.warning("Skipping %s — unreachable: %s", agent_name, e)
+
+        active_agents = [a for a in agents if a not in skipped]
+        if not active_agents:
+            yield ("hephaestus", "No agents reachable — aborting pipeline")
+            return
 
         # Execute pipeline
-        for i, agent_name in enumerate(agents):
+        for i, agent_name in enumerate(active_agents):
             conn = connections[agent_name]
             step_num = i + 1
-            total = len(agents)
+            total = len(active_agents)
 
             yield (agent_name, f"[{step_num}/{total}] Sending task to {conn.card.name}...")
 
@@ -158,10 +176,77 @@ async def execute_pipeline(
                     accumulated_context += f"\n\n--- Output from {agent_name} ---\n{result}"
                     yield (agent_name, f"[{step_num}/{total}] {conn.card.name} completed")
 
+                except AgentInputRequired as e:
+                    # Propagate clarification request back to the user
+                    yield (agent_name, f"INPUT_REQUIRED:{e.question}")
+                    log.info("%s needs user input: %s", agent_name, e.question)
+                    return
+
                 except Exception as e:
                     yield (agent_name, f"[{step_num}/{total}] {conn.card.name} failed: {e}")
                     log.error("Pipeline step %s failed: %s", agent_name, e)
                     return
+
+            # Kallos-Techne iterative loop: auto-fix lint issues
+            # Only runs if both agents are connected (not skipped)
+            can_loop = (
+                agent_name == "kallos"
+                and has_techne
+                and has_kallos
+                and "techne" in connections
+                and "kallos" in connections
+                and _kallos_found_issues(result)
+            )
+            if can_loop:
+                iteration = 0
+                while iteration < MAX_ITERATIONS and _kallos_found_issues(result):
+                    iteration += 1
+                    yield (
+                        "hephaestus",
+                        f"Lint issues found — auto-fix iteration {iteration}/{MAX_ITERATIONS}",
+                    )
+
+                    # Send lint errors back to Techne for fixing
+                    fix_prompt = (
+                        f"Fix these lint/style issues reported by Kallos:\n\n{result}\n\n"
+                        f"Apply minimal changes to resolve each issue."
+                    )
+                    with create_span(
+                        "hephaestus.pipeline.fix_loop",
+                        {"iteration": str(iteration), "max": str(MAX_ITERATIONS)},
+                    ):
+                        try:
+                            techne_conn = connections["techne"]
+                            yield ("techne", f"[fix {iteration}] Applying style fixes...")
+                            fix_result = await techne_conn.send(fix_prompt, context_id)
+                            accumulated_context += (
+                                f"\n\n--- Techne fix iteration {iteration} ---\n{fix_result}"
+                            )
+                            yield ("techne", f"[fix {iteration}] Fixes applied")
+
+                            # Re-run Kallos to verify
+                            kallos_conn = connections["kallos"]
+                            yield ("kallos", f"[fix {iteration}] Re-checking style...")
+                            result = await kallos_conn.send(accumulated_context, context_id)
+                            accumulated_context += (
+                                f"\n\n--- Kallos recheck {iteration} ---\n{result}"
+                            )
+
+                            if _kallos_found_issues(result):
+                                yield ("kallos", f"[fix {iteration}] Issues remain")
+                            else:
+                                yield ("kallos", f"[fix {iteration}] All clean")
+
+                        except Exception as e:
+                            yield ("hephaestus", f"Fix loop failed: {e}")
+                            log.error("Fix loop iteration %d failed: %s", iteration, e)
+                            break
+
+                if iteration >= MAX_ITERATIONS and _kallos_found_issues(result):
+                    yield (
+                        "hephaestus",
+                        f"Max fix iterations ({MAX_ITERATIONS}) reached — proceeding with remaining issues",
+                    )
 
         # Final result is the last agent's output
         yield ("hephaestus", "Pipeline complete")

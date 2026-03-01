@@ -12,6 +12,7 @@ from a2a.types import (
     MessageSendParams,
     Part,
     SendMessageRequest,
+    TaskState,
     TextPart,
 )
 
@@ -19,6 +20,15 @@ from kourai_common.retry import with_retry
 from kourai_common.tracing import create_span, get_trace_context
 
 log = logging.getLogger(__name__)
+
+
+class AgentInputRequired(Exception):
+    """Raised when a specialist agent needs user clarification."""
+
+    def __init__(self, agent_name: str, question: str):
+        self.agent_name = agent_name
+        self.question = question
+        super().__init__(f"{agent_name} needs input: {question}")
 
 
 class RemoteAgentConnection:
@@ -80,9 +90,25 @@ class RemoteAgentConnection:
             return result
 
     def _extract_text(self, response) -> str:
-        """Pull text content from an A2A response."""
+        """Pull text content from an A2A response.
+
+        Raises:
+            AgentInputRequired: When the agent needs user clarification.
+        """
         try:
             result = response.root.result
+            # Detect input_required status
+            if hasattr(result, "status") and result.status:
+                state = result.status.state
+                if state == TaskState.input_required:
+                    question = ""
+                    if result.status.message and hasattr(result.status.message, "parts"):
+                        question = "\n".join(
+                            p.root.text for p in result.status.message.parts
+                            if hasattr(p.root, "text")
+                        )
+                    raise AgentInputRequired(self.agent_name, question or "Additional input needed")
+
             if hasattr(result, "artifacts") and result.artifacts:
                 return "\n".join(
                     part.root.text
@@ -97,6 +123,8 @@ class RemoteAgentConnection:
                         p.root.text for p in msg.parts if hasattr(p.root, "text")
                     )
                 return str(msg)
+        except AgentInputRequired:
+            raise
         except AttributeError:
             pass
         return str(response)

@@ -101,9 +101,26 @@ class HephaestusAgentExecutor(AgentExecutor):
 
                 # Step 3: Execute pipeline with real-time status updates
                 final_output = ""
+                input_required = False
                 async for agent_name, status in execute_pipeline(
                     pipeline, user_input, task.context_id
                 ):
+                    # Detect INPUT_REQUIRED from specialist agents
+                    if status.startswith("INPUT_REQUIRED:"):
+                        question = status.removeprefix("INPUT_REQUIRED:")
+                        emoji = AGENT_EMOJI.get(agent_name, "")
+                        await updater.update_status(
+                            TaskState.input_required,
+                            new_agent_text_message(
+                                f"{emoji} {agent_name} needs your input: {question}",
+                                task.context_id,
+                                task.id,
+                            ),
+                            final=True,
+                        )
+                        input_required = True
+                        break
+
                     emoji = AGENT_EMOJI.get(agent_name, "")
                     await updater.update_status(
                         TaskState.working,
@@ -114,6 +131,9 @@ class HephaestusAgentExecutor(AgentExecutor):
                         ),
                     )
                     final_output = status
+
+                if input_required:
+                    return
 
                 # Step 4: Emit final artifact with accumulated results
                 await updater.add_artifact(
