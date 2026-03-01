@@ -1,4 +1,4 @@
-.PHONY: setup up down status test lint clean jaeger docker-up docker-down docker-build docker-status docs upgrade
+.PHONY: setup cli up down status test lint clean jaeger docker-up docker-down docker-build docker-status docs upgrade
 
 # ──────────────── Local Development ────────────────
 
@@ -14,6 +14,9 @@ upgrade:                   ## Update dependencies to latest versions
 jaeger:                    ## Start Jaeger observability
 	docker compose up -d jaeger
 	@echo "🔍 Jaeger UI: http://localhost:16686"
+
+cli:                       ## Launch the interactive CLI client
+	uv run python -m hosts.cli
 
 up: jaeger                 ## Start all agents locally (+ Jaeger)
 	@echo "🔥 Starting Kourai Khryseai..."

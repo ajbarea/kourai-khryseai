@@ -30,8 +30,10 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-# Claude Code
+# Agent Config
 .claude/
+.gemini/
+.kiro/
 
 # Logs
 logs/
