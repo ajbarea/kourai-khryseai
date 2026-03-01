@@ -10,7 +10,10 @@ dependencies = []
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0.0",
+    "pytest-xdist>=3.6.1",
     "ruff>=0.9",
+    "mypy>=1.15.0",
     "zensical>=0.0.24",
 ]
 
@@ -30,7 +33,12 @@ line-length = 100
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM"]
+select = ["E", "F", "I", "UP", "B", "SIM", "W"]
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.lint.isort]
+known-first-party = ["kourai_common", "agents", "hosts"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -38,3 +46,15 @@ quote-style = "double"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+
+[tool.mypy]
+python_version = "3.12"
+explicit_package_bases = true
+namespace_packages = true
+warn_return_any = false
+warn_unused_configs = true
+show_error_codes = true
+no_implicit_optional = true
+ignore_missing_imports = true
+exclude = ["\\.venv", "build", "dist", "\\.git"]
+mypy_path = "shared/src"

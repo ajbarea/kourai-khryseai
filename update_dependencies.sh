@@ -60,14 +60,6 @@ log_info "Syncing local environment..."
 uv sync --frozen --all-packages -q
 log_success "Environment synced"
 
-log_info "Regenerating requirements.txt..."
-uv export \
-    --format requirements-txt \
-    --output-file requirements.txt \
-    --no-hashes \
-    -q
-log_success "requirements.txt updated"
-
 echo ""
 log_warning "Next: Review (git diff), Test (make test), and Commit."
 
