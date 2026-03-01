@@ -7,12 +7,12 @@
   --gold-gradient: linear-gradient(135deg, #CF995F 0%, #F1D2A1 25%, #E2B07E 50%, #F1D2A1 75%, #CF995F 100%);
 
   /* Obsidian & Shadow */
-  --obsidian: #0F1115;
+  --obsidian: #010201;
   --glass-bg: rgba(255, 255, 255, 0.03);
   --glass-border: rgba(212, 175, 55, 0.2);
 
   /* Zensical Overrides */
-  --md-primary-fg-color: var(--gold-mid);
+  --md-primary-fg-color: var(--gold-light);
   --md-accent-fg-color: var(--gold-light);
 }
 
@@ -31,20 +31,42 @@ body.hero-page .md-footer {
   display: none !important;
 }
 
+/* Lock the hero page to exactly one viewport — no scrolling */
+body.hero-page,
+body.hero-page html {
+  overflow: hidden !important;
+  height: 100% !important;
+}
+
+body.hero-page .md-container,
+body.hero-page .md-main,
+body.hero-page .md-main__inner {
+  overflow: hidden !important;
+  height: 100% !important;
+}
+
+body.hero-page .md-main__inner,
+body.hero-page .md-content__inner {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
 .hero {
   position: relative;
-  height: calc(100vh - 48px);
-  /* exact viewport minus navbar — no scrolling */
+  height: 100vh;
+  /* full viewport — navbar overlays on top */
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
   text-align: center;
-  background: var(--obsidian);
+  background: linear-gradient(to bottom, rgba(1, 2, 1, 0.4) 0%, rgba(1, 2, 1, 0.1) 40%, rgba(1, 2, 1, 0.8) 80%, var(--obsidian) 100%), url('../assets/golden-maidens.png') center top / contain no-repeat;
   color: var(--gold-light);
   margin: -1.2rem -0.8rem 0;
   /* bleed into the content padding */
-  padding: 1rem 2rem 1.5rem;
+  padding: 1rem 2rem 5rem;
   overflow: hidden;
 }
 
@@ -106,29 +128,7 @@ body.hero-page .md-footer {
   margin-right: auto;
 }
 
-/* Hero Image — centerpiece with animated glow */
-.hero-image {
-  display: block;
-  max-width: min(320px, 60vw);
-  max-height: 40vh;
-  width: auto;
-  height: auto;
-  object-fit: contain;
-  margin: 0 auto 1rem;
-  border-radius: 1rem;
-  border: 1px solid var(--glass-border);
-  animation: image-glow 4s ease-in-out infinite alternate;
-}
 
-@keyframes image-glow {
-  0% {
-    box-shadow: 0 8px 40px rgba(212, 175, 55, 0.2), 0 0 60px rgba(212, 175, 55, 0.05);
-  }
-
-  100% {
-    box-shadow: 0 8px 60px rgba(212, 175, 55, 0.5), 0 0 120px rgba(212, 175, 55, 0.15);
-  }
-}
 
 /* Hero buttons — equal width */
 .hero-buttons {
@@ -155,15 +155,24 @@ body.hero-page .md-footer {
    ========================================================================== */
 
 .md-header {
-  background-color: rgba(15, 17, 21, 0.9) !important;
+  background-color: rgba(1, 2, 1, 0.9) !important;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid rgba(212, 175, 55, 0.1) !important;
   box-shadow: 0 1px 20px rgba(0, 0, 0, 0.5);
 }
 
+/* On the homepage, fix the header so it overlays the hero without pushing it down */
+body.hero-page .md-header {
+  position: fixed !important;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+}
+
 .md-nav__link--active {
-  color: var(--gold-mid) !important;
+  color: var(--gold-light) !important;
   font-weight: 700 !important;
 }
 
@@ -192,8 +201,8 @@ body.hero-page .md-footer {
 
 .grid.cards>ul>li:hover {
   transform: translateY(-10px);
-  background: rgba(212, 175, 55, 0.05);
-  border-color: var(--gold-mid);
+  background: rgba(241, 210, 161, 0.05);
+  border-color: var(--gold-light);
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
 }
 
@@ -215,14 +224,14 @@ body.hero-page .md-footer {
   letter-spacing: 0.1em !important;
   padding: 0.8rem 2rem !important;
   border-radius: 3rem !important;
-  box-shadow: 0 4px 15px rgba(212, 175, 55, 0.3) !important;
+  box-shadow: 0 4px 15px rgba(241, 210, 161, 0.3) !important;
   transition: all 0.3s ease;
 }
 
 .md-button--primary:hover {
   filter: brightness(1.1);
   transform: scale(1.05);
-  box-shadow: 0 8px 25px rgba(212, 175, 55, 0.5) !important;
+  box-shadow: 0 8px 25px rgba(241, 210, 161, 0.5) !important;
 }
 
 /* Secondary button in hero — glass style */
@@ -234,8 +243,8 @@ body.hero-page .md-footer {
 }
 
 .hero .md-button:not(.md-button--primary):hover {
-  border-color: var(--gold-mid) !important;
-  background: rgba(212, 175, 55, 0.1) !important;
+  border-color: var(--gold-light) !important;
+  background: rgba(241, 210, 161, 0.1) !important;
 }
 
 /* ==========================================================================
@@ -247,6 +256,15 @@ body.hero-page .md-footer {
 .md-typeset h3 {
   color: var(--gold-light);
   font-weight: 800;
+}
+
+.md-typeset a {
+  color: var(--gold-light);
+  transition: color 0.2s ease;
+}
+
+.md-typeset a:hover {
+  color: #fff;
 }
 
 .md-typeset hr {
@@ -266,10 +284,10 @@ body.hero-page .md-footer {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--gold-dark);
+  background: rgba(241, 210, 161, 0.3);
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--gold-mid);
+  background: var(--gold-light);
 }

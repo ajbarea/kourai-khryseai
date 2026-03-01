@@ -12,8 +12,6 @@ hide:
 **Autonomous AI agents forged to code at alarming speeds**
 { .hero-subtitle }
 
-![The Golden Maidens](assets/golden-maidens.png){ .hero-image }
-
 <div class="hero-buttons" markdown>
 
 [:octicons-light-bulb-24: Learn More](overview.md){ .md-button }
