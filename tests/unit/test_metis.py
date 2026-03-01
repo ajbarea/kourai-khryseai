@@ -1,4 +1,4 @@
-"""Unit tests for Metis agent — planning and spec generation."""
+"""Metis: spec generation, project context, planning prompt structure."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Unit tests for Mneme agent — commit message generation."""
+"""Mneme: commit message generation, streaming, prompt constraints."""
 
 from __future__ import annotations
 

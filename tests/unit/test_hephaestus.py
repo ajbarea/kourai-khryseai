@@ -1,4 +1,4 @@
-"""Unit tests for Hephaestus orchestrator — routing and pipeline logic."""
+"""Hephaestus: LLM routing, pipeline determination, agent card config."""
 
 from __future__ import annotations
 

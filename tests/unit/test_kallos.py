@@ -1,4 +1,4 @@
-"""Unit tests for Kallos agent — style checking."""
+"""Kallos: ruff integration, comment analysis, style report output."""
 
 from __future__ import annotations
 

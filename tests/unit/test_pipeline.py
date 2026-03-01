@@ -1,4 +1,4 @@
-"""Unit tests for Phase 7 — pipeline integration, iterative loop, INPUT_REQUIRED."""
+"""Hephaestus pipeline: Kallos-Techne fix loop, INPUT_REQUIRED, CLI helpers."""
 
 from __future__ import annotations
 

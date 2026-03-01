@@ -1,4 +1,4 @@
-"""Tests for LLM error handling, graceful pipeline degradation, and CLI flags."""
+"""Kourai common: LLM timeout handling, graceful degradation, CLI flags."""
 
 from __future__ import annotations
 

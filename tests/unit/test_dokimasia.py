@@ -1,4 +1,4 @@
-"""Unit tests for Dokimasia agent — test writing and running."""
+"""Dokimasia: pytest output parsing, test generation, result formatting."""
 
 from __future__ import annotations
 

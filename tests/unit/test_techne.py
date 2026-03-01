@@ -1,4 +1,4 @@
-"""Unit tests for Techne agent — code generation."""
+"""Techne: file path parsing, file I/O, code generation via LLM."""
 
 from __future__ import annotations
 
