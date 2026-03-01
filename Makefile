@@ -68,17 +68,29 @@ docker-logs:               ## Tail logs from all containers
 
 # ──────────────── Testing & Quality ────────────────
 
-test:                      ## Run Kourai test suite
-	uv run pytest tests/ -v --tb=short
+lint:                      ## Run all quality checks (ruff, mypy)
+	@bash scripts/lint.sh
 
-lint:                      ## Run linters
-	uv run ruff check .
-	uv run ruff format --check .
+test:                      ## Run all quality checks and the full test suite
+	@bash scripts/lint.sh --test
+
+coverage:                  ## Run tests with coverage reporting
+	@echo "📊 Collecting coverage..."
+	@mkdir -p logs
+	@uv run pytest --cov=. --cov-report=xml:logs/coverage.xml --cov-report=html:logs/coverage_html --cov-report=term-missing tests/
+
+check: test                ## Alias for full quality check
+
+format: lint               ## Alias for proactive linting
 
 clean:                     ## Clean build artifacts
-	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
-	find . -type d -name .pytest_cache -exec rm -rf {} + 2>/dev/null || true
-	find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
+	@find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+	@find . -type d -name .pytest_cache -exec rm -rf {} + 2>/dev/null || true
+	@find . -type d -name ".ruff_cache" -exec rm -rf {} + 2>/dev/null || true
+	@find . -type d -name ".mypy_cache" -exec rm -rf {} + 2>/dev/null || true
+	@find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
+	@rm -f .coverage coverage.xml 2>/dev/null || true
+	@rm -rf logs/coverage_html 2>/dev/null || true
 
 help:                      ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
