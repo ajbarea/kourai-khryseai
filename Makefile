@@ -1,4 +1,4 @@
-.PHONY: setup cli up down status test lint clean jaeger docker-up docker-down docker-build docker-status docs upgrade
+.PHONY: setup docs upgrade cli up down status docker-up docker-down lint test clean help
 
 # ──────────────── Local Development ────────────────
 
@@ -11,15 +11,12 @@ docs:                      ## Serve documentation (Zensical)
 upgrade:                   ## Update dependencies to latest versions
 	@bash update_dependencies.sh
 
-jaeger:                    ## Start Jaeger observability
-	docker compose up -d jaeger
-	@echo "🔍 Jaeger UI: http://localhost:16686"
-
 cli:                       ## Launch the interactive CLI client
 	uv run python -m hosts.cli
 
-up: jaeger                 ## Start all agents locally (+ Jaeger)
+up:                        ## Start all agents locally (+ Jaeger)
 	@echo "🔥 Starting Kourai Khryseai..."
+	docker compose up -d jaeger
 	@mkdir -p logs
 	uv run python -m agents.mneme > logs/mneme.log 2>&1 &
 	uv run python -m agents.kallos > logs/kallos.log 2>&1 &
@@ -48,11 +45,8 @@ status:                    ## Check agent health (local)
 
 # ──────────────── Docker ────────────────
 
-docker-build:              ## Build all agent Docker images
-	docker compose --profile full build
-
-docker-up:                 ## Start all agents in Docker containers
-	docker compose --profile full up -d
+docker-up:                 ## Start all agents in Docker
+	docker compose --profile full up -d --build
 	@echo "✅ All agents running in Docker"
 	@echo "🔍 Jaeger: http://localhost:16686"
 
@@ -60,28 +54,13 @@ docker-down:               ## Stop all Docker containers
 	docker compose --profile full down
 	@echo "🛑 All containers stopped"
 
-docker-status:             ## Check Docker container health
-	docker compose --profile full ps
-
-docker-logs:               ## Tail logs from all containers
-	docker compose --profile full logs -f
-
 # ──────────────── Testing & Quality ────────────────
 
-lint:                      ## Run all quality checks (ruff, mypy)
+lint:                      ## Run quality checks (ruff, mypy)
 	@bash scripts/lint.sh
 
-test:                      ## Run all quality checks and the full test suite
+test:                      ## Run quality checks + full test suite
 	@bash scripts/lint.sh --test
-
-coverage:                  ## Run tests with coverage reporting
-	@echo "📊 Collecting coverage..."
-	@mkdir -p logs
-	@uv run pytest --cov=. --cov-report=xml:logs/coverage.xml --cov-report=html:logs/coverage_html --cov-report=term-missing tests/
-
-check: test                ## Alias for full quality check
-
-format: lint               ## Alias for proactive linting
 
 clean:                     ## Clean build artifacts
 	@find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
@@ -89,8 +68,9 @@ clean:                     ## Clean build artifacts
 	@find . -type d -name ".ruff_cache" -exec rm -rf {} + 2>/dev/null || true
 	@find . -type d -name ".mypy_cache" -exec rm -rf {} + 2>/dev/null || true
 	@find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
-	@rm -f .coverage coverage.xml 2>/dev/null || true
-	@rm -rf logs/coverage_html 2>/dev/null || true
+	@rm -f .coverage coverage.xml logs/coverage.xml 2>/dev/null || true
+	@rm -f uv.lock.backup* 2>/dev/null || true
+	@rm -rf .playwright-mcp/ 2>/dev/null || true
 
 help:                      ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
