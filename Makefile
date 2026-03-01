@@ -1,9 +1,15 @@
-.PHONY: setup up down status test lint clean jaeger docker-up docker-down docker-build docker-status
+.PHONY: setup up down status test lint clean jaeger docker-up docker-down docker-build docker-status docs upgrade
 
 # ──────────────── Local Development ────────────────
 
 setup:                     ## Install all dependencies
 	uv sync --all-packages
+
+docs:                      ## Serve documentation (Zensical)
+	uv run zensical serve
+
+upgrade:                   ## Update dependencies to latest versions
+	@bash update_dependencies.sh
 
 jaeger:                    ## Start Jaeger observability
 	docker compose up -d jaeger
