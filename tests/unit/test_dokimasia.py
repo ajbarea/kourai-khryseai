@@ -101,13 +101,28 @@ class TestRunPytest:
     """Test pytest runner."""
 
     @pytest.mark.asyncio
-    async def test_run_on_actual_tests(self):
-        from agents.dokimasia.agent import run_pytest
+    async def test_run_parses_passing_output(self):
+        summary = "5 passed in 0.42s"
+        with patch("agents.dokimasia.agent.run_command", new_callable=AsyncMock) as mock:
+            mock.return_value = (0, f"collecting...\n{summary}\n", "")
+            from agents.dokimasia.agent import run_pytest
 
-        # Run against our own test file (meta!)
-        result = await run_pytest("tests/unit/test_dokimasia.py")
-        assert result.passed > 0
-        assert result.success is True
+            result = await run_pytest("tests/unit/test_example.py")
+            assert result.success is True
+            assert result.passed == 5
+            assert result.duration == pytest.approx(0.42, abs=0.01)
+
+    @pytest.mark.asyncio
+    async def test_run_parses_failure_output(self):
+        summary = "===== 3 passed, 2 failed in 1.10s ====="
+        with patch("agents.dokimasia.agent.run_command", new_callable=AsyncMock) as mock:
+            mock.return_value = (1, f"FAILURES...\n{summary}\n", "")
+            from agents.dokimasia.agent import run_pytest
+
+            result = await run_pytest("tests/unit/test_example.py")
+            assert result.success is False
+            assert result.passed == 3
+            assert result.failed == 2
 
 
 class TestDokimasiaAgentCard:
