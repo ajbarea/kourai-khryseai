@@ -162,6 +162,80 @@ class TestGenerateCode:
             assert "def login(): pass" in user_msg
 
 
+class TestRunCommand:
+    """Test shell command execution."""
+
+    @pytest.mark.asyncio
+    async def test_run_returns_stdout(self):
+        from agents.techne.agent import run_command
+
+        code, stdout, stderr = await run_command(["python", "-c", "print('hello')"])
+        assert code == 0
+        assert "hello" in stdout
+
+    @pytest.mark.asyncio
+    async def test_run_captures_stderr(self):
+        from agents.techne.agent import run_command
+
+        code, stdout, stderr = await run_command(
+            ["python", "-c", "import sys; sys.stderr.write('err')"]
+        )
+        assert "err" in stderr
+
+
+class TestGetGitContext:
+    """Test git context gathering."""
+
+    @pytest.mark.asyncio
+    async def test_returns_string(self):
+        from agents.techne.agent import get_git_context
+
+        result = await get_git_context()
+        assert isinstance(result, str)
+
+
+class TestGenerateCodeStream:
+    """Test streaming code generation."""
+
+    @pytest.mark.asyncio
+    async def test_stream_yields_chunks(self):
+        async def mock_stream(*args, **kwargs):
+            for chunk in ["ACTION:", " EDIT", "\nFILE:"]:
+                yield chunk
+
+        with patch("agents.techne.agent.chat_stream", side_effect=mock_stream):
+            from agents.techne.agent import generate_code_stream
+
+            chunks = []
+            async for chunk in generate_code_stream("fix bug"):
+                chunks.append(chunk)
+
+            assert len(chunks) == 3
+            assert "".join(chunks) == "ACTION: EDIT\nFILE:"
+
+    @pytest.mark.asyncio
+    async def test_stream_includes_file_context(self):
+        received_messages: list[object] = []
+
+        async def mock_stream(*args, **kwargs):
+            received_messages.extend(args)
+            yield "done"
+
+        with patch("agents.techne.agent.chat_stream", side_effect=mock_stream):
+            from agents.techne.agent import generate_code_stream
+
+            async for _ in generate_code_stream(
+                "fix auth",
+                file_contents={"auth.py": "code"},
+                git_context="M auth.py",
+            ):
+                pass
+
+        # Messages should include file content and git context
+        msg_str = str(received_messages)
+        assert "auth.py" in msg_str
+
+
 class TestDataclasses:
     """Test code result data structures."""
 
