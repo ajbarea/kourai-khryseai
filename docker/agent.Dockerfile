@@ -4,12 +4,12 @@ ARG PYTHON_VERSION=3.12
 
 FROM python:${PYTHON_VERSION}-slim AS builder
 
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.6 /uv /usr/local/bin/uv
 
 WORKDIR /app
 
-# Copy workspace root config
-COPY pyproject.toml ./
+# Copy workspace root config + lockfile for reproducible builds
+COPY pyproject.toml uv.lock ./
 COPY shared/ shared/
 
 # Copy agent source (set by build arg)
@@ -36,6 +36,7 @@ COPY --from=builder /app/pyproject.toml /app/pyproject.toml
 # Put venv on PATH
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
 
 # Each agent exposes its own port (set via env)
 ARG PORT=10000

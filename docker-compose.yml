@@ -25,7 +25,7 @@ x-agent-common: &agent-common
 services:
   # ──────────────── Infrastructure ────────────────
   jaeger:
-    image: jaegertracing/all-in-one:latest
+    image: jaegertracing/all-in-one:2.4
     ports:
       - "16686:16686"   # Jaeger UI
       - "4317:4317"     # OTLP gRPC
