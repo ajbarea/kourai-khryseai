@@ -1,34 +1,111 @@
 # Overview
 
-## :material-compass-outline: What is this?
+## 🏛️ What is Kourai Khryseai?
 
-Kourai Khryseai is a **multi-agent development system** where six AI specialists collaborate through the [A2A protocol](https://a2a-protocol.org) to handle the full software development lifecycle.
+Kourai Khryseai is a **multi-agent development system** where six AI specialists collaborate through the [A2A (Agent-to-Agent) protocol](https://a2a-protocol.org) to handle the full software development lifecycle — planning, coding, testing, linting, and commit prep.
 
-You describe what you want. They build it.
+You describe what you want in plain English. They build it.
 
 ```
-$ kourai "implement CSV export with tests"
+╔══════════════════════════════════════════╗
+║     Kourai Khryseai — Golden Maidens     ║
+╚══════════════════════════════════════════╝
+Type your request. Commands: :q (quit), :status (agent info)
 
-🔥 Hephaestus → 📐 Metis → ⚙️ Techne → 🧪 Dokimasia → ✨ Kallos → 📜 Mneme
+kourai: implement CSV export with tests
 
+🔥 Hephaestus: Routing to pipeline [metis, techne, dokimasia, kallos, mneme]
+📐 Metis: [1/5] Spec complete — 12 implementation steps
+⚙️ Techne: [2/5] Writing changes to 3 files...
+🧪 Dokimasia: [3/5] 8/8 tests passed ✅
+✨ Kallos: [4/5] ruff ✅ · comments ✅ · all clean
+📜 Mneme: [5/5] Generated 2 commit groups
+
+────────────────────────────────────────
 feat(parser): add CSV export support
 - Added parse_csv() function with streaming reader
 - Integrated with existing data pipeline
 Files: src/utils/parser.py, src/api/endpoints.py
+
+test(parser): add CSV export test suite
+- Added 8 unit tests covering edge cases
+- Verified streaming behavior with large files
+Files: tests/unit/test_parser.py
+────────────────────────────────────────
 ```
 
 ---
 
-## :material-layers-outline: Built With
+## ⚡ Why This Exists
+
+Most AI coding tools are single-agent — one model tries to do everything. That's fine for small edits, but falls apart on real development work where planning, implementation, testing, and code quality are distinct disciplines.
+
+Kourai Khryseai splits the problem across **six specialist agents**, each focused on one thing:
+
+| Agent | Specialty | Model |
+|---|---|---|
+| 🔥 **Hephaestus** | Orchestration — routes requests, manages pipelines | Claude Sonnet 4.6 |
+| 📐 **Metis** | Planning — specs, acceptance criteria, edge cases | Claude Opus 4.6 |
+| ⚙️ **Techne** | Coding — reads existing code, generates changes | Claude Sonnet 4.6 |
+| 🧪 **Dokimasia** | Testing — writes and runs pytest suites | Claude Sonnet 4.6 |
+| ✨ **Kallos** | Style — ruff linting, comment cleanup, docstrings | Claude Haiku 4.5 |
+| 📜 **Mneme** | Commits — conventional commit messages from diffs | Claude Haiku 4.5 |
+
+Each agent is an independent HTTP server. They communicate through the open [A2A protocol](https://a2a-protocol.org) — the same standard backed by Google, Salesforce, and the Linux Foundation for agent interoperability.
+
+---
+
+## 🔄 How a Request Flows
+
+When you type a request into the CLI, here's what happens:
+
+```
+1. CLI sends your message to Hephaestus via A2A (SSE streaming)
+2. Hephaestus uses its LLM to determine the right pipeline
+3. Each specialist runs sequentially, passing context forward
+4. If Kallos finds lint issues, it loops with Techne to auto-fix (max 3 iterations)
+5. Final output streams back to your terminal in real-time
+```
+
+Hephaestus selects the pipeline automatically based on your request:
+
+| You say | Pipeline |
+|---------|----------|
+| *"implement feature X"* | 📐 → ⚙️ → 🧪 → ✨ → 📜 |
+| *"fix bug in X"* | ⚙️ → 🧪 → ✨ → 📜 |
+| *"add tests for X"* | 🧪 → ✨ → 📜 |
+| *"clean up X"* | ✨ → 📜 |
+| *"commit prep"* | 📜 |
+| *"plan feature X"* | 📐 |
+
+If the request is ambiguous, Hephaestus asks for clarification before proceeding — no wasted work.
+
+---
+
+## 🔧 Built With
 
 | | |
 |---|---|
-| :material-api: **Protocols** | [A2A v0.4](https://a2a-protocol.org) · [MCP](https://modelcontextprotocol.io/) |
+| :material-api: **Protocol** | [A2A v0.4](https://a2a-protocol.org) — open agent-to-agent communication standard |
 | :material-language-python: **Language** | Python 3.12+ · modern type hints · Google docstrings |
-| :material-brain: **LLM** | [LiteLLM](https://docs.litellm.ai/) — Claude, Gemini, or Ollama |
-| :material-tray-full: **Infrastructure** | Docker · uv workspaces · OpenTelemetry → Jaeger |
+| :material-brain: **LLM** | [LiteLLM](https://docs.litellm.ai/) — Claude in production, Ollama for free local dev |
+| :material-server: **Server** | [Starlette](https://www.starlette.io/) + uvicorn via `a2a-sdk` |
+| :material-magnify: **Observability** | [OpenTelemetry](https://opentelemetry.io/) → [Jaeger](https://www.jaegertracing.io/) |
+| :material-docker: **Containers** | Docker + Docker Compose · optional Terraform for cloud |
+| :material-package-variant: **Packaging** | [uv](https://docs.astral.sh/uv/) workspaces |
 | :material-book-open-variant: **Docs** | [Zensical](https://zensical.dev) |
 
 ---
 
-> *In Greek mythology, Hephaestus forged the Κοῦραι Χρύσεαι — golden woman-shaped automatons — to serve as attendants in his divine workshop. Each agent in this system is named after a Greek concept matching their role.*
+## 🏛️ The Name
+
+> *In Greek mythology, Hephaestus — god of fire and forge — crafted the Κοῦραι Χρύσεαι (Golden Maidens), woman-shaped automatons of living gold who served as intelligent attendants in his divine workshop. Each could think, speak, and work independently.*
+
+Each agent is named after a Greek concept matching its role:
+
+- **Hephaestus** — the divine craftsman, master of the forge
+- **Metis** — wisdom and counsel (mother of Athena)
+- **Techne** — art, craft, and skill
+- **Dokimasia** — scrutiny and examination
+- **Kallos** — beauty and elegance
+- **Mneme** — memory (one of the original three Muses)
