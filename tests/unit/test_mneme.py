@@ -83,5 +83,5 @@ class TestMnemeAgentCard:
 
         card = build_agent_card()
         skill = card.skills[0]
-        assert len(skill.examples) >= 1
+        assert skill.examples is not None and len(skill.examples) >= 1
         assert "git" in skill.tags
