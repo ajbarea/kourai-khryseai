@@ -30,10 +30,10 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.x"
+          python-version-file: "pyproject.toml"
 
       - name: Install Dependencies
-        run: uv pip install zensical
+        run: uv sync --group dev --frozen
 
       - name: Build Documentation
         run: uv run zensical build --clean
