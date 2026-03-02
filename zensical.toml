@@ -13,8 +13,15 @@ nav = [
   { "Home" = "index.md" },
   { "Overview" = "overview.md" },
   { "Getting Started" = "getting-started.md" },
-  { "Agents" = "agents.md" },
-  { "Architecture" = "architecture.md" },
+  { "Agents" = [
+      { "Overview" = "agents/index.md" },
+      { "Specialists" = "agents/specialists.md" },
+  ]},
+  { "Architecture" = [
+      { "Overview" = "architecture/index.md" },
+      { "Internals" = "architecture/internals.md" },
+      { "Infrastructure" = "architecture/infrastructure.md" },
+  ]},
   { "CLI Reference" = "cli.md" },
   { "Configuration" = "configuration.md" },
   { "Style Guides" = [

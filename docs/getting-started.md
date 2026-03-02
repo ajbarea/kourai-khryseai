@@ -165,7 +165,7 @@ make docker-down
 
 ## Next Steps
 
-- **[Agents](agents.md)** — Learn what each specialist does and how they work
-- **[Architecture](architecture.md)** — Understand the system design and three-layer pattern
+- **[Agents](agents/index.md)** — Learn what each specialist does and how they work
+- **[Architecture](architecture/index.md)** — Understand the system design and three-layer pattern
 - **[CLI Reference](cli.md)** — All CLI commands, options, and keyboard shortcuts
 - **[Configuration](configuration.md)** — Environment variables, model assignments, timeouts

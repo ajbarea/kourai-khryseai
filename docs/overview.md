@@ -59,12 +59,23 @@ Each agent is an independent HTTP server. They communicate through the open [A2A
 
 When you type a request into the CLI, here's what happens:
 
-```
-1. CLI sends your message to Hephaestus via A2A (SSE streaming)
-2. Hephaestus uses its LLM to determine the right pipeline
-3. Each specialist runs sequentially, passing context forward
-4. If Kallos finds lint issues, it loops with Techne to auto-fix (max 3 iterations)
-5. Final output streams back to your terminal in real-time
+```mermaid
+sequenceDiagram
+    actor User
+    participant CLI
+    participant Hephaestus as 🔥 Hephaestus
+    participant Specialists as 📐⚙️🧪✨📜 Specialists
+
+    User->>CLI: "implement CSV export"
+    CLI->>Hephaestus: A2A message/stream (SSE)
+    Hephaestus->>Hephaestus: LLM selects pipeline
+    loop Each specialist sequentially
+        Hephaestus->>Specialists: A2A message/send (blocking)
+        Specialists-->>Hephaestus: Result + context
+    end
+    Note over Hephaestus,Specialists: If Kallos finds issues,<br/>loops with Techne (max 3×)
+    Hephaestus-->>CLI: SSE status updates + artifacts
+    CLI-->>User: Real-time terminal output
 ```
 
 Hephaestus selects the pipeline automatically based on your request:
