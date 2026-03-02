@@ -30,8 +30,9 @@ if [ "$TEST_MODE" = true ]; then
     COV_ARGS="--cov=. --cov-report=xml:logs/coverage.xml --cov-report=term-missing"
     mkdir -p logs
 
-    log_info "🧪 Running unit tests in parallel (12 workers)..."
-    uv run pytest -n auto tests/unit/ -v --tb=short $COV_ARGS
+    WORKERS=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
+    log_info "🧪 Running unit tests in parallel ($WORKERS workers)..."
+    uv run pytest -n "$WORKERS" tests/unit/ -v --tb=short $COV_ARGS
 
     if [ -d "tests/integration" ]; then
         log_info "🧪 Running integration tests serially..."
