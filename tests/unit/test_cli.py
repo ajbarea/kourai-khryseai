@@ -1,4 +1,4 @@
-"""CLI host: send_and_stream, banner, constants, REPL helpers."""
+"""CLI host: send_and_stream, banner, extract helpers, REPL config."""
 
 from __future__ import annotations
 
@@ -7,13 +7,13 @@ from unittest.mock import MagicMock
 import httpx
 import pytest
 from a2a.types import (
-    JSONRPCErrorResponse,
+    Message,
+    Task,
     TaskState,
     TaskStatusUpdateEvent,
 )
 
 from hosts.cli.__main__ import (
-    AGENT_EMOJI,
     BANNER,
     _extract_artifact_text,
     _extract_status_text,
@@ -26,14 +26,10 @@ from hosts.cli.__main__ import (
 
 
 class TestCLIConstants:
-    """Banner, emoji map, and ANSI codes."""
+    """Banner and ANSI codes."""
 
     def test_banner_contains_project_name(self):
         assert "Kourai Khryseai" in BANNER
-
-    def test_emoji_map_has_all_agents(self):
-        expected = {"hephaestus", "metis", "techne", "dokimasia", "kallos", "mneme"}
-        assert set(AGENT_EMOJI.keys()) == expected
 
 
 # ---------------------------------------------------------------------------
@@ -67,7 +63,7 @@ class TestExtractStatusText:
 
     def test_skips_non_text_parts(self):
         p1 = MagicMock()
-        del p1.root.text  # Simulate a part without .root.text
+        del p1.root.text
         p2 = MagicMock()
         p2.root.text = "text part"
         event = MagicMock()
@@ -98,84 +94,88 @@ class TestExtractArtifactText:
 
 
 # ---------------------------------------------------------------------------
-# send_and_stream
+# send_and_stream — new ClientFactory API
 # ---------------------------------------------------------------------------
 
 
+def _make_task(state: TaskState = TaskState.working) -> MagicMock:
+    task = MagicMock(spec=Task)
+    task.id = "task-1"
+    task.context_id = "ctx-1"
+    task.status = MagicMock()
+    task.status.state = state
+    return task
+
+
 class TestSendAndStream:
-    """Core streaming function."""
+    """Core streaming function using new Client.send_message API."""
 
     @pytest.mark.asyncio
     async def test_handles_status_updates(self):
-        inner = MagicMock()
-        inner.task_id = "task-1"
-        inner.context_id = "ctx-1"
-        inner.status.state = TaskState.working
-        inner.status.message = None
-        # Make isinstance check work
-        inner.__class__ = TaskStatusUpdateEvent  # type: ignore[assignment]
+        task = _make_task()
+        status = MagicMock()
+        status.__class__ = TaskStatusUpdateEvent  # type: ignore[assignment]
+        status.status.state = TaskState.working
+        status.status.message = None
 
-        result_mock = MagicMock()
-        result_mock.root.result = inner
-
-        async def mock_stream(request):
-            yield result_mock
+        async def mock_send(message, **kwargs):
+            yield (task, status)
 
         client = MagicMock()
-        client.send_message_streaming = mock_stream
+        client.send_message = mock_send
 
         cont, ctx, tid = await send_and_stream(client, "hello", "ctx-1")
         assert cont is True
 
     @pytest.mark.asyncio
     async def test_handles_connect_error(self):
-        async def mock_stream(request):
+        async def mock_send(message, **kwargs):
             raise httpx.ConnectError("refused")
-            yield  # noqa: E501 — unreachable, needed for async generator
+            yield  # noqa: E501
 
         client = MagicMock()
-        client.send_message_streaming = mock_stream
+        client.send_message = mock_send
 
         cont, ctx, tid = await send_and_stream(client, "hello", "ctx-1")
         assert cont is True
 
     @pytest.mark.asyncio
     async def test_handles_timeout(self):
-        async def mock_stream(request):
+        async def mock_send(message, **kwargs):
             raise httpx.TimeoutException("timed out")
             yield  # noqa: E501
 
         client = MagicMock()
-        client.send_message_streaming = mock_stream
+        client.send_message = mock_send
 
         cont, ctx, tid = await send_and_stream(client, "hello", "ctx-1")
         assert cont is True
 
     @pytest.mark.asyncio
-    async def test_handles_jsonrpc_error(self):
-        error_response = MagicMock(spec=JSONRPCErrorResponse)
-        error_response.error = "something broke"
+    async def test_handles_message_response(self):
+        """Direct Message response (no task created)."""
+        part = MagicMock()
+        part.root.text = "direct reply"
+        msg = MagicMock(spec=Message)
+        msg.parts = [part]
 
-        result_mock = MagicMock()
-        result_mock.root = error_response
-
-        async def mock_stream(request):
-            yield result_mock
+        async def mock_send(message, **kwargs):
+            yield msg
 
         client = MagicMock()
-        client.send_message_streaming = mock_stream
+        client.send_message = mock_send
 
         cont, ctx, tid = await send_and_stream(client, "hello", "ctx-1")
         assert cont is True
 
     @pytest.mark.asyncio
     async def test_verbose_mode(self):
-        async def mock_stream(request):
+        async def mock_send(message, **kwargs):
             return
             yield  # noqa: E501
 
         client = MagicMock()
-        client.send_message_streaming = mock_stream
+        client.send_message = mock_send
 
         cont, ctx, tid = await send_and_stream(client, "hello", "ctx-1", verbose=True)
         assert cont is True
