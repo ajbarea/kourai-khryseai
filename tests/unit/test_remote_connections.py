@@ -5,7 +5,7 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from a2a.types import TaskState
+from a2a.types import Task, TaskArtifactUpdateEvent, TaskState, TaskStatus
 
 from agents.hephaestus.remote_connections import (
     AgentInputRequired,
@@ -39,19 +39,27 @@ class TestRemoteAgentConnectionConnect:
         mock_resolver = MagicMock()
         mock_resolver.get_agent_card = AsyncMock(return_value=mock_card)
 
+        mock_client = MagicMock()
+        mock_factory = MagicMock()
+        mock_factory.create = MagicMock(return_value=mock_client)
+
         with (
             patch("agents.hephaestus.remote_connections.create_span"),
             patch(
                 "agents.hephaestus.remote_connections.A2ACardResolver",
                 return_value=mock_resolver,
             ),
-            patch("agents.hephaestus.remote_connections.A2AClient") as mock_client_cls,
+            patch(
+                "agents.hephaestus.remote_connections.ClientFactory",
+                return_value=mock_factory,
+            ),
         ):
             conn = RemoteAgentConnection("metis", "http://localhost:10001/")
             await conn.connect()
 
         assert conn.card == mock_card
-        mock_client_cls.assert_called_once()
+        assert conn.client == mock_client
+        mock_factory.create.assert_called_once_with(mock_card)
 
     @pytest.mark.asyncio
     async def test_connect_no_card_leaves_client_none(self):
@@ -72,6 +80,32 @@ class TestRemoteAgentConnectionConnect:
         assert conn.client is None
 
 
+def _make_artifact_part(text: str) -> MagicMock:
+    """Create a mock Part with .root.text."""
+    part = MagicMock()
+    part.root.text = text
+    return part
+
+
+def _make_task_with_artifact(text: str, state: TaskState = TaskState.completed) -> MagicMock:
+    """Create a mock Task with artifacts containing text."""
+    task = MagicMock(spec=Task)
+    task.context_id = "ctx-1"
+    task.id = "task-1"
+    task.status = MagicMock(spec=TaskStatus)
+    task.status.state = state
+    artifact = MagicMock()
+    artifact.parts = [_make_artifact_part(text)]
+    task.artifacts = [artifact]
+    return task
+
+
+async def _async_iter(*items):
+    """Create an async iterator from items."""
+    for item in items:
+        yield item
+
+
 class TestRemoteAgentConnectionSend:
     """Message sending and response extraction."""
 
@@ -82,21 +116,13 @@ class TestRemoteAgentConnectionSend:
             await conn.send.__wrapped__(conn, "hello", "ctx-1")
 
     @pytest.mark.asyncio
-    async def test_send_extracts_artifact_text(self):
-        # Build mock response with artifacts
-        mock_part = MagicMock()
-        mock_part.root.text = "generated code"
-        mock_artifact = MagicMock()
-        mock_artifact.parts = [mock_part]
-        mock_result = MagicMock()
-        mock_result.artifacts = [mock_artifact]
-        mock_result.status = MagicMock()
-        mock_result.status.state = TaskState.completed
-        mock_response = MagicMock()
-        mock_response.root.result = mock_result
+    async def test_send_extracts_artifact_from_task_snapshot(self):
+        """Non-streaming: final Task snapshot with artifacts."""
+        task = _make_task_with_artifact("generated code")
 
-        mock_client = AsyncMock()
-        mock_client.send_message = AsyncMock(return_value=mock_response)
+        mock_client = MagicMock()
+        # send_message yields (Task, None) for non-streaming
+        mock_client.send_message = MagicMock(return_value=_async_iter((task, None)))
 
         with (
             patch("agents.hephaestus.remote_connections.create_span"),
@@ -109,20 +135,46 @@ class TestRemoteAgentConnectionSend:
         assert result == "generated code"
 
     @pytest.mark.asyncio
-    async def test_send_raises_input_required(self):
-        mock_part = MagicMock()
-        mock_part.root.text = "Which file?"
-        mock_status = MagicMock()
-        mock_status.state = TaskState.input_required
-        mock_status.message.parts = [mock_part]
-        mock_result = MagicMock()
-        mock_result.status = mock_status
-        mock_result.artifacts = None
-        mock_response = MagicMock()
-        mock_response.root.result = mock_result
+    async def test_send_extracts_artifact_from_event(self):
+        """Streaming: TaskArtifactUpdateEvent with artifact."""
+        task = MagicMock(spec=Task)
+        task.context_id = "ctx-1"
+        task.id = "task-1"
 
-        mock_client = AsyncMock()
-        mock_client.send_message = AsyncMock(return_value=mock_response)
+        artifact_event = MagicMock(spec=TaskArtifactUpdateEvent)
+        artifact_event.artifact = MagicMock()
+        artifact_event.artifact.parts = [_make_artifact_part("streamed code")]
+
+        mock_client = MagicMock()
+        mock_client.send_message = MagicMock(return_value=_async_iter((task, artifact_event)))
+
+        with (
+            patch("agents.hephaestus.remote_connections.create_span"),
+            patch("agents.hephaestus.remote_connections.get_trace_context", return_value={}),
+        ):
+            conn = RemoteAgentConnection("techne", "http://localhost:10002/")
+            conn.client = mock_client
+            result = await conn.send.__wrapped__(conn, "fix auth", "ctx-1")
+
+        assert result == "streamed code"
+
+    @pytest.mark.asyncio
+    async def test_send_raises_input_required(self):
+        """TaskStatusUpdateEvent with input_required state raises."""
+        from a2a.types import TaskStatusUpdateEvent
+
+        task = MagicMock(spec=Task)
+        task.context_id = "ctx-1"
+        task.id = "task-1"
+
+        status_event = MagicMock(spec=TaskStatusUpdateEvent)
+        status_event.status = MagicMock()
+        status_event.status.state = TaskState.input_required
+        question_part = _make_artifact_part("Which file?")
+        status_event.status.message.parts = [question_part]
+
+        mock_client = MagicMock()
+        mock_client.send_message = MagicMock(return_value=_async_iter((task, status_event)))
 
         with (
             patch("agents.hephaestus.remote_connections.create_span"),
@@ -144,34 +196,34 @@ class TestRemoteAgentConnectionClose:
     async def test_close_calls_aclose(self):
         conn = RemoteAgentConnection("mneme", "http://localhost:10005/")
         conn.http = AsyncMock()
+        conn.client = AsyncMock()
         await conn.close()
+        conn.client.close.assert_called_once()
         conn.http.aclose.assert_called_once()
 
 
-class TestExtractText:
-    """The _extract_text fallback paths."""
+class TestExtractHelpers:
+    """The _extract_*_text helper methods."""
 
-    def test_fallback_to_status_message(self):
-        # Response with no artifacts, but status message
-        mock_part = MagicMock()
-        mock_part.root.text = "status text"
-        mock_status = MagicMock()
-        mock_status.state = TaskState.completed
-        mock_status.message.parts = [mock_part]
-        mock_result = MagicMock()
-        mock_result.artifacts = None
-        mock_result.status = mock_status
-        mock_response = MagicMock()
-        mock_response.root.result = mock_result
+    def test_extract_message_text(self):
+        from a2a.types import Message
+
+        msg = MagicMock(spec=Message)
+        msg.parts = [_make_artifact_part("hello")]
 
         conn = RemoteAgentConnection("kallos", "http://localhost:10004/")
-        result = conn._extract_text(mock_response)
-        assert result == "status text"
+        assert conn._extract_message_text(msg) == "hello"
 
-    def test_fallback_to_str_on_attribute_error(self):
-        mock_response = MagicMock()
-        mock_response.root.result = None  # Will cause AttributeError
+    def test_extract_task_text_from_artifacts(self):
+        task = _make_task_with_artifact("artifact text")
+        conn = RemoteAgentConnection("kallos", "http://localhost:10004/")
+        assert conn._extract_task_text(task) == "artifact text"
+
+    def test_extract_task_text_falls_back_to_status(self):
+        task = MagicMock(spec=Task)
+        task.artifacts = None
+        task.status = MagicMock()
+        task.status.message.parts = [_make_artifact_part("status text")]
 
         conn = RemoteAgentConnection("kallos", "http://localhost:10004/")
-        result = conn._extract_text(mock_response)
-        assert isinstance(result, str)
+        assert conn._extract_task_text(task) == "status text"
