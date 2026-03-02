@@ -1,0 +1,7 @@
+global:
+  scrape_interval: 1s # Frequent scrapes for live-feeling graphs
+
+scrape_configs:
+  - job_name: 'jaeger-metrics'
+    static_configs:
+      - targets: ['jaeger:14269']

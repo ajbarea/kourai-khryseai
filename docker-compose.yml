@@ -25,13 +25,30 @@ x-agent-common: &agent-common
 services:
   # ──────────────── Infrastructure ────────────────
   jaeger:
-    image: jaegertracing/all-in-one:2.4
+    image: jaegertracing/all-in-one:1.60
     ports:
       - "16686:16686"   # Jaeger UI
       - "4317:4317"     # OTLP gRPC
       - "4318:4318"     # OTLP HTTP
+      - "14269:14269"   # Metrics port for Prometheus
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
+      # --- SPM Configuration (v1.x) ---
+      METRICS_STORAGE_TYPE: "prometheus"
+      PROMETHEUS_SERVER_URL: "http://prometheus:9090"
+      PROMETHEUS_QUERY_SUPPORT_SPAN_UNIT: "true"
+      # Enable span metrics generation
+      SPAN_STORAGE_TYPE: "memory"
+    networks:
+      - kourai
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    volumes:
+      - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"     # Prometheus UI (optional to visit)
     networks:
       - kourai
     restart: unless-stopped
