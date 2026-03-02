@@ -4,7 +4,9 @@ version = "0.1.0"
 description = "Multi-agent A2A development system — Golden Maidens of Hephaestus"
 requires-python = ">=3.12"
 readme = "IMPLEMENTATION_PLAN.md"
-dependencies = []
+dependencies = [
+    "psutil>=7.2.2",
+]
 
 [dependency-groups]
 dev = [
