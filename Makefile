@@ -71,6 +71,7 @@ clean:                     ## Clean build artifacts
 	@rm -f .coverage coverage.xml logs/coverage.xml 2>/dev/null || true
 	@rm -f uv.lock.backup* 2>/dev/null || true
 	@rm -rf .playwright-mcp/ 2>/dev/null || true
+	@rm -rf site/ 2>/dev/null || true
 
 help:                      ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
