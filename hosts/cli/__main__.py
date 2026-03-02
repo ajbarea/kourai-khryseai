@@ -14,8 +14,9 @@ import sys
 import time
 from uuid import uuid4
 
-# Windows consoles default to cp1252 — force UTF-8 so emoji and box-drawing work
-if sys.platform == "win32" and hasattr(sys.stdout, "buffer"):
+# Windows consoles default to cp1252 — force UTF-8 so emoji and box-drawing work.
+# Skip when imported under pytest — replacing streams breaks pytest's capture system.
+if sys.platform == "win32" and hasattr(sys.stdout, "buffer") and "pytest" not in sys.modules:
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
