@@ -32,8 +32,8 @@ body.hero-page .md-footer {
 }
 
 /* Lock the hero page to exactly one viewport — no scrolling */
-body.hero-page,
-body.hero-page html {
+html.hero-page,
+body.hero-page {
   overflow: hidden !important;
   height: 100% !important;
 }
@@ -56,13 +56,20 @@ body.hero-page .md-content__inner {
 .hero {
   position: relative;
   height: 100vh;
+  height: 100dvh;
   /* full viewport — navbar overlays on top */
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-end;
   text-align: center;
-  background: linear-gradient(to bottom, rgba(1, 2, 1, 0.4) 0%, rgba(1, 2, 1, 0.1) 40%, rgba(1, 2, 1, 0.8) 80%, var(--obsidian) 100%), url('../assets/golden-maidens.png') center top / contain no-repeat;
+  background:
+    linear-gradient(to bottom,
+      rgba(1, 2, 1, 0.4) 0%,
+      rgba(1, 2, 1, 0.1) 40%,
+      rgba(1, 2, 1, 0.8) 80%,
+      var(--obsidian) 100%),
+    url('../assets/golden-maidens.png') center 48px / contain no-repeat;
   color: var(--gold-light);
   margin: -1.2rem -0.8rem 0;
   /* bleed into the content padding */
@@ -305,7 +312,6 @@ body.hero-page .md-header {
 
 @media (max-width: 768px) {
   .hero {
-    /* Switch to cover so maidens fill the frame; offset down to clear navbar */
     background:
       linear-gradient(to bottom,
         rgba(1, 2, 1, 0.5) 0%,
@@ -315,6 +321,9 @@ body.hero-page .md-header {
         var(--obsidian) 95%),
       url('../assets/golden-maidens.png') center 48px / contain no-repeat;
     padding: 1rem 1.2rem 2rem;
+    /* Ensure dvh is used on real mobile browsers */
+    height: 100vh;
+    height: 100dvh;
   }
 
   .md-typeset .hero h1,
@@ -355,4 +364,122 @@ body.hero-page .md-header {
     padding: 0.5rem 1rem !important;
     font-size: 0.7rem !important;
   }
+}
+
+/* ==========================================================================
+   Mermaid Diagram Theming — Gold on Slate
+   ========================================================================== */
+
+/* Node styling */
+.mermaid .node rect,
+.mermaid .node circle,
+.mermaid .node polygon {
+  fill: rgba(201, 148, 74, 0.15) !important;
+  stroke: var(--gold-mid) !important;
+  stroke-width: 2px !important;
+}
+
+.mermaid .node .label,
+.mermaid .nodeLabel {
+  color: var(--gold-light) !important;
+  fill: var(--gold-light) !important;
+}
+
+/* Edge lines and arrows */
+.mermaid .edgePath .path,
+.mermaid .flowchart-link {
+  stroke: var(--gold-dark) !important;
+  stroke-width: 2px !important;
+}
+
+.mermaid .arrowheadPath,
+.mermaid marker path {
+  fill: var(--gold-dark) !important;
+  stroke: var(--gold-dark) !important;
+}
+
+/* Edge labels */
+.mermaid .edgeLabel {
+  background-color: var(--obsidian) !important;
+  color: var(--gold-light) !important;
+}
+
+.mermaid .edgeLabel rect {
+  fill: var(--obsidian) !important;
+  opacity: 0.9 !important;
+}
+
+.mermaid .edgeLabel span {
+  color: var(--gold-light) !important;
+  fill: var(--gold-light) !important;
+}
+
+/* Diamond / decision nodes */
+.mermaid .node .label-container {
+  fill: rgba(201, 148, 74, 0.15) !important;
+  stroke: var(--gold-mid) !important;
+}
+
+/* Sequence diagram */
+.mermaid .actor {
+  fill: rgba(201, 148, 74, 0.15) !important;
+  stroke: var(--gold-mid) !important;
+}
+
+.mermaid .actor-line {
+  stroke: var(--gold-dark) !important;
+}
+
+.mermaid text.actor,
+.mermaid .actor text {
+  fill: var(--gold-light) !important;
+}
+
+.mermaid .messageLine0,
+.mermaid .messageLine1 {
+  stroke: var(--gold-dark) !important;
+}
+
+.mermaid .messageText {
+  fill: var(--gold-light) !important;
+}
+
+.mermaid .loopText,
+.mermaid .loopText>tspan {
+  fill: var(--gold-light) !important;
+}
+
+.mermaid .loopLine {
+  stroke: var(--gold-mid) !important;
+}
+
+.mermaid .labelBox {
+  fill: var(--obsidian) !important;
+  stroke: var(--gold-mid) !important;
+}
+
+.mermaid .labelText,
+.mermaid .labelText>tspan {
+  fill: var(--gold-light) !important;
+}
+
+.mermaid .noteText {
+  fill: var(--gold-light) !important;
+}
+
+.mermaid .note {
+  fill: rgba(201, 148, 74, 0.1) !important;
+  stroke: var(--gold-mid) !important;
+}
+
+/* Cluster / subgraph backgrounds */
+.mermaid .cluster rect {
+  fill: rgba(201, 148, 74, 0.05) !important;
+  stroke: var(--gold-dark) !important;
+}
+
+/* Responsive Mermaid containers */
+.mermaid {
+  max-width: 100%;
+  overflow-x: auto;
 }

@@ -3,7 +3,8 @@
   const hero = document.querySelector('.hero');
   if (!hero) return;
 
-  // Mark body for homepage-specific CSS (hide footer, etc.)
+  // Mark body + html for homepage-specific CSS (hide footer, lock scroll)
+  document.documentElement.classList.add('hero-page');
   document.body.classList.add('hero-page');
 
   const canvas = document.createElement('canvas');
@@ -28,18 +29,21 @@
   }
 
   function createParticle() {
+    // Scale lifetime to canvas height so particles can traverse the full viewport
+    const avgSpeed = 0.35; // midpoint of speedY range (0.1–0.6)
+    const baseLife = Math.ceil(canvas.height / avgSpeed);
     return {
       x: Math.random() * canvas.width,
       y: Math.random() * canvas.height,
       size: Math.random() * 3 + 0.5,
       speedX: (Math.random() - 0.5) * 0.3,
-      speedY: -Math.random() * 0.4 - 0.1,
+      speedY: -Math.random() * 0.5 - 0.1,
       color: GOLD_COLORS[Math.floor(Math.random() * GOLD_COLORS.length)],
       opacity: Math.random() * 0.8 + 0.2,
       flickerSpeed: Math.random() * 0.02 + 0.005,
       flickerPhase: Math.random() * Math.PI * 2,
       life: 0,
-      maxLife: Math.random() * 400 + 200,
+      maxLife: Math.random() * baseLife + baseLife * 0.5,
     };
   }
 
