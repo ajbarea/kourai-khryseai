@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import traceback
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
@@ -41,34 +42,35 @@ class HephaestusAgentExecutor(AgentExecutor):
         context: RequestContext,
         event_queue: EventQueue,
     ) -> None:
-        with create_span("hephaestus.execute", {"a2a.method": "execute"}):
-            user_input = context.get_user_input()
-            task = context.current_task
+        log.info("Hephaestus execute triggered")
+        try:
+            with create_span("hephaestus.execute", {"a2a.method": "execute"}):
+                user_input = context.get_user_input()
+                task = context.current_task
 
-            if not task and context.message:
-                task = new_task(context.message)
-                await event_queue.enqueue_event(task)
+                if not task and context.message:
+                    task = new_task(context.message)
+                    await event_queue.enqueue_event(task)
 
-            if not task:
-                log.error("No task or message in request context")
-                raise ServerError(error=InternalError())
+                if not task:
+                    log.error("No task or message in request context")
+                    raise ServerError(error=InternalError())
 
-            updater = TaskUpdater(event_queue, task.id, task.context_id)
+                updater = TaskUpdater(event_queue, task.id, task.context_id)
 
-            if not user_input or not user_input.strip():
-                await updater.update_status(
-                    TaskState.input_required,
-                    new_agent_text_message(
-                        "What would you like me to help with? "
-                        "I can route your request to the right specialist agents.",
-                        task.context_id,
-                        task.id,
-                    ),
-                    final=True,
-                )
-                return
+                if not user_input or not user_input.strip():
+                    await updater.update_status(
+                        TaskState.input_required,
+                        new_agent_text_message(
+                            "What would you like me to help with? "
+                            "I can route your request to the right specialist agents.",
+                            task.context_id,
+                            task.id,
+                        ),
+                        final=True,
+                    )
+                    return
 
-            try:
                 # Step 1: Determine the pipeline
                 await updater.update_status(
                     TaskState.working,
@@ -146,9 +148,11 @@ class HephaestusAgentExecutor(AgentExecutor):
                 await updater.complete()
                 log.info("Hephaestus pipeline completed: %s", pipeline_display)
 
-            except Exception as e:
-                log.error("Hephaestus execution failed: %s", e)
-                raise ServerError(error=InternalError()) from e
+        except Exception as e:
+            log.error("Hephaestus execution failed: %s", e)
+            log.error(traceback.format_exc())
+            # Don't let the server crash, return a proper JSON-RPC error
+            raise ServerError(error=InternalError()) from e
 
     async def cancel(
         self,
