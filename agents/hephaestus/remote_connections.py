@@ -3,20 +3,17 @@
 from __future__ import annotations
 
 import logging
-import uuid
 
 import httpx
-from a2a.client import A2ACardResolver, A2AClient
+from a2a.client import A2ACardResolver, ClientConfig, ClientFactory
+from a2a.client.client import Client
 from a2a.types import (
     AgentCard,
     Message,
-    MessageSendConfiguration,
-    MessageSendParams,
-    Part,
-    Role,
-    SendMessageRequest,
+    Task,
+    TaskArtifactUpdateEvent,
     TaskState,
-    TextPart,
+    TaskStatusUpdateEvent,
 )
 
 from kourai_common.retry import with_retry
@@ -43,16 +40,21 @@ class RemoteAgentConnection:
         self.http = httpx.AsyncClient(
             timeout=httpx.Timeout(connect=5.0, read=120.0, write=10.0, pool=5.0),
         )
-        self.client: A2AClient | None = None
+        self.client: Client | None = None
         self.card: AgentCard | None = None
 
     async def connect(self) -> None:
         """Fetch agent card and initialize A2A client."""
         with create_span(f"a2a.connect.{self.agent_name}", {"url": self.agent_url}):
-            resolver = A2ACardResolver(base_url=self.agent_url, httpx_client=self.http)
+            resolver = A2ACardResolver(self.http, self.agent_url)
             self.card = await resolver.get_agent_card()
             if self.card:
-                self.client = A2AClient(httpx_client=self.http, agent_card=self.card)
+                config = ClientConfig(
+                    streaming=False,
+                    httpx_client=self.http,
+                )
+                factory = ClientFactory(config)
+                self.client = factory.create(self.card)
                 log.info("Connected to %s at %s", self.card.name, self.agent_url)
 
     @with_retry(max_attempts=3, base_delay=1.0)
@@ -73,65 +75,73 @@ class RemoteAgentConnection:
             f"a2a.send.{self.agent_name}",
             {"target_agent": self.agent_name, "context_id": context_id},
         ):
-            message_id = str(uuid.uuid4())
-            request = SendMessageRequest(
-                id=message_id,
-                params=MessageSendParams(
-                    message=Message(
-                        role=Role.user,
-                        parts=[Part(root=TextPart(text=text))],
-                        message_id=message_id,
-                        context_id=context_id,
-                        metadata=get_trace_context(),
-                    ),
-                    configuration=MessageSendConfiguration(blocking=True),
-                ),
-            )
+            from a2a.client.helpers import create_text_message_object
+
+            message = create_text_message_object(content=text)
+            message.context_id = context_id
+            message.metadata = get_trace_context()
+
             log.info("Sending to %s: %d chars", self.agent_name, len(text))
-            response = await self.client.send_message(request)
-            result = self._extract_text(response)
-            log.info("Received from %s: %d chars", self.agent_name, len(result))
-            return result
 
-    def _extract_text(self, response) -> str:
-        """Pull text content from an A2A response.
+            async for event in self.client.send_message(message):
+                if isinstance(event, Message):
+                    result = self._extract_message_text(event)
+                    log.info("Received from %s: %d chars", self.agent_name, len(result))
+                    return result
 
-        Raises:
-            AgentInputRequired: When the agent needs user clarification.
-        """
-        try:
-            result = response.root.result
-            # Detect input_required status
-            if hasattr(result, "status") and result.status:
-                state = result.status.state
-                if state == TaskState.input_required:
-                    question = ""
-                    if result.status.message and hasattr(result.status.message, "parts"):
-                        question = "\n".join(
-                            p.root.text
-                            for p in result.status.message.parts
-                            if hasattr(p.root, "text")
+                # ClientEvent: tuple[Task, update | None]
+                task, update = event
+                if isinstance(update, TaskStatusUpdateEvent):
+                    if update.status.state == TaskState.input_required:
+                        question = self._extract_status_message(update)
+                        raise AgentInputRequired(
+                            self.agent_name, question or "Additional input needed"
                         )
-                    raise AgentInputRequired(self.agent_name, question or "Additional input needed")
+                elif isinstance(update, TaskArtifactUpdateEvent):
+                    if update.artifact and update.artifact.parts:
+                        result = "\n".join(
+                            p.root.text for p in update.artifact.parts if hasattr(p.root, "text")
+                        )
+                        log.info("Received from %s: %d chars", self.agent_name, len(result))
+                        return result
+                elif update is None:
+                    # Final task snapshot — extract artifacts
+                    result = self._extract_task_text(task)
+                    if result:
+                        log.info("Received from %s: %d chars", self.agent_name, len(result))
+                        return result
 
-            if hasattr(result, "artifacts") and result.artifacts:
-                return "\n".join(
-                    part.root.text
-                    for artifact in result.artifacts
-                    for part in artifact.parts
-                    if hasattr(part.root, "text")
-                )
-            if hasattr(result, "status") and result.status.message:
-                msg = result.status.message
-                if hasattr(msg, "parts"):
-                    return "\n".join(p.root.text for p in msg.parts if hasattr(p.root, "text"))
-                return str(msg)
-        except AgentInputRequired:
-            raise
-        except AttributeError:
-            pass
-        return str(response)
+            return ""
+
+    def _extract_message_text(self, message: Message) -> str:
+        """Pull text from a direct Message response."""
+        return "\n".join(p.root.text for p in message.parts if hasattr(p.root, "text"))
+
+    def _extract_status_message(self, event: TaskStatusUpdateEvent) -> str:
+        """Pull text from a status update's message."""
+        if event.status.message and hasattr(event.status.message, "parts"):
+            return "\n".join(
+                p.root.text for p in event.status.message.parts if hasattr(p.root, "text")
+            )
+        return ""
+
+    def _extract_task_text(self, task: Task) -> str:
+        """Pull text from a completed task's artifacts or status."""
+        if task.artifacts:
+            return "\n".join(
+                p.root.text
+                for artifact in task.artifacts
+                for p in artifact.parts
+                if hasattr(p.root, "text")
+            )
+        if task.status.message and hasattr(task.status.message, "parts"):
+            return "\n".join(
+                p.root.text for p in task.status.message.parts if hasattr(p.root, "text")
+            )
+        return ""
 
     async def close(self) -> None:
         """Close the HTTP client."""
+        if self.client and hasattr(self.client, "close"):
+            await self.client.close()  # type: ignore[attr-defined]
         await self.http.aclose()
