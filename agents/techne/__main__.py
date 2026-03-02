@@ -15,7 +15,7 @@ from a2a.server.tasks import InMemoryTaskStore
 from a2a.types import AgentCapabilities, AgentCard, AgentSkill
 
 from agents.techne.agent_executor import TechneAgentExecutor
-from kourai_common.config import AGENT_PORTS, OTEL_ENDPOINT
+from kourai_common.config import AGENT_PORTS, OTEL_ENDPOINT, get_agent_url
 from kourai_common.tracing import setup_tracing
 
 logging.basicConfig(
@@ -52,7 +52,7 @@ def build_agent_card() -> AgentCard:
             "following AJ's exact standards, and outputs structured diffs. "
             "Supports Python, TypeScript, and React."
         ),
-        url=f"http://{HOST}:{PORT}/",
+        url=get_agent_url(AGENT_NAME),
         version="0.1.0",
         default_input_modes=["text"],
         default_output_modes=["text"],
