@@ -65,7 +65,7 @@ def build_agent_card() -> AgentCard:
         ),
         url=get_agent_url(AGENT_NAME),
         version="0.1.0",
-        default_input_modes=["text"],
+        default_input_modes=["text", "image"],
         default_output_modes=["text"],
         capabilities=AgentCapabilities(streaming=True),
         skills=[write_skill, run_skill],
