@@ -23,6 +23,21 @@ from kourai_common.tracing import create_span
 
 log = logging.getLogger(__name__)
 
+
+def _extract_attachments(context: RequestContext) -> list[tuple[str, str]]:
+    """Pull (base64_bytes, mime_type) from any FilePart objects in the incoming message."""
+    from a2a.types import FileWithBytes
+
+    attachments: list[tuple[str, str]] = []
+    if not context.message:
+        return attachments
+    for part in context.message.parts:
+        root = part.root
+        if hasattr(root, "file") and isinstance(root.file, FileWithBytes):
+            attachments.append((root.file.bytes, root.file.mime_type or "image/png"))
+    return attachments
+
+
 # Emoji map for status messages
 AGENT_EMOJI = {
     "hephaestus": "\U0001f525",  # fire
@@ -105,10 +120,11 @@ class HephaestusAgentExecutor(AgentExecutor):
                 )
 
                 # Step 3: Execute pipeline with real-time status updates
-                final_output = ""
+                image_attachments = _extract_attachments(context)
+                last_agent_output = ""
                 input_required = False
-                async for agent_name, status in execute_pipeline(
-                    pipeline, user_input, task.context_id
+                async for agent_name, status, agent_output in execute_pipeline(
+                    pipeline, user_input, task.context_id, image_attachments or None
                 ):
                     # Detect INPUT_REQUIRED from specialist agents
                     if status.startswith("INPUT_REQUIRED:"):
@@ -135,14 +151,16 @@ class HephaestusAgentExecutor(AgentExecutor):
                             task.id,
                         ),
                     )
-                    final_output = status
+                    # Track the last real agent output for the final artifact
+                    if agent_output:
+                        last_agent_output = agent_output
 
                 if input_required:
                     return
 
-                # Step 4: Emit final artifact with accumulated results
+                # Step 4: Emit final artifact with the last agent's actual output
                 await updater.add_artifact(
-                    [Part(root=TextPart(text=final_output))],
+                    [Part(root=TextPart(text=last_agent_output or "Pipeline complete"))],
                     name="pipeline_result",
                 )
                 await updater.complete()
