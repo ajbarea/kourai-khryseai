@@ -16,6 +16,7 @@ from agents.hephaestus.remote_connections import AgentInputRequired, RemoteAgent
 from kourai_common.config import MAX_ITERATIONS, get_agent_url
 from kourai_common.llm import chat
 from kourai_common.tracing import create_span
+from scripts.git_changes import collect_git_changes
 
 log = logging.getLogger(__name__)
 
@@ -114,12 +115,13 @@ async def execute_pipeline(
     agents: list[str],
     user_request: str,
     context_id: str | None = None,
-) -> AsyncIterable[tuple[str, str]]:
+    initial_attachments: list[tuple[str, str]] | None = None,
+) -> AsyncIterable[tuple[str, str, str]]:
     """Execute a pipeline of specialist agents sequentially.
 
     Each agent receives the user request plus the accumulated output
-    from previous agents. Yields (agent_name, status_message) tuples
-    for real-time progress updates.
+    from previous agents. Yields (agent_name, status_message, agent_output)
+    tuples for real-time progress updates.
 
     When both kallos and techne are in the pipeline and kallos finds
     lint issues, the pipeline loops techne→kallos up to MAX_ITERATIONS
@@ -129,9 +131,13 @@ async def execute_pipeline(
         agents: Ordered list of agent names to call.
         user_request: Original user request.
         context_id: Shared context ID for the conversation.
+        initial_attachments: Image attachments (base64, mime_type) forwarded
+            to the first agent in the pipeline.
 
     Yields:
-        Tuples of (agent_name, status_message) for progress tracking.
+        Tuples of (agent_name, status_message, agent_output) for progress
+        tracking. agent_output is empty for status-only yields and contains
+        the real response text when an agent completes.
     """
     if not context_id:
         context_id = str(uuid.uuid4())
@@ -151,15 +157,15 @@ async def execute_pipeline(
                 await conn.connect()
                 connections[agent_name] = conn
                 if conn.card:
-                    yield (agent_name, f"Connected to {conn.card.name}")
+                    yield (agent_name, f"Connected to {conn.card.name}", "")
             except Exception as e:
                 skipped.add(agent_name)
-                yield (agent_name, f"Skipped (unreachable): {e}")
+                yield (agent_name, f"Skipped (unreachable): {e}", "")
                 log.warning("Skipping %s — unreachable: %s", agent_name, e)
 
         active_agents = [a for a in agents if a not in skipped]
         if not active_agents:
-            yield ("hephaestus", "No agents reachable — aborting pipeline")
+            yield ("hephaestus", "No agents reachable — aborting pipeline", "")
             return
 
         # Execute pipeline
@@ -173,25 +179,36 @@ async def execute_pipeline(
                 return
 
             card_name = conn.card.name
-            yield (agent_name, f"[{step_num}/{total}] Sending task to {card_name}...")
+            yield (agent_name, f"[{step_num}/{total}] Sending task to {card_name}...", "")
 
             with create_span(
                 f"hephaestus.pipeline.step.{agent_name}",
                 {"step": str(step_num), "total": str(total)},
             ):
                 try:
-                    result = await conn.send(accumulated_context, context_id)
+                    # Auto-collect git diffs for Mneme so she sees real changes
+                    send_context = accumulated_context
+                    if agent_name == "mneme":
+                        try:
+                            git_context = collect_git_changes()
+                            if git_context and "working tree clean" not in git_context:
+                                send_context = f"{accumulated_context}\n\n{git_context}"
+                                log.info("Enriched Mneme input with %d chars of git diffs", len(git_context))
+                        except Exception as e:
+                            log.warning("Failed to collect git changes for Mneme: %s", e)
+
+                    result = await conn.send(send_context, context_id)
                     accumulated_context += f"\n\n--- Output from {agent_name} ---\n{result}"
-                    yield (agent_name, f"[{step_num}/{total}] {card_name} completed")
+                    yield (agent_name, f"[{step_num}/{total}] {card_name} completed", result)
 
                 except AgentInputRequired as e:
                     # Propagate clarification request back to the user
-                    yield (agent_name, f"INPUT_REQUIRED:{e.question}")
+                    yield (agent_name, f"INPUT_REQUIRED:{e.question}", "")
                     log.info("%s needs user input: %s", agent_name, e.question)
                     return
 
                 except Exception as e:
-                    yield (agent_name, f"[{step_num}/{total}] {conn.card.name} failed: {e}")
+                    yield (agent_name, f"[{step_num}/{total}] {conn.card.name} failed: {e}", "")
                     log.error("Pipeline step %s failed: %s", agent_name, e)
                     return
 
@@ -212,6 +229,7 @@ async def execute_pipeline(
                     yield (
                         "hephaestus",
                         f"Lint issues found — auto-fix iteration {iteration}/{MAX_ITERATIONS}",
+                        "",
                     )
 
                     # Send lint errors back to Techne for fixing
@@ -225,28 +243,28 @@ async def execute_pipeline(
                     ):
                         try:
                             techne_conn = connections["techne"]
-                            yield ("techne", f"[fix {iteration}] Applying style fixes...")
+                            yield ("techne", f"[fix {iteration}] Applying style fixes...", "")
                             fix_result = await techne_conn.send(fix_prompt, context_id)
                             accumulated_context += (
                                 f"\n\n--- Techne fix iteration {iteration} ---\n{fix_result}"
                             )
-                            yield ("techne", f"[fix {iteration}] Fixes applied")
+                            yield ("techne", f"[fix {iteration}] Fixes applied", "")
 
                             # Re-run Kallos to verify
                             kallos_conn = connections["kallos"]
-                            yield ("kallos", f"[fix {iteration}] Re-checking style...")
+                            yield ("kallos", f"[fix {iteration}] Re-checking style...", "")
                             result = await kallos_conn.send(accumulated_context, context_id)
                             accumulated_context += (
                                 f"\n\n--- Kallos recheck {iteration} ---\n{result}"
                             )
 
                             if _kallos_found_issues(result):
-                                yield ("kallos", f"[fix {iteration}] Issues remain")
+                                yield ("kallos", f"[fix {iteration}] Issues remain", "")
                             else:
-                                yield ("kallos", f"[fix {iteration}] All clean")
+                                yield ("kallos", f"[fix {iteration}] All clean", "")
 
                         except Exception as e:
-                            yield ("hephaestus", f"Fix loop failed: {e}")
+                            yield ("hephaestus", f"Fix loop failed: {e}", "")
                             log.error("Fix loop iteration %d failed: %s", iteration, e)
                             break
 
@@ -255,10 +273,10 @@ async def execute_pipeline(
                         f"Max fix iterations ({MAX_ITERATIONS}) reached — "
                         "proceeding with remaining issues"
                     )
-                    yield ("hephaestus", msg)
+                    yield ("hephaestus", msg, "")
 
         # Final result is the last agent's output
-        yield ("hephaestus", "Pipeline complete")
+        yield ("hephaestus", "Pipeline complete", "")
 
     finally:
         for conn in connections.values():
@@ -291,11 +309,14 @@ async def run_pipeline(
 
         # Execute the pipeline
         last_output = ""
-        async for agent_name, status in execute_pipeline(pipeline, user_request, context_id):
+        async for agent_name, status, agent_output in execute_pipeline(
+            pipeline, user_request, context_id
+        ):
             step = PipelineStep(agent_name=agent_name, status="completed")
             step.output_text = status
             result.steps.append(step)
-            last_output = status
+            if agent_output:
+                last_output = agent_output
 
         result.final_output = last_output
         result.success = True
