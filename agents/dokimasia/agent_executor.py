@@ -27,6 +27,23 @@ from kourai_common.tracing import create_span
 log = logging.getLogger(__name__)
 
 
+def _extract_image_parts(context: RequestContext) -> list[dict]:
+    """Build LiteLLM image_url blocks from any FilePart in the incoming message."""
+    from a2a.types import FileWithBytes
+
+    image_parts: list[dict] = []
+    if not context.message:
+        return image_parts
+    for part in context.message.parts:
+        root = part.root
+        if hasattr(root, "file") and isinstance(root.file, FileWithBytes):
+            mime = root.file.mime_type or "image/png"
+            image_parts.append(
+                {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{root.file.bytes}"}}
+            )
+    return image_parts
+
+
 class DokimasiaAgentExecutor(AgentExecutor):
     """A2A executor for the Dokimasia tester agent."""
 
@@ -107,6 +124,7 @@ class DokimasiaAgentExecutor(AgentExecutor):
                         tests = await generate_tests(
                             source_code=user_input,
                             module_name="provided_code",
+                            image_parts=_extract_image_parts(context) or None,
                         )
 
                     await updater.update_status(
