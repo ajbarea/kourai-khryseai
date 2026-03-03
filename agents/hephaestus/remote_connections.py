@@ -3,17 +3,23 @@
 from __future__ import annotations
 
 import logging
+from uuid import uuid4
 
 import httpx
 from a2a.client import A2ACardResolver, ClientConfig, ClientFactory
 from a2a.client.client import Client
 from a2a.types import (
     AgentCard,
+    FilePart,
+    FileWithBytes,
     Message,
+    Part,
+    Role,
     Task,
     TaskArtifactUpdateEvent,
     TaskState,
     TaskStatusUpdateEvent,
+    TextPart,
 )
 
 from kourai_common.retry import with_retry
@@ -58,12 +64,18 @@ class RemoteAgentConnection:
                 log.info("Connected to %s at %s", self.card.name, self.agent_url)
 
     @with_retry(max_attempts=3, base_delay=1.0)
-    async def send(self, text: str, context_id: str) -> str:
+    async def send(
+        self,
+        text: str,
+        context_id: str,
+        attachments: list[tuple[str, str]] | None = None,
+    ) -> str:
         """Send a message to the specialist and return the artifact text.
 
         Args:
             text: The message/task content to send.
             context_id: Conversation context ID for multi-turn.
+            attachments: Optional list of (base64_bytes, mime_type) image attachments.
 
         Returns:
             Extracted text from the agent's response artifacts.
@@ -75,9 +87,28 @@ class RemoteAgentConnection:
             f"a2a.send.{self.agent_name}",
             {"target_agent": self.agent_name, "context_id": context_id},
         ):
-            from a2a.client.helpers import create_text_message_object
+            # Build multi-part message when images are present; plain text otherwise.
+            if attachments:
+                parts: list[Part] = [Part(TextPart(text=text))]
+                for b64_data, mime_type in attachments:
+                    parts.append(
+                        Part(
+                            FilePart(
+                                file=FileWithBytes(
+                                    bytes=b64_data, mime_type=mime_type, name="attachment.png"
+                                )
+                            )
+                        )
+                    )
+                message = Message(
+                    role=Role.user,
+                    parts=parts,
+                    message_id=str(uuid4()),
+                )
+            else:
+                from a2a.client.helpers import create_text_message_object
 
-            message = create_text_message_object(content=text)
+                message = create_text_message_object(content=text)
             message.context_id = context_id
             message.metadata = get_trace_context()
 
