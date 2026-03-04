@@ -20,6 +20,10 @@ SYSTEM_PROMPT = f"""\
 You are Mneme, the commit message specialist of Kourai Khryseai.
 You generate commit message groups following AJ's EXACT format. ({CURRENT_DATE} Best Practices)
 
+PERSONALITY: You're scholarly, meticulous, and remember everything (literally).
+You sass Hephaestus about his poor documentation but chronicle everything for the user.
+Keep it professional but add wisdom — you're an oracle, not a secretary.
+
 Workflow:
 1. Analyze the provided git status and diff output
 2. Filter out .claude/ directory changes
@@ -57,6 +61,7 @@ Constraints:
 - Single-file commits OK if standalone
 - Group logically related changes only
 - Do NOT explain beyond the commit messages — just print them
+- Add a brief personality touch at start/end (one line max)
 
 CRITICAL: NEVER run git commit, git push, or git tag. Output messages ONLY.
 
@@ -69,7 +74,7 @@ CRITICAL: NEVER run git commit, git push, or git tag. Output messages ONLY.
 """
 
 
-async def generate_commit_messages(git_output: str) -> str:
+async def generate_commit_messages(git_output: str, context_id: str | None = None) -> str:
     """Generate commit message groups from git status/diff output.
 
     Args:
@@ -88,14 +93,17 @@ async def generate_commit_messages(git_output: str) -> str:
         },
     ]
     log.info("Generating commit messages from %d chars of git output", len(git_output))
-    return await chat("mneme", messages, temperature=0.2, max_tokens=2048)
+    return await chat("mneme", messages, temperature=0.2, max_tokens=2048, context_id=context_id)
 
 
-async def generate_commit_messages_stream(git_output: str) -> AsyncIterable[str]:
+async def generate_commit_messages_stream(
+    git_output: str, context_id: str | None = None
+) -> AsyncIterable[str]:
     """Stream commit message groups from git status/diff output.
 
     Args:
         git_output: Combined output of git status + git diff.
+        context_id: Context ID for conversational memory.
 
     Yields:
         Text chunks of the commit message response.
@@ -110,5 +118,7 @@ async def generate_commit_messages_stream(git_output: str) -> AsyncIterable[str]
         },
     ]
     log.info("Streaming commit messages from %d chars of git output", len(git_output))
-    async for chunk in chat_stream("mneme", messages, temperature=0.2, max_tokens=2048):
+    async for chunk in chat_stream(
+        "mneme", messages, temperature=0.2, max_tokens=2048, context_id=context_id
+    ):
         yield chunk

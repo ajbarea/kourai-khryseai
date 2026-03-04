@@ -120,6 +120,7 @@ class TechneAgentExecutor(AgentExecutor):
                         file_contents=file_contents,
                         git_context=git_context,
                         image_parts=_extract_image_parts(context) or None,
+                        context_id=task.context_id,
                     )
 
                 await updater.update_status(

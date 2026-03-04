@@ -4,12 +4,25 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from functools import wraps
 from typing import Any
 
 import httpx
 
 log = logging.getLogger(__name__)
+
+
+def _extract_retry_delay(exc: Exception) -> float | None:
+    """Attempt to extract a specific retry delay from an exception message."""
+    msg = str(exc)
+    match = re.search(r"Please retry in ([\d\.]+)s", msg)
+    if match:
+        try:
+            return float(match.group(1))
+        except ValueError:
+            pass
+    return None
 
 
 def with_retry(
@@ -22,8 +35,11 @@ def with_retry(
 ) -> Any:
     """Decorator for retrying async calls on transient failures.
 
+    Rate limits (429 / RateLimitError) get extra retries (up to 3x max_attempts)
+    using the API's requested delay when present.
+
     Args:
-        max_attempts: Maximum number of attempts before giving up.
+        max_attempts: Maximum number of attempts for normal transient errors.
         base_delay: Base delay in seconds (doubles each attempt).
         retryable_exceptions: Exception types that trigger a retry.
     """
@@ -32,18 +48,44 @@ def with_retry(
         @wraps(fn)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
             last_exc: Exception | None = None
-            for attempt in range(max_attempts):
+            attempt = 0
+
+            max_rate_limit_attempts = max_attempts * 3
+
+            while True:
                 try:
                     return await fn(*args, **kwargs)
                 except retryable_exceptions as e:
                     last_exc = e
-                    delay = base_delay * (2**attempt)
-                    log.warning(
-                        f"{fn.__name__} failed (attempt {attempt + 1}/{max_attempts}), "
-                        f"retrying in {delay:.1f}s: {e}"
-                    )
+                    exc_name = type(e).__name__
+
+                    # Detect if it is a capacity/quota rate limit error
+                    is_rate_limit = "RateLimit" in exc_name or "429" in str(e)
+
+                    attempt += 1
+                    if is_rate_limit:
+                        if attempt >= max_rate_limit_attempts:
+                            raise last_exc from e
+                    elif attempt >= max_attempts:
+                        raise last_exc from e
+
+                    requested_delay = _extract_retry_delay(e)
+                    if requested_delay is not None:
+                        delay = requested_delay + 0.5  # Add a small 500ms buffer
+                        log.warning(
+                            f"{fn.__name__} hit rate limit, API requested wait of {delay:.1f}s. "
+                            "Pausing until quota refreshes..."
+                        )
+                    else:
+                        # Cap exponential backoff at a reasonable max (e.g. ~64s) for rate limits
+                        exp_attempt = min(attempt, 6) if is_rate_limit else attempt
+                        delay = base_delay * (2**exp_attempt)
+                        log.warning(
+                            f"{fn.__name__} failed (attempt {attempt + 1}), "
+                            f"retrying in {delay:.1f}s: {exc_name}"
+                        )
+
                     await asyncio.sleep(delay)
-            raise last_exc  # type: ignore[misc]
 
         return wrapper
 

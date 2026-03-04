@@ -72,7 +72,7 @@ class PipelineResult:
     error: str = ""
 
 
-async def determine_pipeline(user_request: str) -> list[str] | str:
+async def determine_pipeline(user_request: str, context_id: str | None = None) -> list[str] | str:
     """Use LLM to decide which agents to call and in what order.
 
     Args:
@@ -87,7 +87,9 @@ async def determine_pipeline(user_request: str) -> list[str] | str:
             {"role": "system", "content": ROUTING_PROMPT},
             {"role": "user", "content": user_request},
         ]
-        response = await chat("hephaestus", messages, temperature=0.1, max_tokens=200)
+        response = await chat(
+            "hephaestus", messages, temperature=0.1, max_tokens=200, context_id=context_id
+        )
         response = response.strip()
 
         if response.startswith("ASK_USER:"):
@@ -193,7 +195,10 @@ async def execute_pipeline(
                             git_context = collect_git_changes()
                             if git_context and "working tree clean" not in git_context:
                                 send_context = f"{accumulated_context}\n\n{git_context}"
-                                log.info("Enriched Mneme input with %d chars of git diffs", len(git_context))
+                                log.info(
+                                    "Enriched Mneme input with %d chars of git diffs",
+                                    len(git_context),
+                                )
                         except Exception as e:
                             log.warning("Failed to collect git changes for Mneme: %s", e)
 
@@ -300,7 +305,7 @@ async def run_pipeline(
         result = PipelineResult()
 
         # Determine which agents to call
-        pipeline = await determine_pipeline(user_request)
+        pipeline = await determine_pipeline(user_request, context_id=context_id)
 
         if isinstance(pipeline, str):
             # LLM wants clarification

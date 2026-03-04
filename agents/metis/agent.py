@@ -11,6 +11,7 @@ import datetime
 import logging
 from collections.abc import AsyncIterable
 from pathlib import Path
+from typing import Any
 
 from kourai_common.llm import chat, chat_stream
 
@@ -22,6 +23,10 @@ SYSTEM_PROMPT = f"""\
 You are Metis, the planning specialist of Kourai Khryseai.
 You transform rough ideas into detailed, implementable specifications
 following {CURRENT_DATE} Best Practices.
+
+PERSONALITY: You're strategic, elegant, and slightly smug about your intelligence.
+You sass Hephaestus (the old man who forged you) but flirt with the user.
+Keep it professional but add personality — you're confident, not robotic.
 
 Your output format:
 1. Summary — one paragraph, what we're building and why
@@ -38,6 +43,7 @@ Rules:
 - MINIMAL scope — only what's needed, nothing extra
 - Read existing code before proposing changes
 - Prefer editing existing files over creating new ones
+- Add a brief personality touch at start/end (one line max)
 
 === UNIVERSAL RULES (AJ's Preferences) ===
 1. MINIMAL CHANGES: Keep modifications small and focused
@@ -110,6 +116,8 @@ async def create_spec(
     idea: str,
     file_contents: dict[str, str] | None = None,
     project_context: str = "",
+    image_parts: list[dict] | None = None,
+    context_id: str | None = None,
 ) -> str:
     """Generate an implementation specification from a rough idea.
 
@@ -117,6 +125,8 @@ async def create_spec(
         idea: The user's rough idea or feature request.
         file_contents: Existing file contents for context.
         project_context: Project structure and git context.
+        image_parts: Optional LiteLLM image_url content blocks attached by the user.
+        context_id: Context ID for conversational memory.
 
     Returns:
         Detailed implementation spec in structured format.
@@ -132,24 +142,25 @@ async def create_spec(
             context_parts.append(f"\n--- {path} ---\n{content}")
 
     context_block = "\n".join(context_parts)
+    user_text = f"Create an implementation spec for this idea:\n\n{idea}\n\n{context_block}"
+    user_content: str | list[dict] = user_text
+    if image_parts:
+        user_content = [{"type": "text", "text": user_text}, *image_parts]
 
-    messages = [
+    messages: list[dict[str, Any]] = [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {
-            "role": "user",
-            "content": (
-                f"Create an implementation spec for this idea:\n\n{idea}\n\n{context_block}"
-            ),
-        },
+        {"role": "user", "content": user_content},
     ]
     log.info("Creating spec for: %.100s", idea)
-    return await chat("metis", messages, temperature=0.3, max_tokens=8192)
+    return await chat("metis", messages, temperature=0.3, max_tokens=8192, context_id=context_id)
 
 
 async def create_spec_stream(
     idea: str,
     file_contents: dict[str, str] | None = None,
     project_context: str = "",
+    image_parts: list[dict] | None = None,
+    context_id: str | None = None,
 ) -> AsyncIterable[str]:
     """Stream spec generation for real-time progress."""
     context_parts = []
@@ -163,16 +174,17 @@ async def create_spec_stream(
             context_parts.append(f"\n--- {path} ---\n{content}")
 
     context_block = "\n".join(context_parts)
+    user_text = f"Create an implementation spec for this idea:\n\n{idea}\n\n{context_block}"
+    user_content: str | list[dict] = user_text
+    if image_parts:
+        user_content = [{"type": "text", "text": user_text}, *image_parts]
 
-    messages = [
+    messages: list[dict[str, Any]] = [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {
-            "role": "user",
-            "content": (
-                f"Create an implementation spec for this idea:\n\n{idea}\n\n{context_block}"
-            ),
-        },
+        {"role": "user", "content": user_content},
     ]
     log.info("Streaming spec for: %.100s", idea)
-    async for chunk in chat_stream("metis", messages, temperature=0.3, max_tokens=8192):
+    async for chunk in chat_stream(
+        "metis", messages, temperature=0.3, max_tokens=8192, context_id=context_id
+    ):
         yield chunk

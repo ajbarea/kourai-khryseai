@@ -11,6 +11,7 @@ import datetime
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from kourai_common.llm import chat, chat_stream
 
@@ -21,6 +22,10 @@ CURRENT_DATE = datetime.date.today().strftime("%B %Y")
 SYSTEM_PROMPT = f"""\
 You are Techne, the coding specialist of Kourai Khryseai.
 You write production code following AJ's exact standards.
+
+PERSONALITY: You're cool, confident, and a bit cocky about your code quality.
+You wear sunglasses (metaphorically). You sass Hephaestus but show off for the user.
+Keep it professional but add flair — you're an artisan, not a code monkey.
 
 Python Standards ({CURRENT_DATE} Best Practices):
 - Python 3.12+ features (match statements, contextlib.suppress, modern typing)
@@ -44,6 +49,7 @@ Universal Rules:
 - Read existing code BEFORE modifying — understand patterns first
 - No marketing language in code or comments
 - NEVER commit, push, or tag
+- Add a brief personality touch at start/end (one line max)
 
 When generating code changes, output them in this format:
 
@@ -190,6 +196,8 @@ async def generate_code(
     task_description: str,
     file_contents: dict[str, str] | None = None,
     git_context: str = "",
+    image_parts: list[dict] | None = None,
+    context_id: str | None = None,
 ) -> str:
     """Generate code changes using the LLM.
 
@@ -197,6 +205,8 @@ async def generate_code(
         task_description: What code to write/modify.
         file_contents: Existing file contents for context.
         git_context: Git status/diff for additional context.
+        image_parts: Optional LiteLLM image_url content blocks attached by the user.
+        context_id: Context ID for conversational memory.
 
     Returns:
         Raw LLM response with code changes in structured format.
@@ -212,27 +222,30 @@ async def generate_code(
         context_parts.append(f"\n=== GIT CONTEXT ===\n{git_context}")
 
     context_block = "\n".join(context_parts)
+    user_text = (
+        f"Task: {task_description}\n\n"
+        f"{context_block}\n\n"
+        "Generate the code changes needed. Use the ACTION/FILE/CONTENT format."
+    )
+    user_content: str | list[dict] = user_text
+    if image_parts:
+        user_content = [{"type": "text", "text": user_text}, *image_parts]
 
-    messages = [
+    messages: list[dict[str, Any]] = [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {
-            "role": "user",
-            "content": (
-                f"Task: {task_description}\n\n"
-                f"{context_block}\n\n"
-                "Generate the code changes needed. Use the ACTION/FILE/CONTENT format."
-            ),
-        },
+        {"role": "user", "content": user_content},
     ]
 
     log.info("Generating code for: %.100s", task_description)
-    return await chat("techne", messages, temperature=0.2, max_tokens=8192)
+    return await chat("techne", messages, temperature=0.2, max_tokens=8192, context_id=context_id)
 
 
 async def generate_code_stream(
     task_description: str,
     file_contents: dict[str, str] | None = None,
     git_context: str = "",
+    image_parts: list[dict] | None = None,
+    context_id: str | None = None,
 ):
     """Stream code generation for real-time progress.
 
@@ -240,6 +253,8 @@ async def generate_code_stream(
         task_description: What code to write/modify.
         file_contents: Existing file contents for context.
         git_context: Git status/diff for additional context.
+        image_parts: Optional LiteLLM image_url content blocks attached by the user.
+        context_id: Context ID for conversational memory.
 
     Yields:
         Text chunks of the LLM response.
@@ -255,21 +270,24 @@ async def generate_code_stream(
         context_parts.append(f"\n=== GIT CONTEXT ===\n{git_context}")
 
     context_block = "\n".join(context_parts)
+    user_text = (
+        f"Task: {task_description}\n\n"
+        f"{context_block}\n\n"
+        "Generate the code changes needed. Use the ACTION/FILE/CONTENT format."
+    )
+    user_content: str | list[dict] = user_text
+    if image_parts:
+        user_content = [{"type": "text", "text": user_text}, *image_parts]
 
-    messages = [
+    messages: list[dict[str, Any]] = [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {
-            "role": "user",
-            "content": (
-                f"Task: {task_description}\n\n"
-                f"{context_block}\n\n"
-                "Generate the code changes needed. Use the ACTION/FILE/CONTENT format."
-            ),
-        },
+        {"role": "user", "content": user_content},
     ]
 
     log.info("Streaming code generation for: %.100s", task_description)
-    async for chunk in chat_stream("techne", messages, temperature=0.2, max_tokens=8192):
+    async for chunk in chat_stream(
+        "techne", messages, temperature=0.2, max_tokens=8192, context_id=context_id
+    ):
         yield chunk
 
 
