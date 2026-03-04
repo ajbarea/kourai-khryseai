@@ -66,8 +66,8 @@ When you type a request:
 Type your request. Commands: :q (quit), :status (agent info)
 
 Connecting to Hephaestus at http://localhost:10000/...
-Connected to Hephaestus v0.1.0
-Skills: route_request, manage_pipeline
+Connected to Hephaestus — Orchestrator v0.1.0
+Skills: Route Development Request, Execute Development Pipeline
 
 kourai: fix the off-by-one error in pagination
 

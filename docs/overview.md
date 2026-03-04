@@ -42,14 +42,16 @@ Most AI coding tools are single-agent — one model tries to do everything. That
 
 Kourai Khryseai splits the problem across **six specialist agents**, each focused on one thing:
 
-| Agent | Specialty | Model |
+| Agent | Specialty | Smart Tier Model |
 |---|---|---|
 | 🔥 **Hephaestus** | Orchestration — routes requests, manages pipelines | Claude Sonnet 4.6 |
 | 📐 **Metis** | Planning — specs, acceptance criteria, edge cases | Claude Opus 4.6 |
 | ⚙️ **Techne** | Coding — reads existing code, generates changes | Claude Sonnet 4.6 |
 | 🧪 **Dokimasia** | Testing — writes and runs pytest suites | Claude Sonnet 4.6 |
-| ✨ **Kallos** | Style — ruff linting, comment cleanup, docstrings | Claude Haiku 4.5 |
-| 📜 **Mneme** | Commits — conventional commit messages from diffs | Claude Haiku 4.5 |
+| ✨ **Kallos** | Style — ruff linting, comment cleanup, docstrings | Claude Sonnet 4.6 |
+| 📜 **Mneme** | Commits — conventional commit messages from diffs | Claude Sonnet 4.6 |
+
+Models are assigned per agent via `KOURAI_MODEL_TIER` (`cheap`, `standard`, `smart`). The default `cheap` tier uses Haiku for all agents. See [Configuration → LLM Models](configuration.md#llm-models) for the full breakdown.
 
 Each agent is an independent HTTP server. They communicate through the open [A2A protocol](https://a2a-protocol.org) — the same standard backed by Google, Salesforce, and the Linux Foundation for agent interoperability.
 
@@ -97,7 +99,7 @@ If the request is ambiguous, Hephaestus asks for clarification before proceeding
 
 | | |
 |---|---|
-| :material-api: **Protocol** | [A2A v0.4](https://a2a-protocol.org) — open agent-to-agent communication standard |
+| :material-api: **Protocol** | [A2A 0.3.x](https://a2a-protocol.org) — open agent-to-agent communication standard |
 | :material-language-python: **Language** | Python 3.12+ · modern type hints · Google docstrings |
 | :material-brain: **LLM** | [LiteLLM](https://docs.litellm.ai/) — Claude in production, Ollama for free local dev |
 | :material-server: **Server** | [Starlette](https://www.starlette.io/) + uvicorn via `a2a-sdk` |

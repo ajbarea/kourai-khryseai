@@ -1,12 +1,12 @@
 # The Agents
 
-Every agent in Kourai Khryseai is an independent HTTP server that exposes an [A2A Agent Card](https://a2a-protocol.org) at `/.well-known/agent.json`. Hephaestus discovers specialists by fetching their cards at connection time.
+Every agent in Kourai Khryseai is an independent HTTP server that exposes an [A2A Agent Card](https://a2a-protocol.org) at `/.well-known/agent-card.json`. Hephaestus discovers specialists by fetching their cards at connection time.
 
 ---
 
 ## 🔥 Hephaestus — Orchestrator
 
-**Port `10000`** · Claude Sonnet 4.6 · [`agents/hephaestus/`](https://github.com/ajbarea/Kourai_Khryseai/tree/main/agents/hephaestus)
+**Port `10000`** · Model varies by [tier](../configuration.md#cloud-model-tiers) · [`agents/hephaestus/`](https://github.com/ajbarea/Kourai_Khryseai/tree/main/agents/hephaestus)
 
 The brain of the system. Receives user requests, uses its LLM to decide which specialists to invoke and in what order, then executes the pipeline sequentially while streaming progress back to the CLI.
 
@@ -43,7 +43,7 @@ The brain of the system. Receives user requests, uses its LLM to decide which sp
 
 ## Agent Discovery
 
-Each agent exposes an **A2A Agent Card** — a JSON document at `/.well-known/agent.json` describing:
+Each agent exposes an **A2A Agent Card** — a JSON document at `/.well-known/agent-card.json` describing:
 
 - Agent name, description, and version
 - Skills (capabilities the agent advertises)
@@ -55,5 +55,5 @@ Hephaestus fetches these cards when connecting to specialists, enabling runtime 
 
 ```bash
 # Inspect any agent's card
-curl http://localhost:10005/.well-known/agent.json | python -m json.tool
+curl http://localhost:10005/.well-known/agent-card.json | python -m json.tool
 ```

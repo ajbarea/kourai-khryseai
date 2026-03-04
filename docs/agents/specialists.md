@@ -2,9 +2,9 @@
 
 ## 📐 Metis — Planner
 
-**Port `10001`** · Claude Opus 4.6 · [`agents/metis/`](https://github.com/ajbarea/Kourai_Khryseai/tree/main/agents/metis)
+**Port `10001`** · Model varies by [tier](../configuration.md#cloud-model-tiers) (Opus on `smart`) · [`agents/metis/`](https://github.com/ajbarea/Kourai_Khryseai/tree/main/agents/metis)
 
-Transforms rough ideas into detailed implementation specs. Uses the most capable model (Opus) because planning quality determines everything downstream.
+Transforms rough ideas into detailed implementation specs. On the `smart` tier, uses the most capable model (Opus) because planning quality determines everything downstream.
 
 **What it produces:**
 
@@ -37,7 +37,7 @@ This context is injected into the LLM prompt so specs are grounded in the actual
 
 ## ⚙️ Techne — Coder
 
-**Port `10002`** · Claude Sonnet 4.6 · [`agents/techne/`](https://github.com/ajbarea/Kourai_Khryseai/tree/main/agents/techne)
+**Port `10002`** · Model varies by [tier](../configuration.md#cloud-model-tiers) · [`agents/techne/`](https://github.com/ajbarea/Kourai_Khryseai/tree/main/agents/techne)
 
 Implements code changes from specs or fix requests. Reads existing files first, understands patterns, then generates targeted edits.
 
@@ -85,7 +85,7 @@ Supported actions: `CREATE`, `EDIT`, `DELETE`.
 
 ## 🧪 Dokimasia — Tester
 
-**Port `10003`** · Claude Sonnet 4.6 · [`agents/dokimasia/`](https://github.com/ajbarea/Kourai_Khryseai/tree/main/agents/dokimasia)
+**Port `10003`** · Model varies by [tier](../configuration.md#cloud-model-tiers) · [`agents/dokimasia/`](https://github.com/ajbarea/Kourai_Khryseai/tree/main/agents/dokimasia)
 
 Writes pytest test suites and runs them. Handles both test generation (LLM) and test execution (subprocess).
 
@@ -128,9 +128,9 @@ Target: **80%+ code coverage**.
 
 ## ✨ Kallos — Stylist
 
-**Port `10004`** · Claude Haiku 4.5 · [`agents/kallos/`](https://github.com/ajbarea/Kourai_Khryseai/tree/main/agents/kallos)
+**Port `10004`** · Model varies by [tier](../configuration.md#cloud-model-tiers) · [`agents/kallos/`](https://github.com/ajbarea/Kourai_Khryseai/tree/main/agents/kallos)
 
-Runs linters, cleans up comments, and enforces the project's style guide. Uses a lightweight model because most of its work is subprocess-based (ruff), with LLM only for comment analysis.
+Runs linters, cleans up comments, and enforces the project's style guide. Uses a lightweight model on `cheap`/`standard` tiers because most of its work is subprocess-based (ruff), with LLM only for comment analysis.
 
 **Two-stage analysis:**
 
@@ -161,9 +161,13 @@ class StyleReport:
     comment_analysis: str
 ```
 
-**The feedback loop:**
+**Internal Fix Loop:**
 
-When Hephaestus detects that Kallos found issues and Techne is in the pipeline, it automatically triggers fix iterations:
+Kallos actively attempts to fix linting and formatting issues herself using her LLM. To prevent getting stuck on stubborn errors, her internal execution loop is hardcoded to a **maximum of 3 iterations** per run. If issues remain after 3 attempts, she reports them and completes her execution gracefully without crashing.
+
+**Pipeline Feedback Loop:**
+
+When Hephaestus detects that Kallos still found issues (after her internal loop) and Techne is in the pipeline, it automatically triggers broader fix iterations:
 
 ```mermaid
 flowchart LR
@@ -190,9 +194,9 @@ flowchart LR
 
 ## 📜 Mneme — Scribe
 
-**Port `10005`** · Claude Haiku 4.5 · [`agents/mneme/`](https://github.com/ajbarea/Kourai_Khryseai/tree/main/agents/mneme)
+**Port `10005`** · Model varies by [tier](../configuration.md#cloud-model-tiers) · [`agents/mneme/`](https://github.com/ajbarea/Kourai_Khryseai/tree/main/agents/mneme)
 
-Generates grouped commit messages from git diff output. The simplest agent — pure LLM, no subprocess or file I/O. Uses Haiku for speed.
+Generates grouped commit messages from git diff output. The simplest agent — pure LLM, no subprocess or file I/O. Uses Haiku on `cheap`/`standard` tiers for speed.
 
 **Commit message format:**
 

@@ -41,7 +41,7 @@ ANTHROPIC_API_KEY=sk-ant-your-key-here
     Install [Ollama](https://ollama.com/), pull the models, and set:
 
     ```bash
-    KOURAI_USE_LOCAL_MODELS=true
+    KOURAI_PROVIDER=local
     ```
 
     See [Configuration → LLM Models](configuration.md#llm-models) for the full model table.
@@ -53,11 +53,8 @@ ANTHROPIC_API_KEY=sk-ant-your-key-here
 ### Option A: Local (development)
 
 ```bash
-# Start all 6 agents + Jaeger
+# Start all 6 agents + Jaeger and verify everything is running
 make up
-
-# Verify everything is running
-make status
 # ✅ Hephaestus  :10000
 # ✅ Metis       :10001
 # ✅ Techne      :10002
@@ -71,9 +68,7 @@ Agents run as background processes with logs in `logs/`.
 ### Option B: Docker (containerized)
 
 ```bash
-make docker-build    # Build all images
-make docker-up       # Start full stack
-make docker-logs     # Tail logs
+make docker-up       # Build images + start full stack
 make docker-down     # Stop everything
 ```
 
@@ -104,8 +99,8 @@ You'll see the Kourai Khryseai banner and a prompt:
 Type your request. Commands: :q (quit), :status (agent info)
 
 Connecting to Hephaestus at http://localhost:10000/...
-Connected to Hephaestus v0.1.0
-Skills: route_request, manage_pipeline
+Connected to Hephaestus — Orchestrator v0.1.0
+Skills: Route Development Request, Execute Development Pipeline
 
 kourai:
 ```
@@ -133,21 +128,51 @@ Hephaestus automatically routes your request to the right pipeline of specialist
 
 See the [CLI Reference](cli.md) for all commands and options.
 
+### Using the GUI
+
+For a richer, visual experience, launch the full-screen GUI:
+
+```bash
+make gui
+```
+
+This opens an anime-styled visual interface with:
+- **Full-color portraits** of each agent (1280×720 JRPG aesthetic)
+- **Dialogue bubbles** with real-time responses
+- **Personality-matched voices** with neural speech synthesis
+- **Scrollable chat history** with agent switching
+- **Settings overlay** for voice customization and accessibility
+
+The GUI speaks all agent responses through natural neural voices (Microsoft Edge TTS with real-time volume/pitch control).
+
+#### Quick TTS Test
+
+```bash
+# Just hear what the voices sound like
+python -c "
+from hosts.gui.tts_engine import TTSEngine
+import asyncio
+
+async def demo():
+    engine = TTSEngine(master_volume=0.8)
+    for agent in ['kallos', 'metis', 'hephaestus']:
+        print(f'Speaking as {agent}...')
+        await engine.speak(f'Hello! I am {agent}.', agent_name=agent)
+    engine.cleanup()
+
+asyncio.run(demo())
+"
+```
+
+See [GUI Reference → Text-to-Speech System](gui.md#text-to-speech-system-) for voice customization, personality profiles, and advanced audio options.
+
 ---
 
 ## Viewing Traces
 
-Every request creates a distributed trace across all agents. Open Jaeger to inspect:
+Every request creates a distributed trace across all agents. Jaeger starts automatically with `make up` (or `make docker-up`).
 
-```bash
-# If not already running
-make jaeger
-
-# Open the Jaeger UI
-# http://localhost:16686
-```
-
-Select any agent from the service dropdown to see its spans, timings, and any errors.
+Open the Jaeger UI at [`localhost:16686`](http://localhost:16686) and select any agent from the service dropdown to see its spans, timings, and any errors.
 
 ---
 

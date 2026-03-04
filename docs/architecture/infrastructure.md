@@ -39,13 +39,13 @@ A single generic `Dockerfile` at `docker/agent.Dockerfile` builds any agent via 
 docker build --build-arg AGENT_NAME=mneme -f docker/agent.Dockerfile -t kourai-mneme .
 ```
 
-Multi-stage build: builder installs deps with `uv`, runtime copies only the venv. Each container has a health check against `/.well-known/agent.json`.
+Multi-stage build: builder installs deps with `uv`, runtime copies only the venv. Each container has a health check against `/.well-known/agent-card.json`.
 
 ### Docker Compose
 
-`docker-compose.yml` defines all agents + Jaeger with profiles:
+`docker-compose.yml` defines all agents + infrastructure with profiles:
 
-- **No profile** — Jaeger only
+- **No profile** — Jaeger + Prometheus only
 - **`agents`** — All five specialists
 - **`full`** — Specialists + Hephaestus (depends on all others)
 
@@ -63,13 +63,13 @@ Environment variable `KOURAI_AGENT_HOST=true` is set automatically in Docker, sw
 
 [AgentStack](https://agentstack.beeai.dev/) requires Kubernetes via Lima VM. Windows support needs WSL2. Frequent breaking changes. Decision: `a2a-sdk` + Starlette + uvicorn gives full A2A compliance without K8s overhead.
 
-### Why A2A v0.4, not v1.0
+### Why A2A 0.3.x, not 1.0
 
-v1.0 RC has breaking changes: Part type unification, enum case changes, method renames, well-known URL rename. Pinned at `a2a-sdk>=0.3.0,<1.0` until v1.0 stabilizes.
+v1.0 RC has breaking changes: Part type unification, enum case changes, method renames, well-known URL rename. Pinned at `a2a-sdk>=0.3.0,<1.0` until v1.0 stabilizes. Current stable: `0.3.24` (Feb 2026).
 
 ### Why LiteLLM
 
-Model-agnostic interface. Claude for production, Ollama for free local dev. Swap with one env var: `KOURAI_USE_LOCAL_MODELS=true`.
+Model-agnostic interface. Claude for production, Ollama for free local dev. Swap with one env var: `KOURAI_PROVIDER=local`.
 
 ### Why sequential pipelines, not parallel
 

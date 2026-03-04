@@ -40,13 +40,14 @@ async def generate_commit_messages(git_output: str) -> str:
 # agent_executor.py — A2A bridge
 class MnemeAgentExecutor(AgentExecutor):
     async def execute(self, context, event_queue):
-        user_input = self._extract_text(context)
-        task_updater = TaskUpdater(event_queue)
-        await task_updater.new_task()
-        await task_updater.update_status("working", "Generating commit messages...")
+        user_input = context.get_user_input()
+        task = new_task(context.message)
+        await event_queue.enqueue_event(task)
+        updater = TaskUpdater(event_queue, task.id, task.context_id)
+        await updater.update_status(TaskState.working, new_agent_text_message("Generating commit messages...", ...))
         result = await generate_commit_messages(user_input)
-        await task_updater.add_artifact([Part(root=TextPart(text=result))])
-        await task_updater.complete()
+        await updater.add_artifact([Part(root=TextPart(text=result))])
+        await updater.complete()
 
 # __main__.py — server config
 card = AgentCard(
@@ -72,7 +73,7 @@ Centralized model assignments, ports, timeouts, and environment variable handlin
 ```python
 from kourai_common.config import get_model, get_agent_url, MAX_ITERATIONS
 
-get_model("metis")       # → "anthropic/claude-opus-4-6"
+get_model("metis")       # → depends on KOURAI_MODEL_TIER; "anthropic/claude-opus-4-6" on smart, Haiku on cheap (default)
 get_agent_url("techne")  # → "http://localhost:10002/" (or Docker service name)
 ```
 
@@ -123,3 +124,18 @@ from kourai_common.retry import with_retry
 async def send(self, text, context_id):
     ...
 ```
+
+---
+
+## 🧠 Conversational Memory
+
+Kourai Khryseai persists the entire conversation history to a local SQLite database for context, debugging, and A2A state management. It follows a privacy-first, local-only approach.
+
+**Location:** `.cache/agent_memory.db`
+
+The database implements 2026 Best Practices for A2A Memory (Hierarchical State Management) with two primary tables:
+
+- **`messages`**: Episodic/working memory. Stores every single message exchanged, tracking the `context_id` (thread), `agent_name`, `role`, and the raw `content`.
+- **`agent_states`**: Semantic memory. Stores structured state objects (goal hierarchies, checkpoints, summaries) for each agent and thread.
+
+> **Visualizing the Database:** The 2026 best practice for debugging these A2A SQLite logs is using a modern database UI like **Beekeeper Studio**, or directly within your IDE using the **SQLite Viewer** extension in VS Code/Cursor. Alternatively, use the CLI: `sqlite3 .cache/agent_memory.db "SELECT role, content FROM messages WHERE agent_name='kallos';"`
