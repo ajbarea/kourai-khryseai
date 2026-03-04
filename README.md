@@ -251,7 +251,7 @@ Switch to local models for free development:
 
 ```bash
 # In .env
-KOURAI_USE_LOCAL_MODELS=true
+KOURAI_PROVIDER=local
 ```
 
 ---

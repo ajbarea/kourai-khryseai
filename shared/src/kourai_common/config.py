@@ -36,6 +36,34 @@ MODELS_SMART = {
     "mneme": "anthropic/claude-sonnet-4-6",
 }
 
+# Google Gemini model tiers — mapped to Claude capability equivalents
+MODELS_CHEAP_GOOGLE = {
+    "hephaestus": "gemini/gemini-2.0-flash",
+    "metis": "gemini/gemini-2.0-flash",
+    "techne": "gemini/gemini-2.0-flash",
+    "dokimasia": "gemini/gemini-2.0-flash",
+    "kallos": "gemini/gemini-2.0-flash",
+    "mneme": "gemini/gemini-2.0-flash",
+}
+
+MODELS_STANDARD_GOOGLE = {
+    "hephaestus": "gemini/gemini-2.5-pro",
+    "metis": "gemini/gemini-2.5-pro",
+    "techne": "gemini/gemini-2.5-pro",
+    "dokimasia": "gemini/gemini-2.0-flash",
+    "kallos": "gemini/gemini-2.0-flash",
+    "mneme": "gemini/gemini-2.0-flash",
+}
+
+MODELS_SMART_GOOGLE = {
+    "hephaestus": "gemini/gemini-2.5-pro",
+    "metis": "gemini/gemini-2.5-pro",
+    "techne": "gemini/gemini-2.5-pro",
+    "dokimasia": "gemini/gemini-2.5-pro",
+    "kallos": "gemini/gemini-2.5-pro",
+    "mneme": "gemini/gemini-2.5-pro",
+}
+
 # Local dev models (Ollama) — free, no API key needed
 AGENT_MODELS_LOCAL = {
     "hephaestus": "ollama/llama3.3:70b",
@@ -71,21 +99,40 @@ LOG_LEVEL = os.getenv("KOURAI_LOG_LEVEL", "INFO")
 MODEL_TIER = os.getenv("KOURAI_MODEL_TIER", "cheap").lower()
 MAX_ITERATIONS = int(os.getenv("KOURAI_MAX_ITERATIONS", "3"))
 STREAM_ENABLED = os.getenv("KOURAI_STREAM_ENABLED", "true").lower() == "true"
-USE_LOCAL_MODELS = os.getenv("KOURAI_USE_LOCAL_MODELS", "false").lower() == "true"
 OTEL_ENDPOINT = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318")
+
+# Provider selection: "anthropic" (default), "google", or "local"
+PROVIDER = os.getenv("KOURAI_PROVIDER", "anthropic").lower()
 
 # When running in Docker, agents talk via service names instead of localhost
 DOCKER_MODE = os.getenv("KOURAI_AGENT_HOST", "false").lower() == "true"
 
 
+_PROVIDER_TIERS: dict[str, dict[str, dict[str, str]]] = {
+    "anthropic": {
+        "cheap": MODELS_CHEAP,
+        "standard": MODELS_STANDARD,
+        "smart": MODELS_SMART,
+    },
+    "google": {
+        "cheap": MODELS_CHEAP_GOOGLE,
+        "standard": MODELS_STANDARD_GOOGLE,
+        "smart": MODELS_SMART_GOOGLE,
+    },
+}
+
+
 def get_model(agent_name: str) -> str:
-    """Get the LLM model ID for an agent based on the selected tier."""
-    if USE_LOCAL_MODELS:
+    """Get the LLM model ID for an agent based on the active provider and tier.
+
+    Provider is selected via KOURAI_PROVIDER (anthropic/google/local).
+    Tier is selected via KOURAI_MODEL_TIER (cheap/standard/smart).
+    """
+    if PROVIDER == "local":
         return AGENT_MODELS_LOCAL[agent_name]
 
-    tier_map = {"cheap": MODELS_CHEAP, "standard": MODELS_STANDARD, "smart": MODELS_SMART}
-
-    models = tier_map.get(MODEL_TIER, MODELS_CHEAP)
+    tiers = _PROVIDER_TIERS.get(PROVIDER, _PROVIDER_TIERS["anthropic"])
+    models = tiers.get(MODEL_TIER, tiers["cheap"])
     return models[agent_name]
 
 
