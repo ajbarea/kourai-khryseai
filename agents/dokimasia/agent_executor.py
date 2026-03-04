@@ -18,9 +18,7 @@ from a2a.utils import new_agent_text_message, new_task
 from a2a.utils.errors import ServerError
 
 from agents.dokimasia.agent import (
-    format_test_results,
     generate_tests,
-    run_pytest,
 )
 from kourai_common.tracing import create_span
 
@@ -86,28 +84,94 @@ class DokimasiaAgentExecutor(AgentExecutor):
                 )
 
                 if is_run_request:
-                    # Run existing tests
-                    await updater.update_status(
-                        TaskState.working,
-                        new_agent_text_message(
-                            "\U0001f9ea Running pytest...",
-                            task.context_id,
-                            task.id,
-                        ),
+                    from agents.dokimasia.agent import (
+                        extract_files_from_pytest,
+                        fix_test_issues,
+                        format_test_results,
+                        parse_and_apply_fixes,
+                        run_pytest,
                     )
 
-                    with create_span("dokimasia.pytest"):
-                        result = await run_pytest()
+                    max_iterations = 3
+                    iteration = 0
+                    all_passed = False
+                    final_report = ""
 
-                    report = format_test_results(result)
+                    while iteration < max_iterations:
+                        iteration += 1
+
+                        # Run existing tests
+                        await updater.update_status(
+                            TaskState.working,
+                            new_agent_text_message(
+                                f"🧪 Running pytest (iteration {iteration}/{max_iterations})...",
+                                task.context_id,
+                                task.id,
+                            ),
+                        )
+
+                        with create_span("dokimasia.pytest", {"iteration": str(iteration)}):
+                            result = await run_pytest()
+
+                        if result.success:
+                            all_passed = True
+                            final_report = format_test_results(result)
+                            await updater.update_status(
+                                TaskState.working,
+                                new_agent_text_message(
+                                    "🧪 All tests passed!",
+                                    task.context_id,
+                                    task.id,
+                                ),
+                            )
+                            break
+
+                        # If failed, extract files and ask LLM to fix
+                        files_with_issues = extract_files_from_pytest(result.output)
+                        if not files_with_issues:
+                            final_report = (
+                                format_test_results(result)
+                                + "\n\nCould not extract file paths to fix."
+                            )
+                            break
+
+                        await updater.update_status(
+                            TaskState.working,
+                            new_agent_text_message(
+                                f"🧪 Found failures involving {len(files_with_issues)} files. "
+                                "Fixing...",
+                                task.context_id,
+                                task.id,
+                            ),
+                        )
+
+                        with create_span("dokimasia.fix_issues", {"iteration": str(iteration)}):
+                            llm_fixes = await fix_test_issues(
+                                result.output, files_with_issues, task.context_id
+                            )
+                            fixes_applied = parse_and_apply_fixes(llm_fixes)
+
+                        await updater.update_status(
+                            TaskState.working,
+                            new_agent_text_message(
+                                f"🧪 Applied {fixes_applied} fixes. Re-running tests...",
+                                task.context_id,
+                                task.id,
+                            ),
+                        )
+                        final_report = format_test_results(result)
+
                     await updater.add_artifact(
-                        [Part(root=TextPart(text=report))],
+                        [Part(root=TextPart(text=final_report))],
                         name="test_results",
                     )
-                    await updater.complete()
-                    log.info(
-                        "Dokimasia completed — ran tests: %s", "PASS" if result.success else "FAIL"
-                    )
+
+                    if all_passed:
+                        await updater.complete()
+                        log.info("Dokimasia completed — ran tests: PASS")
+                    else:
+                        await updater.complete()
+                        log.info("Dokimasia completed — tests still failing")
 
                 else:
                     # Generate tests from provided code/spec

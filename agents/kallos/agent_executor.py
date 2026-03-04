@@ -17,7 +17,6 @@ from a2a.types import (
 from a2a.utils import new_agent_text_message, new_task
 from a2a.utils.errors import ServerError
 
-from agents.kallos.agent import format_report, run_style_check
 from kourai_common.tracing import create_span
 
 log = logging.getLogger(__name__)
@@ -69,40 +68,91 @@ class KallosAgentExecutor(AgentExecutor):
                     ),
                 )
 
-                # Extract target path from input (first line or the whole input)
-                target_path = user_input.strip().splitlines()[0].strip()
-
-                with create_span("kallos.ruff", {"target": target_path}):
-                    report = await run_style_check(target_path)
-
-                # Status: lint complete, reporting results
-                lint_summary = ", ".join(
-                    f"{r.tool}: {'PASS' if r.passed else 'FAIL'}" for r in report.lint_results
+                from agents.kallos.agent import (
+                    extract_files_from_lint,
+                    fix_lint_issues,
+                    parse_and_apply_fixes,
+                    run_make_lint,
                 )
-                await updater.update_status(
-                    TaskState.working,
-                    new_agent_text_message(
-                        f"✨ Lint results: {lint_summary}",
-                        task.context_id,
-                        task.id,
-                    ),
-                )
+
+                max_iterations = 3
+                iteration = 0
+                all_clean = False
+                final_output = ""
+
+                while iteration < max_iterations:
+                    iteration += 1
+
+                    await updater.update_status(
+                        TaskState.working,
+                        new_agent_text_message(
+                            f"✨ Running make lint (iteration {iteration}/{max_iterations})...",
+                            task.context_id,
+                            task.id,
+                        ),
+                    )
+
+                    with create_span("kallos.make_lint", {"iteration": str(iteration)}):
+                        passed, output = await run_make_lint()
+
+                    if passed:
+                        all_clean = True
+                        final_output = "✨ All linting checks passed!\n\n" + output
+                        await updater.update_status(
+                            TaskState.working,
+                            new_agent_text_message(
+                                "✨ Linting passed!",
+                                task.context_id,
+                                task.id,
+                            ),
+                        )
+                        break
+
+                    # If failed, extract files and ask LLM to fix
+                    files_with_issues = extract_files_from_lint(output)
+                    if not files_with_issues:
+                        final_output = (
+                            f"✨ Linting failed, but could not extract file paths.\n\n{output}"
+                        )
+                        break
+
+                    await updater.update_status(
+                        TaskState.working,
+                        new_agent_text_message(
+                            f"✨ Found issues in {len(files_with_issues)} files. Fixing...",
+                            task.context_id,
+                            task.id,
+                        ),
+                    )
+
+                    with create_span("kallos.fix_issues", {"iteration": str(iteration)}):
+                        llm_fixes = await fix_lint_issues(
+                            output, files_with_issues, task.context_id
+                        )
+                        fixes_applied = parse_and_apply_fixes(llm_fixes)
+
+                    await updater.update_status(
+                        TaskState.working,
+                        new_agent_text_message(
+                            f"✨ Applied {fixes_applied} fixes. Re-running lint...",
+                            task.context_id,
+                            task.id,
+                        ),
+                    )
+                    final_output = output
 
                 # Format and emit final artifact
-                result_text = format_report(report)
                 await updater.add_artifact(
-                    [Part(root=TextPart(text=result_text))],
+                    [Part(root=TextPart(text=final_output))],
                     name="style_report",
                 )
 
-                if report.all_clean:
+                if all_clean:
                     await updater.complete()
                     log.info("Kallos completed — all clean")
                 else:
-                    # Report issues but still complete (Hephaestus decides next steps)
                     await updater.complete()
-                    log.info("Kallos completed — issues found")
-
+                    log.info("Kallos completed — issues remain")
             except Exception as e:
                 log.error("Kallos execution failed: %s", e)
                 raise ServerError(error=InternalError()) from e

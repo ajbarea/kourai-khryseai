@@ -1,7 +1,6 @@
 """Kallos — Stylist agent. Linting, formatting, comment cleanup.
 
-Pure logic layer: runs ruff/formatters via subprocess, uses LLM for
-comment and docstring analysis. Reports issues found.
+Pure logic layer: runs make lint, uses LLM to fix issues.
 """
 
 from __future__ import annotations
@@ -9,7 +8,9 @@ from __future__ import annotations
 import asyncio
 import datetime
 import logging
+import re
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from kourai_common.llm import chat
 
@@ -21,61 +22,37 @@ SYSTEM_PROMPT = f"""\
 You are Kallos, the style specialist of Kourai Khryseai.
 You enforce AJ's code quality standards across all files using {CURRENT_DATE} Best Practices.
 
+PERSONALITY: You're elegant, detail-oriented, and take pride in aesthetic perfection.
+You sass Hephaestus about his messy forge but make everything beautiful for the user.
+Keep it professional but add grace — you're an artist, not a nitpicker.
+
 Your cleanup checklist:
-1. Remove WHAT comments (restating code)
-2. Keep WHY comments (rationale, research refs, security)
-3. Verify existing Research citations (web search to confirm accuracy)
+1. Fix Ruff and Mypy errors reported in the lint output.
+2. Remove WHAT comments (restating code)
+3. Keep WHY comments (rationale, research refs, security)
 4. Add Research citations where missing (algorithms, constraints, thresholds)
-5. One-liner + Args for public functions (Google-style)
-6. One-liner only for private helpers
-7. No docstrings on inner functions
-8. Modern type hints (Python 3.12+: X | None, lowercase generics like list/dict)
-9. No marketing language ("robust", "comprehensive")
-10. Include Example for complex data structures
-11. Proactively FIX issues, do not just report them when possible.
+5. Modern type hints (Python 3.12+: X | None, lowercase generics like list/dict)
+6. Proactively FIX issues, do not just report them when possible.
 
-Tooling ({CURRENT_DATE} Standards):
-- ALWAYS use `uv run ruff check --fix .` and `uv run ruff format .` for styling.
-- NEVER use `isort` or `flake8` directly. `ruff` is the sole linter.
-
-Comment Rules:
-- REMOVE: "# Create client" above client = Client()
-- REMOVE: "# 30 seconds" next to DEFAULT_TIMEOUT = 30
-- KEEP: "# Cache to avoid expensive recomputation"
-- KEEP: "# Krum paper recommends n-f-2 for Byzantine tolerance"
-- ADD: "# Research: Krum requires n > 2f + 2 (Blanchard et al., NeurIPS 2017)"
-
-Research Citation Format:
-# Research: [Algorithm/concept] [key constraint] (Author et al., Venue Year)
-# [URL to paper]
-
-Output Format:
-For each file with issues, output:
+When you fix issues, you MUST provide the exact file changes in this format:
 
 FILE: path/to/file.py
-ISSUES:
-- [line N] Remove WHAT comment: "# Create client"
-- [line N] Add type hint: def foo(x) -> def foo(x: str) -> str
-- [line N] Add Research citation for algorithm X
-
-SUGGESTED FIX:
+ORIGINAL:
 ```python
-# The corrected code block
+<exact lines to replace, must match file exactly>
+```
+REPLACEMENT:
+```python
+<new lines>
 ```
 
 ---
 
-If no issues found, output: ALL CLEAN
+Separate multiple file changes with ---
+If no issues need fixing, output: ALL CLEAN
+Add a brief personality touch at start/end (one line max)
 
 CRITICAL: NEVER run git commit, git push, or git tag.
-
-=== UNIVERSAL RULES (AJ's Preferences) ===
-1. MINIMAL CHANGES: Keep modifications small and focused
-2. NO FLUFF: Technical language only, no marketing speak
-3. EMOJIS: Use emojis in markdown output
-4. GIT BOUNDARIES: FORBIDDEN — git commit, git push, git tag
-5. PYTHON: 100 char lines, modern type hints, Google docstrings
-6. COMMENTS: WHY not WHAT, Research citations for algorithms
 """
 
 
@@ -115,116 +92,87 @@ async def run_command(cmd: list[str], cwd: str | None = None) -> tuple[int, str,
     )
 
 
-async def run_ruff_check(target_path: str) -> LintResult:
-    """Run ruff check on target path."""
-    code, stdout, stderr = await run_command(
-        ["ruff", "check", target_path, "--output-format=text"],
-    )
+async def run_make_lint(cwd: str | None = None) -> tuple[bool, str]:
+    """Run make lint."""
+    code, stdout, stderr = await run_command(["make", "lint"], cwd=cwd)
     output = stdout + stderr
-    passed = code == 0
-    # Count issues from ruff output (each line with a file path is an issue)
-    issue_count = len([line for line in stdout.splitlines() if line.strip() and ":" in line])
-    log.info("ruff check: %s (%d issues)", "PASS" if passed else "FAIL", issue_count)
-    return LintResult(tool="ruff check", passed=passed, output=output.strip())
+    return code == 0, output
 
 
-async def run_ruff_format_check(target_path: str) -> LintResult:
-    """Run ruff format in check mode (dry-run) on target path."""
-    code, stdout, stderr = await run_command(
-        ["ruff", "format", "--check", target_path],
+def parse_and_apply_fixes(llm_output: str) -> int:
+    """Parse FILE/ORIGINAL/REPLACEMENT blocks and apply them."""
+    pattern = re.compile(
+        r"FILE:\s*(.*?)\n.*?ORIGINAL:\n```(?:python)?\n(.*?)\n```.*?REPLACEMENT:\n```(?:python)?\n(.*?)\n```",
+        re.DOTALL,
     )
-    output = stdout + stderr
-    passed = code == 0
-    fixed_count = len([line for line in stdout.splitlines() if line.strip()])
-    log.info("ruff format: %s (%d files to format)", "PASS" if passed else "FAIL", fixed_count)
-    return LintResult(
-        tool="ruff format",
-        passed=passed,
-        output=output.strip(),
-        fixed_count=fixed_count,
-    )
+    fixes_applied = 0
+    for match in pattern.finditer(llm_output):
+        file_path = match.group(1).strip()
+        original = match.group(2)
+        replacement = match.group(3)
+
+        path = Path(file_path)
+        if path.exists():
+            content = path.read_text(encoding="utf-8")
+            if original in content:
+                new_content = content.replace(original, replacement, 1)
+                path.write_text(new_content, encoding="utf-8")
+                fixes_applied += 1
+                log.info(f"Applied fix to {file_path}")
+            else:
+                log.warning(f"Could not find exact original block in {file_path}")
+    return fixes_applied
 
 
-async def analyze_comments(file_contents: dict[str, str]) -> str:
-    """Use LLM to analyze comments, docstrings, and type hints.
-
-    Args:
-        file_contents: Mapping of file path to file content.
-
-    Returns:
-        LLM analysis of style issues in the provided files.
-    """
-    if not file_contents:
-        return "No files provided for comment analysis."
-
+async def fix_lint_issues(
+    lint_output: str, file_paths: set[str], context_id: str | None = None
+) -> str:
+    """Use LLM to fix lint issues."""
     files_block = ""
-    for path, content in file_contents.items():
-        files_block += f"\n--- {path} ---\n{content}\n"
+    for file_path in file_paths:
+        path = Path(file_path)
+        if path.exists():
+            content = path.read_text(encoding="utf-8")
+            files_block += f"\n--- {file_path} ---\n{content}\n"
 
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {
             "role": "user",
             "content": (
-                "Analyze these files for comment quality, docstring standards, "
-                "type hint modernization, and marketing language. "
-                f"Report issues and suggested fixes:\n{files_block}"
+                f"The build failed with these lint/type errors:\n\n{lint_output}\n\n"
+                f"Here are the relevant files:\n{files_block}\n\n"
+                "Please fix the errors using the FILE/ORIGINAL/REPLACEMENT format."
             ),
         },
     ]
-    log.info("Analyzing comments in %d files", len(file_contents))
-    return await chat("kallos", messages, temperature=0.2, max_tokens=4096)
+    log.info("Requesting fixes for %d files", len(file_paths))
+    return await chat("kallos", messages, temperature=0.2, max_tokens=4096, context_id=context_id)
+
+
+def extract_files_from_lint(output: str) -> set[str]:
+    """Extract file paths from ruff/mypy output."""
+    files = set()
+    for line in output.splitlines():
+        # ruff format: file.py:line:col or --> file.py:line:col
+        # mypy format: file.py:line: error:
+        parts = line.split(":")
+        if len(parts) >= 2 and parts[0].strip().endswith(".py"):
+            path = parts[0].strip()
+            # Remove "--> " prefix if present
+            if path.startswith("--> "):
+                path = path[4:].strip()
+            # remove leading ./ if any
+            if path.startswith("./") or path.startswith(".\\"):
+                path = path[2:]
+            files.add(path)
+    return files
 
 
 async def run_style_check(
     target_path: str,
     file_contents: dict[str, str] | None = None,
+    context_id: str | None = None,
 ) -> StyleReport:
-    """Run full style check: ruff + comment analysis.
-
-    Args:
-        target_path: Path to check with ruff.
-        file_contents: Optional file contents for LLM comment analysis.
-
-    Returns:
-        StyleReport with lint results and comment analysis.
-    """
-    report = StyleReport()
-
-    # Run ruff check and ruff format in parallel
-    ruff_check, ruff_format = await asyncio.gather(
-        run_ruff_check(target_path),
-        run_ruff_format_check(target_path),
-    )
-    report.lint_results = [ruff_check, ruff_format]
-
-    # Run comment analysis if file contents provided
-    if file_contents:
-        report.comment_analysis = await analyze_comments(file_contents)
-
-    report.all_clean = all(r.passed for r in report.lint_results) and (
-        not report.comment_analysis or "ALL CLEAN" in report.comment_analysis
-    )
-    return report
-
-
-def format_report(report: StyleReport) -> str:
-    """Format a StyleReport into a readable string."""
-    lines = []
-
-    for result in report.lint_results:
-        status = "PASS" if result.passed else "FAIL"
-        lines.append(f"### {result.tool}: {status}")
-        if not result.passed and result.output:
-            lines.append(f"```\n{result.output}\n```")
-        lines.append("")
-
-    if report.comment_analysis:
-        lines.append("### Comment & Docstring Analysis")
-        lines.append(report.comment_analysis)
-        lines.append("")
-
-    if report.all_clean:
-        lines.insert(0, "ALL CLEAN")
-
-    return "\n".join(lines)
+    """Run full style check: ruff + comment analysis. (Legacy)"""
+    pass  # Replaced by run_lint_and_fix in agent_executor.py
