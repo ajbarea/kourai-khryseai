@@ -68,7 +68,7 @@ class TestFullPipelineOrchestration:
             from agents.hephaestus.routing_agent import execute_pipeline
 
             statuses: list[tuple[str, str]] = []
-            async for agent, status in execute_pipeline(pipeline, "implement CSV export"):
+            async for agent, status, _output in execute_pipeline(pipeline, "implement CSV export"):
                 statuses.append((agent, status))
 
         # All five agents executed
@@ -105,7 +105,7 @@ class TestFullPipelineOrchestration:
             from agents.hephaestus.routing_agent import execute_pipeline
 
             statuses: list[tuple[str, str]] = []
-            async for agent, status in execute_pipeline(pipeline, "implement feature"):
+            async for agent, status, _output in execute_pipeline(pipeline, "implement feature"):
                 statuses.append((agent, status))
 
         texts = _status_texts(statuses)
@@ -171,7 +171,7 @@ class TestIterativeLoopConvergence:
             from agents.hephaestus.routing_agent import execute_pipeline
 
             statuses: list[tuple[str, str]] = []
-            async for agent, status in execute_pipeline(
+            async for agent, status, _output in execute_pipeline(
                 ["techne", "kallos", "mneme"], "fix style issues"
             ):
                 statuses.append((agent, status))
@@ -232,7 +232,7 @@ class TestMidPipelineDegradation:
             from agents.hephaestus.routing_agent import execute_pipeline
 
             statuses: list[tuple[str, str]] = []
-            async for agent, status in execute_pipeline(pipeline, "implement feature"):
+            async for agent, status, _output in execute_pipeline(pipeline, "implement feature"):
                 statuses.append((agent, status))
 
         texts = _status_texts(statuses)
@@ -278,7 +278,7 @@ class TestMidPipelineDegradation:
             from agents.hephaestus.routing_agent import execute_pipeline
 
             statuses: list[tuple[str, str]] = []
-            async for agent, status in execute_pipeline(
+            async for agent, status, _output in execute_pipeline(
                 ["metis", "techne", "mneme"], "plan something"
             ):
                 statuses.append((agent, status))

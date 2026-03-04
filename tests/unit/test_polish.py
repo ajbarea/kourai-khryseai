@@ -108,7 +108,7 @@ class TestGracefulDegradation:
             from agents.hephaestus.routing_agent import execute_pipeline
 
             statuses = []
-            async for agent, status in execute_pipeline(
+            async for agent, status, _output in execute_pipeline(
                 ["techne", "kallos", "mneme"], "implement X"
             ):
                 statuses.append((agent, status))
@@ -144,7 +144,9 @@ class TestGracefulDegradation:
             from agents.hephaestus.routing_agent import execute_pipeline
 
             statuses = []
-            async for agent, status in execute_pipeline(["techne", "kallos"], "implement X"):
+            async for agent, status, _output in execute_pipeline(
+                ["techne", "kallos"], "implement X"
+            ):
                 statuses.append((agent, status))
 
             abort_msgs = [s for s in statuses if "No agents reachable" in s[1]]

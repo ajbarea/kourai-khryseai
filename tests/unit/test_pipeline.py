@@ -98,7 +98,7 @@ class TestExecutePipelineIterativeLoop:
             from agents.hephaestus.routing_agent import execute_pipeline
 
             statuses = []
-            async for agent, status in execute_pipeline(
+            async for agent, status, _output in execute_pipeline(
                 ["techne", "kallos", "mneme"], "implement feature X"
             ):
                 statuses.append((agent, status))
@@ -142,7 +142,7 @@ class TestExecutePipelineIterativeLoop:
             from agents.hephaestus.routing_agent import execute_pipeline
 
             statuses = []
-            async for agent, status in execute_pipeline(
+            async for agent, status, _output in execute_pipeline(
                 ["techne", "kallos", "mneme"], "implement feature X"
             ):
                 statuses.append((agent, status))
@@ -171,7 +171,9 @@ class TestExecutePipelineIterativeLoop:
             from agents.hephaestus.routing_agent import execute_pipeline
 
             statuses = []
-            async for agent, status in execute_pipeline(["kallos", "mneme"], "clean up code"):
+            async for agent, status, _output in execute_pipeline(
+                ["kallos", "mneme"], "clean up code"
+            ):
                 statuses.append((agent, status))
 
             fix_messages = [s for s in statuses if "auto-fix" in s[1].lower()]
@@ -207,7 +209,9 @@ class TestExecutePipelineInputRequired:
             from agents.hephaestus.routing_agent import execute_pipeline
 
             statuses = []
-            async for agent, status in execute_pipeline(["metis", "techne"], "plan something"):
+            async for agent, status, _output in execute_pipeline(
+                ["metis", "techne"], "plan something"
+            ):
                 statuses.append((agent, status))
 
             input_msgs = [s for s in statuses if "INPUT_REQUIRED:" in s[1]]

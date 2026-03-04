@@ -85,3 +85,51 @@ class TestMnemeAgentCard:
         skill = card.skills[0]
         assert skill.examples is not None and len(skill.examples) >= 1
         assert "git" in skill.tags
+
+
+class TestCollectGitChanges:
+    """Test git change collection for Mneme input enrichment."""
+
+    def test_collects_status_and_diffs(self):
+        with patch("scripts.git_changes._run_git") as mock_git:
+            mock_git.side_effect = lambda *args, **kw: {
+                ("status", "--porcelain"): "M agents/mneme/agent.py\nM scripts/status.py\n",
+                ("diff",): (
+                    "diff --git a/agents/mneme/agent.py b/agents/mneme/agent.py\n"
+                    "--- a/agents/mneme/agent.py\n"
+                    "+++ b/agents/mneme/agent.py\n"
+                    "@@ -1 +1 @@\n"
+                    "-old\n"
+                    "+new\n"
+                ),
+                ("diff", "--staged"): "",
+            }.get(args, "")
+
+            from scripts.git_changes import collect_git_changes
+
+            result = collect_git_changes()
+            assert "=== git status ===" in result
+            assert "M agents/mneme/agent.py" in result
+            assert "Unstaged changes" in result
+
+    def test_clean_working_tree(self):
+        with patch("scripts.git_changes._run_git", return_value=""):
+            from scripts.git_changes import collect_git_changes
+
+            result = collect_git_changes()
+            assert "working tree clean" in result
+
+    def test_truncates_large_file_diffs(self):
+        big_diff = "diff --git a/big.py b/big.py\n" + "+" * 5000
+
+        with patch("scripts.git_changes._run_git") as mock_git:
+            mock_git.side_effect = lambda *args, **kw: {
+                ("status", "--porcelain"): "M big.py\n",
+                ("diff",): big_diff,
+                ("diff", "--staged"): "",
+            }.get(args, "")
+
+            from scripts.git_changes import collect_git_changes
+
+            result = collect_git_changes()
+            assert "truncated" in result

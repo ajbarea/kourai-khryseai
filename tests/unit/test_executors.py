@@ -336,10 +336,10 @@ class TestHephaestusExecutor:
         ctx = _make_context("implement CSV export")
         queue = _make_queue()
 
-        async def mock_pipeline(agents, user_input, context_id=None):
-            yield ("metis", "Spec generated")
-            yield ("techne", "Code written")
-            yield ("hephaestus", "Pipeline complete")
+        async def mock_pipeline(agents, user_input, context_id=None, image_parts=None):
+            yield ("metis", "Spec generated", "spec text")
+            yield ("techne", "Code written", "code text")
+            yield ("hephaestus", "Pipeline complete", "")
 
         with (
             patch("agents.hephaestus.agent_executor.create_span"),
@@ -383,8 +383,8 @@ class TestHephaestusExecutor:
         ctx = _make_context("plan something")
         queue = _make_queue()
 
-        async def mock_pipeline(agents, user_input, context_id=None):
-            yield ("metis", "INPUT_REQUIRED:Which module?")
+        async def mock_pipeline(agents, user_input, context_id=None, image_parts=None):
+            yield ("metis", "INPUT_REQUIRED:Which module?", "")
 
         with (
             patch("agents.hephaestus.agent_executor.create_span"),

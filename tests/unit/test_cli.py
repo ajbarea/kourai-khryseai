@@ -14,23 +14,10 @@ from a2a.types import (
 )
 
 from hosts.cli.__main__ import (
-    BANNER,
     _extract_artifact_text,
     _extract_status_text,
     send_and_stream,
 )
-
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
-
-
-class TestCLIConstants:
-    """Banner and ANSI codes."""
-
-    def test_banner_contains_project_name(self):
-        assert "Kourai Khryseai" in BANNER
-
 
 # ---------------------------------------------------------------------------
 # Extract helpers
