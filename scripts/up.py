@@ -32,7 +32,7 @@ def main() -> None:
 
     print("All agents launched in background")
     print("Jaeger: http://localhost:16686")
-    print("Run 'make status' to check health")
+    print("-" * 40)
 
 
 if __name__ == "__main__":

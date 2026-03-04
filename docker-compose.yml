@@ -13,7 +13,6 @@ x-agent-common: &agent-common
   environment:
     OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
     KOURAI_LOG_LEVEL: ${KOURAI_LOG_LEVEL:-INFO}
-    KOURAI_USE_LOCAL_MODELS: ${KOURAI_USE_LOCAL_MODELS:-false}
     KOURAI_STREAM_ENABLED: ${KOURAI_STREAM_ENABLED:-true}
   networks:
     - kourai

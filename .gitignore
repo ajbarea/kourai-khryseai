@@ -25,6 +25,7 @@ venv/
 .coverage
 htmlcov/
 .mypy_cache/
+.hypothesis/
 
 # OS
 .DS_Store
