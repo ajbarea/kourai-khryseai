@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import threading
 from typing import TYPE_CHECKING
 
@@ -17,6 +18,109 @@ logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     import queue as _queue
+
+# ---------------------------------------------------------------------------
+# Speech filtering — skip artifacts, commit messages, code, etc.
+# ---------------------------------------------------------------------------
+
+# Commit-message header prefixes (conventional commits)
+_COMMIT_PREFIX_RE = re.compile(
+    r"^\s*(?:feat|fix|docs|chore|refactor|test|perf|style|ci|build)\s*[\(\(]",
+    re.IGNORECASE,
+)
+# Commit bullet points: "- Added ...", "- Fixed ...", etc.
+_COMMIT_BULLET_RE = re.compile(
+    r"^\s*-\s+(?:Added|Fixed|Updated|Removed|Renamed|Moved|Created|Deleted|Merged|"
+    r"Refactored|Implemented|Resolved|Cleaned|Improved|Verified|Reverted|Bumped|"
+    r"Replaced|Extracted|Migrated|Enabled|Disabled|Configured|Wrapped)\b",
+    re.IGNORECASE,
+)
+# File-list lines: "Files: foo.py, bar.py"
+_FILES_LINE_RE = re.compile(r"^\s*Files:\s", re.IGNORECASE)
+# Fenced code block markers
+_CODE_FENCE_RE = re.compile(r"^\s*```")
+# Markdown headers
+_MD_HEADER_RE = re.compile(r"^\s*#{1,6}\s")
+# Section dividers
+_DIVIDER_RE = re.compile(r"^\s*-{3,}\s*$")
+# Blockquotes / GH alerts
+_BLOCKQUOTE_RE = re.compile(r"^\s*>")
+# Lines that are mostly non-word chars (tables, ascii art, paths, etc.)
+_NON_PROSE_RE = re.compile(r"^[\s\W]*$")
+# Diff-style lines
+_DIFF_RE = re.compile(r"^\s*[+\-]{1,3}\s")
+# Indented code (4+ spaces or tab)
+_INDENTED_CODE_RE = re.compile(r"^(?:\t|    )\S")
+
+
+def _is_artifact_line(line: str) -> bool:
+    """Return True if a single line looks like an artifact rather than speech."""
+    return bool(
+        _COMMIT_PREFIX_RE.match(line)
+        or _COMMIT_BULLET_RE.match(line)
+        or _FILES_LINE_RE.match(line)
+        or _CODE_FENCE_RE.match(line)
+        or _MD_HEADER_RE.match(line)
+        or _DIVIDER_RE.match(line)
+        or _BLOCKQUOTE_RE.match(line)
+        or _NON_PROSE_RE.match(line)
+        or _DIFF_RE.match(line)
+        or _INDENTED_CODE_RE.match(line)
+    )
+
+
+def should_speak(text: str) -> bool:
+    """Return True if *any* line in `text` is conversational (not an artifact).
+
+    Use for short status messages — if the entire text is artifact
+    content, skip TTS.
+    """
+    if not text or not text.strip():
+        return False
+    return any(not _is_artifact_line(line) for line in text.splitlines() if line.strip())
+
+
+_EMOTE_RE = re.compile(r"\*[^*]+\*")
+
+
+def extract_speakable(text: str, max_chars: int = 500) -> str:
+    """Return only the conversational (non-artifact) portions of `text`.
+
+    For long result blocks, this strips out commit groups, code blocks,
+    file lists, emote cues (*action*), etc. and returns a trimmed version
+    suitable for TTS. Caps output at `max_chars` to avoid extremely long speech.
+    """
+    if not text:
+        return ""
+
+    speakable_lines: list[str] = []
+    inside_code_block = False
+
+    for line in text.splitlines():
+        # Track fenced code blocks so we skip everything inside them
+        if _CODE_FENCE_RE.match(line):
+            inside_code_block = not inside_code_block
+            continue
+        if inside_code_block:
+            continue
+
+        if line.strip() and not _is_artifact_line(line):
+            # Strip emote cues — these are SFX triggers, not speech
+            cleaned = _EMOTE_RE.sub("", line).strip()
+            if cleaned:
+                speakable_lines.append(cleaned)
+
+    result = " ".join(speakable_lines)
+    if len(result) > max_chars:
+        # Truncate at last sentence boundary within limit
+        truncated = result[:max_chars]
+        last_period = truncated.rfind(".")
+        if last_period > max_chars // 2:
+            result = truncated[: last_period + 1]
+        else:
+            result = truncated.rstrip() + "…"
+
+    return result
 
 
 class TTSGUIManager:

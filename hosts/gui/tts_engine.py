@@ -124,8 +124,9 @@ class TTSEngine:
     def set_master_volume(self, volume: float) -> None:
         """Set master volume (0.0 to 1.0)."""
         self.master_volume = max(0.0, min(1.0, volume))
-        if self._mixer_initialized:
-            pygame.mixer.music.set_volume(self.master_volume)
+        channel = getattr(self, "_tts_channel", None)
+        if channel is not None:
+            channel.set_volume(self.master_volume)
         logger.debug(f"Master volume set to {self.master_volume}")
 
     def set_on_complete(self, callback: Callable[[], None]) -> None:
@@ -179,7 +180,9 @@ class TTSEngine:
 
         try:
             logger.info(
-                f"TTS: Starting speech generation - agent={agent_name}, voice={voice_key}, speed={final_speed}, text_len={len(text)}"
+                "TTS: Starting speech generation - "
+                f"agent={agent_name}, voice={voice_key}, "
+                f"speed={final_speed}, text_len={len(text)}"
             )
 
             # Generate audio with prosody (speed applied via edge-tts)
@@ -313,9 +316,6 @@ class TTSEngine:
         if channel is not None and channel.get_busy():
             channel.stop()
             logger.info("TTS playback stopped (channel 0)")
-        elif self.is_playing and pygame.mixer.get_busy():
-            pygame.mixer.stop()
-            logger.info("TTS playback stopped (mixer-wide fallback)")
         self.is_playing = False
 
     def cleanup(self) -> None:
