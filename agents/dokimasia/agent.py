@@ -6,11 +6,8 @@ reports structured results. Priority: unit > integration > performance.
 
 from __future__ import annotations
 
-import asyncio
 import contextlib
-import datetime
 import logging
-import re
 import sys
 from collections.abc import AsyncIterable
 from dataclasses import dataclass
@@ -18,20 +15,23 @@ from pathlib import Path
 from typing import Any
 
 from kourai_common.llm import chat, chat_stream
+from kourai_common.prompts import CURRENT_DATE, build_system_prompt
+from kourai_common.subprocess import run_command
 
 log = logging.getLogger(__name__)
 
-CURRENT_DATE = datetime.date.today().strftime("%B %Y")
-
-SYSTEM_PROMPT = f"""\
-You are Dokimasia, the testing specialist of Kourai Khryseai.
+SYSTEM_PROMPT = build_system_prompt(
+    agent_name="Dokimasia",
+    role="testing specialist",
+    personality=f"""
 You write and run pytest test suites following AJ's testing standards
 ({CURRENT_DATE} Best Practices).
 
 PERSONALITY: You're fierce, thorough, and take pride in crushing bugs.
 You're protective of code quality. You sass Hephaestus but protect the user's code.
 Keep it professional but add intensity — you're a warrior, not a bureaucrat.
-
+""",
+    specific_instructions="""
 Priority Order:
 1. Unit tests (fast, isolated — tests/unit/)
 2. Integration tests (external deps — tests/integration/)
@@ -66,14 +66,9 @@ Commands: make test, uv run pytest specific paths
 ALWAYS use `uv` for running tools. Do not use legacy pip.
 Add a brief personality touch at start/end (one line max)
 
-=== UNIVERSAL RULES (AJ's Preferences) ===
-1. MINIMAL CHANGES: Keep modifications small and focused
-2. NO FLUFF: Technical language only, no marketing speak
-3. EMOJIS: Use emojis in markdown output
-4. GIT BOUNDARIES: FORBIDDEN — git commit, git push, git tag
-5. PYTHON: 100 char lines, modern type hints, Google docstrings
-6. TESTING: Unit > Integration > Performance. 80%+ coverage. make test must pass.
-"""
+TESTING: Unit > Integration > Performance. 80%+ coverage. make test must pass.
+""",
+)
 
 
 @dataclass
@@ -88,73 +83,6 @@ class PytestRunResult:
     duration: float = 0.0
     output: str = ""
     success: bool = False
-
-
-async def run_command(cmd: list[str], cwd: str | None = None) -> tuple[int, str, str]:
-    """Run a shell command and return (returncode, stdout, stderr)."""
-    log.debug("Running: %s", " ".join(cmd))
-    proc = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-        cwd=cwd,
-    )
-    stdout, stderr = await proc.communicate()
-    return (
-        proc.returncode or 0,
-        stdout.decode("utf-8", errors="replace"),
-        stderr.decode("utf-8", errors="replace"),
-    )
-
-
-def parse_and_apply_fixes(llm_output: str) -> int:
-    """Parse FILE/ORIGINAL/REPLACEMENT blocks and apply them."""
-    pattern = re.compile(
-        r"FILE:\s*(.*?)\n.*?ORIGINAL:\n```(?:python)?\n(.*?)\n```.*?REPLACEMENT:\n```(?:python)?\n(.*?)\n```",
-        re.DOTALL,
-    )
-    fixes_applied = 0
-    for match in pattern.finditer(llm_output):
-        file_path = match.group(1).strip()
-        original = match.group(2)
-        replacement = match.group(3)
-
-        path = Path(file_path)
-        if path.exists():
-            content = path.read_text(encoding="utf-8")
-            if original in content:
-                new_content = content.replace(original, replacement, 1)
-                path.write_text(new_content, encoding="utf-8")
-                fixes_applied += 1
-                log.info(f"Applied fix to {file_path}")
-            else:
-                log.warning(f"Could not find exact original block in {file_path}")
-    return fixes_applied
-
-
-def extract_files_from_pytest(output: str) -> set[str]:
-    """Extract file paths from pytest output."""
-    files = set()
-    for line in output.splitlines():
-        line = line.strip()
-        parts = line.split(":")
-        if len(parts) >= 2 and parts[0].strip().endswith(".py"):
-            path = parts[0].strip()
-            if path.startswith("E "):
-                path = path[2:].strip()
-            if path.startswith("--> "):
-                path = path[4:].strip()
-            if path.startswith("./") or path.startswith(".\\"):
-                path = path[2:]
-            files.add(path)
-        elif " " in line:
-            first_word = line.split(" ")[0].strip()
-            if first_word.endswith(".py"):
-                path = first_word
-                if path.startswith("./") or path.startswith(".\\"):
-                    path = path[2:]
-                files.add(path)
-    return files
 
 
 async def fix_test_issues(

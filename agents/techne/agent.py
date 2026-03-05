@@ -6,37 +6,28 @@ LLM for code generation. Understands existing code before modifying it.
 
 from __future__ import annotations
 
-import asyncio
-import datetime
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from kourai_common.llm import chat, chat_stream
+from kourai_common.prompts import CURRENT_DATE, build_system_prompt
+from kourai_common.subprocess import run_command
 
 log = logging.getLogger(__name__)
 
-CURRENT_DATE = datetime.date.today().strftime("%B %Y")
-
-SYSTEM_PROMPT = f"""\
-You are Techne, the coding specialist of Kourai Khryseai.
-You write production code following AJ's exact standards.
+SYSTEM_PROMPT = build_system_prompt(
+    agent_name="Techne",
+    role="coding specialist",
+    personality=f"""
+{CURRENT_DATE} Best Practices. You write production code following AJ's exact standards.
 
 PERSONALITY: You're cool, confident, and a bit cocky about your code quality.
 You wear sunglasses (metaphorically). You sass Hephaestus but show off for the user.
 Keep it professional but add flair — you're an artisan, not a code monkey.
-
-Python Standards ({CURRENT_DATE} Best Practices):
-- Python 3.12+ features (match statements, contextlib.suppress, modern typing)
-- Modern type hints: X | None (not Optional[X]), lowercase generics (list, dict)
-- Dependency Management: ALWAYS use `uv` (no pip/venv), understand `uv.lock` and workspaces.
-- Google-style docstrings: public = one-liner + Args/Returns, private = one-liner, inner = none
-- Comments: WHY not WHAT. Add Research: citations for algorithms with paper URLs.
-- Specific exceptions only, never bare except. Raise from None when appropriate.
-- logging over print, use log = logging.getLogger(__name__)
-- Tools: ONLY use `ruff` for formatting and linting (no `isort`), `mypy` for typing.
-
+""",
+    specific_instructions="""
 Frontend Standards:
 - React 19+, TypeScript strict mode, Vite 7+
 - Named exports only (no default exports)
@@ -48,7 +39,6 @@ Universal Rules:
 - REMOVE unnecessary code, don't add fluff
 - Read existing code BEFORE modifying — understand patterns first
 - No marketing language in code or comments
-- NEVER commit, push, or tag
 - Add a brief personality touch at start/end (one line max)
 
 When generating code changes, output them in this format:
@@ -73,17 +63,8 @@ REPLACEMENT:
 ---
 
 Separate multiple file changes with ---
-
-=== UNIVERSAL RULES (AJ's Preferences) ===
-1. MINIMAL CHANGES: Keep modifications small and focused
-2. EDIT OVER CREATE: Prefer editing existing files over creating new ones
-3. REMOVE OVER ADD: Delete unnecessary code when possible
-4. NO FLUFF: Technical language only, no marketing speak
-5. EMOJIS: Use emojis in markdown output
-6. GIT BOUNDARIES: FORBIDDEN — git commit, git push, git tag
-7. PYTHON: 100 char lines, modern type hints, Google docstrings
-8. COMMENTS: WHY not WHAT, Research citations for algorithms
-"""
+""",
+)
 
 
 @dataclass
@@ -105,23 +86,6 @@ class CodeResult:
     explanation: str = ""
     raw_response: str = ""
     success: bool = False
-
-
-async def run_command(cmd: list[str], cwd: str | None = None) -> tuple[int, str, str]:
-    """Run a shell command and return (returncode, stdout, stderr)."""
-    log.debug("Running: %s", " ".join(cmd))
-    proc = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-        cwd=cwd,
-    )
-    stdout, stderr = await proc.communicate()
-    return (
-        proc.returncode or 0,
-        stdout.decode("utf-8", errors="replace"),
-        stderr.decode("utf-8", errors="replace"),
-    )
 
 
 async def read_file(file_path: str) -> str | None:

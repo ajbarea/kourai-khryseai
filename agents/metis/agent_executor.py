@@ -4,132 +4,82 @@ from __future__ import annotations
 
 import logging
 
-from a2a.server.agent_execution import AgentExecutor, RequestContext
+from a2a.server.agent_execution import RequestContext
 from a2a.server.events import EventQueue
 from a2a.server.tasks import TaskUpdater
-from a2a.types import (
-    InternalError,
-    Part,
-    TaskState,
-    TextPart,
-    UnsupportedOperationError,
-)
-from a2a.utils import new_agent_text_message, new_task
+from a2a.types import Part, Task, TextPart, UnsupportedOperationError
 from a2a.utils.errors import ServerError
 
 from agents.metis.agent import create_spec, get_project_context
+from kourai_common.a2a_utils import extract_image_parts
+from kourai_common.base_executor import BaseAgentExecutor
+from kourai_common.decorators import executor_error_handler
+from kourai_common.messaging import send_working_status
 from kourai_common.tracing import create_span
 
 log = logging.getLogger(__name__)
 
 
-def _extract_image_parts(context: RequestContext) -> list[dict]:
-    """Build LiteLLM image_url blocks from any FilePart in the incoming message."""
-    from a2a.types import FileWithBytes
-
-    image_parts: list[dict] = []
-    if not context.message:
-        return image_parts
-    for part in context.message.parts:
-        root = part.root
-        if hasattr(root, "file") and isinstance(root.file, FileWithBytes):
-            mime = root.file.mime_type or "image/png"
-            image_parts.append(
-                {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{root.file.bytes}"}}
-            )
-    return image_parts
-
-
-class MetisAgentExecutor(AgentExecutor):
+class MetisAgentExecutor(BaseAgentExecutor):
     """A2A executor for the Metis planner agent."""
 
-    async def execute(
-        self,
-        context: RequestContext,
-        event_queue: EventQueue,
+    def get_input_required_message(self) -> str:
+        return (
+            "What feature or change do you want me to plan? "
+            "Describe your idea and I'll create a detailed spec."
+        )
+
+    @executor_error_handler(agent_name="metis")
+    async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
+        await super().execute(context, event_queue)
+
+    async def execute_agent_logic(
+        self, context: RequestContext, task: Task, updater: TaskUpdater
     ) -> None:
+        """Metis-specific: create implementation specs."""
         with create_span("metis.execute", {"a2a.method": "execute"}):
             user_input = context.get_user_input()
-            task = context.current_task
 
-            if not task and context.message:
-                task = new_task(context.message)
-                await event_queue.enqueue_event(task)
+            # Step 1: Gather project context
+            await send_working_status(
+                updater,
+                task,
+                "Analyzing project structure...",
+                emoji="📐",
+            )
 
-            if not task:
-                log.error("No task or message in request context")
-                raise ServerError(error=InternalError())
+            with create_span("metis.context"):
+                project_context = await get_project_context()
 
-            updater = TaskUpdater(event_queue, task.id, task.context_id)
+            # Step 2: Generate spec
+            await send_working_status(
+                updater,
+                task,
+                "Drafting implementation spec...",
+                emoji="📐",
+            )
 
-            if not user_input or not user_input.strip():
-                await updater.update_status(
-                    TaskState.input_required,
-                    new_agent_text_message(
-                        "What feature or change do you want me to plan? "
-                        "Describe your idea and I'll create a detailed spec.",
-                        task.context_id,
-                        task.id,
-                    ),
-                    final=True,
-                )
-                return
-
-            try:
-                # Step 1: Gather project context
-                await updater.update_status(
-                    TaskState.working,
-                    new_agent_text_message(
-                        "\U0001f4d0 Analyzing project structure...",
-                        task.context_id,
-                        task.id,
-                    ),
+            with create_span("metis.spec", {"idea": user_input[:100]}):
+                spec = await create_spec(
+                    idea=user_input,
+                    project_context=project_context,
+                    image_parts=extract_image_parts(context) or None,
                 )
 
-                with create_span("metis.context"):
-                    project_context = await get_project_context()
+            await send_working_status(
+                updater,
+                task,
+                "Spec complete",
+                emoji="📐",
+            )
 
-                # Step 2: Generate spec
-                await updater.update_status(
-                    TaskState.working,
-                    new_agent_text_message(
-                        "\U0001f4d0 Drafting implementation spec...",
-                        task.context_id,
-                        task.id,
-                    ),
-                )
+            # Step 3: Emit artifact
+            await updater.add_artifact(
+                [Part(root=TextPart(text=spec))],
+                name="implementation_spec",
+            )
+            await updater.complete()
+            log.info("Metis completed — spec generated")
 
-                with create_span("metis.spec", {"idea": user_input[:100]}):
-                    spec = await create_spec(
-                        idea=user_input,
-                        project_context=project_context,
-                        image_parts=_extract_image_parts(context) or None,
-                    )
-
-                await updater.update_status(
-                    TaskState.working,
-                    new_agent_text_message(
-                        "\U0001f4d0 Spec complete",
-                        task.context_id,
-                        task.id,
-                    ),
-                )
-
-                # Step 3: Emit artifact
-                await updater.add_artifact(
-                    [Part(root=TextPart(text=spec))],
-                    name="implementation_spec",
-                )
-                await updater.complete()
-                log.info("Metis completed — spec generated")
-
-            except Exception as e:
-                log.error("Metis execution failed: %s", e)
-                raise ServerError(error=InternalError()) from e
-
-    async def cancel(
-        self,
-        context: RequestContext,
-        event_queue: EventQueue,
-    ) -> None:
+    async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
         raise ServerError(error=UnsupportedOperationError())

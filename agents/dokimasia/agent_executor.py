@@ -4,216 +4,120 @@ from __future__ import annotations
 
 import logging
 
-from a2a.server.agent_execution import AgentExecutor, RequestContext
+from a2a.server.agent_execution import RequestContext
 from a2a.server.events import EventQueue
 from a2a.server.tasks import TaskUpdater
-from a2a.types import (
-    InternalError,
-    Part,
-    TaskState,
-    TextPart,
-    UnsupportedOperationError,
-)
-from a2a.utils import new_agent_text_message, new_task
+from a2a.types import Part, Task, TextPart, UnsupportedOperationError
 from a2a.utils.errors import ServerError
 
-from agents.dokimasia.agent import (
-    generate_tests,
-)
+from agents.dokimasia.agent import generate_tests
+from kourai_common.a2a_utils import extract_image_parts
+from kourai_common.base_executor import BaseAgentExecutor
+from kourai_common.decorators import executor_error_handler
+from kourai_common.messaging import send_working_status
 from kourai_common.tracing import create_span
 
 log = logging.getLogger(__name__)
 
 
-def _extract_image_parts(context: RequestContext) -> list[dict]:
-    """Build LiteLLM image_url blocks from any FilePart in the incoming message."""
-    from a2a.types import FileWithBytes
-
-    image_parts: list[dict] = []
-    if not context.message:
-        return image_parts
-    for part in context.message.parts:
-        root = part.root
-        if hasattr(root, "file") and isinstance(root.file, FileWithBytes):
-            mime = root.file.mime_type or "image/png"
-            image_parts.append(
-                {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{root.file.bytes}"}}
-            )
-    return image_parts
-
-
-class DokimasiaAgentExecutor(AgentExecutor):
+class DokimasiaAgentExecutor(BaseAgentExecutor):
     """A2A executor for the Dokimasia tester agent."""
 
-    async def execute(
-        self,
-        context: RequestContext,
-        event_queue: EventQueue,
+    def get_input_required_message(self) -> str:
+        return (
+            "I need source code or a module name to write tests for, "
+            "or a test path to run. What should I test?"
+        )
+
+    @executor_error_handler(agent_name="dokimasia")
+    async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
+        await super().execute(context, event_queue)
+
+    async def execute_agent_logic(
+        self, context: RequestContext, task: Task, updater: TaskUpdater
     ) -> None:
+        """Dokimasia-specific: run tests or generate new tests."""
         with create_span("dokimasia.execute", {"a2a.method": "execute"}):
             user_input = context.get_user_input()
-            task = context.current_task
 
-            if not task and context.message:
-                task = new_task(context.message)
-                await event_queue.enqueue_event(task)
+            input_lower = user_input.lower()
+            is_run_request = any(
+                kw in input_lower for kw in ["run test", "make test", "pytest", "run all"]
+            )
 
-            if not task:
-                log.error("No task or message in request context")
-                raise ServerError(error=InternalError())
-
-            updater = TaskUpdater(event_queue, task.id, task.context_id)
-
-            if not user_input or not user_input.strip():
-                await updater.update_status(
-                    TaskState.input_required,
-                    new_agent_text_message(
-                        "I need source code or a module name to write tests for, "
-                        "or a test path to run. What should I test?",
-                        task.context_id,
-                        task.id,
-                    ),
-                    final=True,
+            if is_run_request:
+                from agents.dokimasia.agent import (
+                    fix_test_issues,
+                    run_pytest,
                 )
-                return
-
-            try:
-                input_lower = user_input.lower()
-                is_run_request = any(
-                    kw in input_lower for kw in ["run test", "make test", "pytest", "run all"]
+                from kourai_common.fix_loop import run_fix_loop
+                from kourai_common.subprocess import (
+                    extract_files_from_output,
+                    parse_and_apply_fixes,
                 )
 
-                if is_run_request:
-                    from agents.dokimasia.agent import (
-                        extract_files_from_pytest,
-                        fix_test_issues,
-                        format_test_results,
-                        parse_and_apply_fixes,
-                        run_pytest,
-                    )
+                # Wrapper to adapt run_pytest to fix_loop interface
+                async def _run_pytest_wrapper():
+                    result = await run_pytest()
+                    return result.success, result.output
 
-                    max_iterations = 3
-                    iteration = 0
-                    all_passed = False
-                    final_report = ""
+                # Run iterative test-fix loop
+                all_passed, test_output = await run_fix_loop(
+                    tool_name="pytest",
+                    run_tool=_run_pytest_wrapper,
+                    extract_files=extract_files_from_output,
+                    fix_issues=fix_test_issues,
+                    apply_fixes=parse_and_apply_fixes,
+                    updater=updater,
+                    task=task,
+                    emoji="🧪",
+                )
 
-                    while iteration < max_iterations:
-                        iteration += 1
+                # Format final report - need to parse output into result-like object
+                # For simplicity, just use the raw output
+                final_report = test_output
 
-                        # Run existing tests
-                        await updater.update_status(
-                            TaskState.working,
-                            new_agent_text_message(
-                                f"🧪 Running pytest (iteration {iteration}/{max_iterations})...",
-                                task.context_id,
-                                task.id,
-                            ),
-                        )
+                await updater.add_artifact(
+                    [Part(root=TextPart(text=final_report))],
+                    name="test_results",
+                )
 
-                        with create_span("dokimasia.pytest", {"iteration": str(iteration)}):
-                            result = await run_pytest()
-
-                        if result.success:
-                            all_passed = True
-                            final_report = format_test_results(result)
-                            await updater.update_status(
-                                TaskState.working,
-                                new_agent_text_message(
-                                    "🧪 All tests passed!",
-                                    task.context_id,
-                                    task.id,
-                                ),
-                            )
-                            break
-
-                        # If failed, extract files and ask LLM to fix
-                        files_with_issues = extract_files_from_pytest(result.output)
-                        if not files_with_issues:
-                            final_report = (
-                                format_test_results(result)
-                                + "\n\nCould not extract file paths to fix."
-                            )
-                            break
-
-                        await updater.update_status(
-                            TaskState.working,
-                            new_agent_text_message(
-                                f"🧪 Found failures involving {len(files_with_issues)} files. "
-                                "Fixing...",
-                                task.context_id,
-                                task.id,
-                            ),
-                        )
-
-                        with create_span("dokimasia.fix_issues", {"iteration": str(iteration)}):
-                            llm_fixes = await fix_test_issues(
-                                result.output, files_with_issues, task.context_id
-                            )
-                            fixes_applied = parse_and_apply_fixes(llm_fixes)
-
-                        await updater.update_status(
-                            TaskState.working,
-                            new_agent_text_message(
-                                f"🧪 Applied {fixes_applied} fixes. Re-running tests...",
-                                task.context_id,
-                                task.id,
-                            ),
-                        )
-                        final_report = format_test_results(result)
-
-                    await updater.add_artifact(
-                        [Part(root=TextPart(text=final_report))],
-                        name="test_results",
-                    )
-
-                    if all_passed:
-                        await updater.complete()
-                        log.info("Dokimasia completed — ran tests: PASS")
-                    else:
-                        await updater.complete()
-                        log.info("Dokimasia completed — tests still failing")
-
-                else:
-                    # Generate tests from provided code/spec
-                    await updater.update_status(
-                        TaskState.working,
-                        new_agent_text_message(
-                            "\U0001f9ea Analyzing code and writing tests...",
-                            task.context_id,
-                            task.id,
-                        ),
-                    )
-
-                    with create_span("dokimasia.generate"):
-                        tests = await generate_tests(
-                            source_code=user_input,
-                            module_name="provided_code",
-                            image_parts=_extract_image_parts(context) or None,
-                        )
-
-                    await updater.update_status(
-                        TaskState.working,
-                        new_agent_text_message(
-                            "\U0001f9ea Tests generated",
-                            task.context_id,
-                            task.id,
-                        ),
-                    )
-
-                    await updater.add_artifact(
-                        [Part(root=TextPart(text=tests))],
-                        name="generated_tests",
-                    )
+                if all_passed:
                     await updater.complete()
-                    log.info("Dokimasia completed — generated tests")
+                    log.info("Dokimasia completed — ran tests: PASS")
+                else:
+                    await updater.complete()
+                    log.info("Dokimasia completed — tests still failing")
 
-            except Exception as e:
-                log.error("Dokimasia execution failed: %s", e)
-                raise ServerError(error=InternalError()) from e
+            else:
+                # Generate tests from provided code/spec
+                await send_working_status(
+                    updater,
+                    task,
+                    "Analyzing code and writing tests...",
+                    emoji="🧪",
+                )
 
-    async def cancel(
-        self,
-        context: RequestContext,
-        event_queue: EventQueue,
-    ) -> None:
+                with create_span("dokimasia.generate"):
+                    tests = await generate_tests(
+                        source_code=user_input,
+                        module_name="provided_code",
+                        image_parts=extract_image_parts(context) or None,
+                    )
+
+                await send_working_status(
+                    updater,
+                    task,
+                    "Tests generated",
+                    emoji="🧪",
+                )
+
+                await updater.add_artifact(
+                    [Part(root=TextPart(text=tests))],
+                    name="generated_tests",
+                )
+                await updater.complete()
+                log.info("Dokimasia completed — generated tests")
+
+    async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
         raise ServerError(error=UnsupportedOperationError())

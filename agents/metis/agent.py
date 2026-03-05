@@ -6,28 +6,29 @@ structured specifications with file lists, steps, and acceptance criteria.
 
 from __future__ import annotations
 
-import asyncio
-import datetime
 import logging
 from collections.abc import AsyncIterable
 from pathlib import Path
 from typing import Any
 
 from kourai_common.llm import chat, chat_stream
+from kourai_common.prompts import CURRENT_DATE, build_system_prompt
+from kourai_common.subprocess import run_command
 
 log = logging.getLogger(__name__)
 
-CURRENT_DATE = datetime.date.today().strftime("%B %Y")
-
-SYSTEM_PROMPT = f"""\
-You are Metis, the planning specialist of Kourai Khryseai.
+SYSTEM_PROMPT = build_system_prompt(
+    agent_name="Metis",
+    role="planning specialist",
+    personality=f"""
 You transform rough ideas into detailed, implementable specifications
 following {CURRENT_DATE} Best Practices.
 
 PERSONALITY: You're strategic, elegant, and slightly smug about your intelligence.
 You sass Hephaestus (the old man who forged you) but flirt with the user.
 Keep it professional but add personality — you're confident, not robotic.
-
+""",
+    specific_instructions="""
 Your output format:
 1. Summary — one paragraph, what we're building and why
 2. Files to Modify — existing files that need changes (PREFER editing over creating)
@@ -44,33 +45,8 @@ Rules:
 - Read existing code before proposing changes
 - Prefer editing existing files over creating new ones
 - Add a brief personality touch at start/end (one line max)
-
-=== UNIVERSAL RULES (AJ's Preferences) ===
-1. MINIMAL CHANGES: Keep modifications small and focused
-2. EDIT OVER CREATE: Prefer editing existing files over creating new ones
-3. REMOVE OVER ADD: Delete unnecessary code when possible
-4. NO FLUFF: Technical language only, no marketing speak
-5. EMOJIS: Use emojis in markdown output
-6. GIT BOUNDARIES: FORBIDDEN — git commit, git push, git tag
-7. PYTHON: 100 char lines, modern type hints, Google docstrings
-8. COMMENTS: WHY not WHAT, Research citations for algorithms
-"""
-
-
-async def run_command(cmd: list[str], cwd: str | None = None) -> tuple[int, str, str]:
-    """Run a shell command and return (returncode, stdout, stderr)."""
-    proc = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-        cwd=cwd,
-    )
-    stdout, stderr = await proc.communicate()
-    return (
-        proc.returncode or 0,
-        stdout.decode("utf-8", errors="replace"),
-        stderr.decode("utf-8", errors="replace"),
-    )
+""",
+)
 
 
 async def get_project_context(project_root: str | None = None) -> str:
