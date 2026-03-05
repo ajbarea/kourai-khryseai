@@ -97,7 +97,7 @@ AGENT_TIMEOUTS = {
 # Environment config
 LOG_LEVEL = os.getenv("KOURAI_LOG_LEVEL", "INFO")
 MODEL_TIER = os.getenv("KOURAI_MODEL_TIER", "cheap").lower()
-MAX_ITERATIONS = int(os.getenv("KOURAI_MAX_ITERATIONS", "3"))
+MAX_ITERATIONS = int(os.getenv("KOURAI_MAX_ITERATIONS", "5"))
 STREAM_ENABLED = os.getenv("KOURAI_STREAM_ENABLED", "true").lower() == "true"
 OTEL_ENDPOINT = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318")
 
