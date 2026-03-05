@@ -106,11 +106,19 @@ class TTSEngine:
                 channels=2,  # Stereo
                 buffer=512,  # Low latency buffer
             )
+            # Ensure we have enough channels and reserve channel 0 for TTS
+            # so pygame.mixer.stop() from background music can't evict speech.
+            pygame.mixer.set_num_channels(8)
+            self._tts_channel = pygame.mixer.Channel(0)
             self._mixer_initialized = True
-            logger.info("Pygame mixer initialized successfully")
+            logger.info("Pygame mixer initialized successfully (TTS on channel 0)")
         except RuntimeError as e:
-            # Mixer already initialized or init failed
+            # Mixer already initialized — grab the channel anyway
             logger.warning(f"Pygame mixer init error (may be already init): {e}")
+            try:
+                self._tts_channel = pygame.mixer.Channel(0)
+            except Exception:
+                self._tts_channel = None
             self._mixer_initialized = True
 
     def set_master_volume(self, volume: float) -> None:
@@ -238,14 +246,25 @@ class TTSEngine:
             else:
                 sound.set_volume(self.master_volume)
 
-            logger.info(f"TTS: Playing sound at volume={sound.get_volume():.2f}")
-            sound.play()
+            # Use dedicated channel so mixer.stop() from background music can't kill us
+            channel = getattr(self, "_tts_channel", None)
+            if channel is not None:
+                logger.info(f"TTS: Playing on reserved channel 0, volume={sound.get_volume():.2f}")
+                channel.play(sound)
+            else:
+                logger.info(f"TTS: Playing on default, volume={sound.get_volume():.2f}")
+                sound.play()
 
-            # Wait for playback with responsive checking
+            # Wait for this specific channel to finish
             playback_start = 0
-            while pygame.mixer.get_busy():
-                await asyncio.sleep(0.05)
-                playback_start += 0.05
+            if channel is not None:
+                while channel.get_busy():
+                    await asyncio.sleep(0.05)
+                    playback_start += 0.05
+            else:
+                while pygame.mixer.get_busy():
+                    await asyncio.sleep(0.05)
+                    playback_start += 0.05
 
             logger.info(f"TTS: Playback complete (duration={playback_start:.2f}s)")
 
@@ -290,9 +309,13 @@ class TTSEngine:
 
     def stop(self) -> None:
         """Stop current playback gracefully."""
-        if self.is_playing and pygame.mixer.get_busy():
+        channel = getattr(self, "_tts_channel", None)
+        if channel is not None and channel.get_busy():
+            channel.stop()
+            logger.info("TTS playback stopped (channel 0)")
+        elif self.is_playing and pygame.mixer.get_busy():
             pygame.mixer.stop()
-            logger.info("TTS playback stopped")
+            logger.info("TTS playback stopped (mixer-wide fallback)")
         self.is_playing = False
 
     def cleanup(self) -> None:
