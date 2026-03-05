@@ -50,7 +50,8 @@ class BackgroundMusic:
     def set_volume(self, volume: float) -> None:
         """Set background music volume (0.0 to 1.0)."""
         self.master_volume = max(0.0, min(1.0, volume))
-        pygame.mixer.music.set_volume(self.master_volume)
+        if pygame.mixer.music.get_busy():
+            pygame.mixer.music.set_volume(self.master_volume)
         logger.debug(f"Background music volume set to {self.master_volume}")
 
     def _generate_ambient_wave(self) -> bytes:
@@ -102,16 +103,13 @@ class BackgroundMusic:
         logger.info("Generating and playing ambient background music...")
 
         try:
-            # Generate WAV data
             wav_data = self._generate_ambient_wave()
 
-            # Load into pygame mixer
+            # mixer.music streams from BytesIO — no Sound channel consumed
             wav_buffer = io.BytesIO(wav_data)
-            sound = pygame.mixer.Sound(file=wav_buffer)
-            sound.set_volume(self.master_volume)
-
-            # Play with looping
-            sound.play(-1)
+            pygame.mixer.music.load(wav_buffer)
+            pygame.mixer.music.set_volume(self.master_volume)
+            pygame.mixer.music.play(-1)  # loop forever
 
             self.is_playing = True
             self.current_track = "ambient_generated"
@@ -123,19 +121,19 @@ class BackgroundMusic:
     def stop(self) -> None:
         """Stop background music."""
         if self.is_playing:
-            pygame.mixer.stop()
+            pygame.mixer.music.stop()
             self.is_playing = False
             logger.info("Background music stopped")
 
     def pause(self) -> None:
         """Pause background music."""
         if self.is_playing:
-            pygame.mixer.pause()
+            pygame.mixer.music.pause()
             logger.debug("Background music paused")
 
     def unpause(self) -> None:
         """Resume background music."""
-        pygame.mixer.unpause()
+        pygame.mixer.music.unpause()
         logger.debug("Background music resumed")
 
     def cleanup(self) -> None:
@@ -143,8 +141,8 @@ class BackgroundMusic:
         self.stop()
         if self._mixer_initialized:
             try:
-                pygame.mixer.quit()
+                pygame.mixer.music.unload()
                 self._mixer_initialized = False
-                logger.info("Mixer shut down")
+                logger.info("Music unloaded")
             except RuntimeError:
                 pass
