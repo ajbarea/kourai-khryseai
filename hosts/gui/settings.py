@@ -24,6 +24,10 @@ DEFAULT_SETTINGS = {
     "status_bubbles_collapsed": False,
     "reduce_motion": False,
     "fullscreen": False,
+    "music_volume": 0.25,
+    "ambient_volume": 0.5,
+    "voice_volume": 1.0,
+    "sfx_volume": 0.8,
 }
 
 

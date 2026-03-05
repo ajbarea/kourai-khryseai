@@ -15,6 +15,81 @@ import pygame.freetype
 
 from hosts.gui.gui_components_integration import GUIComponentsIntegration
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from hosts.gui.audio_manager import AudioManager as _AM
+
+
+class VolumeSlider:
+    """A horizontal volume slider with gold knob and value label."""
+
+    def __init__(
+        self,
+        x: int,
+        y: int,
+        width: int,
+        height: int,
+        initial_value: float,
+        callback: Callable[[float], None],
+    ):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.value = max(0.0, min(1.0, initial_value))
+        self.callback = callback
+        self.dragging = False
+        self._knob_radius = height // 2
+
+    def _knob_x(self) -> float:
+        usable = self.rect.width - self._knob_radius * 2
+        return self.rect.x + self._knob_radius + self.value * usable
+
+    def _value_from_x(self, mx: int) -> float:
+        usable = self.rect.width - self._knob_radius * 2
+        rel = mx - (self.rect.x + self._knob_radius)
+        return max(0.0, min(1.0, rel / max(usable, 1)))
+
+    def draw(self, surf: pygame.Surface, palette: dict) -> None:
+        gold = palette.get("gold", (218, 165, 32))
+        track_y = self.rect.centery
+        # Track background
+        pygame.draw.line(
+            surf, (50, 45, 40),
+            (self.rect.x + self._knob_radius, track_y),
+            (self.rect.right - self._knob_radius, track_y),
+            3,
+        )
+        # Filled portion
+        kx = int(self._knob_x())
+        pygame.draw.line(
+            surf, gold,
+            (self.rect.x + self._knob_radius, track_y),
+            (kx, track_y),
+            3,
+        )
+        # Knob
+        pygame.draw.circle(surf, (255, 255, 255), (kx, track_y), self._knob_radius)
+        pygame.draw.circle(surf, gold, (kx, track_y), self._knob_radius, 1)
+
+    def handle_mousedown(self, pos: tuple[int, int]) -> bool:
+        # Expand hit area vertically for easier grabbing
+        hit = pygame.Rect(self.rect.x, self.rect.y - 6, self.rect.width, self.rect.height + 12)
+        if hit.collidepoint(pos):
+            self.dragging = True
+            self.value = self._value_from_x(pos[0])
+            self.callback(self.value)
+            return True
+        return False
+
+    def handle_mousemotion(self, pos: tuple[int, int]) -> bool:
+        if self.dragging:
+            self.value = self._value_from_x(pos[0])
+            self.callback(self.value)
+            return True
+        return False
+
+    def handle_mouseup(self) -> None:
+        self.dragging = False
+
 
 class ToggleSwitch:
     """A clean, modern toggle switch."""
@@ -94,16 +169,18 @@ class Button:
 class SettingsOverlay:
     """The main settings overlay panel."""
 
-    def __init__(self, width: int, height: int, gui_integration: GUIComponentsIntegration):
+    def __init__(self, width: int, height: int, gui_integration: GUIComponentsIntegration,
+                 audio_manager: _AM | None = None):
         self.screen_w = width
         self.screen_h = height
         self.gui = gui_integration
+        self.audio_manager = audio_manager
         self.active = False
         self.alpha = 0.0
 
-        # Layout
+        # Layout — taller panel to hold audio sliders
         self.panel_w = 400
-        self.panel_h = 620
+        self.panel_h = 780
         self.panel_rect = pygame.Rect(
             (self.screen_w - self.panel_w) // 2,
             (self.screen_h - self.panel_h) // 2,
@@ -128,10 +205,11 @@ class SettingsOverlay:
 
     def _init_controls(self):
         self.toggles = {}
+        self.sliders: dict[str, dict] = {}
 
         # Starting Y for controls
         start_y = self.panel_rect.y + 80
-        spacing = 60
+        spacing = 48
 
         def make_toggle(key, label, y_offset, default=False):
             state = self.gui.settings.get(key, default)
@@ -171,8 +249,42 @@ class SettingsOverlay:
         )
         make_toggle("fullscreen", "Fullscreen Mode", start_y + spacing * 5, False)
 
+        # --- Audio section ---
+        audio_section_y = start_y + spacing * 6 + 16
+        self._audio_label_y = audio_section_y
+        slider_start_y = audio_section_y + 28
+        slider_spacing = 48
+        slider_w = self.panel_w - 140  # leave room for label + value text
+
+        audio_controls = [
+            ("music_volume", "Music", 0.25),
+            ("ambient_volume", "Ambient", 0.5),
+            ("voice_volume", "Voice", 1.0),
+            ("sfx_volume", "SFX", 0.8),
+        ]
+
+        for i, (key, label, default) in enumerate(audio_controls):
+            vol = self.gui.settings.get(key, default)
+
+            def on_slide(value: float, k=key):
+                self.gui.settings.set(k, round(value, 2))
+                if self.audio_manager is not None:
+                    setter = getattr(self.audio_manager, f"set_{k}", None)
+                    if setter:
+                        setter(value)
+                self.gui.save_all_settings()
+
+            y = slider_start_y + i * slider_spacing
+            self.sliders[key] = {
+                "label": label,
+                "slider": VolumeSlider(
+                    self.panel_rect.x + 100, y, slider_w, 20, vol, on_slide,
+                ),
+                "y": y,
+            }
+
         # Quit button
-        quit_y = start_y + spacing * 6 + 20
+        quit_y = slider_start_y + len(audio_controls) * slider_spacing + 12
         self.quit_button = Button(
             self.panel_rect.x + 30, quit_y, self.panel_w - 60, 40, "Quit", self._on_quit_clicked
         )
@@ -185,10 +297,13 @@ class SettingsOverlay:
     def toggle(self):
         self.active = not self.active
         if self.active:
-            # Re-sync states just in case
+            # Re-sync toggle states
             for k, t in self.toggles.items():
                 t["switch"].state = self.gui.settings.get(k, t["switch"].state)
                 t["switch"].anim_t = 1.0 if t["switch"].state else 0.0
+            # Re-sync slider values from settings
+            for k, s in self.sliders.items():
+                s["slider"].value = self.gui.settings.get(k, s["slider"].value)
 
     def update(self, dt: float):
         target_alpha = 255.0 if self.active else 0.0
@@ -224,7 +339,21 @@ class SettingsOverlay:
             for t in self.toggles.values():
                 if t["switch"].handle_click(event.pos):
                     return True
+
+            for s in self.sliders.values():
+                if s["slider"].handle_mousedown(event.pos):
+                    return True
+
             return True  # Consume all clicks on panel
+
+        if event.type == pygame.MOUSEMOTION:
+            for s in self.sliders.values():
+                if s["slider"].handle_mousemotion(event.pos):
+                    return True
+
+        if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            for s in self.sliders.values():
+                s["slider"].handle_mouseup()
 
         return False
 
@@ -242,6 +371,7 @@ class SettingsOverlay:
         border_color = (*palette.get("bubble_border", (218, 165, 32)), int(self.alpha))
         text_color = (*palette.get("text", (255, 255, 255)), int(self.alpha))
         dim_color = (*palette.get("scrollbar", (160, 155, 145)), int(self.alpha))
+        gold = palette.get("gold", (218, 165, 32))
 
         pygame.draw.rect(overlay, panel_color, self.panel_rect, border_radius=12)
         pygame.draw.rect(overlay, border_color, self.panel_rect, 1, border_radius=12)
@@ -257,6 +387,31 @@ class SettingsOverlay:
                 overlay, (self.panel_rect.x + 30, t["y"] + 4), t["label"], text_color
             )
             t["switch"].draw(overlay, palette)
+
+        # --- Audio section divider + heading ---
+        div_y = self._audio_label_y - 4
+        pygame.draw.line(
+            overlay,
+            (*gold, int(self.alpha * 0.4)),
+            (self.panel_rect.x + 30, div_y),
+            (self.panel_rect.right - 30, div_y),
+            1,
+        )
+        self.font_label.render_to(
+            overlay, (self.panel_rect.x + 30, self._audio_label_y + 2), "Audio", text_color
+        )
+
+        # Draw volume sliders
+        for s in self.sliders.values():
+            self.font_small.render_to(
+                overlay, (self.panel_rect.x + 30, s["y"] + 4), s["label"], dim_color
+            )
+            s["slider"].draw(overlay, palette)
+            # Value percentage label
+            pct = f"{int(s['slider'].value * 100)}%"
+            self.font_small.render_to(
+                overlay, (self.panel_rect.right - 48, s["y"] + 4), pct, dim_color
+            )
 
         # Draw quit button
         self.quit_button.draw(overlay, self.font_label, palette)
