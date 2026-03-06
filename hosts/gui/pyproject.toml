@@ -10,6 +10,7 @@ dependencies = [
     "pillow>=10.0",
     "httpx>=0.27",
     "edge-tts>=0.30.0",  # Neural TTS with real-time prosody control
+    "emoji>=2.15.0",
 ]
 
 [build-system]
