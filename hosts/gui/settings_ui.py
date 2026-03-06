@@ -4,6 +4,7 @@ Implements March 2026 UI/UX best practices:
 - "Quiet Intelligence" aesthetic (clean, frosted glass/overlay).
 - Progressive disclosure.
 - Easy to tap/click toggles for accessibility settings.
+- Tabbed navigation (Display, Gameplay, Audio) for better organization.
 """
 
 from __future__ import annotations
@@ -18,6 +19,57 @@ from hosts.gui.gui_components_integration import GUIComponentsIntegration
 
 if TYPE_CHECKING:
     from hosts.gui.audio_manager import AudioManager as _AM
+
+
+class TabButton:
+    """A tab button for navigating sections."""
+
+    def __init__(
+        self,
+        x: int,
+        y: int,
+        width: int,
+        height: int,
+        label: str,
+        tab_id: str,
+        callback: Callable[[str], None],
+    ):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.label = label
+        self.tab_id = tab_id
+        self.callback = callback
+        self.hovered = False
+        self.active = False
+
+    def update(self, mouse_pos: tuple[int, int]) -> None:
+        self.hovered = self.rect.collidepoint(mouse_pos)
+
+    def draw(self, surf: pygame.Surface, font: pygame.freetype.Font, palette: dict) -> None:
+        if self.active:
+            bg_color = palette.get("gold", (218, 165, 32))
+            text_color = palette.get("bubble_bg", (30, 22, 10))
+        elif self.hovered:
+            bg_color = (70, 65, 60)
+            text_color = palette.get("text", (255, 255, 255))
+        else:
+            bg_color = (40, 35, 30)
+            text_color = palette.get("scrollbar", (160, 155, 145))
+
+        pygame.draw.rect(surf, bg_color, self.rect, border_radius=6)
+
+        text_rect = font.get_rect(self.label)
+        font.render_to(
+            surf,
+            (self.rect.centerx - text_rect.width // 2, self.rect.centery - text_rect.height // 2),
+            self.label,
+            text_color,
+        )
+
+    def handle_click(self, pos: tuple[int, int]) -> bool:
+        if self.rect.collidepoint(pos):
+            self.callback(self.tab_id)
+            return True
+        return False
 
 
 class VolumeSlider:
@@ -167,6 +219,69 @@ class Button:
         return False
 
 
+class CycleButton:
+    """A button that cycles through a list of string options."""
+
+    def __init__(
+        self,
+        x: int,
+        y: int,
+        width: int,
+        height: int,
+        options: list[str],
+        initial_value: str,
+        callback: Callable[[str], None],
+    ):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.options = options
+        if initial_value in options:
+            self.index = options.index(initial_value)
+        else:
+            self.index = 0
+
+        self.callback = callback
+        self.hovered = False
+
+    @property
+    def value(self) -> str:
+        return self.options[self.index]
+
+    @value.setter
+    def value(self, val: str) -> None:
+        if val in self.options:
+            self.index = self.options.index(val)
+
+    def update(self, mouse_pos: tuple[int, int]) -> None:
+        self.hovered = self.rect.collidepoint(mouse_pos)
+
+    def draw(self, surf: pygame.Surface, font: pygame.freetype.Font, palette: dict) -> None:
+        # Background
+        bg_color = palette.get("gold", (218, 165, 32)) if self.hovered else (50, 45, 40)
+        pygame.draw.rect(surf, bg_color, self.rect, border_radius=6)
+
+        # Text
+        text_color = (
+            palette.get("bubble_bg", (30, 22, 10))
+            if self.hovered
+            else palette.get("text", (255, 255, 255))
+        )
+        text_rect = font.get_rect(self.value)
+
+        font.render_to(
+            surf,
+            (self.rect.centerx - text_rect.width // 2, self.rect.centery - text_rect.height // 2),
+            self.value,
+            text_color,
+        )
+
+    def handle_click(self, pos: tuple[int, int]) -> bool:
+        if self.rect.collidepoint(pos):
+            self.index = (self.index + 1) % len(self.options)
+            self.callback(self.value)
+            return True
+        return False
+
+
 class SettingsOverlay:
     """The main settings overlay panel."""
 
@@ -186,7 +301,7 @@ class SettingsOverlay:
 
         # Layout — taller panel to hold audio sliders
         self.panel_w = 400
-        self.panel_h = 780
+        self.panel_h = 480
         self.panel_rect = pygame.Rect(
             (self.screen_w - self.panel_w) // 2,
             (self.screen_h - self.panel_h) // 2,
@@ -199,26 +314,88 @@ class SettingsOverlay:
         self.font_small = pygame.freetype.SysFont("segoeui, inter, arial", 12)
 
         self.on_quit_callback: Callable[[], None] | None = None
-        self.on_fullscreen_toggle: Callable[[bool], None] | None = None
         self._init_controls()
 
-    def set_fullscreen_callback(self, callback: Callable[[bool], None]) -> None:
-        """Set callback for fullscreen toggle."""
-        self.on_fullscreen_toggle = callback
+    def update_layout(self, screen_w: int, screen_h: int):
+        self.screen_w = screen_w
+        self.screen_h = screen_h
+        self.panel_rect.centerx = screen_w // 2
+        self.panel_rect.centery = screen_h // 2
+
+        # Save necessary state
+        old_tab = getattr(self, "active_tab", "display")
+
+        self._init_controls()
+
+        # Restore state
+        self.active_tab = old_tab
+        for t in self.tabs.values():
+            t.active = t.tab_id == old_tab
+
+        # Re-sync states from settings
+        for category in self.toggles.values():
+            for k, t in category.items():
+                t["switch"].state = self.gui.settings.get(k, t["switch"].state)
+                t["switch"].anim_t = 1.0 if t["switch"].state else 0.0
+        for category in self.sliders.values():
+            for k, s in category.items():
+                s["slider"].value = self.gui.settings.get(k, s["slider"].value)
+
+    def set_display_mode_callback(self, callback: Callable[[str], None]) -> None:
+        """Set callback for display mode toggle."""
+        self.on_display_mode_toggle = callback
 
     def set_quit_callback(self, callback: Callable[[], None]) -> None:
         """Set callback for quit button."""
         self.on_quit_callback = callback
 
     def _init_controls(self):
-        self.toggles: dict[str, dict] = {}
-        self.sliders: dict[str, dict] = {}
+        # Tabs
+        self.active_tab = "display"
+        self.tabs: dict[str, TabButton] = {}
+        tab_width = (self.panel_w - 60) // 3
 
-        # Starting Y for controls
-        start_y = self.panel_rect.y + 80
+        def on_tab_click(tab_id: str):
+            self.active_tab = tab_id
+            for t in self.tabs.values():
+                t.active = t.tab_id == tab_id
+
+        self.tabs["display"] = TabButton(
+            self.panel_rect.x + 30,
+            self.panel_rect.y + 70,
+            tab_width - 5,
+            30,
+            "Display",
+            "display",
+            on_tab_click,
+        )
+        self.tabs["display"].active = True
+        self.tabs["gameplay"] = TabButton(
+            self.panel_rect.x + 30 + tab_width,
+            self.panel_rect.y + 70,
+            tab_width - 5,
+            30,
+            "Gameplay",
+            "gameplay",
+            on_tab_click,
+        )
+        self.tabs["audio"] = TabButton(
+            self.panel_rect.x + 30 + tab_width * 2,
+            self.panel_rect.y + 70,
+            tab_width - 5,
+            30,
+            "Audio",
+            "audio",
+            on_tab_click,
+        )
+
+        self.toggles: dict[str, dict] = {"display": {}, "gameplay": {}, "audio": {}}
+        self.sliders: dict[str, dict] = {"display": {}, "gameplay": {}, "audio": {}}
+
+        start_y = self.panel_rect.y + 130
         spacing = 48
 
-        def make_toggle(key, label, y_offset, default=False):
+        def make_toggle(tab, key, label, y_offset, default=False):
             state = self.gui.settings.get(key, default)
 
             def on_toggle(new_state, k=key):
@@ -229,17 +406,13 @@ class SettingsOverlay:
                         self.gui.high_contrast.enable_high_contrast()
                     else:
                         self.gui.high_contrast.disable_high_contrast()
-                elif k == "status_bubbles_collapsed":
-                    # sync it
-                    if self.gui.status_bubbles.is_collapsed() != new_state:
-                        self.gui.status_bubbles.toggle_status_bubbles()
-                elif k == "fullscreen" and self.on_fullscreen_toggle is not None:
+                elif k == "fullscreen" and hasattr(self, "on_fullscreen_toggle"):
                     # Trigger fullscreen toggle via callback
                     self.on_fullscreen_toggle(new_state)
 
                 self.gui.save_all_settings()
 
-            self.toggles[key] = {
+            self.toggles[tab][key] = {
                 "label": label,
                 "switch": ToggleSwitch(
                     self.panel_rect.right - 70, y_offset, 40, 24, state, on_toggle
@@ -247,27 +420,43 @@ class SettingsOverlay:
                 "y": y_offset,
             }
 
-        make_toggle("high_contrast", "High Contrast Mode", start_y)
-        make_toggle("reduce_motion", "Reduce Motion", start_y + spacing)
-        make_toggle("auto_scroll_enabled", "Auto-Scroll Chat", start_y + spacing * 2, True)
-        make_toggle("typewriter_enabled", "Typewriter Effect", start_y + spacing * 3, True)
-        make_toggle(
-            "status_bubbles_collapsed", "Collapse Status Bubbles", start_y + spacing * 4, False
-        )
-        make_toggle("fullscreen", "Fullscreen Mode", start_y + spacing * 5, False)
+        # Display Controls
+        make_toggle("display", "high_contrast", "High Contrast Mode", start_y)
+        make_toggle("display", "reduce_motion", "Reduce Motion", start_y + spacing)
 
-        # --- Audio section ---
-        audio_section_y = start_y + spacing * 6 + 16
-        self._audio_label_y = audio_section_y
-        slider_start_y = audio_section_y + 28
+        # Display Mode Cycle Button
+        display_mode_state = self.gui.settings.get("display_mode", "Windowed")
+
+        def on_display_mode(new_mode: str):
+            self.gui.settings.set("display_mode", new_mode)
+            if hasattr(self, "on_display_mode_toggle"):
+                self.on_display_mode_toggle(new_mode)
+            self.gui.save_all_settings()
+
+        self.display_mode_btn = CycleButton(
+            self.panel_rect.right - 140,
+            start_y + spacing * 2,
+            110,
+            24,
+            ["Windowed", "Borderless", "Fullscreen"],
+            display_mode_state,
+            on_display_mode,
+        )
+
+        # Gameplay Toggles
+        make_toggle("gameplay", "auto_scroll_enabled", "Auto-Scroll Chat", start_y, True)
+        make_toggle("gameplay", "typewriter_enabled", "Typewriter Effect", start_y + spacing, True)
+        make_toggle("gameplay", "show_debug_logs", "Show Debug Logs", start_y + spacing * 2, False)
+
+        # Audio Sliders
         slider_spacing = 48
-        slider_w = self.panel_w - 140  # leave room for label + value text
+        slider_w = self.panel_w - 140
 
         audio_controls = [
-            ("music_volume", "Music", 0.25),
-            ("ambient_volume", "Ambient", 0.5),
+            ("music_volume", "Music", 0.65),
+            ("ambient_volume", "Ambient", 0.50),
             ("voice_volume", "Voice", 1.0),
-            ("sfx_volume", "SFX", 0.8),
+            ("sfx_volume", "SFX", 0.85),
         ]
 
         for i, (key, label, default) in enumerate(audio_controls):
@@ -281,8 +470,8 @@ class SettingsOverlay:
                         setter(value)
                 self.gui.save_all_settings()
 
-            y = slider_start_y + i * slider_spacing
-            self.sliders[key] = {
+            y = start_y + i * slider_spacing
+            self.sliders["audio"][key] = {
                 "label": label,
                 "slider": VolumeSlider(
                     self.panel_rect.x + 100,
@@ -295,11 +484,49 @@ class SettingsOverlay:
                 "y": y,
             }
 
-        # Quit button
-        quit_y = slider_start_y + len(audio_controls) * slider_spacing + 12
-        self.quit_button = Button(
-            self.panel_rect.x + 30, quit_y, self.panel_w - 60, 40, "Quit", self._on_quit_clicked
+        # Buttons
+        btn_y = self.panel_rect.bottom - 60
+        btn_w = (self.panel_w - 90) // 2
+
+        self.reset_button = Button(
+            self.panel_rect.x + 30, btn_y, btn_w, 40, "Reset", self._on_reset_clicked
         )
+
+        self.quit_button = Button(
+            self.panel_rect.x + 60 + btn_w, btn_y, btn_w, 40, "Quit", self._on_quit_clicked
+        )
+
+    def _on_reset_clicked(self) -> None:
+        """Handle reset defaults click."""
+        if hasattr(self.gui.settings, "reset_to_defaults"):
+            self.gui.settings.reset_to_defaults()
+
+        # Apply immediate effects
+        if self.gui.settings.get("high_contrast"):
+            self.gui.high_contrast.enable_high_contrast()
+        else:
+            self.gui.high_contrast.disable_high_contrast()
+
+        if hasattr(self, "on_display_mode_toggle"):
+            self.on_display_mode_toggle(self.gui.settings.get("display_mode", "Windowed"))
+
+        self.display_mode_btn.value = self.gui.settings.get("display_mode", "Windowed")
+
+        # Re-sync toggles
+        for category in self.toggles.values():
+            for k, t in category.items():
+                t["switch"].state = self.gui.settings.get(k, t["switch"].state)
+                t["switch"].anim_t = 1.0 if t["switch"].state else 0.0
+
+        # Re-sync sliders and audio
+        for category in self.sliders.values():
+            for k, s in category.items():
+                val = self.gui.settings.get(k, s["slider"].value)
+                s["slider"].value = val
+                if self.audio_manager is not None:
+                    setter = getattr(self.audio_manager, f"set_{k}", None)
+                    if setter:
+                        setter(val)
 
     def _on_quit_clicked(self) -> None:
         """Handle quit button click."""
@@ -310,12 +537,14 @@ class SettingsOverlay:
         self.active = not self.active
         if self.active:
             # Re-sync toggle states
-            for k, t in self.toggles.items():
-                t["switch"].state = self.gui.settings.get(k, t["switch"].state)
-                t["switch"].anim_t = 1.0 if t["switch"].state else 0.0
+            for category in self.toggles.values():
+                for k, t in category.items():
+                    t["switch"].state = self.gui.settings.get(k, t["switch"].state)
+                    t["switch"].anim_t = 1.0 if t["switch"].state else 0.0
             # Re-sync slider values from settings
-            for k, s in self.sliders.items():
-                s["slider"].value = self.gui.settings.get(k, s["slider"].value)
+            for category in self.sliders.values():
+                for k, s in category.items():
+                    s["slider"].value = self.gui.settings.get(k, s["slider"].value)
 
     def update(self, dt: float):
         target_alpha = 255.0 if self.active else 0.0
@@ -323,11 +552,18 @@ class SettingsOverlay:
 
         # Update controls only while menu is actively open (not during close animation)
         if self.alpha > 1.0 and self.active:
-            for t in self.toggles.values():
+            mouse_pos = pygame.mouse.get_pos()
+            for t in self.tabs.values():
+                t.update(mouse_pos)
+
+            for t in self.toggles[self.active_tab].values():
                 t["switch"].update(dt)
 
+            if self.active_tab == "display":
+                self.display_mode_btn.update(mouse_pos)
+
             # Update button hover state
-            mouse_pos = pygame.mouse.get_pos()
+            self.reset_button.update(mouse_pos)
             self.quit_button.update(mouse_pos)
 
     def handle_event(self, event: pygame.event.Event) -> bool:
@@ -344,27 +580,36 @@ class SettingsOverlay:
                 self.toggle()
                 return True
 
-            # Check quit button
+            for t in self.tabs.values():
+                if t.handle_click(event.pos):
+                    return True
+
+            # Check buttons
             if self.quit_button.handle_click(event.pos):
                 return True
+            if self.reset_button.handle_click(event.pos):
+                return True
 
-            for t in self.toggles.values():
+            for t in self.toggles[self.active_tab].values():
                 if t["switch"].handle_click(event.pos):
                     return True
 
-            for s in self.sliders.values():
+            if self.active_tab == "display" and self.display_mode_btn.handle_click(event.pos):
+                return True
+
+            for s in self.sliders[self.active_tab].values():
                 if s["slider"].handle_mousedown(event.pos):
                     return True
 
             return True  # Consume all clicks on panel
 
         if event.type == pygame.MOUSEMOTION:
-            for s in self.sliders.values():
+            for s in self.sliders[self.active_tab].values():
                 if s["slider"].handle_mousemotion(event.pos):
                     return True
 
         if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-            for s in self.sliders.values():
+            for s in self.sliders[self.active_tab].values():
                 s["slider"].handle_mouseup()
 
         return False
@@ -383,38 +628,38 @@ class SettingsOverlay:
         border_color = (*palette.get("bubble_border", (218, 165, 32)), int(self.alpha))
         text_color = (*palette.get("text", (255, 255, 255)), int(self.alpha))
         dim_color = (*palette.get("scrollbar", (160, 155, 145)), int(self.alpha))
-        gold = palette.get("gold", (218, 165, 32))
+        palette.get("gold", (218, 165, 32))
 
         pygame.draw.rect(overlay, panel_color, self.panel_rect, border_radius=12)
         pygame.draw.rect(overlay, border_color, self.panel_rect, 1, border_radius=12)
 
         # Title
         self.font_title.render_to(
-            overlay, (self.panel_rect.x + 30, self.panel_rect.y + 30), "Settings", text_color
+            overlay, (self.panel_rect.x + 30, self.panel_rect.y + 25), "Settings", text_color
         )
 
+        # Tabs
+        for t in self.tabs.values():
+            t.draw(overlay, self.font_label, palette)
+
         # Draw toggles with synchronized alpha
-        for t in self.toggles.values():
+        for t in self.toggles[self.active_tab].values():
             self.font_label.render_to(
                 overlay, (self.panel_rect.x + 30, t["y"] + 4), t["label"], text_color
             )
             t["switch"].draw(overlay, palette)
 
-        # --- Audio section divider + heading ---
-        div_y = self._audio_label_y - 4
-        pygame.draw.line(
-            overlay,
-            (*gold, int(self.alpha * 0.4)),
-            (self.panel_rect.x + 30, div_y),
-            (self.panel_rect.right - 30, div_y),
-            1,
-        )
-        self.font_label.render_to(
-            overlay, (self.panel_rect.x + 30, self._audio_label_y + 2), "Audio", text_color
-        )
+        if self.active_tab == "display":
+            self.font_label.render_to(
+                overlay,
+                (self.panel_rect.x + 30, self.display_mode_btn.rect.y + 4),
+                "Display Mode",
+                text_color,
+            )
+            self.display_mode_btn.draw(overlay, self.font_label, palette)
 
         # Draw volume sliders
-        for s in self.sliders.values():
+        for s in self.sliders[self.active_tab].values():
             self.font_small.render_to(
                 overlay, (self.panel_rect.x + 30, s["y"] + 4), s["label"], dim_color
             )
@@ -425,13 +670,14 @@ class SettingsOverlay:
                 overlay, (self.panel_rect.right - 48, s["y"] + 4), pct, dim_color
             )
 
-        # Draw quit button
+        # Draw buttons
+        self.reset_button.draw(overlay, self.font_label, palette)
         self.quit_button.draw(overlay, self.font_label, palette)
 
         # Footer hint
         self.font_small.render_to(
             overlay,
-            (self.panel_rect.x + 30, self.panel_rect.bottom - 40),
+            (self.panel_rect.centerx - 100, self.panel_rect.bottom - 15),
             "Press ESC or click outside to close",
             dim_color,
         )
