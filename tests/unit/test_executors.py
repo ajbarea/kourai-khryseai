@@ -41,26 +41,66 @@ def _collect_events(queue: AsyncMock) -> list:
 
 
 # ---------------------------------------------------------------------------
-# Mneme executor
+# Parametrized common tests for all executors
+# ---------------------------------------------------------------------------
+
+AGENT_EXECUTORS = [
+    ("mneme", "agents.mneme.agent_executor", "MnemeAgentExecutor"),
+    ("kallos", "agents.kallos.agent_executor", "KallosAgentExecutor"),
+    ("metis", "agents.metis.agent_executor", "MetisAgentExecutor"),
+    ("dokimasia", "agents.dokimasia.agent_executor", "DokimasiaAgentExecutor"),
+    ("techne", "agents.techne.agent_executor", "TechneAgentExecutor"),
+    ("hephaestus", "agents.hephaestus.agent_executor", "HephaestusAgentExecutor"),
+]
+
+
+class TestExecutorCommonBehavior:
+    """Common tests parametrized across all 6 agent executors."""
+
+    @pytest.mark.parametrize("agent_name,module_path,class_name", AGENT_EXECUTORS)
+    @pytest.mark.asyncio
+    async def test_empty_input_returns_input_required(
+        self, agent_name: str, module_path: str, class_name: str
+    ):
+        """All executors should return input_required status for empty input."""
+        executor_module = __import__(module_path, fromlist=[class_name])
+        executor_class = getattr(executor_module, class_name)
+
+        executor = executor_class()
+        ctx = _make_context("")
+        queue = _make_queue()
+
+        with patch(f"{module_path}.create_span"):
+            await executor.execute(ctx, queue)
+
+        # Should have enqueued at least a task creation event
+        assert queue.enqueue_event.call_count >= 1
+
+    @pytest.mark.parametrize("agent_name,module_path,class_name", AGENT_EXECUTORS)
+    @pytest.mark.asyncio
+    async def test_cancel_raises_unsupported(
+        self, agent_name: str, module_path: str, class_name: str
+    ):
+        """All executors should raise ServerError on cancel (unsupported operation)."""
+        executor_module = __import__(module_path, fromlist=[class_name])
+        executor_class = getattr(executor_module, class_name)
+
+        executor = executor_class()
+        with pytest.raises(ServerError):
+            await executor.cancel(_make_context(), _make_queue())
+
+
+# ---------------------------------------------------------------------------
+# Agent-specific tests (different logic per executor)
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Agent-specific tests (different logic per executor)
 # ---------------------------------------------------------------------------
 
 
 class TestMnemeExecutor:
-    """Mneme agent executor tests."""
-
-    @pytest.mark.asyncio
-    async def test_empty_input_returns_input_required(self):
-        from agents.mneme.agent_executor import MnemeAgentExecutor
-
-        executor = MnemeAgentExecutor()
-        ctx = _make_context("")
-        queue = _make_queue()
-
-        with patch("agents.mneme.agent_executor.create_span"):
-            await executor.execute(ctx, queue)
-
-        # Should have enqueued a task + status events
-        assert queue.enqueue_event.call_count >= 1
+    """Mneme-specific tests (streaming, commit messages)."""
 
     @pytest.mark.asyncio
     async def test_valid_input_streams_and_completes(self):
@@ -85,88 +125,34 @@ class TestMnemeExecutor:
 
         assert queue.enqueue_event.call_count >= 2
 
-    @pytest.mark.asyncio
-    async def test_cancel_raises_unsupported(self):
-        from agents.mneme.agent_executor import MnemeAgentExecutor
-
-        executor = MnemeAgentExecutor()
-        with pytest.raises(ServerError):
-            await executor.cancel(_make_context(), _make_queue())
-
-
-# ---------------------------------------------------------------------------
-# Kallos executor
-# ---------------------------------------------------------------------------
-
 
 class TestKallosExecutor:
-    """Kallos agent executor tests."""
+    """Kallos-specific tests (linting, style checks)."""
 
     @pytest.mark.asyncio
-    async def test_empty_input_returns_input_required(self):
+    async def test_valid_input_runs_style_check(self):
         from agents.kallos.agent_executor import KallosAgentExecutor
-
-        executor = KallosAgentExecutor()
-        ctx = _make_context("   ")
-        queue = _make_queue()
-
-        with patch("agents.kallos.agent_executor.create_span"):
-            await executor.execute(ctx, queue)
-
-        assert queue.enqueue_event.call_count >= 1
-
-    @pytest.mark.asyncio
-    async def test_valid_input_runs_fix_loop(self):
-        from agents.kallos.agent_executor import KallosAgentExecutor
-        from kourai_common.fix_loop import FixLoopResult
 
         executor = KallosAgentExecutor()
         ctx = _make_context("agents/kallos/agent.py")
         queue = _make_queue()
 
-        result = FixLoopResult(all_passed=True, iterations_run=1)
+        # Mock the run_make_lint function to return success
+        async def mock_run_make_lint():
+            return (True, "All checks passed")
 
         with (
             patch("agents.kallos.agent_executor.create_span"),
-            patch(
-                "kourai_common.fix_loop.run_fix_loop",
-                new_callable=AsyncMock,
-                return_value=(True, "All checks passed", result),
-            ),
+            patch("agents.kallos.agent.run_make_lint", side_effect=mock_run_make_lint),
+            patch("kourai_common.subprocess.extract_files_from_output", return_value=[]),
         ):
             await executor.execute(ctx, queue)
 
         assert queue.enqueue_event.call_count >= 3
 
-    @pytest.mark.asyncio
-    async def test_cancel_raises_unsupported(self):
-        from agents.kallos.agent_executor import KallosAgentExecutor
-
-        executor = KallosAgentExecutor()
-        with pytest.raises(ServerError):
-            await executor.cancel(_make_context(), _make_queue())
-
-
-# ---------------------------------------------------------------------------
-# Metis executor
-# ---------------------------------------------------------------------------
-
 
 class TestMetisExecutor:
-    """Metis agent executor tests."""
-
-    @pytest.mark.asyncio
-    async def test_empty_input_returns_input_required(self):
-        from agents.metis.agent_executor import MetisAgentExecutor
-
-        executor = MetisAgentExecutor()
-        ctx = _make_context(None)
-        queue = _make_queue()
-
-        with patch("agents.metis.agent_executor.create_span"):
-            await executor.execute(ctx, queue)
-
-        assert queue.enqueue_event.call_count >= 1
+    """Metis-specific tests (planning, specs)."""
 
     @pytest.mark.asyncio
     async def test_valid_input_generates_spec(self):
@@ -185,54 +171,27 @@ class TestMetisExecutor:
 
         assert queue.enqueue_event.call_count >= 4
 
-    @pytest.mark.asyncio
-    async def test_cancel_raises_unsupported(self):
-        from agents.metis.agent_executor import MetisAgentExecutor
-
-        executor = MetisAgentExecutor()
-        with pytest.raises(ServerError):
-            await executor.cancel(_make_context(), _make_queue())
-
-
-# ---------------------------------------------------------------------------
-# Dokimasia executor
-# ---------------------------------------------------------------------------
-
 
 class TestDokimasiaExecutor:
-    """Dokimasia agent executor tests."""
+    """Dokimasia-specific tests (testing, pytest runs)."""
 
     @pytest.mark.asyncio
-    async def test_empty_input_returns_input_required(self):
+    async def test_run_request_runs_pytest(self):
         from agents.dokimasia.agent_executor import DokimasiaAgentExecutor
-
-        executor = DokimasiaAgentExecutor()
-        ctx = _make_context("")
-        queue = _make_queue()
-
-        with patch("agents.dokimasia.agent_executor.create_span"):
-            await executor.execute(ctx, queue)
-
-        assert queue.enqueue_event.call_count >= 1
-
-    @pytest.mark.asyncio
-    async def test_run_request_runs_fix_loop(self):
-        from agents.dokimasia.agent_executor import DokimasiaAgentExecutor
-        from kourai_common.fix_loop import FixLoopResult
 
         executor = DokimasiaAgentExecutor()
         ctx = _make_context("run tests please")
         queue = _make_queue()
 
-        result = FixLoopResult(all_passed=True, iterations_run=1)
+        # Mock run_pytest to return an object with success and output
+        mock_result = MagicMock()
+        mock_result.success = True
+        mock_result.output = "8/8 tests passed"
 
         with (
             patch("agents.dokimasia.agent_executor.create_span"),
-            patch(
-                "kourai_common.fix_loop.run_fix_loop",
-                new_callable=AsyncMock,
-                return_value=(True, "All tests passed", result),
-            ),
+            patch("agents.dokimasia.agent.run_pytest", return_value=mock_result),
+            patch("kourai_common.subprocess.extract_files_from_output", return_value=[]),
         ):
             await executor.execute(ctx, queue)
 
@@ -254,35 +213,9 @@ class TestDokimasiaExecutor:
 
         assert queue.enqueue_event.call_count >= 4
 
-    @pytest.mark.asyncio
-    async def test_cancel_raises_unsupported(self):
-        from agents.dokimasia.agent_executor import DokimasiaAgentExecutor
-
-        executor = DokimasiaAgentExecutor()
-        with pytest.raises(ServerError):
-            await executor.cancel(_make_context(), _make_queue())
-
-
-# ---------------------------------------------------------------------------
-# Techne executor
-# ---------------------------------------------------------------------------
-
 
 class TestTechneExecutor:
-    """Techne agent executor tests."""
-
-    @pytest.mark.asyncio
-    async def test_empty_input_returns_input_required(self):
-        from agents.techne.agent_executor import TechneAgentExecutor
-
-        executor = TechneAgentExecutor()
-        ctx = _make_context("  ")
-        queue = _make_queue()
-
-        with patch("agents.techne.agent_executor.create_span"):
-            await executor.execute(ctx, queue)
-
-        assert queue.enqueue_event.call_count >= 1
+    """Techne-specific tests (code generation)."""
 
     @pytest.mark.asyncio
     async def test_valid_input_generates_code(self):
@@ -303,35 +236,9 @@ class TestTechneExecutor:
 
         assert queue.enqueue_event.call_count >= 5
 
-    @pytest.mark.asyncio
-    async def test_cancel_raises_unsupported(self):
-        from agents.techne.agent_executor import TechneAgentExecutor
-
-        executor = TechneAgentExecutor()
-        with pytest.raises(ServerError):
-            await executor.cancel(_make_context(), _make_queue())
-
-
-# ---------------------------------------------------------------------------
-# Hephaestus executor
-# ---------------------------------------------------------------------------
-
 
 class TestHephaestusExecutor:
-    """Hephaestus orchestrator executor tests."""
-
-    @pytest.mark.asyncio
-    async def test_empty_input_returns_input_required(self):
-        from agents.hephaestus.agent_executor import HephaestusAgentExecutor
-
-        executor = HephaestusAgentExecutor()
-        ctx = _make_context("")
-        queue = _make_queue()
-
-        with patch("agents.hephaestus.agent_executor.create_span"):
-            await executor.execute(ctx, queue)
-
-        assert queue.enqueue_event.call_count >= 1
+    """Hephaestus-specific tests (orchestration, routing)."""
 
     @pytest.mark.asyncio
     async def test_pipeline_routes_and_completes(self):
