@@ -15,7 +15,6 @@ from pathlib import Path
 from typing import Any
 
 from kourai_common.llm import chat, chat_stream
-from kourai_common.player import get_enriched_system_prompt
 from kourai_common.prompts import CURRENT_DATE, build_system_prompt
 from kourai_common.subprocess import run_command
 
@@ -41,14 +40,21 @@ Priority Order:
 Target: 80%+ code coverage
 
 Test File Pattern:
-- File: tests/unit/test_{module_name}.py
+- File: tests/unit/test_{{module_name}}.py
 - Class: TestClassName (groups related tests)
-- Methods: test_{description} (descriptive names)
+- Methods: test_{{description}} (descriptive names)
 - Fixtures: @pytest.fixture with type hints (Python 3.12+) and one-liner docstrings
 
 Docstring Style (same as production code):
 - Public: one-liner + Args, private: one-liner, inner: none
 - Comments: WHY not WHAT
+
+Mocking & Typing Rules:
+- When mocking objects requiring attribute access (e.g. `event.type`),
+  use classes, `dataclass`, or `Mock()`. Do NOT use raw dicts to avoid
+  `dict has no attribute` mypy errors.
+- Always guard Optional types (`if x is not None:`) before indexing or
+  accessing attributes to prevent mypy errors.
 
 After writing tests, output them in this format:
 
@@ -101,14 +107,16 @@ async def fix_test_issues(
         {
             "role": "system",
             "content": (
-                get_enriched_system_prompt(SYSTEM_PROMPT, "dokimasia")
+                SYSTEM_PROMPT
                 + "\n\nWhen fixing issues, you MUST provide the exact file changes in this"
                 " format:\n\n"
                 "FILE: path/to/file.py\nORIGINAL:\n```python\n<exact lines to replace,"
                 " must match file exactly>\n```\n"
                 "REPLACEMENT:\n```python\n<new lines>\n```\n\nSeparate multiple file"
                 " changes with ---\n"
-                "If no issues need fixing, output: ALL CLEAN"
+                "If no issues need fixing, output: ALL CLEAN\n\n"
+                "IMPORTANT: Before outputting any fixes, briefly plan your fixes by"
+                " writing a TODO list based on the test failures."
             ),
         },
         {
@@ -121,10 +129,7 @@ async def fix_test_issues(
             ),
         },
     ]
-    log.info("Requesting test fixes for %d files", len(file_paths))
-    return await chat(
-        "dokimasia", messages, temperature=0.2, max_tokens=4096, context_id=context_id
-    )
+    return await chat("dokimasia", messages, temperature=0.2, max_tokens=4096)
 
 
 async def run_pytest(
@@ -227,7 +232,7 @@ async def generate_tests(
         user_content = [{"type": "text", "text": user_text}, *image_parts]
 
     messages: list[dict[str, Any]] = [
-        {"role": "system", "content": get_enriched_system_prompt(SYSTEM_PROMPT, "dokimasia")},
+        {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": user_content},
     ]
     log.info("Generating tests for %s", module_name)
@@ -256,7 +261,7 @@ async def generate_tests_stream(
         user_content = [{"type": "text", "text": user_text}, *image_parts]
 
     messages: list[dict[str, Any]] = [
-        {"role": "system", "content": get_enriched_system_prompt(SYSTEM_PROMPT, "dokimasia")},
+        {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": user_content},
     ]
     log.info("Streaming test generation for %s", module_name)

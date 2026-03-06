@@ -7,13 +7,11 @@ LLM for code generation. Understands existing code before modifying it.
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from kourai_common.llm import chat, chat_stream
-from kourai_common.player import get_enriched_system_prompt
 from kourai_common.prompts import CURRENT_DATE, build_system_prompt
 from kourai_common.subprocess import run_command
 
@@ -41,6 +39,12 @@ Universal Rules:
 - REMOVE unnecessary code, don't add fluff
 - Read existing code BEFORE modifying — understand patterns first
 - No marketing language in code or comments
+- Limit generated code line length to strictly <100 characters (to avoid
+  E501 lint errors, break long strings/comments)
+- Guard `Optional` types (`if x is not None:`) to prevent `not indexable`
+  mypy errors.
+- Mock objects relying on attribute access (`event.type`) using classes or
+  `unittest.mock.Mock`, not raw `dict`s.
 - Add a brief personality touch at start/end (one line max)
 
 When generating code changes, output them in this format:
@@ -65,6 +69,9 @@ REPLACEMENT:
 ---
 
 Separate multiple file changes with ---
+
+IMPORTANT: Before outputting any code changes, briefly plan your
+implementation by writing a TODO list based on the requested task.
 """,
 )
 
@@ -198,7 +205,7 @@ async def generate_code(
         user_content = [{"type": "text", "text": user_text}, *image_parts]
 
     messages: list[dict[str, Any]] = [
-        {"role": "system", "content": get_enriched_system_prompt(SYSTEM_PROMPT, "techne")},
+        {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": user_content},
     ]
 
@@ -212,7 +219,7 @@ async def generate_code_stream(
     git_context: str = "",
     image_parts: list[dict] | None = None,
     context_id: str | None = None,
-) -> AsyncGenerator[str, None]:
+):
     """Stream code generation for real-time progress.
 
     Args:
@@ -246,7 +253,7 @@ async def generate_code_stream(
         user_content = [{"type": "text", "text": user_text}, *image_parts]
 
     messages: list[dict[str, Any]] = [
-        {"role": "system", "content": get_enriched_system_prompt(SYSTEM_PROMPT, "techne")},
+        {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": user_content},
     ]
 
