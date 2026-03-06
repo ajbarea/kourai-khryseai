@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import sys
 
-from kourai_common.player import PlayerProfile
+from kourai_common.player import PlayerProfile, set_active_profile
 
 # Reuse CLI color palette
 _GOLD = "\033[38;2;218;165;32m"
@@ -134,6 +134,7 @@ def run_onboarding() -> PlayerProfile:
     )
     profile.total_sessions = 1
     profile.save()
+    set_active_profile(profile.player_id)
 
     # Personalized welcome
     _echo("")

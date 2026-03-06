@@ -44,7 +44,9 @@ def _isolate_db(tmp_path, monkeypatch):
     _ensure_player_tables(conn)
     monkeypatch.setattr(player_mod, "_get_player_db", lambda: conn)
     monkeypatch.setattr(player_mod, "PLAYER_DIR", tmp_path)
-    monkeypatch.setattr(player_mod, "PLAYER_FILE", tmp_path / "player.json")
+    monkeypatch.setattr(player_mod, "PROFILES_DIR", tmp_path / "profiles")
+    monkeypatch.setattr(player_mod, "ACTIVE_PROFILE_FILE", tmp_path / "active_profile.txt")
+    monkeypatch.setattr(player_mod, "_LEGACY_PLAYER_FILE", tmp_path / "player.json")
 
     # Reset profile cache
     player_mod._profile_cache = None
@@ -59,23 +61,39 @@ def _isolate_db(tmp_path, monkeypatch):
 
 class TestOnboarding:
     def test_needs_onboarding_when_no_profile(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("kourai_common.player.PLAYER_FILE", tmp_path / "player.json")
+        monkeypatch.setattr("kourai_common.player.PROFILES_DIR", tmp_path / "profiles")
+        monkeypatch.setattr(
+            "kourai_common.player.ACTIVE_PROFILE_FILE", tmp_path / "active_profile.txt"
+        )
+        monkeypatch.setattr("kourai_common.player._LEGACY_PLAYER_FILE", tmp_path / "player.json")
         from hosts.cli.onboarding import needs_onboarding
 
         assert needs_onboarding() is True
 
     def test_needs_onboarding_false_when_profile_exists(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("kourai_common.player.PLAYER_FILE", tmp_path / "player.json")
+        monkeypatch.setattr("kourai_common.player.PROFILES_DIR", tmp_path / "profiles")
+        monkeypatch.setattr(
+            "kourai_common.player.ACTIVE_PROFILE_FILE", tmp_path / "active_profile.txt"
+        )
+        monkeypatch.setattr("kourai_common.player._LEGACY_PLAYER_FILE", tmp_path / "player.json")
         monkeypatch.setattr("kourai_common.player.PLAYER_DIR", tmp_path)
         profile = PlayerProfile(display_name="AJ")
         profile.save()
+
+        from kourai_common.player import set_active_profile
+
+        set_active_profile(profile.player_id)
 
         from hosts.cli.onboarding import needs_onboarding
 
         assert needs_onboarding() is False
 
     def test_run_onboarding_creates_profile(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("kourai_common.player.PLAYER_FILE", tmp_path / "player.json")
+        monkeypatch.setattr("kourai_common.player.PROFILES_DIR", tmp_path / "profiles")
+        monkeypatch.setattr(
+            "kourai_common.player.ACTIVE_PROFILE_FILE", tmp_path / "active_profile.txt"
+        )
+        monkeypatch.setattr("kourai_common.player._LEGACY_PLAYER_FILE", tmp_path / "player.json")
         monkeypatch.setattr("kourai_common.player.PLAYER_DIR", tmp_path)
 
         from hosts.cli.onboarding import run_onboarding
@@ -97,10 +115,18 @@ class TestOnboarding:
         assert loaded.display_name == "TestPlayer"
 
     def test_increment_session(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("kourai_common.player.PLAYER_FILE", tmp_path / "player.json")
+        monkeypatch.setattr("kourai_common.player.PROFILES_DIR", tmp_path / "profiles")
+        monkeypatch.setattr(
+            "kourai_common.player.ACTIVE_PROFILE_FILE", tmp_path / "active_profile.txt"
+        )
+        monkeypatch.setattr("kourai_common.player._LEGACY_PLAYER_FILE", tmp_path / "player.json")
         monkeypatch.setattr("kourai_common.player.PLAYER_DIR", tmp_path)
         profile = PlayerProfile(display_name="AJ", total_sessions=5)
         profile.save()
+
+        from kourai_common.player import set_active_profile
+
+        set_active_profile(profile.player_id)
 
         from hosts.cli.onboarding import increment_session
 

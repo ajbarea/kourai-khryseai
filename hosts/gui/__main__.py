@@ -54,6 +54,7 @@ from .memory_viewer import MemoryViewerPanel
 from .onboarding_ui import OnboardingOverlay
 from .particles import ParticleSystem
 from .portrait import PortraitPanel
+from .profile_select import run_profile_select
 from .settings_ui import SettingsOverlay
 from .tts_gui_integration import TTSGUIManager, extract_speakable
 from .typewriter import TypewriterManager
@@ -233,6 +234,44 @@ def main(agent_url: str | None = None) -> None:
             pygame.quit()
         sys.exit(0)
 
+    # --- Profile selection screen ---
+    # Show profile select after title screen; runs its own event loop
+    _selected_profile = None
+    _run_onboarding = False
+    try:
+        from kourai_common.player import (
+            list_profiles,
+            needs_onboarding,
+            set_active_profile,
+        )
+
+        profiles = list_profiles()
+        if needs_onboarding():
+            # No profiles exist — go straight to onboarding
+            _run_onboarding = True
+        elif len(profiles) == 1:
+            # Single profile — auto-select it
+            _selected_profile = profiles[0]
+            set_active_profile(_selected_profile["player_id"])
+        else:
+            # Multiple profiles — show selection screen
+            result = run_profile_select(screen, clock, profiles)
+            if result is False:
+                # User quit
+                with contextlib.suppress(Exception):
+                    audio_manager.cleanup()
+                with contextlib.suppress(Exception):
+                    pygame.quit()
+                sys.exit(0)
+            elif result is None:
+                # New Game
+                _run_onboarding = True
+            else:
+                _selected_profile = result
+                set_active_profile(_selected_profile["player_id"])
+    except Exception:
+        pass  # Player module not available — skip
+
     # --- Unpack loaded subsystems ---
     gui_integration: GUIComponentsIntegration = _loaded["gui_integration"]
     settings_overlay: SettingsOverlay = _loaded["settings_overlay"]
@@ -293,14 +332,9 @@ def main(agent_url: str | None = None) -> None:
     _typewriter_full_text = ""  # full text for the active typewriter entry
     _alignment_refresh_timer = 0.0  # Refresh alignment from profile every 10s
 
-    # --- Check if onboarding is needed ---
-    try:
-        from kourai_common.player import needs_onboarding
-
-        if needs_onboarding():
-            onboarding.start()
-    except Exception:
-        pass  # Player module not available — skip onboarding
+    # --- Trigger onboarding if needed (New Game or first run) ---
+    if _run_onboarding:
+        onboarding.start()
 
     def _add_with_typewriter(entry: DialogueEntry) -> None:
         """Add a dialogue entry, animating it with the typewriter effect."""
@@ -456,15 +490,16 @@ def main(agent_url: str | None = None) -> None:
                 result = onboarding.get_result()
                 if result:
                     try:
-                        from kourai_common.player import load_profile, save_profile
+                        from kourai_common.player import PlayerProfile, set_active_profile
 
-                        profile = load_profile()
+                        profile = PlayerProfile()
                         profile.display_name = result["display_name"]
                         profile.tts_name = result["tts_name"]
                         profile.title = result["title"]
                         profile.role = result["role"]
                         profile.pronouns = result["pronouns"]
-                        save_profile(profile)
+                        profile.save()
+                        set_active_profile(profile.player_id)
                         alignment_panel.update_values(
                             profile.sovereignty, profile.devotion, profile.role
                         )

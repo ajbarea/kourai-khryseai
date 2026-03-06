@@ -46,7 +46,9 @@ def _isolate_db(tmp_path, monkeypatch):
     _ensure_player_tables(conn)
     monkeypatch.setattr(player_mod, "_get_player_db", lambda: conn)
     monkeypatch.setattr(player_mod, "PLAYER_DIR", tmp_path)
-    monkeypatch.setattr(player_mod, "PLAYER_FILE", tmp_path / "player.json")
+    monkeypatch.setattr(player_mod, "PROFILES_DIR", tmp_path / "profiles")
+    monkeypatch.setattr(player_mod, "ACTIVE_PROFILE_FILE", tmp_path / "active_profile.txt")
+    monkeypatch.setattr(player_mod, "_LEGACY_PLAYER_FILE", tmp_path / "player.json")
 
     player_mod._profile_cache = None
     player_mod._profile_cache_ts = 0.0
@@ -305,7 +307,11 @@ class TestRunPostTaskHooks:
 
         p = PlayerProfile(display_name="AJ", sovereignty=0, devotion=0)
         monkeypatch.setattr("kourai_common.player.PLAYER_DIR", tmp_path)
-        monkeypatch.setattr("kourai_common.player.PLAYER_FILE", tmp_path / "player.json")
+        monkeypatch.setattr("kourai_common.player.PROFILES_DIR", tmp_path / "profiles")
+        monkeypatch.setattr(
+            "kourai_common.player.ACTIVE_PROFILE_FILE", tmp_path / "active_profile.txt"
+        )
+        monkeypatch.setattr("kourai_common.player._LEGACY_PLAYER_FILE", tmp_path / "player.json")
         p.save()
 
         run_post_task_hooks(
@@ -944,7 +950,11 @@ class TestRunPostTaskHooksV2:
 
         p = PlayerProfile(display_name="AJ", sovereignty=0, devotion=0)
         monkeypatch.setattr("kourai_common.player.PLAYER_DIR", tmp_path)
-        monkeypatch.setattr("kourai_common.player.PLAYER_FILE", tmp_path / "player.json")
+        monkeypatch.setattr("kourai_common.player.PROFILES_DIR", tmp_path / "profiles")
+        monkeypatch.setattr(
+            "kourai_common.player.ACTIVE_PROFILE_FILE", tmp_path / "active_profile.txt"
+        )
+        monkeypatch.setattr("kourai_common.player._LEGACY_PLAYER_FILE", tmp_path / "player.json")
         p.save()
 
         results = run_post_task_hooks(
@@ -1267,7 +1277,11 @@ class TestResolveJealousy:
         from kourai_common.gossip import GossipResponseOption, ResponseTone, resolve_jealousy
 
         monkeypatch.setattr("kourai_common.player.PLAYER_DIR", tmp_path)
-        monkeypatch.setattr("kourai_common.player.PLAYER_FILE", tmp_path / "player.json")
+        monkeypatch.setattr("kourai_common.player.PROFILES_DIR", tmp_path / "profiles")
+        monkeypatch.setattr(
+            "kourai_common.player.ACTIVE_PROFILE_FILE", tmp_path / "active_profile.txt"
+        )
+        monkeypatch.setattr("kourai_common.player._LEGACY_PLAYER_FILE", tmp_path / "player.json")
 
         p = PlayerProfile(display_name="AJ", sovereignty=0, devotion=0)
         p.save()
@@ -1285,7 +1299,11 @@ class TestResolveJealousy:
         from kourai_common.gossip import GossipResponseOption, ResponseTone, resolve_jealousy
 
         monkeypatch.setattr("kourai_common.player.PLAYER_DIR", tmp_path)
-        monkeypatch.setattr("kourai_common.player.PLAYER_FILE", tmp_path / "player.json")
+        monkeypatch.setattr("kourai_common.player.PROFILES_DIR", tmp_path / "profiles")
+        monkeypatch.setattr(
+            "kourai_common.player.ACTIVE_PROFILE_FILE", tmp_path / "active_profile.txt"
+        )
+        monkeypatch.setattr("kourai_common.player._LEGACY_PLAYER_FILE", tmp_path / "player.json")
 
         p = PlayerProfile(display_name="AJ", sovereignty=70, devotion=0)
         p.save()
@@ -1302,7 +1320,11 @@ class TestResolveJealousy:
         from kourai_common.gossip import GossipResponseOption, ResponseTone, resolve_jealousy
 
         monkeypatch.setattr("kourai_common.player.PLAYER_DIR", tmp_path)
-        monkeypatch.setattr("kourai_common.player.PLAYER_FILE", tmp_path / "player.json")
+        monkeypatch.setattr("kourai_common.player.PROFILES_DIR", tmp_path / "profiles")
+        monkeypatch.setattr(
+            "kourai_common.player.ACTIVE_PROFILE_FILE", tmp_path / "active_profile.txt"
+        )
+        monkeypatch.setattr("kourai_common.player._LEGACY_PLAYER_FILE", tmp_path / "player.json")
 
         p = PlayerProfile(display_name="AJ", sovereignty=70, devotion=0)
         p.save()
@@ -1318,7 +1340,11 @@ class TestResolveJealousy:
         from kourai_common.gossip import GossipResponseOption, ResponseTone, resolve_jealousy
 
         monkeypatch.setattr("kourai_common.player.PLAYER_DIR", tmp_path)
-        monkeypatch.setattr("kourai_common.player.PLAYER_FILE", tmp_path / "player.json")
+        monkeypatch.setattr("kourai_common.player.PROFILES_DIR", tmp_path / "profiles")
+        monkeypatch.setattr(
+            "kourai_common.player.ACTIVE_PROFILE_FILE", tmp_path / "active_profile.txt"
+        )
+        monkeypatch.setattr("kourai_common.player._LEGACY_PLAYER_FILE", tmp_path / "player.json")
 
         p = PlayerProfile(display_name="AJ")
         p.save()

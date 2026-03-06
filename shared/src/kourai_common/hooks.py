@@ -429,7 +429,7 @@ def track_interaction(
         return
 
     if profile is None:
-        profile = PlayerProfile.load()
+        profile = PlayerProfile.load(player_id)
     if not profile:
         return
 
@@ -534,7 +534,7 @@ def run_post_task_hooks(
     if not player_id:
         return {}
 
-    profile = PlayerProfile.load()
+    profile = PlayerProfile.load(player_id)
     if not profile:
         return {}
 

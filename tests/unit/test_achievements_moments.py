@@ -46,7 +46,9 @@ def _isolate_db(tmp_path, monkeypatch):
     _ensure_player_tables(conn)
     monkeypatch.setattr(player_mod, "_get_player_db", lambda: conn)
     monkeypatch.setattr(player_mod, "PLAYER_DIR", tmp_path)
-    monkeypatch.setattr(player_mod, "PLAYER_FILE", tmp_path / "player.json")
+    monkeypatch.setattr(player_mod, "PROFILES_DIR", tmp_path / "profiles")
+    monkeypatch.setattr(player_mod, "ACTIVE_PROFILE_FILE", tmp_path / "active_profile.txt")
+    monkeypatch.setattr(player_mod, "_LEGACY_PLAYER_FILE", tmp_path / "player.json")
 
     player_mod._profile_cache = None
     player_mod._profile_cache_ts = 0.0
@@ -419,7 +421,11 @@ class TestEnrichedPromptIntegration:
 
         p = PlayerProfile(display_name="AJ", sovereignty=0, devotion=0)
         monkeypatch.setattr("kourai_common.player.PLAYER_DIR", tmp_path)
-        monkeypatch.setattr("kourai_common.player.PLAYER_FILE", tmp_path / "player.json")
+        monkeypatch.setattr("kourai_common.player.PROFILES_DIR", tmp_path / "profiles")
+        monkeypatch.setattr(
+            "kourai_common.player.ACTIVE_PROFILE_FILE", tmp_path / "active_profile.txt"
+        )
+        monkeypatch.setattr("kourai_common.player._LEGACY_PLAYER_FILE", tmp_path / "player.json")
         p.save()
 
         results = run_post_task_hooks(p.player_id, "techne", "hello", "done", success=True)

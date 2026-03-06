@@ -164,23 +164,33 @@ class TestPlayerProfile:
 
     def test_save_and_load(self, tmp_path):
         with (
-            patch("kourai_common.player.PLAYER_FILE", tmp_path / "player.json"),
+            patch("kourai_common.player.PROFILES_DIR", tmp_path / "profiles"),
+            patch("kourai_common.player.ACTIVE_PROFILE_FILE", tmp_path / "active.txt"),
             patch("kourai_common.player.PLAYER_DIR", tmp_path),
+            patch("kourai_common.player._LEGACY_PLAYER_FILE", tmp_path / "player.json"),
         ):
             p = PlayerProfile(display_name="SaveTest", sovereignty=55)
             p.save()
 
-            loaded = PlayerProfile.load()
+            loaded = PlayerProfile.load(p.player_id)
             assert loaded is not None
             assert loaded.display_name == "SaveTest"
             assert loaded.sovereignty == 55
 
     def test_load_returns_none_when_missing(self, tmp_path):
-        with patch("kourai_common.player.PLAYER_FILE", tmp_path / "nonexistent.json"):
+        with (
+            patch("kourai_common.player.PROFILES_DIR", tmp_path / "profiles"),
+            patch("kourai_common.player.ACTIVE_PROFILE_FILE", tmp_path / "active.txt"),
+            patch("kourai_common.player._LEGACY_PLAYER_FILE", tmp_path / "nonexistent.json"),
+        ):
             assert PlayerProfile.load() is None
 
     def test_load_or_default(self, tmp_path):
-        with patch("kourai_common.player.PLAYER_FILE", tmp_path / "nonexistent.json"):
+        with (
+            patch("kourai_common.player.PROFILES_DIR", tmp_path / "profiles"),
+            patch("kourai_common.player.ACTIVE_PROFILE_FILE", tmp_path / "active.txt"),
+            patch("kourai_common.player._LEGACY_PLAYER_FILE", tmp_path / "nonexistent.json"),
+        ):
             p = PlayerProfile.load_or_default()
             assert p.display_name == ""
 
@@ -455,7 +465,8 @@ class TestExportImport:
     def test_export_roundtrip(self, profile, tmp_path, monkeypatch):
 
         # Save profile to disk so export can find it
-        monkeypatch.setattr("kourai_common.player.PLAYER_FILE", tmp_path / "player.json")
+        monkeypatch.setattr("kourai_common.player.PROFILES_DIR", tmp_path / "profiles")
+        monkeypatch.setattr("kourai_common.player.ACTIVE_PROFILE_FILE", tmp_path / "active.txt")
         monkeypatch.setattr("kourai_common.player.PLAYER_DIR", tmp_path)
         profile.save()
 
@@ -470,7 +481,8 @@ class TestExportImport:
 
     def test_import_creates_profile(self, tmp_path, monkeypatch):
 
-        monkeypatch.setattr("kourai_common.player.PLAYER_FILE", tmp_path / "player.json")
+        monkeypatch.setattr("kourai_common.player.PROFILES_DIR", tmp_path / "profiles")
+        monkeypatch.setattr("kourai_common.player.ACTIVE_PROFILE_FILE", tmp_path / "active.txt")
         monkeypatch.setattr("kourai_common.player.PLAYER_DIR", tmp_path)
 
         data = {
@@ -504,7 +516,8 @@ class TestExportImport:
 
     def test_import_merge_mode(self, profile, tmp_path, monkeypatch):
 
-        monkeypatch.setattr("kourai_common.player.PLAYER_FILE", tmp_path / "player.json")
+        monkeypatch.setattr("kourai_common.player.PROFILES_DIR", tmp_path / "profiles")
+        monkeypatch.setattr("kourai_common.player.ACTIVE_PROFILE_FILE", tmp_path / "active.txt")
         monkeypatch.setattr("kourai_common.player.PLAYER_DIR", tmp_path)
         profile.save()
 
@@ -530,9 +543,8 @@ class TestExportImport:
 
 class TestEnrichedSystemPrompt:
     def test_returns_base_when_no_profile(self, monkeypatch):
-        from kourai_common.player import get_enriched_system_prompt
-
         import kourai_common.player as player_mod
+        from kourai_common.player import get_enriched_system_prompt
 
         player_mod._profile_cache = None
         player_mod._profile_cache_ts = 0.0
@@ -542,9 +554,8 @@ class TestEnrichedSystemPrompt:
         assert result == "base prompt"
 
     def test_appends_player_context_when_profile_exists(self, profile, monkeypatch):
-        from kourai_common.player import get_enriched_system_prompt
-
         import kourai_common.player as player_mod
+        from kourai_common.player import get_enriched_system_prompt
 
         player_mod._profile_cache = None
         player_mod._profile_cache_ts = 0.0
