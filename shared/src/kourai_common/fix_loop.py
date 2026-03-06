@@ -1,7 +1,7 @@
 """Generic iterative fix-check loop for agent executors.
 
 Kallos and Dokimasia share nearly identical retry patterns:
-run tool → extract files with issues → ask LLM to fix → apply → repeat.
+run tool -> extract files with issues -> ask LLM to fix -> apply -> repeat.
 
 This module provides a reusable loop abstraction that works for any tool.
 """
@@ -10,11 +10,74 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, field
 
 from a2a.server.tasks import TaskUpdater
 from a2a.types import Task
 
 log = logging.getLogger(__name__)
+
+
+@dataclass
+class StatusMessages:
+    """Per-agent personality templates for fix loop status messages.
+
+    Use {tool}, {iteration}, {max}, {count}, {fixes} as placeholders.
+    """
+
+    running: str = "Running {tool} (iteration {iteration}/{max})..."
+    passed: str = "{tool} passed!"
+    found_issues: str = "Found issues in {count} files. Fixing..."
+    applied_fixes: str = "Applied {fixes} fixes. Re-running {tool}..."
+
+    def format_running(self, tool: str, iteration: int, max_iter: int) -> str:
+        return self.running.format(tool=tool, iteration=iteration, max=max_iter)
+
+    def format_passed(self, tool: str) -> str:
+        return self.passed.format(tool=tool)
+
+    def format_found_issues(self, count: int) -> str:
+        return self.found_issues.format(count=count)
+
+    def format_applied_fixes(self, tool: str, fixes: int) -> str:
+        return self.applied_fixes.format(tool=tool, fixes=fixes)
+
+
+# Pre-built personality message sets for agents
+KALLOS_MESSAGES = StatusMessages(
+    running="Scanning for imperfections... (pass {iteration}/{max})",
+    passed="Everything is gorgeous~ Not a blemish in sight.",
+    found_issues="Hmm, {count} files need my touch...",
+    applied_fixes="Applied {fixes} fixes. Let me check my work...",
+)
+
+DOKIMASIA_MESSAGES = StatusMessages(
+    running="Running the gauntlet... (attempt {iteration}/{max})",
+    passed="All tests survived the crucible!",
+    found_issues="{count} files are failing. Patching up...",
+    applied_fixes="Patched {fixes} issues. Re-testing...",
+)
+
+
+@dataclass
+class FixLoopResult:
+    """Structured result from a fix loop run for DataPart emission."""
+
+    all_passed: bool = False
+    iterations_run: int = 0
+    max_iterations: int = 3
+    files_with_issues: list[str] = field(default_factory=list)
+    total_fixes_applied: int = 0
+    final_output: str = ""
+
+    def to_dict(self) -> dict:
+        return {
+            "all_passed": self.all_passed,
+            "iterations_run": self.iterations_run,
+            "max_iterations": self.max_iterations,
+            "files_with_issues": self.files_with_issues,
+            "total_fixes_applied": self.total_fixes_applied,
+        }
 
 
 async def run_fix_loop(
@@ -27,7 +90,8 @@ async def run_fix_loop(
     task: Task,
     emoji: str = "✨",
     max_iterations: int = 3,
-) -> tuple[bool, str]:
+    messages: StatusMessages | None = None,
+) -> tuple[bool, str, FixLoopResult]:
     """Run iterative fix-check loop until passing or max iterations reached.
 
     Args:
@@ -40,53 +104,44 @@ async def run_fix_loop(
         task: Current task being executed
         emoji: Emoji prefix for status messages
         max_iterations: Maximum retry attempts (default: 3)
+        messages: Per-agent personality status messages (uses generic defaults if None)
 
     Returns:
-        Tuple of (all_passed: bool, final_output: str)
-
-    Example:
-        all_clean, output = await run_fix_loop(
-            tool_name="make lint",
-            run_tool=lambda: run_make_lint(),
-            extract_files=extract_files_from_output,
-            fix_issues=lambda out, files, ctx: fix_lint_issues(out, files, ctx),
-            apply_fixes=parse_and_apply_fixes,
-            updater=updater,
-            task=task,
-            emoji="✨",
-        )
+        Tuple of (all_passed: bool, final_output: str, result: FixLoopResult)
     """
     from kourai_common.messaging import send_working_status
 
+    msgs = messages or StatusMessages()
+    result = FixLoopResult(max_iterations=max_iterations)
     iteration = 0
-    all_passed = False
-    final_output = ""
 
     while iteration < max_iterations:
         iteration += 1
+        result.iterations_run = iteration
 
         await send_working_status(
             updater,
             task,
-            f"Running {tool_name} (iteration {iteration}/{max_iterations})...",
+            msgs.format_running(tool_name, iteration, max_iterations),
             emoji=emoji,
         )
 
         success, output = await run_tool()
-        final_output = output
+        result.final_output = output
 
         if success:
-            all_passed = True
+            result.all_passed = True
             await send_working_status(
                 updater,
                 task,
-                f"{tool_name} passed!",
+                msgs.format_passed(tool_name),
                 emoji=emoji,
             )
             break
 
         # Extract files with issues
         files_with_issues = extract_files(output)
+        result.files_with_issues = sorted(files_with_issues)
         if not files_with_issues:
             log.warning("%s failed but could not extract file paths", tool_name)
             break
@@ -94,19 +149,20 @@ async def run_fix_loop(
         await send_working_status(
             updater,
             task,
-            f"Found issues in {len(files_with_issues)} files. Fixing...",
+            msgs.format_found_issues(len(files_with_issues)),
             emoji=emoji,
         )
 
         # Ask LLM to fix
         llm_fixes = await fix_issues(output, files_with_issues, task.context_id)
         fixes_applied = apply_fixes(llm_fixes)
+        result.total_fixes_applied += fixes_applied
 
         await send_working_status(
             updater,
             task,
-            f"Applied {fixes_applied} fixes. Re-running {tool_name}...",
+            msgs.format_applied_fixes(tool_name, fixes_applied),
             emoji=emoji,
         )
 
-    return all_passed, final_output
+    return result.all_passed, result.final_output, result

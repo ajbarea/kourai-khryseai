@@ -5,9 +5,14 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from functools import wraps
+from typing import TYPE_CHECKING, Any
 
 from a2a.types import InternalError
 from a2a.utils.errors import ServerError
+
+if TYPE_CHECKING:
+    from a2a.server.agent_execution import RequestContext
+    from a2a.server.events import EventQueue
 
 log = logging.getLogger(__name__)
 
@@ -33,7 +38,7 @@ def executor_error_handler(agent_name: str) -> Callable:
 
     def decorator(func: Callable) -> Callable:
         @wraps(func)
-        async def wrapper(self, context, event_queue):
+        async def wrapper(self: Any, context: RequestContext, event_queue: EventQueue) -> Any:
             try:
                 return await func(self, context, event_queue)
             except Exception as e:
