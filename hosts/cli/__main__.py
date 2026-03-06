@@ -17,6 +17,7 @@ import re
 import sys
 import time
 from pathlib import Path
+from typing import Any
 from uuid import uuid4
 
 import asyncclick as click
@@ -274,7 +275,9 @@ def _render_image_ansi(
 
     # Resize to fit — height * 2 because each char row holds 2 pixel rows
     img = img.resize((width, height * 2), Image.Resampling.LANCZOS)
-    pixels = img.load()
+    pixels: Any = img.load()
+    if pixels is None:
+        return None
 
     # Gold color for tinting (218, 165, 32)
     gold_r, gold_g, gold_b = 218, 165, 32
@@ -1141,6 +1144,15 @@ async def main(agent: str | None, timeout: int, verbose: bool, prompt: str | Non
         return
 
     _echo(_banner())
+
+    # First-run onboarding — collect player identity before connecting
+    from hosts.cli.onboarding import increment_session, needs_onboarding, run_onboarding
+
+    if needs_onboarding():
+        run_onboarding()
+    else:
+        increment_session()
+
     _echo(f"Connecting to Hephaestus at {agent}...")
 
     config = ClientConfig(
