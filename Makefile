@@ -1,4 +1,4 @@
-.PHONY: setup docs upgrade cli gui up down restart shutdown status docker-up docker-down lint test clean help
+.PHONY: setup docs upgrade cli gui up down restart status lint test clean help
 .DEFAULT_GOAL := help
 
 # ──────────────── Portability ────────────────
@@ -6,7 +6,7 @@ export LC_ALL=en_US.UTF-8
 export LANG=en_US.UTF-8
 export PYTHONIOENCODING=utf-8
 
-# ──────────────── Local Development ────────────────
+# ──────────────── Development ────────────────
 
 setup:                     ## Install all dependencies
 	uv sync --all-packages
@@ -15,7 +15,7 @@ docs:                      ## Serve documentation (Zensical)
 	uv run zensical serve
 
 upgrade:                   ## Update dependencies to latest versions
-	@bash update_dependencies.sh
+	@bash scripts/update_dependencies.sh
 
 cli:                       ## Launch the interactive CLI client (terminal)
 	uv run python -m hosts.cli
@@ -23,31 +23,22 @@ cli:                       ## Launch the interactive CLI client (terminal)
 gui:                       ## Launch the pygame GUI client (portrait window)
 	uv run python -m hosts.gui
 
-up:                        ## Start all agents locally (+ Jaeger)
-	@uv run python scripts/up.py
-	@uv run python scripts/status.py --wait
+up:                        ## Start all agents in Docker (+ Jaeger)
+	docker compose --profile full up -d --build --wait --wait-timeout 120
+	@echo All services are running and healthy.
+	@echo Jaeger UI: http://localhost:16686
+	@echo Prometheus: http://localhost:9090
+	@$(MAKE) status
 
-down:                      ## Stop all local agents
-	@uv run python scripts/down.py
+down:                      ## Stop all Docker containers
+	docker compose --profile full down --remove-orphans
 
-restart:                   ## Restart all local agents
+restart:                   ## Restart all agents
 	@$(MAKE) down
 	@$(MAKE) up
 
-shutdown:                  ## Total system shutdown (local agents + Docker)
-	@uv run python scripts/down.py --total
-	@docker compose down
-
-status:                    ## Check agent health (local)
-	@uv run python scripts/status.py
-
-# ──────────────── Docker ────────────────
-
-docker-up:                 ## Start all agents in Docker
-	@uv run python scripts/docker_up.py
-
-docker-down:               ## Stop all Docker containers
-	@uv run python scripts/docker_down.py
+status:                    ## Show Docker service status/health
+	docker compose --profile full ps
 
 # ──────────────── Testing & Quality ────────────────
 
