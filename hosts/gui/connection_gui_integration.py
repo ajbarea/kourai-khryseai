@@ -7,7 +7,8 @@ from __future__ import annotations
 
 import pygame
 import pygame.freetype
-from connection_manager import ConnectionManager
+
+from .connection_manager import ConnectionManager
 
 
 class ConnectionStatusDisplay:
