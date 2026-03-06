@@ -21,8 +21,10 @@ nav = [
       { "Overview" = "architecture/index.md" },
       { "Internals" = "architecture/internals.md" },
       { "Infrastructure" = "architecture/infrastructure.md" },
+      { "TTS System" = "architecture/tts.md" },
   ]},
   { "CLI Reference" = "cli.md" },
+  { "GUI Reference" = "gui.md" },
   { "Configuration" = "configuration.md" },
   { "Style Guides" = [
       { "Python" = "python-style-guide.md" },
