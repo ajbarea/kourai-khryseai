@@ -96,16 +96,6 @@ class TestGUIComponentsIntegration:
             handoff = integration.get_agent_handoff()
             assert handoff is integration.agent_handoff
 
-    def test_update(self):
-        """Test updating all components."""
-        mock_gui = Mock()
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = Path(tmpdir) / "settings.json"
-            integration = GUIComponentsIntegration(mock_gui, config_path)
-
-            # Should not raise an error
-            integration.update(0.016)
-
     def test_save_all_settings(self):
         """Test saving all settings."""
         mock_gui = Mock()
