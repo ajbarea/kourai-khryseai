@@ -1,4 +1,5 @@
 .PHONY: setup docs upgrade cli gui up down restart shutdown status docker-up docker-down lint test clean help
+.DEFAULT_GOAL := help
 
 # ──────────────── Portability ────────────────
 export LC_ALL=en_US.UTF-8
