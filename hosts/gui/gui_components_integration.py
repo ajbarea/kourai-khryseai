@@ -2,13 +2,14 @@
 
 from pathlib import Path
 
-from agent_handoff_personality_integration import AgentHandoffPersonalityIntegration
-from agent_personality_indicators import AgentPersonalityIndicators
-from font_scaler import FontScaler
-from high_contrast_gui_integration import HighContrastGUIIntegration
-from pipeline_status_gui_integration import PipelineStatusGUIIntegration
-from settings import SettingsManager
-from status_bubbles_gui_integration import StatusBubblesGUIIntegration
+from .agent_handoff_personality_integration import AgentHandoffPersonalityIntegration
+from .agent_personality_indicators import AgentPersonalityIndicators
+from .font_scaler import FontScaler
+from .high_contrast_gui_integration import HighContrastGUIIntegration
+from .pipeline_status_gui_integration import PipelineStatusGUIIntegration
+from .scratchpad_gui_integration import ScratchpadGUIIntegration
+from .settings import SettingsManager
+from .status_bubbles_gui_integration import StatusBubblesGUIIntegration
 
 
 class GUIComponentsIntegration:
@@ -32,6 +33,7 @@ class GUIComponentsIntegration:
         self.font_scaler = FontScaler()
         self.status_bubbles = StatusBubblesGUIIntegration(gui_instance)
         self.pipeline_status = PipelineStatusGUIIntegration(gui_instance)
+        self.scratchpad = ScratchpadGUIIntegration(gui_instance)
         self.high_contrast = HighContrastGUIIntegration(gui_instance, self.settings)
         self.agent_personalities = AgentPersonalityIndicators()
         self.agent_handoff = AgentHandoffPersonalityIntegration(
@@ -52,16 +54,11 @@ class GUIComponentsIntegration:
         if high_contrast:
             self.high_contrast.enable_high_contrast()
 
-        # Status bubbles
-        collapsed = self.settings.get("status_bubbles_collapsed", False)
-        if collapsed:
-            self.status_bubbles.toggle_status_bubbles()
-
     def save_all_settings(self) -> None:
         """Save all settings to file."""
         self.settings.set("font_scale", self.font_scaler.scale)
         self.settings.set("high_contrast", self.high_contrast.is_high_contrast_enabled())
-        self.settings.set("status_bubbles_collapsed", self.status_bubbles.is_collapsed())
+        self.settings.set("show_debug_logs", self.settings.get("show_debug_logs", False))
         self.settings.save()
 
     def get_settings_manager(self) -> SettingsManager:
@@ -79,6 +76,10 @@ class GUIComponentsIntegration:
     def get_pipeline_status(self) -> PipelineStatusGUIIntegration:
         """Get the pipeline status integration."""
         return self.pipeline_status
+
+    def get_scratchpad(self) -> ScratchpadGUIIntegration:
+        """Get the scratchpad integration."""
+        return self.scratchpad
 
     def get_high_contrast(self) -> HighContrastGUIIntegration:
         """Get the high contrast integration."""

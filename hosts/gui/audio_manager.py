@@ -22,7 +22,6 @@ class AudioManager:
     """Manages all game audio: music, ambient, voice, and SFX."""
 
     _instance = None
-    _initialized = False
 
     def __new__(cls):
         # Optional singleton pattern or just allow normal instantiation.
@@ -34,8 +33,9 @@ class AudioManager:
 
     def __init__(self):
         # Prevent re-initialization
-        if self._initialized:
+        if hasattr(self, "_initialized") and self._initialized:
             return
+        self._initialized: bool = False
 
         # 1. Pre-init for low latency
         try:
@@ -59,6 +59,9 @@ class AudioManager:
 
         self.ambient_sound = None
 
+        # SFX cache: path → loaded Sound object
+        self._sfx_cache: dict[str, pygame.mixer.Sound] = {}
+
         self._initialized = True
 
     # --- Volume Controls ---
@@ -79,12 +82,12 @@ class AudioManager:
         self.sfx_volume = max(0.0, min(1.0, volume))
 
     # --- Music (Streamed) ---
-    def play_music(self, path: str | Path, loops: int = -1) -> None:
+    def play_music(self, path: str | Path, loops: int = -1, fade_ms: int = 0) -> None:
         try:
             pygame.mixer.music.load(str(path))
             pygame.mixer.music.set_volume(self.music_volume)
-            pygame.mixer.music.play(loops=loops)
-            logger.info(f"Playing music: {path}")
+            pygame.mixer.music.play(loops=loops, fade_ms=fade_ms)
+            logger.info(f"Playing music: {path} with fade_ms={fade_ms}")
         except Exception as e:
             logger.error(f"Failed to play music: {e}")
 
@@ -115,17 +118,22 @@ class AudioManager:
         pygame.mixer.music.unpause()
 
     # --- Ambient ---
-    def play_ambient(self) -> None:
-        """Plays the generated ambient background music as a Sound object."""
+    def play_ambient(self, path: str | Path | None = None) -> None:
+        """Plays an ambient background sound, looping indefinitely.
+        If no path is provided, falls back to the generated synth pad.
+        """
         try:
-            if not self.ambient_sound:
+            if path:
+                self.ambient_sound = pygame.mixer.Sound(file=str(path))
+            elif not self.ambient_sound:
+                # Fallback to generative synth drone
                 wav_data = self._generate_ambient_wave()
                 wav_buffer = io.BytesIO(wav_data)
                 self.ambient_sound = pygame.mixer.Sound(file=wav_buffer)
 
             self.ambient_channel.set_volume(self.ambient_volume)
             self.ambient_channel.play(self.ambient_sound, loops=-1)
-            logger.info("Ambient music playing via Sound channel")
+            logger.info(f"Ambient playing via Sound channel: {path or 'generative synth'}")
         except Exception as e:
             logger.error(f"Failed to play ambient sound: {e}", exc_info=True)
 
@@ -168,6 +176,64 @@ class AudioManager:
 
         return wav_buffer.getvalue()
 
+    # --- SFX (one-shot on free channel) ---
+    def play_sfx(self, path: str | Path | None = None) -> None:
+        """Play a one-shot SFX file on the next free channel (2-7).
+
+        Loads and caches the Sound object on first use. If no path is provided,
+        falls back to a generated UI blip.
+        """
+        try:
+            if path:
+                key = str(path)
+                sound = self._sfx_cache.get(key)
+                if sound is None:
+                    sound = pygame.mixer.Sound(file=key)
+                    self._sfx_cache[key] = sound
+            else:
+                # Generate a short, pleasant UI blip
+                sample_rate = 44100
+                duration = 0.1  # 100ms
+                frequency = 880  # Hz (A5 note)
+
+                num_samples = int(sample_rate * duration)
+                audio_frames = []
+
+                for i in range(num_samples):
+                    t = i / sample_rate
+                    # Simple sine wave
+                    sample = math.sin(2 * math.pi * frequency * t)
+
+                    # Quick fade out to avoid clicking
+                    fade_samples = int(sample_rate * 0.05)
+                    if i > (num_samples - fade_samples):
+                        sample *= (num_samples - i) / fade_samples
+
+                    sample = int(sample * 32767 * 0.3)
+                    sample = max(-32768, min(32767, sample))
+
+                    audio_frames.append(struct.pack("h", sample))
+                    audio_frames.append(struct.pack("h", sample))
+
+                audio_data = b"".join(audio_frames)
+                wav_buffer = io.BytesIO()
+                with wave.open(wav_buffer, "wb") as wav:
+                    wav.setnchannels(2)
+                    wav.setsampwidth(2)
+                    wav.setframerate(sample_rate)
+                    wav.writeframes(audio_data)
+
+                wav_buffer.seek(0)
+                sound = pygame.mixer.Sound(file=wav_buffer)
+
+            sound.set_volume(self.sfx_volume)
+            # Find an available channel (not 0 or 1)
+            channel = pygame.mixer.find_channel()
+            if channel:
+                channel.play(sound)
+        except Exception as e:
+            logger.error(f"Failed to play SFX: {e}")
+
     def cleanup(self) -> None:
         """Clean up mixer resources."""
         self.stop_music()
@@ -175,5 +241,6 @@ class AudioManager:
             self.ambient_channel.stop()
         if self.voice_channel:
             self.voice_channel.stop()
+        self._sfx_cache.clear()
         # Do not call pygame.mixer.quit() if TTSEngine might still need to cleanup,
         # but it's safe if it's the last thing.
