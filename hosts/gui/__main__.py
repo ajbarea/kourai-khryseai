@@ -614,7 +614,6 @@ def main(agent_url: str | None = None) -> None:
                 settings_overlay.panel_rect.centery = screen_h // 2
 
         # --- Updates ---
-        gui_integration.update(dt)
         settings_overlay.update(dt)
         alignment_panel.update(dt)
         gossip_panel.update(dt)

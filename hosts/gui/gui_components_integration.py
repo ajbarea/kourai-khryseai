@@ -64,14 +64,6 @@ class GUIComponentsIntegration:
         self.settings.set("status_bubbles_collapsed", self.status_bubbles.is_collapsed())
         self.settings.save()
 
-    def update(self, dt: float) -> None:
-        """Update all components.
-
-        Args:
-            dt: Delta time since last update.
-        """
-        self.status_bubbles.update(dt)
-
     def get_settings_manager(self) -> SettingsManager:
         """Get the settings manager."""
         return self.settings
