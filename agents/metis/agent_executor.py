@@ -10,7 +10,7 @@ from a2a.server.tasks import TaskUpdater
 from a2a.types import Part, Task, TextPart, UnsupportedOperationError
 from a2a.utils.errors import ServerError
 
-from agents.metis.agent import create_spec, get_project_context
+from agents.metis.agent import create_spec_stream, get_project_context
 from kourai_common.a2a_utils import extract_image_parts
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
@@ -60,11 +60,25 @@ class MetisAgentExecutor(BaseAgentExecutor):
             )
 
             with create_span("metis.spec", {"idea": user_input[:100]}):
-                spec = await create_spec(
+                spec = ""
+                chunk_count = 0
+                async for chunk in create_spec_stream(
                     idea=user_input,
                     project_context=project_context,
                     image_parts=extract_image_parts(context) or None,
-                )
+                    context_id=task.context_id,
+                ):
+                    spec += chunk
+                    chunk_count += 1
+                    if chunk_count % 10 == 0:
+                        lines = spec.strip().split("\n")
+                        latest_line = lines[-1] if lines else ""
+                        if len(latest_line) > 50:
+                            latest_line = latest_line[:47] + "..."
+                        if latest_line.strip():
+                            await send_working_status(
+                                updater, task, f"Writing: {latest_line}", emoji="📐"
+                            )
 
             await send_working_status(
                 updater,

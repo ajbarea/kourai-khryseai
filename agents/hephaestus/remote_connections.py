@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncGenerator
 from uuid import uuid4
 
 import httpx
@@ -22,7 +23,6 @@ from a2a.types import (
     TextPart,
 )
 
-from kourai_common.retry import with_retry
 from kourai_common.tracing import create_span, get_trace_context
 
 log = logging.getLogger(__name__)
@@ -56,29 +56,28 @@ class RemoteAgentConnection:
             self.card = await resolver.get_agent_card()
             if self.card:
                 config = ClientConfig(
-                    streaming=False,
+                    streaming=True,
                     httpx_client=self.http,
                 )
                 factory = ClientFactory(config)
                 self.client = factory.create(self.card)
                 log.info("Connected to %s at %s", self.card.name, self.agent_url)
 
-    @with_retry(max_attempts=3, base_delay=1.0)
     async def send(
         self,
         text: str,
         context_id: str,
         attachments: list[tuple[str, str]] | None = None,
-    ) -> str:
-        """Send a message to the specialist and return the artifact text.
+    ) -> AsyncGenerator[tuple[str, str], None]:
+        """Send a message to the specialist and yield status and result updates.
 
         Args:
             text: The message/task content to send.
             context_id: Conversation context ID for multi-turn.
             attachments: Optional list of (base64_bytes, mime_type) image attachments.
 
-        Returns:
-            Extracted text from the agent's response artifacts.
+        Yields:
+            Tuples of (event_type, text) where event_type is "status" or "result".
         """
         if not self.client:
             raise RuntimeError(f"Not connected to {self.agent_name}. Call connect() first.")
@@ -118,7 +117,8 @@ class RemoteAgentConnection:
                 if isinstance(event, Message):
                     result = self._extract_message_text(event)
                     log.info("Received from %s: %d chars", self.agent_name, len(result))
-                    return result
+                    yield ("result", result)
+                    return
 
                 # ClientEvent: tuple[Task, update | None]
                 task, update = event
@@ -128,21 +128,25 @@ class RemoteAgentConnection:
                         raise AgentInputRequired(
                             self.agent_name, question or "Additional input needed"
                         )
+                    elif update.status.message:
+                        status_msg = self._extract_status_message(update)
+                        if status_msg:
+                            yield ("status", status_msg)
                 elif isinstance(update, TaskArtifactUpdateEvent):
                     if update.artifact and update.artifact.parts:
                         result = "\n".join(
                             p.root.text for p in update.artifact.parts if hasattr(p.root, "text")
                         )
                         log.info("Received from %s: %d chars", self.agent_name, len(result))
-                        return result
+                        yield ("result", result)
+                        return
                 elif update is None:
                     # Final task snapshot — extract artifacts
                     result = self._extract_task_text(task)
                     if result:
                         log.info("Received from %s: %d chars", self.agent_name, len(result))
-                        return result
-
-            return ""
+                        yield ("result", result)
+                        return
 
     def _extract_message_text(self, message: Message) -> str:
         """Pull text from a direct Message response."""

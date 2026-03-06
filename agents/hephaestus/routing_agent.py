@@ -219,7 +219,13 @@ async def execute_pipeline(
                         except Exception as e:
                             log.warning("Failed to collect git changes for Mneme: %s", e)
 
-                    result = await conn.send(send_context, context_id)
+                    result = ""
+                    async for event_type, content in conn.send(send_context, context_id):
+                        if event_type == "status":
+                            yield (agent_name, content, "")
+                        elif event_type == "result":
+                            result = content
+
                     accumulated_context += f"\n\n--- Output from {agent_name} ---\n{result}"
                     yield (agent_name, f"[{step_num}/{total}] {card_name} completed", result)
 
@@ -266,7 +272,15 @@ async def execute_pipeline(
                         try:
                             techne_conn = connections["techne"]
                             yield ("techne", f"[fix {iteration}] Applying style fixes...", "")
-                            fix_result = await techne_conn.send(fix_prompt, context_id)
+                            fix_result = ""
+                            async for event_type, content in techne_conn.send(
+                                fix_prompt, context_id
+                            ):
+                                if event_type == "status":
+                                    yield ("techne", content, "")
+                                elif event_type == "result":
+                                    fix_result = content
+
                             accumulated_context += (
                                 f"\n\n--- Techne fix iteration {iteration} ---\n{fix_result}"
                             )
@@ -275,7 +289,15 @@ async def execute_pipeline(
                             # Re-run Kallos to verify
                             kallos_conn = connections["kallos"]
                             yield ("kallos", f"[fix {iteration}] Re-checking style...", "")
-                            result = await kallos_conn.send(accumulated_context, context_id)
+                            result = ""
+                            async for event_type, content in kallos_conn.send(
+                                accumulated_context, context_id
+                            ):
+                                if event_type == "status":
+                                    yield ("kallos", content, "")
+                                elif event_type == "result":
+                                    result = content
+
                             accumulated_context += (
                                 f"\n\n--- Kallos recheck {iteration} ---\n{result}"
                             )
