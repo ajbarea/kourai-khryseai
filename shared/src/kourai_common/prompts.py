@@ -47,6 +47,7 @@ def build_system_prompt(
     personality: str,
     specific_instructions: str,
     include_python_standards: bool = True,
+    player_context: str | None = None,
 ) -> str:
     """Build a complete agent system prompt with shared + custom sections.
 
@@ -56,6 +57,7 @@ def build_system_prompt(
         personality: Personality/style description
         specific_instructions: Agent-specific instructions and output formats
         include_python_standards: Whether to include Python standards section
+        player_context: Optional player identity/memory block from build_player_context()
 
     Returns:
         Complete system prompt combining shared and agent-specific content
@@ -71,5 +73,8 @@ def build_system_prompt(
         sections.append(PYTHON_STANDARDS)
 
     sections.extend([GIT_BOUNDARIES, UNIVERSAL_RULES])
+
+    if player_context:
+        sections.append(player_context)
 
     return "\n".join(sections)
