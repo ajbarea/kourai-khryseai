@@ -41,9 +41,9 @@ Priority Order:
 Target: 80%+ code coverage
 
 Test File Pattern:
-- File: tests/unit/test_{{module_name}}.py
+- File: tests/unit/test_{module_name}.py
 - Class: TestClassName (groups related tests)
-- Methods: test_{{description}} (descriptive names)
+- Methods: test_{description} (descriptive names)
 - Fixtures: @pytest.fixture with type hints (Python 3.12+) and one-liner docstrings
 
 Docstring Style (same as production code):

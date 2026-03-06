@@ -50,7 +50,7 @@ def build_agent_card() -> AgentCard:
         description=(
             "Code style specialist. Runs ruff linter/formatter, analyzes "
             "comments and docstrings, enforces AJ's quality standards. "
-            "Reports issues — hands off to Techne for fixes if needed."
+            "Auto-fixes issues iteratively via LLM-powered fix loop."
         ),
         url=get_agent_url(AGENT_NAME),
         version="0.1.0",

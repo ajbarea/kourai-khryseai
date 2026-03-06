@@ -10,12 +10,7 @@ from a2a.server.tasks import TaskUpdater
 from a2a.types import Part, Task, TextPart, UnsupportedOperationError
 from a2a.utils.errors import ServerError
 
-from agents.techne.agent import (
-    generate_code,
-    get_git_context,
-    parse_file_paths,
-    read_files,
-)
+from agents.techne.agent import generate_code, get_git_context, parse_file_paths, read_files
 from kourai_common.a2a_utils import extract_image_parts
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler

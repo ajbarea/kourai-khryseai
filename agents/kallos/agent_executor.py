@@ -7,7 +7,7 @@ import logging
 from a2a.server.agent_execution import RequestContext
 from a2a.server.events import EventQueue
 from a2a.server.tasks import TaskUpdater
-from a2a.types import Part, Task, TextPart, UnsupportedOperationError
+from a2a.types import DataPart, Part, Task, TextPart, UnsupportedOperationError
 from a2a.utils.errors import ServerError
 
 from kourai_common.base_executor import BaseAgentExecutor
@@ -35,18 +35,12 @@ class KallosAgentExecutor(BaseAgentExecutor):
     ) -> None:
         """Kallos-specific: run linting and auto-fix issues."""
         with create_span("kallos.execute", {"a2a.method": "execute"}):
-            from agents.kallos.agent import (
-                fix_lint_issues,
-                run_make_lint,
-            )
-            from kourai_common.fix_loop import run_fix_loop
-            from kourai_common.subprocess import (
-                extract_files_from_output,
-                parse_and_apply_fixes,
-            )
+            from agents.kallos.agent import fix_lint_issues, run_make_lint
+            from kourai_common.fix_loop import KALLOS_MESSAGES, run_fix_loop
+            from kourai_common.subprocess import extract_files_from_output, parse_and_apply_fixes
 
-            # Run iterative lint-fix loop
-            all_clean, final_output = await run_fix_loop(
+            # Run iterative lint-fix loop with personality messages
+            all_clean, final_output, result = await run_fix_loop(
                 tool_name="make lint",
                 run_tool=run_make_lint,
                 extract_files=extract_files_from_output,
@@ -55,6 +49,7 @@ class KallosAgentExecutor(BaseAgentExecutor):
                 updater=updater,
                 task=task,
                 emoji="✨",
+                messages=KALLOS_MESSAGES,
             )
 
             # Format final output
@@ -63,18 +58,18 @@ class KallosAgentExecutor(BaseAgentExecutor):
             else:
                 final_output = f"✨ Linting completed with issues.\n\n{final_output}"
 
-            # Format and emit final artifact
+            # Emit both human-readable text and machine-readable structured data
             await updater.add_artifact(
-                [Part(root=TextPart(text=final_output))],
+                [
+                    Part(root=TextPart(text=final_output)),
+                    Part(root=DataPart(data=result.to_dict())),
+                ],
                 name="style_report",
             )
 
-            if all_clean:
-                await updater.complete()
-                log.info("Kallos completed — all clean")
-            else:
-                await updater.complete()
-                log.info("Kallos completed — issues remain")
+            status = "all clean" if all_clean else "issues remain"
+            await updater.complete()
+            log.info("Kallos completed — %s", status)
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
         raise ServerError(error=UnsupportedOperationError())
