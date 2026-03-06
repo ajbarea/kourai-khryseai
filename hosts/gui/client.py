@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import queue as _queue
+import re
 from uuid import uuid4
 
 import httpx
@@ -26,13 +27,7 @@ from a2a.types import (
 
 from kourai_common.config import get_agent_url
 
-# Event dict shapes pushed to recv_q:
-#   {"type": "connected", "name": str, "url": str}
-#   {"type": "status",   "text": str}
-#   {"type": "result",   "text": str}
-#   {"type": "complete", "elapsed": float}
-#   {"type": "error",    "text": str}
-#   {"type": "disconnected"}
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
 
 
 class GuiClient:
@@ -49,6 +44,8 @@ class GuiClient:
         self._default_url = agent_url or get_agent_url("hephaestus")
 
     def _put(self, event: dict) -> None:
+        if "text" in event and isinstance(event["text"], str):
+            event["text"] = _ANSI_RE.sub("", event["text"])
         self._recv.put_nowait(event)
 
     async def run(self) -> None:
