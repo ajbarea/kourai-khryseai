@@ -5,7 +5,7 @@
 # Creates a backup of uv.lock before making changes.
 #
 # Usage:
-#   ./update_dependencies.sh
+#   ./scripts/update_dependencies.sh
 #
 # Dependencies: uv
 
@@ -16,7 +16,10 @@ set -euo pipefail
 # ============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-. "$SCRIPT_DIR/scripts/common.sh"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+. "$SCRIPT_DIR/common.sh"
+
+cd "$REPO_ROOT"
 
 setup_unicode_env
 
