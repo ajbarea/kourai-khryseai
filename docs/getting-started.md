@@ -6,7 +6,7 @@
 |---|---|---|
 | **Python** | 3.12+ | Required by `a2a-sdk` |
 | **[uv](https://docs.astral.sh/uv/)** | Latest | Fast Python packaging with workspace support |
-| **Docker** | Any | For Jaeger observability (optional but recommended) |
+| **Docker + Docker Compose** | Any | Required to run agents and observability stack |
 | **API Key** | — | Anthropic API key, or use [Ollama](https://ollama.com/) for free local models |
 
 ---
@@ -50,26 +50,9 @@ ANTHROPIC_API_KEY=sk-ant-your-key-here
 
 ## Starting the Agents
 
-### Option A: Local (development)
-
 ```bash
-# Start all 6 agents + Jaeger and verify everything is running
-make up
-# ✅ Hephaestus  :10000
-# ✅ Metis       :10001
-# ✅ Techne      :10002
-# ✅ Dokimasia   :10003
-# ✅ Kallos      :10004
-# ✅ Mneme       :10005
-```
-
-Agents run as background processes with logs in `logs/`.
-
-### Option B: Docker (containerized)
-
-```bash
-make docker-up       # Build images + start full stack
-make docker-down     # Stop everything
+make up              # Build images + start full stack (waits for healthy services)
+make status          # Show service state/health
 ```
 
 Docker Compose profiles for fine control:
@@ -170,7 +153,7 @@ See [GUI Reference → Text-to-Speech System](gui.md#text-to-speech-system-) for
 
 ## Viewing Traces
 
-Every request creates a distributed trace across all agents. Jaeger starts automatically with `make up` (or `make docker-up`).
+Every request creates a distributed trace across all agents. Jaeger starts automatically with `make up`.
 
 Open the Jaeger UI at [`localhost:16686`](http://localhost:16686) and select any agent from the service dropdown to see its spans, timings, and any errors.
 
@@ -179,11 +162,7 @@ Open the Jaeger UI at [`localhost:16686`](http://localhost:16686) and select any
 ## Stopping the Agents
 
 ```bash
-# Local
 make down
-
-# Docker
-make docker-down
 ```
 
 ---

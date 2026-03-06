@@ -266,15 +266,12 @@ See [Architecture → TTS System](architecture/tts.md) for complete API referenc
 | `make setup` | Install all dependencies (`uv sync --all-packages`) |
 | `make cli` | Launch the interactive CLI client |
 | `make gui` | Launch the visual GUI with voice synthesis |
-| `make up` | Start all agents locally + Jaeger + Prometheus |
-| `make down` | Stop all local agents |
-| `make shutdown` | Total system shutdown (local agents + Docker) |
-| `make status` | Health check all agent endpoints |
+| `make up` | Start all agents in Docker + Jaeger + Prometheus (build + wait healthy) |
+| `make down` | Stop all Docker containers from the full profile |
+| `make status` | Show Docker service status and health |
 | `make lint` | Run ruff + mypy |
 | `make test` | Run linters + full test suite with coverage |
 | `make clean` | Remove `__pycache__`, `.pytest_cache`, build artifacts |
 | `make docs` | Serve documentation locally (Zensical) |
 | `make upgrade` | Update all dependencies to latest versions |
-| `make docker-up` | Build + start all agents in Docker |
-| `make docker-down` | Stop all Docker containers |
 | `make help` | Show all available commands |

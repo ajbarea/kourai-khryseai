@@ -142,7 +142,7 @@ Generates grouped commit messages from <code>git diff</code> in conventional-com
 
 - **Python 3.12+**
 - **[uv](https://docs.astral.sh/uv/)** — `curl -LsSf https://astral.sh/uv/install.sh | sh`
-- **Docker** — for Jaeger (observability)
+- **Docker + Docker Compose** — required to run agents and observability stack
 - **Anthropic API key** — or [Ollama](https://ollama.com/) for free local models
 
 ### Setup
@@ -182,12 +182,7 @@ kourai "commit prep"
 # Check agent health
 make status
 
-# ✅ hephaestus :10000
-# ✅ metis      :10001
-# ✅ techne     :10002
-# ✅ dokimasia  :10003
-# ✅ kallos     :10004
-# ✅ mneme      :10005
+# Shows container state and health for full profile services
 
 # View traces
 open http://localhost:16686    # Jaeger UI
@@ -218,10 +213,10 @@ Every agent can run as an isolated Docker container:
 
 ```bash
 # Start the full stack (builds + all agents + Jaeger)
-make docker-up
+make up
 
 # Stop
-make docker-down
+make down
 ```
 
 Docker Compose profiles give you fine control:
@@ -307,10 +302,17 @@ make setup      # Install deps
 make test       # Run test suite
 make lint       # Run ruff
 make clean      # Remove __pycache__, .pytest_cache
-make status     # Check all agent health endpoints
+make status     # Show Docker service status/health
 make docs       # Serve documentation locally
 make help       # Show all available commands
 ```
+
+## Build and runtime tools
+
+- **Build backend:** `hatchling` (declared as `build-backend = "hatchling.build"` in package `pyproject.toml`). Install `hatch` or `hatchling` only when you need to build wheels with `hatch build`.
+- **Workspace / package manager:** `uv` — used for dependency sync and workspace commands (`uv sync`, `uv run`).
+- **Developer tasks / runtime:** `make` targets handle day-to-day operations (`make setup`, `make test`, `make lint`, `make up`).
+- **Recommendation:** Use `uv` and `make` for normal development and runs; use `hatch`/`hatchling` only for packaging/building wheels.
 
 ---
 

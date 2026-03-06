@@ -22,7 +22,7 @@ Every script starts with a shebang and a brief purpose:
 #!/bin/bash
 # Update all workspace dependencies and regenerate lock files.
 #
-# Usage: ./update_dependencies.sh
+# Usage: ./scripts/update_dependencies.sh
 #
 # Dependencies: uv, python3
 ```
