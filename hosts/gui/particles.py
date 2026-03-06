@@ -14,12 +14,29 @@ class Ember:
 
     __slots__ = ("x", "y", "vx", "vy", "radius", "alpha", "decay", "color")
 
-    def __init__(self) -> None:
-        self._reset()
+    x: float
+    y: float
+    vx: float
+    vy: float
+    radius: float
+    alpha: float
+    decay: float
+    color: tuple[int, int, int]
 
-    def _reset(self) -> None:
-        self.x = random.uniform(0, W)
-        self.y = random.uniform(0, H)
+    def __init__(self) -> None:
+        self.x = 0
+        self.y = 0
+        self.vx = 0
+        self.vy = 0
+        self.radius = 0
+        self.alpha = 0
+        self.decay = 0
+        self.color = (0, 0, 0)
+        self._reset(W, H)
+
+    def _reset(self, max_w: int, max_h: int) -> None:
+        self.x = random.uniform(0, max_w)
+        self.y = random.uniform(0, max_h)
         self.vx = random.uniform(-0.25, 0.25)
         self.vy = random.uniform(-0.6, -0.15)
         self.radius = random.uniform(1.0, 2.5)
@@ -54,10 +71,10 @@ class ParticleSystem:
     def __init__(self) -> None:
         self._embers: list[Ember] = [Ember() for _ in range(self.MAX)]
 
-    def update(self, dt: float) -> None:
+    def update(self, dt: float, screen_w: int = W, screen_h: int = H) -> None:
         for e in self._embers:
             if not e.update(dt):
-                e._reset()
+                e._reset(screen_w, screen_h)
 
     def draw(self, surf: pygame.Surface) -> None:
         for e in self._embers:
