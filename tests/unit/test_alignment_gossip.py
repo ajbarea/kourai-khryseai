@@ -1123,3 +1123,209 @@ class TestRomanceInPlayerContext:
         ctx = build_player_context(p, "metis")
         assert "ROMANCE: FLAME" in ctx
         assert "intellectual seduction" in ctx.lower()
+
+
+# ── Jealousy Confrontation System ──────────────────────────────────────
+
+
+class TestJealousyTrigger:
+    def _setup_multi_romance(self, profile, agents_and_stages):
+        """Set up multiple agents at various romance stages."""
+        from kourai_common.player import update_affinity
+
+        for agent, stage in agents_and_stages:
+            for _ in range(40):
+                update_affinity(profile.player_id, agent, 0.02)
+            conn = player._get_player_db()
+            conn.execute(
+                "UPDATE agent_affinity SET romance_stage = ? "
+                "WHERE player_id = ? AND agent_name = ?",
+                (stage, profile.player_id, agent),
+            )
+            conn.commit()
+
+    def test_no_trigger_without_romance(self):
+        from kourai_common.gossip import ResponseTone, check_jealousy_trigger, start_gossip_session
+
+        p = PlayerProfile(display_name="AJ")
+        session = start_gossip_session("metis", "kallos")
+        result = check_jealousy_trigger(session, ResponseTone.FLIRT, p)
+        assert result is None
+
+    def test_no_trigger_with_single_romance(self):
+        from kourai_common.gossip import ResponseTone, check_jealousy_trigger, start_gossip_session
+
+        p = PlayerProfile(display_name="AJ", romance_targets=["metis"])
+        self._setup_multi_romance(p, [("metis", "kindling")])
+        session = start_gossip_session("metis", "kallos")
+        result = check_jealousy_trigger(session, ResponseTone.FLIRT, p)
+        assert result is None
+
+    def test_no_trigger_on_scold(self):
+        from kourai_common.gossip import ResponseTone, check_jealousy_trigger, start_gossip_session
+
+        p = PlayerProfile(display_name="AJ", romance_targets=["metis", "kallos", "dokimasia"])
+        self._setup_multi_romance(
+            p,
+            [
+                ("metis", "kindling"),
+                ("kallos", "kindling"),
+                ("dokimasia", "kindling"),
+            ],
+        )
+        session = start_gossip_session("metis", "kallos")
+        result = check_jealousy_trigger(session, ResponseTone.SCOLD, p)
+        assert result is None
+
+    def test_trigger_on_flirt_with_absent_rival(self):
+        from kourai_common.gossip import ResponseTone, check_jealousy_trigger, start_gossip_session
+
+        p = PlayerProfile(display_name="AJ", romance_targets=["metis", "kallos", "dokimasia"])
+        self._setup_multi_romance(
+            p,
+            [
+                ("metis", "kindling"),
+                ("kallos", "spark"),
+                ("dokimasia", "flame"),
+            ],
+        )
+        session = start_gossip_session("metis", "kallos")
+        result = check_jealousy_trigger(session, ResponseTone.FLIRT, p)
+        # dokimasia is absent and at flame (kindling+) → should trigger
+        assert result is not None
+        assert result.jealous_agent == "dokimasia"
+        assert result.rival_agent == "metis"  # metis has higher romance in session
+        assert "confrontation" in result.trigger or "flirted" in result.trigger
+        assert len(result.response_options) >= 2
+
+    def test_no_trigger_when_absent_romance_is_spark_only(self):
+        from kourai_common.gossip import ResponseTone, check_jealousy_trigger, start_gossip_session
+
+        p = PlayerProfile(display_name="AJ", romance_targets=["metis", "dokimasia"])
+        self._setup_multi_romance(
+            p,
+            [
+                ("metis", "kindling"),
+                ("dokimasia", "spark"),  # spark doesn't trigger jealousy
+            ],
+        )
+        session = start_gossip_session("metis", "kallos")
+        result = check_jealousy_trigger(session, ResponseTone.FLIRT, p)
+        assert result is None
+
+
+class TestJealousyResponses:
+    def test_response_options_basic(self):
+        from kourai_common.gossip import _generate_jealousy_responses
+
+        p = PlayerProfile(display_name="AJ", sovereignty=0, devotion=0)
+        options = _generate_jealousy_responses(p, "metis")
+        labels = [o.label for o in options]
+        assert "Reassure" in labels
+        assert "Deflect" in labels
+        # No high-alignment options
+        assert "Assert" not in labels
+        assert "Cherish" not in labels
+
+    def test_response_options_sovereignty_gated(self):
+        from kourai_common.gossip import _generate_jealousy_responses
+
+        p = PlayerProfile(display_name="AJ", sovereignty=65, devotion=0)
+        options = _generate_jealousy_responses(p, "metis")
+        labels = [o.label for o in options]
+        assert "Assert" in labels
+
+    def test_response_options_devotion_gated(self):
+        from kourai_common.gossip import _generate_jealousy_responses
+
+        p = PlayerProfile(display_name="AJ", sovereignty=0, devotion=65)
+        options = _generate_jealousy_responses(p, "metis")
+        labels = [o.label for o in options]
+        assert "Cherish" in labels
+
+    def test_response_options_commander_gated(self):
+        from kourai_common.gossip import _generate_jealousy_responses
+
+        p = PlayerProfile(display_name="AJ", sovereignty=85, devotion=85)
+        options = _generate_jealousy_responses(p, "metis")
+        labels = [o.label for o in options]
+        assert "Embrace all" in labels
+
+
+class TestResolveJealousy:
+    def _make_event(self, agent="metis"):
+        from kourai_common.gossip import JealousyEvent
+
+        return JealousyEvent(
+            jealous_agent=agent,
+            rival_agent="kallos",
+            trigger="test",
+            confrontation_text="test confrontation",
+        )
+
+    def test_reassure_positive_affinity(self, tmp_path, monkeypatch):
+        from kourai_common.gossip import GossipResponseOption, ResponseTone, resolve_jealousy
+
+        monkeypatch.setattr("kourai_common.player.PLAYER_DIR", tmp_path)
+        monkeypatch.setattr("kourai_common.player.PLAYER_FILE", tmp_path / "player.json")
+
+        p = PlayerProfile(display_name="AJ", sovereignty=0, devotion=0)
+        p.save()
+
+        event = self._make_event("dokimasia")
+        option = GossipResponseOption(ResponseTone.JOIN, "💙", "Reassure", "You're special to me.")
+        result = resolve_jealousy(event, option, p)
+
+        assert result["affinity_delta"] > 0
+        assert result["devotion_points"] > 0
+        assert event.resolved is True
+        assert event.resolution_text != ""
+
+    def test_assert_authority_sovereignty_agent(self, tmp_path, monkeypatch):
+        from kourai_common.gossip import GossipResponseOption, ResponseTone, resolve_jealousy
+
+        monkeypatch.setattr("kourai_common.player.PLAYER_DIR", tmp_path)
+        monkeypatch.setattr("kourai_common.player.PLAYER_FILE", tmp_path / "player.json")
+
+        p = PlayerProfile(display_name="AJ", sovereignty=70, devotion=0)
+        p.save()
+
+        # Hephaestus likes sovereignty
+        event = self._make_event("hephaestus")
+        option = GossipResponseOption(ResponseTone.SCOLD, "🔴", "Assert", "Don't question me.")
+        result = resolve_jealousy(event, option, p)
+
+        assert result["sovereignty_points"] == 3
+        assert result["affinity_delta"] > 0  # hephaestus respects authority
+
+    def test_assert_authority_devotion_agent_negative(self, tmp_path, monkeypatch):
+        from kourai_common.gossip import GossipResponseOption, ResponseTone, resolve_jealousy
+
+        monkeypatch.setattr("kourai_common.player.PLAYER_DIR", tmp_path)
+        monkeypatch.setattr("kourai_common.player.PLAYER_FILE", tmp_path / "player.json")
+
+        p = PlayerProfile(display_name="AJ", sovereignty=70, devotion=0)
+        p.save()
+
+        # Kallos dislikes sovereignty
+        event = self._make_event("kallos")
+        option = GossipResponseOption(ResponseTone.SCOLD, "🔴", "Assert", "Don't question me.")
+        result = resolve_jealousy(event, option, p)
+
+        assert result["affinity_delta"] < 0  # kallos is hurt
+
+    def test_deflect_mixed_results(self, tmp_path, monkeypatch):
+        from kourai_common.gossip import GossipResponseOption, ResponseTone, resolve_jealousy
+
+        monkeypatch.setattr("kourai_common.player.PLAYER_DIR", tmp_path)
+        monkeypatch.setattr("kourai_common.player.PLAYER_FILE", tmp_path / "player.json")
+
+        p = PlayerProfile(display_name="AJ")
+        p.save()
+
+        event = self._make_event("techne")
+        option = GossipResponseOption(ResponseTone.TEASE, "😏", "Deflect", "Jealous? Cute~")
+        result = resolve_jealousy(event, option, p)
+
+        assert result["sovereignty_points"] == 1
+        assert result["devotion_points"] == 1
