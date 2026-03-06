@@ -10,7 +10,12 @@ from a2a.server.tasks import TaskUpdater
 from a2a.types import Part, Task, TextPart, UnsupportedOperationError
 from a2a.utils.errors import ServerError
 
-from agents.techne.agent import generate_code, get_git_context, parse_file_paths, read_files
+from agents.techne.agent import (
+    generate_code_stream,
+    get_git_context,
+    parse_file_paths,
+    read_files,
+)
 from kourai_common.a2a_utils import extract_image_parts
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
@@ -69,13 +74,26 @@ class TechneAgentExecutor(BaseAgentExecutor):
 
             # Step 4: Generate code
             with create_span("techne.generate", {"task": user_input[:100]}):
-                result = await generate_code(
+                result = ""
+                chunk_count = 0
+                async for chunk in generate_code_stream(
                     task_description=user_input,
                     file_contents=file_contents,
                     git_context=git_context,
                     image_parts=extract_image_parts(context) or None,
                     context_id=task.context_id,
-                )
+                ):
+                    result += chunk
+                    chunk_count += 1
+                    if chunk_count % 10 == 0:
+                        lines = result.strip().split("\n")
+                        latest_line = lines[-1] if lines else ""
+                        if len(latest_line) > 50:
+                            latest_line = latest_line[:47] + "..."
+                        if latest_line.strip():
+                            await send_working_status(
+                                updater, task, f"Coding: {latest_line}", emoji="⚙️"
+                            )
 
             # Step 5: Apply code changes to disk
             # WHY: Without this, cross-agent fix loops are broken — Kallos/Dokimasia

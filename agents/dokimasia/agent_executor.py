@@ -7,10 +7,9 @@ import logging
 from a2a.server.agent_execution import RequestContext
 from a2a.server.events import EventQueue
 from a2a.server.tasks import TaskUpdater
-from a2a.types import DataPart, Part, Task, TextPart, UnsupportedOperationError
+from a2a.types import Part, Task, TextPart, UnsupportedOperationError
 from a2a.utils.errors import ServerError
 
-from agents.dokimasia.agent import generate_tests
 from kourai_common.a2a_utils import extract_image_parts
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
@@ -46,20 +45,23 @@ class DokimasiaAgentExecutor(BaseAgentExecutor):
             )
 
             if is_run_request:
-                from agents.dokimasia.agent import fix_test_issues, run_pytest
-                from kourai_common.fix_loop import DOKIMASIA_MESSAGES, run_fix_loop
+                from agents.dokimasia.agent import (
+                    fix_test_issues,
+                    run_pytest,
+                )
+                from kourai_common.fix_loop import run_fix_loop
                 from kourai_common.subprocess import (
                     extract_files_from_output,
                     parse_and_apply_fixes,
                 )
 
                 # Wrapper to adapt run_pytest to fix_loop interface
-                async def _run_pytest_wrapper() -> tuple[bool, str]:
+                async def _run_pytest_wrapper():
                     result = await run_pytest()
                     return result.success, result.output
 
-                # Run iterative test-fix loop with personality messages
-                all_passed, test_output, loop_result = await run_fix_loop(
+                # Run iterative test-fix loop
+                all_passed, test_output = await run_fix_loop(
                     tool_name="pytest",
                     run_tool=_run_pytest_wrapper,
                     extract_files=extract_files_from_output,
@@ -68,23 +70,28 @@ class DokimasiaAgentExecutor(BaseAgentExecutor):
                     updater=updater,
                     task=task,
                     emoji="🧪",
-                    messages=DOKIMASIA_MESSAGES,
                 )
 
+                # Format final report - need to parse output into result-like object
+                # For simplicity, just use the raw output
+                final_report = test_output
+
                 await updater.add_artifact(
-                    [
-                        Part(root=TextPart(text=test_output)),
-                        Part(root=DataPart(data=loop_result.to_dict())),
-                    ],
+                    [Part(root=TextPart(text=final_report))],
                     name="test_results",
                 )
 
-                status = "PASS" if all_passed else "tests still failing"
-                await updater.complete()
-                log.info("Dokimasia completed — ran tests: %s", status)
+                if all_passed:
+                    await updater.complete()
+                    log.info("Dokimasia completed — ran tests: PASS")
+                else:
+                    await updater.complete()
+                    log.info("Dokimasia completed — tests still failing")
 
             else:
                 # Generate tests from provided code/spec
+                from agents.dokimasia.agent import generate_tests_stream
+
                 await send_working_status(
                     updater,
                     task,
@@ -93,11 +100,25 @@ class DokimasiaAgentExecutor(BaseAgentExecutor):
                 )
 
                 with create_span("dokimasia.generate"):
-                    tests = await generate_tests(
+                    tests = ""
+                    chunk_count = 0
+                    async for chunk in generate_tests_stream(
                         source_code=user_input,
                         module_name="provided_code",
                         image_parts=extract_image_parts(context) or None,
-                    )
+                        context_id=task.context_id,
+                    ):
+                        tests += chunk
+                        chunk_count += 1
+                        if chunk_count % 10 == 0:
+                            lines = tests.strip().split("\n")
+                            latest_line = lines[-1] if lines else ""
+                            if len(latest_line) > 50:
+                                latest_line = latest_line[:47] + "..."
+                            if latest_line.strip():
+                                await send_working_status(
+                                    updater, task, f"Testing: {latest_line}", emoji="🧪"
+                                )
 
                 await send_working_status(
                     updater,
