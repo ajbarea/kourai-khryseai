@@ -84,7 +84,7 @@ Six divine agents, each with unique personality, color, and visual style:
 
 ### Avatar Assets
 
-Avatars are stored in `docs/assets/maidens/golden_avatars/`:
+Avatars are stored in `assets/maidens/golden_avatars/`:
 
 ```
 hephaestus.png   — The Forge Master  (gruff male forge god)
@@ -450,7 +450,7 @@ uv run pytest
 
 ### Adding New Agents
 
-1. Add avatar PNG to `docs/assets/maidens/golden_avatars/`
+1. Add avatar PNG to `assets/maidens/golden_avatars/`
 2. Add agent data to `AGENTS` dict in `maidens.py`
 3. Add emoji mapping to `EMOJI_TO_AGENT` dict
 4. Add handoff lines to `HANDOFF_LINES` dict
@@ -472,7 +472,7 @@ uv run pytest
 - Check display permissions on Linux: `xhost +local:`
 
 ### Avatars don't show
-- Verify PNG files exist in `docs/assets/maidens/golden_avatars/`
+- Verify PNG files exist in `assets/maidens/golden_avatars/`
 - Check file names match agent keys exactly (case-sensitive)
 - Ensure PNGs are valid images (not corrupted)
 
