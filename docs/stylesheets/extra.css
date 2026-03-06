@@ -4,12 +4,16 @@
   --gold-mid: #C9944A;
   --gold-dark: #AA771C;
   --gold-deep: #8A6623;
+  --gold-metallic: #D4AF37;
   --gold-gradient: linear-gradient(135deg, #CF995F 0%, #F1D2A1 25%, #E2B07E 50%, #F1D2A1 75%, #CF995F 100%);
 
   /* Obsidian & Shadow */
   --obsidian: #010201;
-  --glass-bg: rgba(255, 255, 255, 0.03);
-  --glass-border: rgba(212, 175, 55, 0.2);
+  --glass-bg: color-mix(in srgb, #fff 3%, transparent);
+  --glass-border: color-mix(in srgb, var(--gold-metallic) 20%, transparent);
+
+  /* Assets */
+  --hero-bg-image: url('../assets/golden-maidens.png');
 
   /* Zensical Overrides */
   --md-primary-fg-color: var(--gold-light);
@@ -65,11 +69,11 @@ body.hero-page .md-content__inner {
   text-align: center;
   background:
     linear-gradient(to bottom,
-      rgba(1, 2, 1, 0.4) 0%,
-      rgba(1, 2, 1, 0.1) 40%,
-      rgba(1, 2, 1, 0.8) 80%,
+      color-mix(in srgb, var(--obsidian) 40%, transparent) 0%,
+      color-mix(in srgb, var(--obsidian) 10%, transparent) 40%,
+      color-mix(in srgb, var(--obsidian) 80%, transparent) 80%,
       var(--obsidian) 100%),
-    url('../assets/golden-maidens.png') center 48px / contain no-repeat;
+    var(--hero-bg-image) center 48px / contain no-repeat;
   color: var(--gold-light);
   margin: -1.2rem -0.8rem 0;
   /* bleed into the content padding */
@@ -108,23 +112,23 @@ body.hero-page .md-content__inner {
   -webkit-background-clip: text !important;
   -webkit-text-fill-color: transparent !important;
   color: transparent !important;
-  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.9))
-    drop-shadow(0 0 3px rgba(0, 0, 0, 0.7))
-    drop-shadow(0 2px 8px rgba(212, 175, 55, 0.4));
+  filter: drop-shadow(0 0 1px color-mix(in srgb, #000 90%, transparent))
+    drop-shadow(0 0 3px color-mix(in srgb, #000 70%, transparent))
+    drop-shadow(0 2px 8px color-mix(in srgb, var(--gold-metallic) 40%, transparent));
   animation: shimmer 3s ease-in-out infinite alternate;
 }
 
 @keyframes shimmer {
   0% {
-    filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.9))
-      drop-shadow(0 0 3px rgba(0, 0, 0, 0.7))
-      drop-shadow(0 2px 8px rgba(212, 175, 55, 0.3));
+    filter: drop-shadow(0 0 1px color-mix(in srgb, #000 90%, transparent))
+      drop-shadow(0 0 3px color-mix(in srgb, #000 70%, transparent))
+      drop-shadow(0 2px 8px color-mix(in srgb, var(--gold-metallic) 30%, transparent));
   }
 
   100% {
-    filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.9))
-      drop-shadow(0 0 3px rgba(0, 0, 0, 0.6))
-      drop-shadow(0 2px 16px rgba(212, 175, 55, 0.6));
+    filter: drop-shadow(0 0 1px color-mix(in srgb, #000 90%, transparent))
+      drop-shadow(0 0 3px color-mix(in srgb, #000 60%, transparent))
+      drop-shadow(0 2px 16px color-mix(in srgb, var(--gold-metallic) 60%, transparent));
   }
 }
 
@@ -136,13 +140,11 @@ body.hero-page .md-content__inner {
   color: var(--gold-light);
   opacity: 0.8;
   margin-bottom: 1rem;
-  text-shadow: 0 0 4px rgba(0, 0, 0, 0.9), 0 0 8px rgba(0, 0, 0, 0.6);
+  text-shadow: 0 0 4px color-mix(in srgb, #000 90%, transparent), 0 0 8px color-mix(in srgb, #000 60%, transparent);
   max-width: 700px;
   margin-left: auto;
   margin-right: auto;
 }
-
-
 
 /* Hero buttons — equal width */
 .hero-buttons {
@@ -169,11 +171,11 @@ body.hero-page .md-content__inner {
    ========================================================================== */
 
 .md-header {
-  background-color: rgba(1, 2, 1, 0.9) !important;
+  background-color: color-mix(in srgb, var(--obsidian) 90%, transparent) !important;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(212, 175, 55, 0.1) !important;
-  box-shadow: 0 1px 20px rgba(0, 0, 0, 0.5);
+  border-bottom: 1px solid color-mix(in srgb, var(--gold-metallic) 10%, transparent) !important;
+  box-shadow: 0 1px 20px color-mix(in srgb, #000 50%, transparent);
 }
 
 /* On the homepage, fix the header so it overlays the hero without pushing it down */
@@ -191,41 +193,6 @@ body.hero-page .md-header {
 }
 
 /* ==========================================================================
-   Glassmorphism Cards
-   ========================================================================== */
-
-.grid.cards>ul {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 2.5rem;
-  list-style: none;
-  padding: 0;
-}
-
-.grid.cards>ul>li {
-  padding: 2.5rem;
-  background: var(--glass-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--glass-border);
-  border-radius: 1.25rem;
-  transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
-  position: relative;
-}
-
-.grid.cards>ul>li:hover {
-  transform: translateY(-10px);
-  background: rgba(241, 210, 161, 0.05);
-  border-color: var(--gold-light);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-}
-
-.grid.cards>ul>li h2,
-.grid.cards>ul>li strong {
-  color: var(--gold-light) !important;
-}
-
-/* ==========================================================================
    Buttons
    ========================================================================== */
 
@@ -238,14 +205,14 @@ body.hero-page .md-header {
   letter-spacing: 0.1em !important;
   padding: 0.8rem 2rem !important;
   border-radius: 3rem !important;
-  box-shadow: 0 4px 15px rgba(241, 210, 161, 0.3) !important;
+  box-shadow: 0 4px 15px color-mix(in srgb, var(--gold-light) 30%, transparent) !important;
   transition: all 0.3s ease;
 }
 
 .md-button--primary:hover {
   filter: brightness(1.1);
   transform: scale(1.05);
-  box-shadow: 0 8px 25px rgba(241, 210, 161, 0.5) !important;
+  box-shadow: 0 8px 25px color-mix(in srgb, var(--gold-light) 50%, transparent) !important;
 }
 
 /* Secondary button in hero — glass style */
@@ -258,7 +225,7 @@ body.hero-page .md-header {
 
 .hero .md-button:not(.md-button--primary):hover {
   border-color: var(--gold-light) !important;
-  background: rgba(241, 210, 161, 0.1) !important;
+  background: color-mix(in srgb, var(--gold-light) 10%, transparent) !important;
 }
 
 /* ==========================================================================
@@ -298,7 +265,7 @@ body.hero-page .md-header {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(241, 210, 161, 0.3);
+  background: color-mix(in srgb, var(--gold-light) 30%, transparent);
   border-radius: 10px;
 }
 
@@ -307,19 +274,20 @@ body.hero-page .md-header {
 }
 
 /* ==========================================================================
-   Mobile Responsive — Hero
+   Mobile Responsive Rules
    ========================================================================== */
 
 @media (max-width: 768px) {
+  /* Hero adjustments */
   .hero {
     background:
       linear-gradient(to bottom,
-        rgba(1, 2, 1, 0.5) 0%,
-        rgba(1, 2, 1, 0.15) 25%,
-        rgba(1, 2, 1, 0.6) 60%,
-        rgba(1, 2, 1, 0.9) 80%,
+        color-mix(in srgb, var(--obsidian) 50%, transparent) 0%,
+        color-mix(in srgb, var(--obsidian) 15%, transparent) 25%,
+        color-mix(in srgb, var(--obsidian) 60%, transparent) 60%,
+        color-mix(in srgb, var(--obsidian) 90%, transparent) 80%,
         var(--obsidian) 95%),
-      url('../assets/golden-maidens.png') center 48px / contain no-repeat;
+      var(--hero-bg-image) center 48px / contain no-repeat;
     padding: 1rem 1.2rem 2rem;
     /* Ensure dvh is used on real mobile browsers */
     height: 100vh;
@@ -351,6 +319,24 @@ body.hero-page .md-header {
     padding: 0.55rem 1.2rem !important;
     font-size: 0.75rem !important;
   }
+  
+  /* Footer adjustments */
+  .md-footer-meta__inner {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+  }
+
+  .md-footer-meta__inner .md-copyright {
+    padding: 0 !important;
+  }
+
+  .md-footer-meta__inner .md-social {
+    margin-top: 0 !important;
+    padding: 0 !important;
+  }
 }
 
 /* Extra-small screens (< 400px) */
@@ -374,7 +360,7 @@ body.hero-page .md-header {
 .mermaid .node rect,
 .mermaid .node circle,
 .mermaid .node polygon {
-  fill: rgba(201, 148, 74, 0.15) !important;
+  fill: color-mix(in srgb, var(--gold-mid) 15%, transparent) !important;
   stroke: var(--gold-mid) !important;
   stroke-width: 2px !important;
 }
@@ -416,13 +402,13 @@ body.hero-page .md-header {
 
 /* Diamond / decision nodes */
 .mermaid .node .label-container {
-  fill: rgba(201, 148, 74, 0.15) !important;
+  fill: color-mix(in srgb, var(--gold-mid) 15%, transparent) !important;
   stroke: var(--gold-mid) !important;
 }
 
 /* Sequence diagram */
 .mermaid .actor {
-  fill: rgba(201, 148, 74, 0.15) !important;
+  fill: color-mix(in srgb, var(--gold-mid) 15%, transparent) !important;
   stroke: var(--gold-mid) !important;
 }
 
@@ -468,13 +454,13 @@ body.hero-page .md-header {
 }
 
 .mermaid .note {
-  fill: rgba(201, 148, 74, 0.1) !important;
+  fill: color-mix(in srgb, var(--gold-mid) 10%, transparent) !important;
   stroke: var(--gold-mid) !important;
 }
 
 /* Cluster / subgraph backgrounds */
 .mermaid .cluster rect {
-  fill: rgba(201, 148, 74, 0.05) !important;
+  fill: color-mix(in srgb, var(--gold-mid) 5%, transparent) !important;
   stroke: var(--gold-dark) !important;
 }
 
