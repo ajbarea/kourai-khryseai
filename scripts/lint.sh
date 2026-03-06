@@ -1,8 +1,8 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Run quality checks and full test suite for Kourai Khryseai
 # Usage: ./scripts/lint.sh [--test]
 
-set -e
+set -euo pipefail
 trap 'echo ""; log_warning "Interrupted."; exit 130' INT
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -21,7 +21,7 @@ log_info "⚡ Running ruff format..."
 uv run ruff format .
 
 log_info "⚡ Running ruff check --fix..."
-uv run ruff check --fix --unsafe-fixes --show-fixes .
+uv run ruff check --fix --unsafe-fixes --quiet .
 
 log_info "🔍 Running mypy..."
 uv run mypy --config-file=pyproject.toml . || log_warning "mypy found some issues"
@@ -32,7 +32,7 @@ if [ "$TEST_MODE" = true ]; then
 
     WORKERS=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
     log_info "🧪 Running unit tests in parallel ($WORKERS workers)..."
-    uv run pytest -n "$WORKERS" tests/unit/ -v --tb=short $COV_ARGS
+    uv run pytest -n "$WORKERS" tests/unit/ -v --tb=short "$COV_ARGS"
 
     if [ -d "tests/integration" ]; then
         log_info "🧪 Running integration tests serially..."
