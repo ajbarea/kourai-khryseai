@@ -821,3 +821,145 @@ class TestCliGossip:
         assert summary is not None
         assert summary["rounds"] >= 1
         assert any("Hello" in line for line in output_lines)
+
+
+# ── Affinity Tier System ───────────────────────────────────────────────
+
+
+class TestAffinityTiers:
+    def test_tier_instructions_exist(self):
+        from kourai_common.player import AFFINITY_TIER_INSTRUCTIONS
+
+        assert 0 in AFFINITY_TIER_INSTRUCTIONS  # Stranger
+        assert 3 in AFFINITY_TIER_INSTRUCTIONS  # Bonded
+        assert len(AFFINITY_TIER_INSTRUCTIONS) == 4
+
+    def test_tier_context_stranger(self):
+        from kourai_common.player import get_affinity_tier_context
+
+        p = PlayerProfile(display_name="AJ")
+        ctx = get_affinity_tier_context(p.player_id, "metis")
+        assert "Stranger" in ctx
+        assert "formal" in ctx.lower()
+
+    def test_tier_context_injected_in_player_context(self):
+        from kourai_common.player import build_player_context
+
+        p = PlayerProfile(display_name="AJ")
+        ctx = build_player_context(p, "metis")
+        # Should contain tier instruction (Stranger for new player)
+        assert "formal" in ctx.lower() or "polite" in ctx.lower()
+
+
+# ── Romance Eligibility ───────────────────────────────────────────────
+
+
+class TestRomanceEligibility:
+    def test_not_eligible_low_affinity(self):
+        from kourai_common.player import check_romance_eligibility
+
+        p = PlayerProfile(display_name="AJ", sovereignty=50, devotion=80)
+        result = check_romance_eligibility(p.player_id, "kallos", profile=p)
+        assert result["eligible"] is False
+        assert result["bonded"] is False
+
+    def test_not_eligible_opted_out(self):
+        from kourai_common.player import check_romance_eligibility
+
+        p = PlayerProfile(display_name="AJ", romance_opted_out=True)
+        result = check_romance_eligibility(p.player_id, "kallos", profile=p)
+        assert result["eligible"] is False
+        assert result["romance_opted_out"] is True
+
+    def test_eligible_when_all_conditions_met(self):
+        from kourai_common.player import (
+            add_player_memory,
+            check_romance_eligibility,
+            update_affinity,
+        )
+
+        p = PlayerProfile(display_name="AJ", sovereignty=0, devotion=80)
+        # Build up affinity to bonded
+        for _ in range(40):
+            update_affinity(p.player_id, "kallos", 0.02)
+
+        # Add gossip-sourced memories
+        for i in range(4):
+            add_player_memory(
+                p.player_id,
+                f"gossip memory {i}",
+                category="moment",
+                agent_name="kallos",
+                source="gossip:metis",
+            )
+
+        result = check_romance_eligibility(p.player_id, "kallos", profile=p)
+        assert result["bonded"] is True
+        assert result["gossip_moments"] >= 3
+        assert result["alignment_compatible"] is True
+        assert result["eligible"] is True
+
+    def test_try_advance_romance_ineligible(self):
+        from kourai_common.player import try_advance_romance
+
+        p = PlayerProfile(display_name="AJ")
+        result = try_advance_romance(p.player_id, "kallos", profile=p)
+        assert result is None
+
+    def test_try_advance_romance_eligible(self):
+        from kourai_common.player import (
+            add_player_memory,
+            get_affinity,
+            try_advance_romance,
+            update_affinity,
+        )
+
+        p = PlayerProfile(display_name="AJ", sovereignty=0, devotion=80)
+        for _ in range(40):
+            update_affinity(p.player_id, "kallos", 0.02)
+
+        for i in range(4):
+            add_player_memory(
+                p.player_id,
+                f"gossip memory {i}",
+                category="moment",
+                agent_name="kallos",
+                source="gossip:metis",
+            )
+
+        new_stage = try_advance_romance(p.player_id, "kallos", profile=p)
+        assert new_stage == "spark"
+
+        aff = get_affinity(p.player_id, "kallos")
+        assert aff["romance_stage"] == "spark"
+
+
+# ── Run Post-Task Hooks (updated) ──────────────────────────────────────
+
+
+class TestRunPostTaskHooksV2:
+    def test_returns_results_dict(self, tmp_path, monkeypatch):
+        from kourai_common.hooks import run_post_task_hooks
+
+        p = PlayerProfile(display_name="AJ", sovereignty=0, devotion=0)
+        monkeypatch.setattr("kourai_common.player.PLAYER_DIR", tmp_path)
+        monkeypatch.setattr("kourai_common.player.PLAYER_FILE", tmp_path / "player.json")
+        p.save()
+
+        results = run_post_task_hooks(
+            p.player_id,
+            "techne",
+            "Great job!",
+            "Done.",
+            success=True,
+        )
+        assert "alignment_delta" in results
+        assert "memories_created" in results
+        assert "patterns_detected" in results
+        assert "romance_advanced" in results
+
+    def test_returns_empty_dict_without_player(self):
+        from kourai_common.hooks import run_post_task_hooks
+
+        results = run_post_task_hooks("", "metis", "hello", "world")
+        assert results == {}

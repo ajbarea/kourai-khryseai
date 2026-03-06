@@ -578,6 +578,47 @@ def get_affinity_tier(affinity_score: float) -> int:
 
 AFFINITY_TIER_NAMES = {0: "Stranger", 1: "Acquaintance", 2: "Companion", 3: "Bonded"}
 
+# Dialogue style guidance per tier — injected into agent system prompts
+AFFINITY_TIER_INSTRUCTIONS: dict[int, str] = {
+    0: (
+        "You don't know this player well yet. Be polite but formal. "
+        "Use their name occasionally. Don't reference shared history or inside jokes."
+    ),
+    1: (
+        "You're getting to know this player. Use their name naturally. "
+        "You can reference their stated preferences. "
+        "Show warmth but maintain professional distance."
+    ),
+    2: (
+        "You and this player have a real working relationship. "
+        "Reference shared history and inside jokes when relevant. "
+        "Be casual, warm, and occasionally playful. Use their name intimately."
+    ),
+    3: (
+        "You and this player are deeply bonded. You anticipate their needs. "
+        "Use pet names or affectionate terms if appropriate for your personality. "
+        "Reference deep callbacks. Show genuine concern for them as a person, "
+        "not just a user. Your dialogue is personal and intimate."
+    ),
+}
+
+
+def get_affinity_tier_context(player_id: str, agent_name: str) -> str:
+    """Build affinity tier context for prompt injection.
+
+    Returns a concise instruction string telling the agent how to behave
+    based on their relationship tier with this player.
+    """
+    aff = get_affinity(player_id, agent_name)
+    tier = get_affinity_tier(aff["affinity_score"])
+    tier_name = AFFINITY_TIER_NAMES[tier]
+    instruction = AFFINITY_TIER_INSTRUCTIONS[tier]
+
+    return (
+        f"Affinity tier with this player: {tier_name} "
+        f"({aff['interaction_count']} interactions).\n{instruction}"
+    )
+
 
 def advance_romance(player_id: str, agent_name: str) -> str | None:
     """Check and advance romance stage if conditions are met.
@@ -604,6 +645,92 @@ def advance_romance(player_id: str, agent_name: str) -> str | None:
     conn.commit()
     log.info("Romance advanced: %s → %s with %s", current_stage, next_stage, agent_name)
     return next_stage
+
+
+# Minimum gossip moments required to unlock romance path
+ROMANCE_GOSSIP_THRESHOLD = 3
+
+
+def check_romance_eligibility(
+    player_id: str,
+    agent_name: str,
+    profile: PlayerProfile | None = None,
+) -> dict[str, Any]:
+    """Check whether a romance path can be unlocked with an agent.
+
+    Full unlock conditions:
+    1. Affinity tier 3 (Bonded) — affinity_score >= 0.7
+    2. Alignment compatibility >= 1.0 (player in agent's preferred zone)
+    3. At least ROMANCE_GOSSIP_THRESHOLD gossip-sourced memories
+    4. Player hasn't opted out of romance content
+
+    Returns:
+        Dict with 'eligible' bool and detail about each condition.
+    """
+    if profile is None:
+        profile = PlayerProfile.load()
+
+    result: dict[str, Any] = {
+        "eligible": False,
+        "bonded": False,
+        "alignment_compatible": False,
+        "gossip_moments": 0,
+        "romance_opted_out": True,
+        "current_stage": "none",
+    }
+
+    if not profile:
+        return result
+
+    result["romance_opted_out"] = profile.romance_opted_out
+    if profile.romance_opted_out:
+        return result
+
+    aff = get_affinity(player_id, agent_name)
+    result["current_stage"] = aff["romance_stage"]
+
+    # Condition 1: Bonded tier
+    result["bonded"] = aff["affinity_score"] >= ROMANCE_AFFINITY_THRESHOLD
+
+    # Condition 2: Alignment compatibility
+    compat = profile.alignment_compatibility(agent_name)
+    result["alignment_compatible"] = compat >= 1.0
+    result["alignment_multiplier"] = compat
+
+    # Condition 3: Gossip moments
+    memories = get_player_memories(
+        player_id, agent_name=agent_name, include_shared=False, limit=200
+    )
+    gossip_count = sum(1 for m in memories if m.get("source", "").startswith("gossip:"))
+    result["gossip_moments"] = gossip_count
+
+    result["eligible"] = (
+        result["bonded"]
+        and result["alignment_compatible"]
+        and gossip_count >= ROMANCE_GOSSIP_THRESHOLD
+    )
+
+    return result
+
+
+def try_advance_romance(
+    player_id: str,
+    agent_name: str,
+    profile: PlayerProfile | None = None,
+) -> str | None:
+    """Attempt to advance romance, checking all eligibility conditions first.
+
+    This is the recommended entry point for romance progression.
+    Checks eligibility, then advances if conditions are met.
+
+    Returns:
+        New romance stage name if advanced, None otherwise.
+    """
+    eligibility = check_romance_eligibility(player_id, agent_name, profile)
+    if not eligibility["eligible"]:
+        return None
+
+    return advance_romance(player_id, agent_name)
 
 
 # ── Prompt Context Builder ──────────────────────────────────────────────
@@ -692,6 +819,7 @@ def build_player_context(
     lines.append(f"Affinity: {tier_name} ({aff['interaction_count']} interactions)")
     if aff["romance_stage"] != "none" and not profile.romance_opted_out:
         lines.append(f"Romance: {aff['romance_stage'].title()}")
+    lines.append(AFFINITY_TIER_INSTRUCTIONS[tier])
 
     # Memory section
     memories = retrieve_relevant_memories(profile.player_id, agent_name, top_k=top_k_memories)

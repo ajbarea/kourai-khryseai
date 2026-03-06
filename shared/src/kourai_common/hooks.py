@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 import re
 from datetime import UTC, datetime
+from typing import Any
 
 from kourai_common.player import (
     PlayerProfile,
@@ -514,8 +515,8 @@ def run_post_task_hooks(
     user_input: str,
     agent_output: str,
     success: bool = True,
-) -> None:
-    """Run all post-task hooks: affinity, alignment, memories, patterns.
+) -> dict[str, Any]:
+    """Run all post-task hooks: affinity, alignment, memories, patterns, romance.
 
     This is the primary integration point — call after each agent task completes.
 
@@ -525,25 +526,42 @@ def run_post_task_hooks(
         user_input: Player's original request.
         agent_output: Agent's response/output.
         success: Whether the task succeeded.
+
+    Returns:
+        Dict with hook results (romance_advanced, memories_created, etc.).
+        Empty dict if no profile.
     """
     if not player_id:
-        return
+        return {}
 
     profile = PlayerProfile.load()
     if not profile:
-        return
+        return {}
+
+    results: dict[str, Any] = {}
 
     # 1. Track affinity
     track_interaction(player_id, agent_name, profile=profile, success=success)
 
     # 2. Score alignment from player input
-    score_alignment(user_input, profile)
+    sov, dev = score_alignment(user_input, profile)
+    results["alignment_delta"] = {"sovereignty": sov, "devotion": dev}
 
     # 3. Extract memories
-    extract_memories_from_interaction(player_id, agent_name, user_input, agent_output)
+    memory_ids = extract_memories_from_interaction(player_id, agent_name, user_input, agent_output)
+    results["memories_created"] = memory_ids
 
     # 4. Detect work patterns
-    detect_work_patterns(player_id, user_input)
+    patterns = detect_work_patterns(player_id, user_input)
+    results["patterns_detected"] = patterns
 
-    # 5. Persist any alignment changes
+    # 5. Check romance progression
+    from kourai_common.player import try_advance_romance
+
+    new_stage = try_advance_romance(player_id, agent_name, profile)
+    results["romance_advanced"] = new_stage
+
+    # 6. Persist any alignment changes
     profile.save()
+
+    return results
