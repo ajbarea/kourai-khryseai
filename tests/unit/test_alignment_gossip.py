@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from kourai_common import player
 from kourai_common.player import (
     PlayerProfile,
     _ensure_player_tables,
@@ -963,3 +964,162 @@ class TestRunPostTaskHooksV2:
 
         results = run_post_task_hooks("", "metis", "hello", "world")
         assert results == {}
+
+
+# ── Romance Dialogue System ────────────────────────────────────────────
+
+
+class TestRomanceDialogueInstructions:
+    def _setup_romance(self, agent: str, stage: str, profile: PlayerProfile):
+        """Helper to set up an agent at a specific romance stage."""
+        from kourai_common.player import update_affinity
+
+        # Build affinity to bonded
+        for _ in range(40):
+            update_affinity(profile.player_id, agent, 0.02)
+        # Force the romance stage
+        conn = player._get_player_db()
+        conn.execute(
+            "UPDATE agent_affinity SET romance_stage = ? WHERE player_id = ? AND agent_name = ?",
+            (stage, profile.player_id, agent),
+        )
+        conn.commit()
+
+    def test_no_romance_returns_empty(self):
+        from kourai_common.player import get_romance_dialogue_instructions
+
+        p = PlayerProfile(display_name="AJ")
+        result = get_romance_dialogue_instructions(p.player_id, "metis", p)
+        assert result == ""
+
+    def test_opted_out_returns_empty(self):
+        from kourai_common.player import get_romance_dialogue_instructions
+
+        p = PlayerProfile(display_name="AJ", romance_opted_out=True)
+        self._setup_romance("metis", "spark", p)
+        result = get_romance_dialogue_instructions(p.player_id, "metis", p)
+        assert result == ""
+
+    def test_spark_stage_instructions(self):
+        from kourai_common.player import get_romance_dialogue_instructions
+
+        p = PlayerProfile(display_name="AJ")
+        self._setup_romance("metis", "spark", p)
+        result = get_romance_dialogue_instructions(p.player_id, "metis", p)
+        assert "ROMANCE: SPARK" in result
+        assert "AJ" in result
+        assert "subtly warmer" in result.lower() or "spark" in result.lower()
+
+    def test_kindling_has_pet_names(self):
+        from kourai_common.player import get_romance_dialogue_instructions
+
+        p = PlayerProfile(display_name="AJ")
+        self._setup_romance("kallos", "kindling", p)
+        result = get_romance_dialogue_instructions(p.player_id, "kallos", p)
+        assert "ROMANCE: KINDLING" in result
+        assert "gorgeous" in result.lower() or "muse" in result.lower()
+
+    def test_flame_stage(self):
+        from kourai_common.player import get_romance_dialogue_instructions
+
+        p = PlayerProfile(display_name="AJ")
+        self._setup_romance("techne", "flame", p)
+        result = get_romance_dialogue_instructions(p.player_id, "techne", p)
+        assert "ROMANCE: FLAME" in result
+        assert "deeply in love" in result.lower()
+
+    def test_bonfire_stage(self):
+        from kourai_common.player import get_romance_dialogue_instructions
+
+        p = PlayerProfile(display_name="AJ")
+        self._setup_romance("mneme", "bonfire", p)
+        result = get_romance_dialogue_instructions(p.player_id, "mneme", p)
+        assert "ROMANCE: BONFIRE" in result
+        assert "bonfire" in result.lower()
+
+    def test_personality_flavour_included(self):
+        from kourai_common.player import get_romance_dialogue_instructions
+
+        p = PlayerProfile(display_name="AJ")
+        self._setup_romance("hephaestus", "spark", p)
+        result = get_romance_dialogue_instructions(p.player_id, "hephaestus", p)
+        assert "tsundere" in result.lower()
+
+    def test_no_jealousy_at_spark(self):
+        from kourai_common.player import get_romance_dialogue_instructions
+
+        p = PlayerProfile(display_name="AJ", romance_targets=["metis", "kallos"])
+        self._setup_romance("metis", "spark", p)
+        self._setup_romance("kallos", "spark", p)
+        result = get_romance_dialogue_instructions(p.player_id, "metis", p)
+        assert "JEALOUSY" not in result
+
+    def test_jealousy_at_kindling(self):
+        from kourai_common.player import get_romance_dialogue_instructions
+
+        p = PlayerProfile(display_name="AJ", romance_targets=["metis", "kallos"])
+        self._setup_romance("metis", "kindling", p)
+        self._setup_romance("kallos", "kindling", p)
+        result = get_romance_dialogue_instructions(p.player_id, "metis", p)
+        assert "JEALOUSY" in result
+        assert "Kallos" in result
+
+    def test_jealousy_uses_agent_trait(self):
+        from kourai_common.player import get_romance_dialogue_instructions
+
+        p = PlayerProfile(display_name="AJ", romance_targets=["dokimasia", "techne"])
+        self._setup_romance("dokimasia", "flame", p)
+        self._setup_romance("techne", "flame", p)
+
+        doki_result = get_romance_dialogue_instructions(p.player_id, "dokimasia", p)
+        assert "confront" in doki_result.lower() or "priority" in doki_result.lower()
+
+        techne_result = get_romance_dialogue_instructions(p.player_id, "techne", p)
+        assert "cocky" in techne_result.lower() or "dismissal" in techne_result.lower()
+
+
+class TestGetActiveRomances:
+    def test_no_romances(self):
+        from kourai_common.player import get_active_romances
+
+        p = PlayerProfile(display_name="AJ")
+        assert get_active_romances(p.player_id) == []
+
+    def test_returns_active_romances(self):
+        from kourai_common.player import get_active_romances, update_affinity
+
+        p = PlayerProfile(display_name="AJ")
+        for _ in range(40):
+            update_affinity(p.player_id, "kallos", 0.02)
+        conn = player._get_player_db()
+        conn.execute(
+            "UPDATE agent_affinity SET romance_stage = 'kindling' "
+            "WHERE player_id = ? AND agent_name = 'kallos'",
+            (p.player_id,),
+        )
+        conn.commit()
+
+        romances = get_active_romances(p.player_id)
+        assert len(romances) == 1
+        assert romances[0]["agent_name"] == "kallos"
+        assert romances[0]["romance_stage"] == "kindling"
+
+
+class TestRomanceInPlayerContext:
+    def test_romance_injected_into_context(self):
+        from kourai_common.player import build_player_context, update_affinity
+
+        p = PlayerProfile(display_name="AJ")
+        for _ in range(40):
+            update_affinity(p.player_id, "metis", 0.02)
+        conn = player._get_player_db()
+        conn.execute(
+            "UPDATE agent_affinity SET romance_stage = 'flame' "
+            "WHERE player_id = ? AND agent_name = 'metis'",
+            (p.player_id,),
+        )
+        conn.commit()
+
+        ctx = build_player_context(p, "metis")
+        assert "ROMANCE: FLAME" in ctx
+        assert "intellectual seduction" in ctx.lower()
