@@ -1,6 +1,6 @@
 """Integration of agent personality indicators with agent handoff."""
 
-from agent_personality_indicators import AgentPersonalityIndicators
+from .agent_personality_indicators import AgentPersonalityIndicators
 
 
 class AgentHandoffPersonalityIntegration:

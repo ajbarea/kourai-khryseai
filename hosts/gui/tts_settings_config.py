@@ -9,8 +9,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-from dialogue_pacing import PacingMode
-from tts_gui_integration import TTSGUIManager
+from .dialogue_pacing import PacingMode
+from .tts_gui_integration import TTSGUIManager
 
 
 class TTSSettingsConfig:

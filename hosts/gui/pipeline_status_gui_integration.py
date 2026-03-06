@@ -1,6 +1,6 @@
 """Integration of PipelineStatusIndicator with the main GUI."""
 
-from pipeline_status_indicator import PipelineStatusIndicator
+from .pipeline_status_indicator import PipelineStatusIndicator
 
 
 class PipelineStatusGUIIntegration:

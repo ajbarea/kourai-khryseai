@@ -6,7 +6,7 @@ when agent switches and applies alpha blending to portrait during flash.
 
 from __future__ import annotations
 
-from flash_effect import FlashEffect
+from .flash_effect import FlashEffect
 
 
 class PortraitFlashIntegration:

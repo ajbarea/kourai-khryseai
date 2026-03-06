@@ -4,7 +4,8 @@ Implements WCAG 2.2 SC 2.1.1 (Keyboard) compliance.
 """
 
 import pygame
-from message_history import MessageHistory
+
+from .message_history import MessageHistory
 
 
 class KeyboardShortcuts:

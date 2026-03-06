@@ -1,6 +1,6 @@
 """Integration of high contrast mode with the main GUI."""
 
-from high_contrast_colors import get_color_palette, is_wcag_aa_compliant
+from .high_contrast_colors import get_color_palette, is_wcag_aa_compliant
 
 
 class HighContrastGUIIntegration:
