@@ -564,4 +564,13 @@ def run_post_task_hooks(
     # 6. Persist any alignment changes
     profile.save()
 
+    # 7. Check achievements
+    try:
+        from kourai_common.achievements import check_achievements
+
+        new_achievements = check_achievements(player_id, profile)
+        results["achievements_unlocked"] = [a.id for a in new_achievements]
+    except Exception:
+        results["achievements_unlocked"] = []
+
     return results

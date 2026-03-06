@@ -907,6 +907,9 @@ def get_enriched_system_prompt(base_prompt: str, agent_name: str) -> str:
     This is the primary integration point for agent code. Call this at
     message-construction time instead of using SYSTEM_PROMPT directly.
     Caches the player profile for 30s to avoid repeated disk reads.
+
+    Includes: player identity, memories, alignment, romance, personality
+    adaptation, and optional memory moments.
     """
     global _profile_cache, _profile_cache_ts
 
@@ -922,7 +925,31 @@ def get_enriched_system_prompt(base_prompt: str, agent_name: str) -> str:
     if not ctx:
         return base_prompt
 
-    return f"{base_prompt}\n\n{ctx}"
+    parts = [base_prompt, ctx]
+
+    # Personality adaptation (tier + alignment shifts)
+    try:
+        from kourai_common.personality_adaptation import get_personality_adaptation
+
+        adaptation = get_personality_adaptation(
+            _profile_cache.player_id, agent_name, _profile_cache
+        )
+        if adaptation:
+            parts.append(adaptation)
+    except Exception:
+        pass  # Non-critical
+
+    # Memory moments (probabilistic nostalgia callbacks)
+    try:
+        from kourai_common.memory_moments import generate_moment_context
+
+        moment = generate_moment_context(_profile_cache.player_id, agent_name, _profile_cache)
+        if moment:
+            parts.append(moment)
+    except Exception:
+        pass  # Non-critical
+
+    return "\n\n".join(parts)
 
 
 def build_player_context(
