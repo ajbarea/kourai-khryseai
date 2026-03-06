@@ -110,7 +110,8 @@ class TestRemoteAgentConnectionSend:
     async def test_send_raises_if_not_connected(self):
         conn = RemoteAgentConnection("metis", "http://localhost:10001/")
         with pytest.raises(RuntimeError, match="Not connected"):
-            await conn.send.__wrapped__(conn, "hello", "ctx-1")
+            async for _ in conn.send("hello", "ctx-1"):
+                pass
 
     @pytest.mark.asyncio
     async def test_send_extracts_artifact_from_task_snapshot(self):
@@ -127,9 +128,13 @@ class TestRemoteAgentConnectionSend:
         ):
             conn = RemoteAgentConnection("techne", "http://localhost:10002/")
             conn.client = mock_client
-            result = await conn.send.__wrapped__(conn, "fix auth", "ctx-1")
+            results = [
+                content
+                async for event_type, content in conn.send("fix auth", "ctx-1")
+                if event_type == "result"
+            ]
 
-        assert result == "generated code"
+        assert results == ["generated code"]
 
     @pytest.mark.asyncio
     async def test_send_extracts_artifact_from_event(self):
@@ -151,9 +156,13 @@ class TestRemoteAgentConnectionSend:
         ):
             conn = RemoteAgentConnection("techne", "http://localhost:10002/")
             conn.client = mock_client
-            result = await conn.send.__wrapped__(conn, "fix auth", "ctx-1")
+            results = [
+                content
+                async for event_type, content in conn.send("fix auth", "ctx-1")
+                if event_type == "result"
+            ]
 
-        assert result == "streamed code"
+        assert results == ["streamed code"]
 
     @pytest.mark.asyncio
     async def test_send_raises_input_required(self):
@@ -180,7 +189,8 @@ class TestRemoteAgentConnectionSend:
             conn = RemoteAgentConnection("metis", "http://localhost:10001/")
             conn.client = mock_client
             with pytest.raises(AgentInputRequired) as exc_info:
-                await conn.send.__wrapped__(conn, "plan something", "ctx-1")
+                async for _ in conn.send("plan something", "ctx-1"):
+                    pass
 
         assert exc_info.value.agent_name == "metis"
         assert "Which file" in exc_info.value.question
