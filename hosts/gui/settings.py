@@ -21,13 +21,13 @@ DEFAULT_SETTINGS = {
     "timestamp_format": "24h",
     "show_timestamps": True,
     "show_metadata": True,
-    "status_bubbles_collapsed": False,
+    "show_debug_logs": False,
     "reduce_motion": False,
-    "fullscreen": False,
-    "music_volume": 0.25,
-    "ambient_volume": 0.5,
+    "display_mode": "Windowed",
+    "music_volume": 0.05,
+    "ambient_volume": 0.10,
     "voice_volume": 1.0,
-    "sfx_volume": 0.8,
+    "sfx_volume": 0.85,
 }
 
 
@@ -83,6 +83,11 @@ class SettingsManager:
         except OSError as e:
             # Gracefully handle file I/O errors
             print(f"Warning: Failed to save settings to {self.config_path}: {e}")
+
+    def reset_to_defaults(self) -> None:
+        """Reset all settings to their default values."""
+        self.settings = DEFAULT_SETTINGS.copy()
+        self.save()
 
     def _load(self) -> None:
         """Load settings from file.
