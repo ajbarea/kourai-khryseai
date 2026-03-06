@@ -11,10 +11,8 @@ import re
 import threading
 from typing import TYPE_CHECKING
 
-from dialogue_pacing import DialoguePacer, PacingConfig, PacingMode
-from tts_engine import TTSEngine
-
-from kourai_common.player import PlayerProfile
+from .dialogue_pacing import DialoguePacer, PacingConfig, PacingMode
+from .tts_engine import TTSEngine
 
 logger = logging.getLogger(__name__)
 
@@ -85,37 +83,12 @@ def should_speak(text: str) -> bool:
 _EMOTE_RE = re.compile(r"\*[^*]+\*")
 
 
-def substitute_tts_name(text: str, profile: PlayerProfile | None = None) -> str:
-    """Replace player's display name with TTS phonetic spelling.
-
-    Edge-TTS has no custom SSML <phoneme> support, so we substitute the
-    display name with a phonetic respelling before synthesis. Only applies
-    when the player has a tts_name that differs from display_name.
-
-    Args:
-        text: Text about to be sent to TTS.
-        profile: Player profile (loaded once, cached by caller).
-
-    Returns:
-        Text with display_name replaced by tts_name for pronunciation.
-    """
-    if not profile or not profile.tts_name or not profile.display_name:
-        return text
-    if profile.tts_name == profile.display_name:
-        return text
-    # Case-insensitive replacement preserving surrounding context
-    return re.sub(re.escape(profile.display_name), profile.tts_name, text, flags=re.IGNORECASE)
-
-
-def extract_speakable(text: str, max_chars: int = 500, profile: PlayerProfile | None = None) -> str:
+def extract_speakable(text: str, max_chars: int = 500) -> str:
     """Return only the conversational (non-artifact) portions of `text`.
 
     For long result blocks, this strips out commit groups, code blocks,
     file lists, emote cues (*action*), etc. and returns a trimmed version
     suitable for TTS. Caps output at `max_chars` to avoid extremely long speech.
-
-    If a player profile is provided, the display name is substituted with
-    the TTS phonetic spelling for correct pronunciation.
     """
     if not text:
         return ""
@@ -132,16 +105,12 @@ def extract_speakable(text: str, max_chars: int = 500, profile: PlayerProfile | 
             continue
 
         if line.strip() and not _is_artifact_line(line):
-            # Strip emote cues — these are SFX triggers, not speech
+            # Strip emote cues — these trigger SFX via emote_sfx.py, not speech
             cleaned = _EMOTE_RE.sub("", line).strip()
             if cleaned:
                 speakable_lines.append(cleaned)
 
     result = " ".join(speakable_lines)
-
-    # Substitute display name → TTS phonetic name before truncation
-    result = substitute_tts_name(result, profile)
-
     if len(result) > max_chars:
         # Truncate at last sentence boundary within limit
         truncated = result[:max_chars]
