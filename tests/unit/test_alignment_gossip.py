@@ -681,3 +681,143 @@ async def session_round(session):
     from kourai_common.gossip import generate_gossip_round
 
     return await generate_gossip_round(session)
+
+
+# ── Alignment Dialogue Gating ──────────────────────────────────────────
+
+
+class TestDialogueGating:
+    def test_no_gating_at_low_alignment(self):
+        from kourai_common.player import get_alignment_gated_instructions
+
+        p = PlayerProfile(display_name="AJ", sovereignty=20, devotion=20)
+        instructions = get_alignment_gated_instructions(p, "metis")
+        assert instructions == ""
+
+    def test_sovereignty_gating_with_compatible_agent(self):
+        from kourai_common.player import get_alignment_gated_instructions
+
+        p = PlayerProfile(display_name="AJ", sovereignty=70, devotion=10)
+        instructions = get_alignment_gated_instructions(p, "dokimasia")
+        assert "SOVEREIGNTY" in instructions
+        assert "respect" in instructions.lower()
+
+    def test_sovereignty_gating_with_incompatible_agent(self):
+        from kourai_common.player import get_alignment_gated_instructions
+
+        p = PlayerProfile(display_name="AJ", sovereignty=70, devotion=10)
+        instructions = get_alignment_gated_instructions(p, "kallos")
+        assert "SOVEREIGNTY" in instructions
+        assert "intimidat" in instructions.lower()
+
+    def test_devotion_gating_with_devotion_agent(self):
+        from kourai_common.player import get_alignment_gated_instructions
+
+        p = PlayerProfile(display_name="AJ", sovereignty=10, devotion=70)
+        instructions = get_alignment_gated_instructions(p, "kallos")
+        assert "DEVOTION" in instructions
+        assert "adore" in instructions.lower() or "affectionate" in instructions.lower()
+
+    def test_devotion_gating_with_sovereignty_agent(self):
+        from kourai_common.player import get_alignment_gated_instructions
+
+        p = PlayerProfile(display_name="AJ", sovereignty=10, devotion=70)
+        instructions = get_alignment_gated_instructions(p, "hephaestus")
+        assert "DEVOTION" in instructions
+        assert "awkward" in instructions.lower() or "gruff" in instructions.lower()
+
+    def test_commander_gating(self):
+        from kourai_common.player import get_alignment_gated_instructions
+
+        p = PlayerProfile(display_name="AJ", sovereignty=85, devotion=85)
+        instructions = get_alignment_gated_instructions(p, "metis")
+        assert "COMMANDER" in instructions
+        assert "awe" in instructions.lower() or "highest" in instructions.lower()
+
+    def test_gating_injected_into_player_context(self):
+        from kourai_common.player import build_player_context
+
+        p = PlayerProfile(display_name="AJ", sovereignty=75, devotion=75)
+        ctx = build_player_context(p, "kallos")
+        # Should contain alignment gating
+        assert "DEVOTION" in ctx or "SOVEREIGNTY" in ctx
+
+    def test_both_gauges_high_but_below_commander(self):
+        from kourai_common.player import get_alignment_gated_instructions
+
+        p = PlayerProfile(display_name="AJ", sovereignty=70, devotion=70)
+        instructions = get_alignment_gated_instructions(p, "dokimasia")
+        # Both sovereignty and devotion gating present, but not Commander
+        assert "COMMANDER" not in instructions
+        assert "SOVEREIGNTY" in instructions
+        assert "DEVOTION" in instructions
+
+
+# ── CLI Gossip ─────────────────────────────────────────────────────────
+
+
+class TestCliGossip:
+    def test_maybe_start_gossip(self):
+        from hosts.cli.gossip_cli import maybe_start_gossip
+
+        session = maybe_start_gossip("techne")
+        assert session is not None
+        assert "techne" not in (session.agent_a, session.agent_b)
+
+    def test_maybe_start_gossip_no_idle(self):
+        from kourai_common.gossip import select_gossip_pair
+
+        pair = select_gossip_pair("techne", all_agents=["techne"])
+        assert pair is None
+
+    def test_format_gossip_header(self):
+        from hosts.cli.gossip_cli import _format_gossip_header
+        from kourai_common.gossip import GossipSession, GossipTopic
+
+        session = GossipSession(agent_a="metis", agent_b="kallos", topic=GossipTopic.PLAYER_HABITS)
+        header = _format_gossip_header(session)
+        assert "Metis" in header
+        assert "Kallos" in header
+        assert "Gossip" in header
+
+    def test_format_gossip_message(self):
+        from hosts.cli.gossip_cli import _format_gossip_message
+
+        msg = _format_gossip_message("metis", "*giggles* Hello~")
+        assert "Metis" in msg
+        assert "Hello" in msg
+
+    def test_format_response_options(self):
+        from hosts.cli.gossip_cli import _format_response_options
+        from kourai_common.gossip import GossipResponseOption, ResponseTone
+
+        options = [
+            GossipResponseOption(ResponseTone.FLIRT, "💬", "Flirt", "Hey there~"),
+            GossipResponseOption(ResponseTone.IGNORE, "👀", "Ignore", ""),
+        ]
+        text = _format_response_options(options)
+        assert "Flirt" in text
+        assert "Ignore" in text or "listening" in text.lower()
+        assert "Custom" in text
+
+    @pytest.mark.asyncio
+    async def test_run_gossip_session_cli(self):
+        from hosts.cli.gossip_cli import run_gossip_session_cli
+        from kourai_common.gossip import start_gossip_session
+
+        session = start_gossip_session("metis", "kallos", max_rounds=1)
+
+        output_lines: list[str] = []
+        inputs = iter([""])  # Just press enter (ignore)
+
+        with patch("kourai_common.llm.chat", new_callable=AsyncMock) as mock_chat:
+            mock_chat.return_value = "*waves* Hello there~"
+            summary = await run_gossip_session_cli(
+                session,
+                print_fn=lambda s: output_lines.append(s),
+                input_fn=lambda _: next(inputs),
+            )
+
+        assert summary is not None
+        assert summary["rounds"] >= 1
+        assert any("Hello" in line for line in output_lines)
