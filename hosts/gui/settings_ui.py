@@ -9,13 +9,12 @@ Implements March 2026 UI/UX best practices:
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 import pygame
 import pygame.freetype
 
 from hosts.gui.gui_components_integration import GUIComponentsIntegration
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from hosts.gui.audio_manager import AudioManager as _AM
@@ -53,7 +52,8 @@ class VolumeSlider:
         track_y = self.rect.centery
         # Track background
         pygame.draw.line(
-            surf, (50, 45, 40),
+            surf,
+            (50, 45, 40),
             (self.rect.x + self._knob_radius, track_y),
             (self.rect.right - self._knob_radius, track_y),
             3,
@@ -61,7 +61,8 @@ class VolumeSlider:
         # Filled portion
         kx = int(self._knob_x())
         pygame.draw.line(
-            surf, gold,
+            surf,
+            gold,
             (self.rect.x + self._knob_radius, track_y),
             (kx, track_y),
             3,
@@ -169,8 +170,13 @@ class Button:
 class SettingsOverlay:
     """The main settings overlay panel."""
 
-    def __init__(self, width: int, height: int, gui_integration: GUIComponentsIntegration,
-                 audio_manager: _AM | None = None):
+    def __init__(
+        self,
+        width: int,
+        height: int,
+        gui_integration: GUIComponentsIntegration,
+        audio_manager: _AM | None = None,
+    ):
         self.screen_w = width
         self.screen_h = height
         self.gui = gui_integration
@@ -192,7 +198,8 @@ class SettingsOverlay:
         self.font_label = pygame.freetype.SysFont("segoeui, inter, arial", 16)
         self.font_small = pygame.freetype.SysFont("segoeui, inter, arial", 12)
 
-        self.on_quit_callback = None
+        self.on_quit_callback: Callable[[], None] | None = None
+        self.on_fullscreen_toggle: Callable[[bool], None] | None = None
         self._init_controls()
 
     def set_fullscreen_callback(self, callback: Callable[[bool], None]) -> None:
@@ -204,7 +211,7 @@ class SettingsOverlay:
         self.on_quit_callback = callback
 
     def _init_controls(self):
-        self.toggles = {}
+        self.toggles: dict[str, dict] = {}
         self.sliders: dict[str, dict] = {}
 
         # Starting Y for controls
@@ -226,7 +233,7 @@ class SettingsOverlay:
                     # sync it
                     if self.gui.status_bubbles.is_collapsed() != new_state:
                         self.gui.status_bubbles.toggle_status_bubbles()
-                elif k == "fullscreen" and hasattr(self, "on_fullscreen_toggle"):
+                elif k == "fullscreen" and self.on_fullscreen_toggle is not None:
                     # Trigger fullscreen toggle via callback
                     self.on_fullscreen_toggle(new_state)
 
@@ -278,7 +285,12 @@ class SettingsOverlay:
             self.sliders[key] = {
                 "label": label,
                 "slider": VolumeSlider(
-                    self.panel_rect.x + 100, y, slider_w, 20, vol, on_slide,
+                    self.panel_rect.x + 100,
+                    y,
+                    slider_w,
+                    20,
+                    vol,
+                    on_slide,
                 ),
                 "y": y,
             }

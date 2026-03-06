@@ -34,7 +34,7 @@ HIGH_CONTRAST_COLORS = {
     "user_bubble_border": (200, 150, 0),  # Darker gold - 7.5:1 contrast
     "result_bubble_bg": (30, 30, 30),  # Very dark gray
     "result_bubble_border": (255, 200, 0),  # Bright gold - 10.5:1 contrast
-    "error_bubble_bg": (60, 0, 0),  # Dark red
+    "error_bubble_bg": (40, 0, 0),  # Dark red — 4.8:1 with error_red
     "error_bubble_border": (255, 0, 0),  # Pure red - 5.3:1 contrast
 }
 

@@ -6,6 +6,7 @@ Provides connection status display in the title bar and reconnect button functio
 from __future__ import annotations
 
 import pygame
+import pygame.freetype
 from connection_manager import ConnectionManager
 
 

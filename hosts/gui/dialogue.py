@@ -12,16 +12,12 @@ from .constants import (
     DIALOGUE_H,
     DIALOGUE_W,
     DIALOGUE_X,
-    DIM_WHITE,
-    ERROR_RED,
     FONT_AGENT,
     FONT_BANNER,
     FONT_BODY,
-    GOLD,
-    GOLD_DIM,
-    SCROLLBAR,
-    WHITE,
+    SCROLL_CHROME_H,
     W,
+    theme,
 )
 from .maidens import AGENTS
 
@@ -98,11 +94,11 @@ class DialogueHistory:
             self._dirty = True
 
     def scroll(self, dy: int) -> None:
-        max_scroll = max(0, self._content_h - (DIALOGUE_H - self.PAD * 2 - 60))
+        max_scroll = max(0, self._content_h - (DIALOGUE_H - self.PAD * 2 - SCROLL_CHROME_H))
         self._scroll_y = max(0, min(self._scroll_y + dy, max_scroll))
 
     def scroll_to_bottom(self) -> None:
-        self._scroll_y = max(0, self._content_h - (DIALOGUE_H - self.PAD * 2 - 60))
+        self._scroll_y = max(0, self._content_h - (DIALOGUE_H - self.PAD * 2 - SCROLL_CHROME_H))
 
     def handle_click(self, pos: tuple[int, int], dest_rect: pygame.Rect) -> str | None:
         """Handle mouse click and return the agent of the clicked message."""
@@ -198,7 +194,7 @@ class DialogueHistory:
             if alpha <= 0.0:
                 return None
             a = int(alpha * 140)
-            col = (*DIM_WHITE, a)
+            col = (*theme.dim_white, a)
             FONT_AGENT.render_to(surf, (16, y + 4), f"⋯ {e.text}", col)
             drawn_rect = pygame.Rect(8, y, DIALOGUE_W - 16, 24)
         elif e.is_user:
@@ -207,31 +203,31 @@ class DialogueHistory:
             bx = DIALOGUE_W - bubble_w - 8
             bubble = pygame.Surface((bubble_w, body_h), pygame.SRCALPHA)
             pygame.draw.rect(bubble, (30, 22, 10, 200), bubble.get_rect(), border_radius=8)
-            pygame.draw.rect(bubble, (*GOLD_DIM, 180), bubble.get_rect(), 1, border_radius=8)
+            pygame.draw.rect(bubble, (*theme.gold_dim, 180), bubble.get_rect(), 1, border_radius=8)
             for i, line in enumerate(lines):
-                FONT_BODY.render_to(bubble, (pad, pad + i * self.LINE_H), line, WHITE)
+                FONT_BODY.render_to(bubble, (pad, pad + i * self.LINE_H), line, theme.white)
             surf.blit(bubble, (bx, y))
             drawn_rect = pygame.Rect(bx, y, bubble_w, body_h)
         elif e.is_result:
             # Result block — full width, slightly highlighted
             bubble = pygame.Surface((DIALOGUE_W - 16, total_h), pygame.SRCALPHA)
             pygame.draw.rect(bubble, (20, 18, 10, 220), bubble.get_rect(), border_radius=6)
-            pygame.draw.rect(bubble, (*GOLD, 120), bubble.get_rect(), 1, border_radius=6)
+            pygame.draw.rect(bubble, (*theme.gold, 120), bubble.get_rect(), 1, border_radius=6)
             # Left gold accent bar
-            pygame.draw.rect(bubble, GOLD, pygame.Rect(0, 0, 3, total_h), border_radius=2)
+            pygame.draw.rect(bubble, theme.gold, pygame.Rect(0, 0, 3, total_h), border_radius=2)
             info = AGENTS.get(e.agent, {})
             hdr = f"✦ {e.agent.upper()} — {info.get('title', '')}"
-            FONT_AGENT.render_to(bubble, (pad + 4, 4), hdr, GOLD)
+            FONT_AGENT.render_to(bubble, (pad + 4, 4), hdr, theme.gold)
             for i, line in enumerate(lines):
                 FONT_BODY.render_to(
-                    bubble, (pad + 4, header_h + pad + i * self.LINE_H), line, WHITE
+                    bubble, (pad + 4, header_h + pad + i * self.LINE_H), line, theme.white
                 )
             surf.blit(bubble, (8, y))
             drawn_rect = pygame.Rect(8, y, DIALOGUE_W - 16, total_h)
         elif e.is_error:
             bubble = pygame.Surface((DIALOGUE_W - 16, total_h), pygame.SRCALPHA)
             pygame.draw.rect(bubble, (40, 10, 10, 200), bubble.get_rect(), border_radius=6)
-            pygame.draw.rect(bubble, (*ERROR_RED, 160), bubble.get_rect(), 1, border_radius=6)
+            pygame.draw.rect(bubble, (*theme.error_red, 160), bubble.get_rect(), 1, border_radius=6)
             for i, line in enumerate(lines):
                 FONT_BODY.render_to(bubble, (pad, pad + i * self.LINE_H), line, (220, 100, 80))
             surf.blit(bubble, (8, y))
@@ -239,7 +235,7 @@ class DialogueHistory:
         else:
             # Agent dialogue bubble — with emote rendering
             info = AGENTS.get(e.agent, {})
-            agent_color = info.get("color", GOLD)
+            agent_color = info.get("color", theme.gold)
             bubble = pygame.Surface((DIALOGUE_W - 16, total_h), pygame.SRCALPHA)
             pygame.draw.rect(bubble, (20, 16, 8, 180), bubble.get_rect(), border_radius=6)
             pygame.draw.rect(bubble, (*agent_color, 80), bubble.get_rect(), 1, border_radius=6)
@@ -247,8 +243,10 @@ class DialogueHistory:
             FONT_AGENT.render_to(bubble, (pad, 3), hdr, agent_color)
             for i, line in enumerate(lines):
                 dim = min(i * 8, 40)
-                base_col = tuple(max(0, c - dim) for c in WHITE)
-                self._draw_line_with_emotes(bubble, pad, header_h + pad + i * self.LINE_H, line, base_col)
+                base_col = tuple(max(0, c - dim) for c in theme.white)
+                self._draw_line_with_emotes(
+                    bubble, pad, header_h + pad + i * self.LINE_H, line, base_col
+                )
             surf.blit(bubble, (8, y))
             drawn_rect = pygame.Rect(8, y, DIALOGUE_W - 16, total_h)
 
@@ -267,7 +265,7 @@ class DialogueHistory:
                 continue
             if is_emote:
                 text = f"*{part}*"
-                col = (*GOLD_DIM, 180)
+                col = (*theme.gold_dim, 180)
                 rect = FONT_AGENT.render_to(surf, (cursor_x, y + 2), text, col)
             else:
                 rect = FONT_BODY.render_to(surf, (cursor_x, y), part, base_col)
@@ -276,10 +274,7 @@ class DialogueHistory:
 
     def draw(self, surf: pygame.Surface, dest_rect: pygame.Rect) -> None:
         # Re-render whenever system messages are still fading
-        if any(
-            e.is_system and self._system_alpha(e) > 0.0
-            for e in self._entries
-        ):
+        if any(e.is_system and self._system_alpha(e) > 0.0 for e in self._entries):
             self._dirty = True
 
         if self._dirty:
@@ -297,7 +292,10 @@ class DialogueHistory:
             bar_h = max(30, int(dest_rect.height * ratio))
             bar_y = dest_rect.top + int(self._scroll_y / self._content_h * dest_rect.height)
             pygame.draw.rect(
-                surf, SCROLLBAR, pygame.Rect(dest_rect.right - 4, bar_y, 3, bar_h), border_radius=2
+                surf,
+                theme.scrollbar,
+                pygame.Rect(dest_rect.right - 4, bar_y, 3, bar_h),
+                border_radius=2,
             )
 
     def toggle_timestamps(self) -> None:
@@ -339,12 +337,12 @@ def draw_banner(surf: pygame.Surface, connected: bool, agent_url: str) -> None:
     """Top-of-transcript title strip."""
     r = pygame.Rect(DIALOGUE_X, 0, DIALOGUE_W, 32)
     pygame.draw.rect(surf, (10, 8, 5), r)
-    pygame.draw.line(surf, GOLD_DIM, (DIALOGUE_X, 32), (W, 32), 1)
+    pygame.draw.line(surf, theme.gold_dim, (DIALOGUE_X, 32), (W, 32), 1)
 
     title = "✦  KOURAI KHRYSEAI  —  Golden Maidens"
-    FONT_AGENT.render_to(surf, (DIALOGUE_X + 12, 8), title, GOLD)
+    FONT_AGENT.render_to(surf, (DIALOGUE_X + 12, 8), title, theme.gold)
 
     status_text = "connected" if connected else "connecting..."
-    status_col = (100, 180, 100) if connected else GOLD_DIM
+    status_col = (100, 180, 100) if connected else theme.gold_dim
     sr = FONT_BANNER.get_rect(status_text)
     FONT_BANNER.render_to(surf, (W - sr.width - 12, 10), status_text, status_col)

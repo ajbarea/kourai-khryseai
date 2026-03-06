@@ -323,10 +323,10 @@ def run_loading_screen(
 
             # "Press any key" (pulsing, only in READY phase)
             if phase == PHASE_READY:
-                pulse = 0.45 + 0.55 * math.sin(pygame.time.get_ticks() / 400.0)
+                pulse = 0.5 + 0.5 * math.sin(pygame.time.get_ticks() / 400.0)
                 prompt_str = "— Press any key —"
                 pr = prompt_font.get_rect(prompt_str)
-                prompt_alpha = int(255 * pulse)
+                prompt_alpha = max(0, min(255, int(255 * pulse)))
                 prompt_font.render_to(
                     screen,
                     ((screen_w - pr.width) // 2, screen_h - 40),

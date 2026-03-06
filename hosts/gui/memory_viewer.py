@@ -88,13 +88,16 @@ class MemoryViewerPanel:
         """Load current player data for display."""
         try:
             from kourai_common.player import (
+                PlayerProfile,
                 get_active_romances,
                 get_all_affinities,
-                get_memories,
-                load_profile,
+                get_player_memories,
             )
 
-            profile = load_profile()
+            profile = PlayerProfile.load()
+            if not profile:
+                raise ValueError("No active profile")
+
             self._profile_data = {
                 "display_name": profile.display_name,
                 "tts_name": profile.tts_name,
@@ -106,7 +109,7 @@ class MemoryViewerPanel:
                 "total_sessions": profile.total_sessions,
             }
             self._affinities = get_all_affinities(profile.player_id)
-            self._memories = get_memories(profile.player_id, limit=20)
+            self._memories = get_player_memories(profile.player_id, limit=20)
             self._romances = get_active_romances(profile.player_id)
         except Exception:
             self._profile_data = None
@@ -117,13 +120,12 @@ class MemoryViewerPanel:
         try:
             from kourai_common.achievements import get_achievement_progress
 
-            if self._profile_data:
-                from kourai_common.player import load_profile
-
-                profile = load_profile()
-                self._achievements = [
-                    a for a in get_achievement_progress(profile) if a.get("unlocked")
-                ]
+            if self._profile_data and profile:
+                progress = get_achievement_progress(profile.player_id)
+                # Flatten all categories into a single list of unlocked achievements
+                self._achievements = []
+                for cat_achs in progress.get("by_category", {}).values():
+                    self._achievements.extend([a for a in cat_achs if a.get("unlocked")])
         except Exception:
             self._achievements = []
 

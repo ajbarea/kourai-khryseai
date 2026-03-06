@@ -55,6 +55,7 @@ from .onboarding_ui import OnboardingOverlay
 from .particles import ParticleSystem
 from .portrait import PortraitPanel
 from .profile_select import run_profile_select
+from .quick_actions import QuickActionBar
 from .settings_ui import SettingsOverlay
 from .tts_gui_integration import TTSGUIManager, extract_speakable
 from .typewriter import TypewriterManager
@@ -128,7 +129,7 @@ def main(agent_url: str | None = None) -> None:
         Yields (progress, description) tuples.  Each ``next()`` call does
         one unit of work on the main thread (safe for Surface creation).
         """
-        total_steps = 13
+        total_steps = 14
         step = 0
 
         # 1. GUI integration (settings, font scaler, etc.)
@@ -192,7 +193,12 @@ def main(agent_url: str | None = None) -> None:
         _loaded["flash"] = FlashEffect()
         yield step / total_steps, "Preparing the forge…"
 
-        # 11. A2A client thread
+        # 11. Quick actions
+        step += 1
+        _loaded["quick_actions"] = QuickActionBar()
+        yield step / total_steps, "Forging quick actions…"
+
+        # 12. A2A client thread
         step += 1
         send_q: queue.Queue[tuple[str, str] | None] = queue.Queue()
         recv_q: queue.Queue[dict] = queue.Queue()
@@ -213,12 +219,11 @@ def main(agent_url: str | None = None) -> None:
         _loaded["recv_q"] = recv_q
         yield step / total_steps, "Connecting to Hephaestus…"
 
-        # 12. Start music
+        # 13. Audio ready (music deferred until user presses start)
         step += 1
-        audio_manager.play_music("assets/audio/music/SithuAye-2016.ogg")
-        yield step / total_steps, "Striking up the anvil chorus…"
+        yield step / total_steps, "Tuning the forge…"
 
-        # 13. TTS manager
+        # 14. TTS manager
         step += 1
         tts_manager = TTSGUIManager(recv_q, enable_tts=True, pacing_mode=PacingMode.NORMAL)
         tts_manager.set_current_agent("hephaestus")
@@ -233,6 +238,9 @@ def main(agent_url: str | None = None) -> None:
         with contextlib.suppress(Exception):
             pygame.quit()
         sys.exit(0)
+
+    # --- Music fades in slowly after the player presses start ---
+    audio_manager.fade_to_music("assets/audio/music/sithuaye-2016.ogg", fade_ms=6000)
 
     # --- Profile selection screen ---
     # Show profile select after title screen; runs its own event loop
@@ -288,6 +296,7 @@ def main(agent_url: str | None = None) -> None:
     send_q: queue.Queue[tuple[str, str] | None] = _loaded["send_q"]
     recv_q: queue.Queue[dict] = _loaded["recv_q"]
     tts_manager: TTSGUIManager = _loaded["tts_manager"]
+    quick_actions: QuickActionBar = _loaded["quick_actions"]
 
     # --- Initial layout ---
     dialogue_rect = pygame.Rect(DIALOGUE_X, BANNER_TOTAL_H, DIALOGUE_W, DIALOGUE_H - BANNER_TOTAL_H)
@@ -561,7 +570,24 @@ def main(agent_url: str | None = None) -> None:
             elif pg_event.type == pygame.MOUSEWHEEL:
                 history.scroll(-pg_event.y * 40)
 
+            elif pg_event.type == pygame.MOUSEMOTION:
+                quick_actions.update(pg_event.pos)
+
             elif pg_event.type == pygame.MOUSEBUTTONDOWN and pg_event.button == 1:
+                if not input_bar.processing:
+                    action = quick_actions.handle_click(pg_event.pos)
+                    if action:
+                        history.add(DialogueEntry("user", action.display_text, is_user=True))
+                        payload = f"{action.display_text}\n\n{action.hidden_prompt}"
+                        send_q.put((action.agent, payload))
+                        portrait.switch_to(action.agent)
+                        current_agent = action.agent
+                        input_bar.processing = True
+                        agent_quotes = AGENTS.get(action.agent, {}).get("user_quotes", [])
+                        portrait.current_quote = (
+                            random.choice(agent_quotes) if agent_quotes else ""
+                        )
+
                 clicked_agent = history.handle_click(pg_event.pos, dialogue_rect)
                 if clicked_agent and clicked_agent in AGENTS:
                     portrait.switch_to(clicked_agent)
@@ -603,12 +629,11 @@ def main(agent_url: str | None = None) -> None:
             if _alignment_refresh_timer >= 10.0:
                 _alignment_refresh_timer = 0.0
                 try:
-                    from kourai_common.player import load_profile
+                    from kourai_common.player import PlayerProfile
 
-                    profile = load_profile()
-                    alignment_panel.update_values(
-                        profile.sovereignty, profile.devotion, profile.role
-                    )
+                    _p = PlayerProfile.load()
+                    if _p:
+                        alignment_panel.update_values(_p.sovereignty, _p.devotion, _p.role)
                 except Exception:
                     pass
             alignment_palette = compute_alignment_palette(
@@ -656,6 +681,12 @@ def main(agent_url: str | None = None) -> None:
 
         # Bottom: input
         input_bar.draw(screen)
+
+        # Quick action pills (above input bar)
+        if not input_bar.processing:
+            quick_actions.draw(screen, disabled=False)
+        else:
+            quick_actions.draw(screen, disabled=True)
 
         # Overlay
         settings_overlay.draw(screen)

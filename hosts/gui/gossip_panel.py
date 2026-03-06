@@ -227,7 +227,7 @@ class GossipPanel:
                 continue
 
             bubble_y = y + msg_y
-            bubble_h = self._draw_message(panel_surf, bubble_y, msg, msg_alpha, msg_clip)
+            bubble_h = self._draw_message(panel_surf, int(bubble_y), msg, msg_alpha, msg_clip)
             msg_y += bubble_h + GOSSIP_MSG_PAD
 
         self._content_h = msg_y + self._scroll_y

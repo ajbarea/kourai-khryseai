@@ -7,17 +7,7 @@ import textwrap
 import pygame
 from PIL import Image as PILImage
 
-from .constants import (
-    DIALOGUE_H,
-    DIM_WHITE,
-    FONT_BANNER,
-    FONT_NAME,
-    FONT_TITLE,
-    GOLD,
-    GOLD_DIM,
-    PANEL_BG,
-    PORTRAIT_W,
-)
+from .constants import DIALOGUE_H, FONT_BANNER, FONT_NAME, FONT_TITLE, PORTRAIT_W, theme
 from .maidens import AGENTS, get_avatar_path
 
 
@@ -76,12 +66,12 @@ class PortraitPanel:
                 self._fade_t = 0.0
                 self._fading = False
 
-    def draw(self, surf: pygame.Surface) -> None:
+    def draw(self, surf: pygame.Surface, flash_alpha: int = 0) -> None:
         panel_rect = pygame.Rect(0, 0, PORTRAIT_W, DIALOGUE_H)
 
         # Panel background
-        pygame.draw.rect(surf, PANEL_BG, panel_rect)
-        pygame.draw.line(surf, GOLD_DIM, (PORTRAIT_W, 0), (PORTRAIT_W, DIALOGUE_H), 1)
+        pygame.draw.rect(surf, theme.panel_bg, panel_rect)
+        pygame.draw.line(surf, theme.gold_dim, (PORTRAIT_W, 0), (PORTRAIT_W, DIALOGUE_H), 1)
 
         cx = PORTRAIT_W // 2
         avatar_y = 24
@@ -90,10 +80,12 @@ class PortraitPanel:
         # Gold circular frame behind avatar
         frame_cx, frame_cy = cx, avatar_y + avatar_size // 2
         frame_r = avatar_size // 2 + 6
-        pygame.draw.circle(surf, GOLD_DIM, (frame_cx, frame_cy), frame_r, 2)
+        pygame.draw.circle(surf, theme.gold_dim, (frame_cx, frame_cy), frame_r, 2)
         # Glow rings
         frame_glow = pygame.Surface((frame_r * 2 + 20, frame_r * 2 + 20), pygame.SRCALPHA)
-        pygame.draw.circle(frame_glow, (*GOLD, 20), (frame_r + 10, frame_r + 10), frame_r + 4, 6)
+        pygame.draw.circle(
+            frame_glow, (*theme.gold, 20), (frame_r + 10, frame_r + 10), frame_r + 4, 6
+        )
         surf.blit(frame_glow, (frame_cx - frame_r - 10, frame_cy - frame_r - 10))
 
         def _blit_avatar(name: str, alpha: int) -> None:
@@ -120,10 +112,21 @@ class PortraitPanel:
         else:
             _blit_avatar(self._current, 255)
 
+        # Flash overlay on handoff (golden flash fading out)
+        if flash_alpha > 0:
+            flash_surf = pygame.Surface((avatar_size, avatar_size), pygame.SRCALPHA)
+            pygame.draw.circle(
+                flash_surf,
+                (*theme.gold, flash_alpha),
+                (avatar_size // 2, avatar_size // 2),
+                avatar_size // 2,
+            )
+            surf.blit(flash_surf, (cx - avatar_size // 2, avatar_y))
+
         # Agent name + title (below portrait)
         info = AGENTS.get(self._current, {})
         name_y = avatar_y + avatar_size + 18
-        agent_color = info.get("color", GOLD)
+        agent_color = info.get("color", theme.gold)
 
         FONT_NAME.render_to(
             surf,
@@ -138,13 +141,15 @@ class PortraitPanel:
             surf,
             (cx - title_rect.width // 2, name_y + 28),
             title,
-            GOLD_DIM,
+            theme.gold_dim,
         )
 
         # Decorative separator
         sep_y = name_y + 54
         sep_w = 120
-        pygame.draw.line(surf, GOLD_DIM, (cx - sep_w // 2, sep_y), (cx + sep_w // 2, sep_y), 1)
+        pygame.draw.line(
+            surf, theme.gold_dim, (cx - sep_w // 2, sep_y), (cx + sep_w // 2, sep_y), 1
+        )
 
         # Quote at bottom of panel
         if self.current_quote:
@@ -156,6 +161,6 @@ class PortraitPanel:
                     surf,
                     (cx - r.width // 2, q_y),
                     line,
-                    DIM_WHITE,
+                    theme.dim_white,
                 )
                 q_y += 18

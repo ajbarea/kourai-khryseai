@@ -59,6 +59,78 @@ AGENT_VOICES = {
 }
 
 
+# Per-agent prosody progression keyed by affinity tier (0-3).
+# Edge-TTS supports pitch and rate adjustments but NOT mstts:express-as styles.
+# We simulate emotional warmth via prosody: higher tiers get slightly faster speech
+# (more energetic) and raised pitch (warmer, more expressive).
+# Format: (rate_offset%, pitch_offset_Hz) — applied on top of base voice config.
+@dataclass
+class EmotionProsody:
+    """Prosody adjustments to simulate emotional warmth."""
+
+    rate_offset: int = 0  # Added to base rate (percentage points, e.g. +5 means 5% faster)
+    pitch_offset: int = 0  # Hz offset (e.g. +10 means +10Hz)
+    label: str = "neutral"  # Descriptive label for logging
+
+
+AGENT_TIER_PROSODY: dict[str, dict[int, EmotionProsody]] = {
+    "hephaestus": {
+        0: EmotionProsody(0, 0, "stoic"),
+        1: EmotionProsody(0, 0, "warming"),
+        2: EmotionProsody(2, 5, "gruff-fond"),
+        3: EmotionProsody(3, 8, "tender"),
+    },
+    "metis": {
+        0: EmotionProsody(0, 0, "polished"),
+        1: EmotionProsody(2, 5, "playful"),
+        2: EmotionProsody(4, 10, "cheerful"),
+        3: EmotionProsody(5, 15, "warm"),
+    },
+    "techne": {
+        0: EmotionProsody(0, 0, "cool"),
+        1: EmotionProsody(2, 3, "relaxed"),
+        2: EmotionProsody(5, 8, "cocky"),
+        3: EmotionProsody(3, 12, "genuine"),
+    },
+    "dokimasia": {
+        0: EmotionProsody(0, 0, "precise"),
+        1: EmotionProsody(1, 3, "protective"),
+        2: EmotionProsody(3, 8, "fierce-loyal"),
+        3: EmotionProsody(2, 12, "devoted"),
+    },
+    "kallos": {
+        0: EmotionProsody(0, 0, "elegant"),
+        1: EmotionProsody(3, 8, "expressive"),
+        2: EmotionProsody(5, 12, "cheerful"),
+        3: EmotionProsody(6, 18, "radiant"),
+    },
+    "mneme": {
+        0: EmotionProsody(0, 0, "scholarly"),
+        1: EmotionProsody(1, 3, "warm"),
+        2: EmotionProsody(2, 8, "fond"),
+        3: EmotionProsody(3, 12, "tender"),
+    },
+}
+
+
+def get_prosody_for_agent(agent_name: str) -> EmotionProsody:
+    """Get the current prosody adjustments for an agent based on player affinity tier.
+
+    Falls back to neutral prosody if player profile is unavailable.
+    """
+    try:
+        from kourai_common.player import PlayerProfile, get_affinity, get_affinity_tier
+
+        profile = PlayerProfile.load()
+        if profile and profile.display_name:
+            aff = get_affinity(profile.player_id, agent_name)
+            tier = get_affinity_tier(aff["affinity_score"])
+            return AGENT_TIER_PROSODY.get(agent_name, {}).get(tier, EmotionProsody())
+    except Exception:
+        pass
+    return EmotionProsody()
+
+
 class TTSEngine:
     """Manages text-to-speech generation and playback with advanced audio control.
 
@@ -92,6 +164,7 @@ class TTSEngine:
         self._current_task: asyncio.Task | None = None
         self._on_complete: Callable[[], None] | None = None
         self._mixer_initialized = False
+        self._tts_channel: pygame.mixer.Channel | None = None
         self._init_mixer()
         logger.info(f"TTSEngine initialized: temp_dir={self.temp_dir}, volume={self.master_volume}")
 
@@ -173,6 +246,13 @@ class TTSEngine:
         voice_cfg = VOICE_ROSTER.get(voice_key, VOICE_ROSTER["aria"])
         final_speed = speed if speed is not None else voice_cfg.speed
 
+        # Resolve prosody from affinity tier (evolves with relationship)
+        prosody = get_prosody_for_agent(agent_name) if agent_name else EmotionProsody()
+
+        # Apply tier-based prosody on top of base voice config
+        rate_pct = (final_speed - 1.0) * 50 + prosody.rate_offset
+        pitch_hz = prosody.pitch_offset
+
         # Generate audio with edge-tts (MP3 format)
         temp_mp3 = self.temp_dir / f"speech_{abs(hash(text)) % 1000000}.mp3"
         # Also prepare WAV path for pygame compatibility
@@ -182,12 +262,15 @@ class TTSEngine:
             logger.info(
                 "TTS: Starting speech generation - "
                 f"agent={agent_name}, voice={voice_key}, "
-                f"speed={final_speed}, text_len={len(text)}"
+                f"speed={final_speed}, emotion={prosody.label}, text_len={len(text)}"
             )
 
-            # Generate audio with prosody (speed applied via edge-tts)
+            # Generate audio with prosody (rate + pitch adjusted by affinity tier)
             communicate = edge_tts.Communicate(
-                text, voice_cfg.edge_id, rate=f"{(final_speed - 1.0) * 50:+.0f}%"
+                text,
+                voice_cfg.edge_id,
+                rate=f"{rate_pct:+.0f}%",
+                pitch=f"{pitch_hz:+d}Hz",
             )
             await communicate.save(str(temp_mp3))
 
@@ -259,7 +342,7 @@ class TTSEngine:
                 sound.play()
 
             # Wait for this specific channel to finish
-            playback_start = 0
+            playback_start: float = 0.0
             if channel is not None:
                 while channel.get_busy():
                     await asyncio.sleep(0.05)

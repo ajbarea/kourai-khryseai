@@ -14,7 +14,7 @@ from status_bubbles_gui_integration import StatusBubblesGUIIntegration
 class GUIComponentsIntegration:
     """Manages integration of all GUI components."""
 
-    def __init__(self, gui_instance, config_path: Path | str = None):
+    def __init__(self, gui_instance, config_path: Path | str | None = None):
         """Initialize all GUI components.
 
         Args:

@@ -22,6 +22,7 @@ class AudioManager:
     """Manages all game audio: music, ambient, voice, and SFX."""
 
     _instance = None
+    _initialized = False
 
     def __new__(cls):
         # Optional singleton pattern or just allow normal instantiation.
@@ -33,7 +34,7 @@ class AudioManager:
 
     def __init__(self):
         # Prevent re-initialization
-        if hasattr(self, "_initialized") and self._initialized:
+        if self._initialized:
             return
 
         # 1. Pre-init for low latency

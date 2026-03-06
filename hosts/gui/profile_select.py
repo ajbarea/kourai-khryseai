@@ -9,6 +9,8 @@ Each profile card shows: name, role icon, alignment bars (mini), session count.
 
 from __future__ import annotations
 
+from typing import Literal
+
 import pygame
 import pygame.freetype
 
@@ -36,7 +38,7 @@ def run_profile_select(
     screen: pygame.Surface,
     clock: pygame.time.Clock,
     profiles: list[dict],
-) -> dict | None:
+) -> dict | None | Literal[False]:
     """Run the profile selection screen.
 
     Args:
