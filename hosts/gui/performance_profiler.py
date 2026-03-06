@@ -15,7 +15,7 @@ class PerformanceProfiler:
         """
         self.max_samples = max_samples
         self.frame_times: deque[float] = deque(maxlen=max_samples)
-        self.component_times: dict[str, deque[float]] = {}
+        self.component_times: dict[str, deque] = {}
         self.frame_start: float | None = None
         self.target_fps = 60
         self.target_frame_time = 1.0 / self.target_fps

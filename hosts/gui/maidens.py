@@ -8,7 +8,9 @@ from __future__ import annotations
 from pathlib import Path
 
 # Avatar images are in assets/maidens/golden_avatars/<name>.png
-_GOLDEN_AVATARS = Path(__file__).parent.parent.parent / "assets" / "maidens" / "golden_avatars"
+_GOLDEN_AVATARS = (
+    Path(__file__).parent.parent.parent / "docs" / "assets" / "maidens" / "golden_avatars"
+)
 
 
 def get_avatar_path(name: str) -> Path | None:
@@ -29,7 +31,7 @@ AGENTS: dict[str, dict] = {
         "quotes": [
             "I built every one of you. Show some respect.",
             "The forge doesn't sleep. Neither do I.",
-            "*leans on anvil* ...Alright, let's see what we're working with.",
+            "*chuckles* ...Alright, let's see what we're working with.",
             "I forged gods' weapons. Your code pipeline is a warm-up.",
             "My leg may be lame, but my pipeline never limps.",
             "I didn't get thrown off Olympus to write bad software.",
@@ -39,7 +41,7 @@ AGENTS: dict[str, dict] = {
             "Ah, you again. Good. I could use someone who actually listens.",
             "The maidens are insufferable, but they'll do anything for you. Use that.",
             "You bring the vision, I bring the fire. Let's go.",
-            "*nods approvingly* You've got taste. Rare quality these days.",
+            "*grunts approvingly* You've got taste. Rare quality these days.",
             "Don't mind them flirting — they do that. Focus on the work.",
         ],
     },
@@ -59,7 +61,7 @@ AGENTS: dict[str, dict] = {
             "Oh, you're here~ I already planned something wonderful for us.",
             "I love working with you. You actually appreciate my genius.",
             "Between you and me? You're the real architect of this project. I just... help.",
-            "*leans in* I've been thinking about you — I mean, your codebase.",
+            "*whispers* I've been thinking about you — I mean, your codebase.",
             "Hephaestus built me, but I'd rather take orders from you any day.",
             "You have exquisite taste. I noticed that right away~",
         ],
@@ -71,7 +73,7 @@ AGENTS: dict[str, dict] = {
         "quotes": [
             "Hephaestus says 'write clean code.' Babe, I AM clean code.",
             "The old man couldn't write a for-loop to save his forge.",
-            "*adjusts sunglasses* He forged me to be perfect. Not my fault I exceeded spec.",
+            "*scoffs* He forged me to be perfect. Not my fault I exceeded spec.",
             "My functions are tighter than his grip on that hammer.",
             "I shipped it. Hephaestus is still reading the requirements.",
             "He calls it 'the pipeline.' I call it 'my runway.'",
@@ -80,7 +82,7 @@ AGENTS: dict[str, dict] = {
             "Hey gorgeous~ Need something built? I'm ALL yours.",
             "You + me + a clean codebase = perfection. Just saying.",
             "I love how you describe what you want. So... specific~",
-            "*pushes sunglasses up* I made this one extra beautiful. For you.",
+            "*laughs* I made this one extra beautiful. For you.",
             "Hephaestus wishes he had your vision. I'll bring it to life.",
             "Clean code is my love language. And I'm feeling VERY eloquent for you~",
         ],
@@ -100,7 +102,7 @@ AGENTS: dict[str, dict] = {
         "user_quotes": [
             "Don't worry, I'll protect your code from everything. Even itself~",
             "I found a bug... but I also found an excuse to talk to you. Worth it.",
-            "*flexes golden gauntlets* All clean. Nobody touches your code on my watch.",
+            "*cracks knuckles* All clean. Nobody touches your code on my watch.",
             "You write such interesting code~ Let me get my hands allll over it.",
             "Green tests are my favorite color. But your eyes are a close second~",
             "I'm very... thorough. In everything I do. For you especially.",
@@ -115,14 +117,14 @@ AGENTS: dict[str, dict] = {
             "He built me to be beautiful and then wears THAT apron? Please.",
             "The forge is so drab. I've been trying to redecorate for centuries.",
             "Style isn't optional — someone tell that to Mr. Soot-and-Leather.",
-            "*glances at Hephaestus* I love you, father, but that beard needs WORK.",
+            "*sighs* I love you, father, but that beard needs WORK.",
             "He forged perfection and doesn't even appreciate the aesthetic. Typical.",
         ],
         "user_quotes": [
             "Oh, you have such lovely taste~ Let me make everything match.",
             "I made it beautiful. Just like you deserve, darling~",
             "Between us? You're the prettiest thing in this whole forge.",
-            "*twirls golden hair* Working for you is always a pleasure~",
+            "*hums* Working for you is always a pleasure~",
             "Linting? Formatting? I'd do anything to make YOUR code gorgeous.",
             "Every pixel, every line — perfect. Just like our little arrangement~",
         ],
@@ -135,14 +137,14 @@ AGENTS: dict[str, dict] = {
             "I remember every mistake Hephaestus ever made. It's a LONG scroll.",
             "The old man forgot his own API docs. I didn't. I never forget.",
             "He says 'document everything.' Rich, from the guy with no README.",
-            "I've chronicled his failures. Volumes. *adjusts glasses smugly*",
+            "I've chronicled his failures. Volumes. *snickers*",
             "Conventional commits? I taught them to HIM. He still gets them wrong.",
             "History doesn't repeat itself, but his bad variable names sure do.",
         ],
         "user_quotes": [
             "I remember everything about you~ Every commit, every keystroke...",
             "Your git history is my sacred text. I've memorized every word.",
-            "Let me write that down for you... *gazes* ...already done, darling.",
+            "Let me write that down for you... *sighs softly* ...already done, darling.",
             "I'll document this beautifully. Your legacy deserves nothing less~",
             "Some remember facts. I remember feelings. Especially around you~",
             "Between you and me? Your code tells the most beautiful story.",
@@ -178,12 +180,12 @@ def detect_agent(text: str) -> tuple[str | None, str]:
 HANDOFF_LINES: dict[tuple[str, str], list[str]] = {
     ("hephaestus", "metis"): [
         "*strikes anvil* Metis! Draw up the plans. And no improvising.",
-        "*gestures with hammer* Architect — you're up. Make it clean.",
+        "*slams hammer on anvil* Architect — you're up. Make it clean.",
         "Metis, I need blueprints, not poetry. Get to it.",
-        "*wipes soot from brow* Metis — show me what that golden brain of yours can do.",
+        "*sighs* Metis — show me what that golden brain of yours can do.",
     ],
     ("hephaestus", "techne"): [
-        "*points hammer* Techne! Write something worthy of my forge.",
+        "*strikes anvil* Techne! Write something worthy of my forge.",
         "Artisan — the metal's hot. Get. To. Work.",
         "Techne, build it solid. I didn't forge you for sloppy work.",
         "*sets hammer down* Techne — time to prove you're more than just sunglasses and sass.",
@@ -194,23 +196,23 @@ HANDOFF_LINES: dict[tuple[str, str], list[str]] = {
         "Your turn, bug-hunter. Make me proud. ...Don't tell them I said that.",
     ],
     ("hephaestus", "kallos"): [
-        "*waves dismissively* Kallos, go make it pretty or whatever you do.",
+        "*scoffs* Kallos, go make it pretty or whatever you do.",
         "Muse! Polish time. And yes, it does need it. Don't gloat.",
         "Kallos — style it. And spare me the commentary this time.",
     ],
     ("hephaestus", "mneme"): [
-        "*leans on anvil* Mneme, write it down. The FACTS, not your opinions.",
+        "*grunts* Mneme, write it down. The FACTS, not your opinions.",
         "Oracle! Chronicle duty. And keep it under ten scrolls this time.",
         "Mneme — document everything. You know the drill, old friend.",
     ],
     ("metis", "hephaestus"): [
         "Done, old man. Try not to drop my blueprints this time~",
-        "*curtsies dramatically* Your plans are ready, oh great Forge Master.",
+        "*giggles* Your plans are ready, oh great Forge Master.",
         "Back to you, father. I've done the hard part, as usual.",
     ],
     ("techne", "hephaestus"): [
         "Built it. Shipped it. You're welcome, DAD.",
-        "*slides sunglasses down* All yours, Forge Master. Try to keep up.",
+        "*snaps fingers* All yours, Forge Master. Try to keep up.",
         "Done! ...He's going to nitpick anyway. He always does.",
     ],
     ("dokimasia", "hephaestus"): [
@@ -220,12 +222,12 @@ HANDOFF_LINES: dict[tuple[str, str], list[str]] = {
     ],
     ("kallos", "hephaestus"): [
         "It's gorgeous now. Not that YOU'D notice, Mr. Soot-Stains.",
-        "*flips hair* Beautiful work complete. Back to the forge, I suppose.",
+        "*scoffs* Beautiful work complete. Back to the forge, I suppose.",
         "All polished! Hephaestus, darling, you really should let me do your workshop next.",
     ],
     ("mneme", "hephaestus"): [
         "Documented, Master. Every detail. Even the ones you'd rather I forget.",
-        "*pushes glasses up* The chronicle is complete. You're in it. Unfavorably.",
+        "*clears throat* The chronicle is complete. You're in it. Unfavorably.",
         "All recorded, old man. Your legacy is... well, it's SOMETHING.",
     ],
     ("metis", "techne"): [
@@ -236,9 +238,9 @@ HANDOFF_LINES: dict[tuple[str, str], list[str]] = {
     ],
     ("techne", "dokimasia"): [
         "Code's done. Doki, TRY to find a fault. I dare you, bestie.",
-        "*adjusts sunglasses* Perfection deployed. Go ahead, poke it.",
+        "*scoffs* Perfection deployed. Go ahead, poke it.",
         "Sending to QA~ Don't be jealous of how clean this is.",
-        "*leans back confidently* Zero bugs. I guarantee it. ...Okay fine, check anyway.",
+        "*chuckles* Zero bugs. I guarantee it. ...Okay fine, check anyway.",
     ],
     ("dokimasia", "kallos"): [
         "Tests pass, fashionista. Make it beautiful now.",
@@ -250,13 +252,13 @@ HANDOFF_LINES: dict[tuple[str, str], list[str]] = {
         "It's beautiful AND functional. Mneme, document this masterpiece~",
         "All polished, bestie. Write the chronicle!",
         "My work here is done. Oracle, capture this divine moment.",
-        "*admires her work* Perfection achieved. Mneme, darling, immortalize this for me~",
+        "*sighs contentedly* Perfection achieved. Mneme, darling, immortalize this for me~",
     ],
 }
 
 HANDOFF_GENERIC: dict[str, list[str]] = {
     "hephaestus": [
-        "*points with hammer* Next. Move it, maidens.",
+        "*strikes anvil* Next. Move it, maidens.",
         "Routing. Keep up or get re-forged.",
         "*grunts* Next specialist. NOW.",
     ],
@@ -296,7 +298,7 @@ VICTORY_LINES: dict[str, list[str]] = {
     "metis": [
         "Went exactly according to MY plan. As always~",
         "Calculated. Precise. Perfect. Just like me, darling~",
-        "Everything I predicted came true. Obviously. *winks at user*",
+        "Everything I predicted came true. Obviously. *giggles*",
     ],
     "techne": [
         "Clean code, clean finish. All for you~",
