@@ -584,9 +584,7 @@ def main(agent_url: str | None = None) -> None:
                         current_agent = action.agent
                         input_bar.processing = True
                         agent_quotes = AGENTS.get(action.agent, {}).get("user_quotes", [])
-                        portrait.current_quote = (
-                            random.choice(agent_quotes) if agent_quotes else ""
-                        )
+                        portrait.current_quote = random.choice(agent_quotes) if agent_quotes else ""
 
                 clicked_agent = history.handle_click(pg_event.pos, dialogue_rect)
                 if clicked_agent and clicked_agent in AGENTS:
