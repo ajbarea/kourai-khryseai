@@ -10,6 +10,7 @@ import logging
 from collections.abc import AsyncIterable
 
 from kourai_common.llm import chat, chat_stream
+from kourai_common.player import get_enriched_system_prompt
 from kourai_common.prompts import CURRENT_DATE, build_system_prompt
 
 log = logging.getLogger(__name__)
@@ -75,7 +76,7 @@ async def generate_commit_messages(git_output: str, context_id: str | None = Non
         Formatted commit message groups.
     """
     messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": get_enriched_system_prompt(SYSTEM_PROMPT, "mneme")},
         {
             "role": "user",
             "content": (
@@ -100,7 +101,7 @@ async def generate_commit_messages_stream(
         Text chunks of the commit message response.
     """
     messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": get_enriched_system_prompt(SYSTEM_PROMPT, "mneme")},
         {
             "role": "user",
             "content": (

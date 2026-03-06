@@ -609,6 +609,35 @@ def advance_romance(player_id: str, agent_name: str) -> str | None:
 # ── Prompt Context Builder ──────────────────────────────────────────────
 
 
+_profile_cache: PlayerProfile | None = None
+_profile_cache_ts: float = 0.0
+_PROFILE_CACHE_TTL = 30.0  # Reload profile every 30 seconds max
+
+
+def get_enriched_system_prompt(base_prompt: str, agent_name: str) -> str:
+    """Return base system prompt enriched with player context.
+
+    This is the primary integration point for agent code. Call this at
+    message-construction time instead of using SYSTEM_PROMPT directly.
+    Caches the player profile for 30s to avoid repeated disk reads.
+    """
+    global _profile_cache, _profile_cache_ts
+
+    now = time.time()
+    if _profile_cache is None or (now - _profile_cache_ts) > _PROFILE_CACHE_TTL:
+        _profile_cache = PlayerProfile.load()
+        _profile_cache_ts = now
+
+    if not _profile_cache or not _profile_cache.display_name:
+        return base_prompt
+
+    ctx = build_player_context(_profile_cache, agent_name, top_k_memories=6)
+    if not ctx:
+        return base_prompt
+
+    return f"{base_prompt}\n\n{ctx}"
+
+
 def build_player_context(
     profile: PlayerProfile,
     agent_name: str,

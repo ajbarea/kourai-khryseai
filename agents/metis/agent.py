@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from kourai_common.llm import chat, chat_stream
+from kourai_common.player import get_enriched_system_prompt
 from kourai_common.prompts import CURRENT_DATE, build_system_prompt
 from kourai_common.subprocess import run_command
 
@@ -124,7 +125,7 @@ async def create_spec(
         user_content = [{"type": "text", "text": user_text}, *image_parts]
 
     messages: list[dict[str, Any]] = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": get_enriched_system_prompt(SYSTEM_PROMPT, "metis")},
         {"role": "user", "content": user_content},
     ]
     log.info("Creating spec for: %.100s", idea)
@@ -156,7 +157,7 @@ async def create_spec_stream(
         user_content = [{"type": "text", "text": user_text}, *image_parts]
 
     messages: list[dict[str, Any]] = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": get_enriched_system_prompt(SYSTEM_PROMPT, "metis")},
         {"role": "user", "content": user_content},
     ]
     log.info("Streaming spec for: %.100s", idea)

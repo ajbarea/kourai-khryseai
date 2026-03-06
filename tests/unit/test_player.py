@@ -523,3 +523,34 @@ class TestExportImport:
         contents = [m["content"] for m in mems]
         assert "Existing" in contents
         assert "New imported" in contents
+
+
+# ── Enriched System Prompt Tests ────────────────────────────────────────
+
+
+class TestEnrichedSystemPrompt:
+    def test_returns_base_when_no_profile(self, monkeypatch):
+        from kourai_common.player import get_enriched_system_prompt
+
+        import kourai_common.player as player_mod
+
+        player_mod._profile_cache = None
+        player_mod._profile_cache_ts = 0.0
+        monkeypatch.setattr(PlayerProfile, "load", staticmethod(lambda: None))
+
+        result = get_enriched_system_prompt("base prompt", "metis")
+        assert result == "base prompt"
+
+    def test_appends_player_context_when_profile_exists(self, profile, monkeypatch):
+        from kourai_common.player import get_enriched_system_prompt
+
+        import kourai_common.player as player_mod
+
+        player_mod._profile_cache = None
+        player_mod._profile_cache_ts = 0.0
+        monkeypatch.setattr(PlayerProfile, "load", staticmethod(lambda: profile))
+
+        result = get_enriched_system_prompt("base prompt", "metis")
+        assert "base prompt" in result
+        assert "PLAYER IDENTITY" in result
+        assert "AJ" in result

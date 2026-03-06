@@ -7,11 +7,13 @@ LLM for code generation. Understands existing code before modifying it.
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from kourai_common.llm import chat, chat_stream
+from kourai_common.player import get_enriched_system_prompt
 from kourai_common.prompts import CURRENT_DATE, build_system_prompt
 from kourai_common.subprocess import run_command
 
@@ -196,7 +198,7 @@ async def generate_code(
         user_content = [{"type": "text", "text": user_text}, *image_parts]
 
     messages: list[dict[str, Any]] = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": get_enriched_system_prompt(SYSTEM_PROMPT, "techne")},
         {"role": "user", "content": user_content},
     ]
 
@@ -210,7 +212,7 @@ async def generate_code_stream(
     git_context: str = "",
     image_parts: list[dict] | None = None,
     context_id: str | None = None,
-):
+) -> AsyncGenerator[str, None]:
     """Stream code generation for real-time progress.
 
     Args:
@@ -244,7 +246,7 @@ async def generate_code_stream(
         user_content = [{"type": "text", "text": user_text}, *image_parts]
 
     messages: list[dict[str, Any]] = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": get_enriched_system_prompt(SYSTEM_PROMPT, "techne")},
         {"role": "user", "content": user_content},
     ]
 

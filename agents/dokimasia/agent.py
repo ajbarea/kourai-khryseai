@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from kourai_common.llm import chat, chat_stream
+from kourai_common.player import get_enriched_system_prompt
 from kourai_common.prompts import CURRENT_DATE, build_system_prompt
 from kourai_common.subprocess import run_command
 
@@ -100,7 +101,7 @@ async def fix_test_issues(
         {
             "role": "system",
             "content": (
-                SYSTEM_PROMPT
+                get_enriched_system_prompt(SYSTEM_PROMPT, "dokimasia")
                 + "\n\nWhen fixing issues, you MUST provide the exact file changes in this"
                 " format:\n\n"
                 "FILE: path/to/file.py\nORIGINAL:\n```python\n<exact lines to replace,"
@@ -226,7 +227,7 @@ async def generate_tests(
         user_content = [{"type": "text", "text": user_text}, *image_parts]
 
     messages: list[dict[str, Any]] = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": get_enriched_system_prompt(SYSTEM_PROMPT, "dokimasia")},
         {"role": "user", "content": user_content},
     ]
     log.info("Generating tests for %s", module_name)
@@ -255,7 +256,7 @@ async def generate_tests_stream(
         user_content = [{"type": "text", "text": user_text}, *image_parts]
 
     messages: list[dict[str, Any]] = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": get_enriched_system_prompt(SYSTEM_PROMPT, "dokimasia")},
         {"role": "user", "content": user_content},
     ]
     log.info("Streaming test generation for %s", module_name)
