@@ -32,7 +32,7 @@ if [ "$TEST_MODE" = true ]; then
 
     WORKERS=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
     log_info "🧪 Running unit tests in parallel ($WORKERS workers)..."
-    uv run pytest -n "$WORKERS" tests/unit/ -v --tb=short "$COV_ARGS"
+    uv run pytest -n "$WORKERS" tests/unit/ -v --tb=short $COV_ARGS
 
     if [ -d "tests/integration" ]; then
         log_info "🧪 Running integration tests serially..."
