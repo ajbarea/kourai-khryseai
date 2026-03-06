@@ -1,4 +1,4 @@
-.PHONY: setup docs upgrade cli gui up down shutdown status docker-up docker-down lint test clean help
+.PHONY: setup docs upgrade cli gui up down restart shutdown status docker-up docker-down lint test clean help
 
 # ──────────────── Portability ────────────────
 export LC_ALL=en_US.UTF-8
@@ -29,6 +29,10 @@ up:                        ## Start all agents locally (+ Jaeger)
 down:                      ## Stop all local agents
 	@uv run python scripts/down.py
 
+restart:                   ## Restart all local agents
+	@$(MAKE) down
+	@$(MAKE) up
+
 shutdown:                  ## Total system shutdown (local agents + Docker)
 	@uv run python scripts/down.py --total
 	@docker compose down
@@ -53,16 +57,7 @@ test:                      ## Run quality checks + full test suite
 	@bash scripts/lint.sh --test
 
 clean:                     ## Clean build artifacts
-	@find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
-	@find . -type d -name .pytest_cache -exec rm -rf {} + 2>/dev/null || true
-	@find . -type d -name ".ruff_cache" -exec rm -rf {} + 2>/dev/null || true
-	@find . -type d -name ".mypy_cache" -exec rm -rf {} + 2>/dev/null || true
-	@rm -rf logs/
-	@find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
-	@rm -f .coverage coverage.xml logs/coverage.xml 2>/dev/null || true
-	@rm -f uv.lock.backup* 2>/dev/null || true
-	@rm -rf .playwright-mcp/ 2>/dev/null || true
-	@rm -rf site/ 2>/dev/null || true
+	@bash scripts/clean.sh
 
 help:                      ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \

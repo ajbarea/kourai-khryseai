@@ -15,6 +15,7 @@ dev = [
     "pytest-cov>=6.0.0",
     "pytest-xdist>=3.6.1",
     "ruff>=0.9",
+    "isort>=6.0.0",
     "mypy>=1.15.0",
     "zensical>=0.0.24",
     "hypothesis>=6.151.9",
@@ -34,17 +35,34 @@ kourai-common = { workspace = true }
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+exclude = [
+    ".venv",
+    "__pycache__",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".hypothesis",
+]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "W"]
+# "I" enables Ruff's isort-compatible import sorting
+select = ["E", "F", "I", "UP", "B", "SIM", "W", "C4"]
 fixable = ["ALL"]
 unfixable = []
+ignore = [
+    "E501",   # Handled by formatter
+    "B008",   # Function calls in defaults (useful for FastAPI/Click)
+    "SIM102", # Nested if statements
+    "SIM108", # Use ternary operator
+]
 
 [tool.ruff.lint.isort]
 known-first-party = ["kourai_common", "agents", "hosts"]
+combine-as-imports = true
 
 [tool.ruff.format]
 quote-style = "double"
+indent-style = "space"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -57,8 +75,22 @@ namespace_packages = true
 check_untyped_defs = true
 warn_return_any = false
 warn_unused_configs = true
+warn_redundant_casts = true
 show_error_codes = true
 no_implicit_optional = true
 ignore_missing_imports = true
-exclude = ["\\.venv", "build", "dist", "\\.git"]
+follow_imports = "normal"
 mypy_path = "shared/src"
+exclude = ["\\.venv", "build", "dist", "\\.git"]
+
+# Enforce strict typing on core shared logic
+[[tool.mypy.overrides]]
+module = "kourai_common.*"
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+
+# Enforce strict typing on agents
+[[tool.mypy.overrides]]
+module = "agents.*"
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
