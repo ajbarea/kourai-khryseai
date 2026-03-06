@@ -9,8 +9,7 @@ from __future__ import annotations
 import pygame
 import pygame.freetype
 import pytest
-from hypothesis import given, settings
-from hypothesis import strategies as st
+from hypothesis import given, settings, strategies as st
 
 from hosts.gui.font_scaler import FontScaler
 
@@ -90,7 +89,10 @@ class TestFontScaleConsistencyProperty:
         scaled_font = scaler.scale_font(font, base_size)
 
         expected_size = int(base_size * scale)
-        assert scaled_font.size == expected_size
+        actual_size = scaled_font.size
+        if isinstance(actual_size, tuple):
+            actual_size = actual_size[0]
+        assert actual_size == expected_size
 
     @given(scale=valid_scales, base_size=base_sizes)
     @settings(max_examples=100)
@@ -108,7 +110,10 @@ class TestFontScaleConsistencyProperty:
         font = pygame.freetype.Font(None, base_size)
         scaled_font = scaler.scale_font(font, base_size)
 
-        assert scaled_font.size == base_size
+        actual_size = scaled_font.size
+        if isinstance(actual_size, tuple):
+            actual_size = actual_size[0]
+        assert actual_size == base_size
 
     @given(
         old_scale=valid_scales,
@@ -280,8 +285,12 @@ class TestFontScaleConsistencyProperty:
             font = pygame.freetype.Font(None, base_size)
             scaled_font = scaler.scale_font(font, base_size)
 
+            actual_size = scaled_font.size
+            if isinstance(actual_size, tuple):
+                actual_size = actual_size[0]
+
             # Font size should be positive
-            assert scaled_font.size > 0
+            assert actual_size > 0
             # Font size should be proportional to scale
             expected = int(base_size * test_scale)
-            assert scaled_font.size == expected
+            assert actual_size == expected

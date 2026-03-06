@@ -1,9 +1,6 @@
 """Tests for agent personality indicators."""
 
-from hosts.gui.agent_personality_indicators import (
-    AgentPersonality,
-    AgentPersonalityIndicators,
-)
+from hosts.gui.agent_personality_indicators import AgentPersonality, AgentPersonalityIndicators
 
 
 class TestAgentPersonality:

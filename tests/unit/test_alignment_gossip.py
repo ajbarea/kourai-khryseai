@@ -333,6 +333,7 @@ class TestRunPostTaskHooks:
 
         # Alignment changed (profile saved to disk)
         reloaded = PlayerProfile.load()
+        assert reloaded is not None
         assert reloaded.devotion > 0  # "Great job" → devotion
 
     def test_noop_without_player_id(self):

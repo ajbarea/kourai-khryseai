@@ -52,7 +52,7 @@ class TestDialogueEntryMetadata:
         entry = DialogueEntry("Hephaestus", "Test message")
         # Should not be able to add arbitrary attributes
         with pytest.raises(AttributeError):
-            entry.new_attribute = "value"
+            entry.new_attribute = "value"  # type: ignore[attr-defined]
 
     def test_dialogue_entry_is_user(self):
         """Test DialogueEntry with is_user flag."""

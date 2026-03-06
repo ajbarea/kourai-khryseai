@@ -38,6 +38,7 @@ class TestKeyboardShortcutsCtrlK:
         shortcuts = KeyboardShortcuts()
         event = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_k, mod=pygame.KMOD_CTRL)
         result = shortcuts.handle_key(event, "")
+        assert result is not None
         assert result["action"] == "focus"
 
     def test_ctrl_k_with_text(self) -> None:
@@ -98,12 +99,15 @@ class TestKeyboardShortcutsUpArrow:
 
         event = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_UP)
         result1 = shortcuts.handle_key(event, "")
+        assert result1 is not None
         assert result1["text"] == "Third"
 
         result2 = shortcuts.handle_key(event, "")
+        assert result2 is not None
         assert result2["text"] == "Second"
 
         result3 = shortcuts.handle_key(event, "")
+        assert result3 is not None
         assert result3["text"] == "First"
 
     def test_up_arrow_empty_history(self) -> None:
@@ -123,6 +127,7 @@ class TestKeyboardShortcutsUpArrow:
         shortcuts.handle_key(event, "")  # Navigate to Second
         shortcuts.handle_key(event, "")  # Navigate to First
         result = shortcuts.handle_key(event, "")  # Wrap to Second
+        assert result is not None
         assert result["text"] == "Second"
 
 
@@ -176,6 +181,7 @@ class TestKeyboardShortcutsDownArrow:
         event_down = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_DOWN)
         result = shortcuts.handle_key(event_down, "")
         # With wraparound, down from most recent goes to oldest
+        assert result is not None
         assert result["text"] == "Message"
 
 
@@ -238,6 +244,7 @@ class TestKeyboardShortcutsIntegration:
         # Navigate up
         event_up = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_UP)
         result = shortcuts.handle_key(event_up, "")
+        assert result is not None
         assert result["text"] == "Message 2"
 
         # Clear
@@ -247,6 +254,7 @@ class TestKeyboardShortcutsIntegration:
 
         # Navigate again should work
         result = shortcuts.handle_key(event_up, "")
+        assert result is not None
         assert result["text"] == "Message 2"
 
     def test_workflow_focus_and_navigate(self) -> None:
@@ -263,6 +271,7 @@ class TestKeyboardShortcutsIntegration:
         # Navigate
         event_up = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_UP)
         result = shortcuts.handle_key(event_up, "")
+        assert result is not None
         assert result["text"] == "Message"
 
     def test_multiple_shortcuts_in_sequence(self) -> None:
@@ -277,6 +286,7 @@ class TestKeyboardShortcutsIntegration:
         shortcuts.handle_key(event_up, "")
         shortcuts.handle_key(event_up, "")
         result = shortcuts.handle_key(event_up, "")
+        assert result is not None
         assert result["text"] == "First"
 
         # Clear
@@ -285,6 +295,7 @@ class TestKeyboardShortcutsIntegration:
 
         # Navigate again
         result = shortcuts.handle_key(event_up, "")
+        assert result is not None
         assert result["text"] == "Third"
 
 
@@ -327,5 +338,7 @@ class TestKeyboardShortcutsEdgeCases:
         result1 = shortcuts1.handle_key(event_up, "")
         result2 = shortcuts2.handle_key(event_up, "")
 
+        assert result1 is not None
+        assert result2 is not None
         assert result1["text"] == "Message 1"
         assert result2["text"] == "Message 2"

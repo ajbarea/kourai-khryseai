@@ -239,6 +239,7 @@ class TestOnboardingOverlay:
         ob._finalize()
 
         result = ob.get_result()
+        assert result is not None
         assert result["tts_name"] == "AJ"
 
     def test_finalize_defaults_role(self):
@@ -252,6 +253,7 @@ class TestOnboardingOverlay:
         ob._finalize()
 
         result = ob.get_result()
+        assert result is not None
         assert result["role"] == "mortal"
 
 

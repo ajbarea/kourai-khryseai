@@ -116,21 +116,23 @@ class TestKallosExecutor:
         assert queue.enqueue_event.call_count >= 1
 
     @pytest.mark.asyncio
-    async def test_valid_input_runs_style_check(self):
+    async def test_valid_input_runs_fix_loop(self):
         from agents.kallos.agent_executor import KallosAgentExecutor
+        from kourai_common.fix_loop import FixLoopResult
 
         executor = KallosAgentExecutor()
         ctx = _make_context("agents/kallos/agent.py")
         queue = _make_queue()
 
-        mock_report = MagicMock()
-        mock_report.lint_results = [MagicMock(tool="ruff check", passed=True)]
-        mock_report.all_clean = True
+        result = FixLoopResult(all_passed=True, iterations_run=1)
 
         with (
             patch("agents.kallos.agent_executor.create_span"),
-            patch("agents.kallos.agent_executor.run_style_check", return_value=mock_report),
-            patch("agents.kallos.agent_executor.format_report", return_value="ALL CLEAN"),
+            patch(
+                "kourai_common.fix_loop.run_fix_loop",
+                new_callable=AsyncMock,
+                return_value=(True, "All checks passed", result),
+            ),
         ):
             await executor.execute(ctx, queue)
 
@@ -214,20 +216,23 @@ class TestDokimasiaExecutor:
         assert queue.enqueue_event.call_count >= 1
 
     @pytest.mark.asyncio
-    async def test_run_request_runs_pytest(self):
+    async def test_run_request_runs_fix_loop(self):
         from agents.dokimasia.agent_executor import DokimasiaAgentExecutor
+        from kourai_common.fix_loop import FixLoopResult
 
         executor = DokimasiaAgentExecutor()
         ctx = _make_context("run tests please")
         queue = _make_queue()
 
-        mock_result = MagicMock()
-        mock_result.success = True
+        result = FixLoopResult(all_passed=True, iterations_run=1)
 
         with (
             patch("agents.dokimasia.agent_executor.create_span"),
-            patch("agents.dokimasia.agent_executor.run_pytest", return_value=mock_result),
-            patch("agents.dokimasia.agent_executor.format_test_results", return_value="8/8 PASS"),
+            patch(
+                "kourai_common.fix_loop.run_fix_loop",
+                new_callable=AsyncMock,
+                return_value=(True, "All tests passed", result),
+            ),
         ):
             await executor.execute(ctx, queue)
 

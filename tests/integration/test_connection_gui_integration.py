@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import pygame
 import pytest
-from hypothesis import given, settings
-from hypothesis import strategies as st
+from hypothesis import given, settings, strategies as st
 
 from hosts.gui.connection_gui_integration import ConnectionStatusDisplay
 from hosts.gui.connection_manager import ConnectionManager

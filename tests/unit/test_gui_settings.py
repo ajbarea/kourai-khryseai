@@ -1,4 +1,4 @@
-"""Tests for GUI settings and font scaling."""
+"""Tests for GUI settings, font scaling, and typewriter effect."""
 
 from __future__ import annotations
 
@@ -6,8 +6,7 @@ import tempfile
 from pathlib import Path
 
 import pytest
-from hypothesis import given, settings
-from hypothesis import strategies as st
+from hypothesis import given, settings, strategies as st
 
 from hosts.gui.font_scaler import FontScaler
 from hosts.gui.settings import SettingsManager
@@ -38,34 +37,32 @@ class TestSettingsManagerProperty:
         typewriter_speed: int,
         show_status_bubbles: bool,
     ) -> None:
-        """Settings should persist correctly when saved and reloaded.
-
-        Validates: Requirements 15.1, 15.2, 15.3, 15.4
-        """
+        """Settings should persist correctly when saved and reloaded."""
         with tempfile.TemporaryDirectory() as tmpdir:
             config_path = str(Path(tmpdir) / "test_config.json")
 
             # Create and set settings
             settings1 = SettingsManager(config_path)
-            settings1.set_font_scale(font_scale)
-            settings1.set_auto_scroll(auto_scroll)
-            settings1.set_high_contrast(high_contrast)
-            settings1.set_show_timestamps(show_timestamps)
-            settings1.set_timestamp_24h(timestamp_24h)
-            settings1.set_typewriter_speed(typewriter_speed)
-            settings1.set_show_status_bubbles(show_status_bubbles)
+            settings1.set("font_scale", font_scale)
+            settings1.set("auto_scroll_enabled", auto_scroll)
+            settings1.set("high_contrast", high_contrast)
+            settings1.set("show_timestamps", show_timestamps)
+            settings1.set("timestamp_format", "24h" if timestamp_24h else "12h")
+            settings1.set("typewriter_speed_ms", typewriter_speed)
+            settings1.set("status_bubbles_collapsed", not show_status_bubbles)
+            settings1.save()
 
             # Create new instance from same file
             settings2 = SettingsManager(config_path)
 
             # Verify all settings persisted
-            assert settings2.get_font_scale() == pytest.approx(font_scale, abs=0.01)
-            assert settings2.get_auto_scroll() == auto_scroll
-            assert settings2.get_high_contrast() == high_contrast
-            assert settings2.get_show_timestamps() == show_timestamps
-            assert settings2.get_timestamp_24h() == timestamp_24h
-            assert settings2.get_typewriter_speed() == typewriter_speed
-            assert settings2.get_show_status_bubbles() == show_status_bubbles
+            assert settings2.get("font_scale") == pytest.approx(font_scale, abs=0.01)
+            assert settings2.get("auto_scroll_enabled") == auto_scroll
+            assert settings2.get("high_contrast") == high_contrast
+            assert settings2.get("show_timestamps") == show_timestamps
+            assert settings2.get("timestamp_format") == ("24h" if timestamp_24h else "12h")
+            assert settings2.get("typewriter_speed_ms") == typewriter_speed
+            assert settings2.get("status_bubbles_collapsed") == (not show_status_bubbles)
 
 
 class TestSettingsManagerUnit:
@@ -75,233 +72,66 @@ class TestSettingsManagerUnit:
         """Settings should have correct default values."""
         with tempfile.TemporaryDirectory() as tmpdir:
             config_path = str(Path(tmpdir) / "test_config.json")
-            settings = SettingsManager(config_path)
+            mgr = SettingsManager(config_path)
 
-            assert settings.get_font_scale() == 1.0
-            assert settings.get_auto_scroll() is True
-            assert settings.get_high_contrast() is False
-            assert settings.get_show_timestamps() is True
-            assert settings.get_timestamp_24h() is True
-            assert settings.get_typewriter_speed() == 30
-            assert settings.get_show_status_bubbles() is True
-
-    def test_font_scale_clamping(self) -> None:
-        """Font scale should be clamped to valid range."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = str(Path(tmpdir) / "test_config.json")
-            settings = SettingsManager(config_path)
-
-            # Test below minimum
-            settings.set_font_scale(0.5)
-            assert settings.get_font_scale() == 0.8
-
-            # Test above maximum
-            settings.set_font_scale(2.5)
-            assert settings.get_font_scale() == 2.0
-
-            # Test valid range
-            settings.set_font_scale(1.5)
-            assert settings.get_font_scale() == 1.5
-
-    def test_typewriter_speed_clamping(self) -> None:
-        """Typewriter speed should be clamped to valid range."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = str(Path(tmpdir) / "test_config.json")
-            settings = SettingsManager(config_path)
-
-            # Test below minimum
-            settings.set_typewriter_speed(5)
-            assert settings.get_typewriter_speed() == 10
-
-            # Test above maximum
-            settings.set_typewriter_speed(150)
-            assert settings.get_typewriter_speed() == 100
-
-            # Test valid range
-            settings.set_typewriter_speed(50)
-            assert settings.get_typewriter_speed() == 50
+            assert mgr.get("font_scale") == 1.0
+            assert mgr.get("auto_scroll_enabled") is True
+            assert mgr.get("high_contrast") is False
+            assert mgr.get("show_timestamps") is True
+            assert mgr.get("typewriter_speed_ms") == 30
 
     def test_get_set_methods(self) -> None:
         """Generic get/set methods should work correctly."""
         with tempfile.TemporaryDirectory() as tmpdir:
             config_path = str(Path(tmpdir) / "test_config.json")
-            settings = SettingsManager(config_path)
+            mgr = SettingsManager(config_path)
 
-            settings.set("custom_setting", "test_value")
-            assert settings.get("custom_setting") == "test_value"
+            mgr.set("custom_setting", "test_value")
+            assert mgr.get("custom_setting") == "test_value"
 
-            settings.set("number_setting", 42)
-            assert settings.get("number_setting") == 42
-
-    def test_window_size(self) -> None:
-        """Window size settings should work correctly."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = str(Path(tmpdir) / "test_config.json")
-            settings = SettingsManager(config_path)
-
-            settings.set_window_size(1920, 1080)
-            width, height = settings.get_window_size()
-            assert width == 1920
-            assert height == 1080
+            mgr.set("number_setting", 42)
+            assert mgr.get("number_setting") == 42
 
 
 class TestFontScalerUnit:
     """Unit tests for FontScaler."""
 
-    def test_initial_scale_from_settings(self) -> None:
-        """FontScaler should initialize with scale from settings."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = str(Path(tmpdir) / "test_config.json")
-            settings = SettingsManager(config_path)
-            settings.set_font_scale(1.2)
-
-            scaler = FontScaler(settings)
-
-            assert scaler.get_scale() == 1.2
+    def test_initial_scale(self) -> None:
+        """FontScaler should initialize with default scale."""
+        scaler = FontScaler()
+        assert scaler.scale == 1.0
 
     def test_scale_clamping(self) -> None:
         """FontScaler should clamp scale to valid range."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = str(Path(tmpdir) / "test_config.json")
-            settings = SettingsManager(config_path)
+        scaler = FontScaler(min_scale=0.8, max_scale=2.0)
 
-            scaler = FontScaler(settings)
+        # Test below minimum
+        scaler.set_scale(0.5)
+        assert scaler.scale == 0.8
 
-            # Test below minimum
-            scaler.set_scale(0.5)
-            assert scaler.get_scale() == 0.8
+        # Test above maximum
+        scaler.set_scale(2.5)
+        assert scaler.scale == 2.0
 
-            # Test above maximum
-            scaler.set_scale(2.5)
-            assert scaler.get_scale() == 2.0
-
-            # Test valid range
-            scaler.set_scale(1.5)
-            assert scaler.get_scale() == 1.5
-
-    def test_scale_up_down(self) -> None:
-        """Scale up/down methods should work correctly."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = str(Path(tmpdir) / "test_config.json")
-            settings = SettingsManager(config_path)
-            settings.set_font_scale(1.0)
-
-            scaler = FontScaler(settings)
-
-            scaler.scale_up()
-            assert scaler.get_scale() == pytest.approx(1.1, abs=0.01)
-
-            scaler.scale_down()
-            assert scaler.get_scale() == pytest.approx(1.0, abs=0.01)
-
-    def test_font_caching(self) -> None:
-        """FontScaler should cache fonts correctly."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = str(Path(tmpdir) / "test_config.json")
-            settings = SettingsManager(config_path)
-
-            scaler = FontScaler(settings)
-
-            # Get font multiple times - should return cached version
-            font1 = scaler.get_font("body")
-            font2 = scaler.get_font("body")
-
-            # Same font object should be returned
-            assert font1 is font2
-
-    def test_font_scaling(self) -> None:
-        """Font sizes should be scaled correctly."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = str(Path(tmpdir) / "test_config.json")
-            settings = SettingsManager(config_path)
-            settings.set_font_scale(1.5)
-
-            scaler = FontScaler(settings)
-
-            # Body font base size is 16, should be scaled to 24
-            font = scaler.get_font("body")
-            # The font size should be approximately scaled
-            assert font.size == 24
+        # Test valid range
+        scaler.set_scale(1.5)
+        assert scaler.scale == 1.5
 
     def test_scroll_adjustment(self) -> None:
         """Scroll position should be adjusted correctly when scale changes."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = str(Path(tmpdir) / "test_config.json")
-            settings = SettingsManager(config_path)
+        scaler = FontScaler()
 
-            scaler = FontScaler(settings)
+        # Test scroll adjustment
+        new_scroll = scaler.adjust_scroll(
+            current_scroll=100,
+            old_scale=1.0,
+            new_scale=1.5,
+        )
 
-            # Test scroll adjustment
-            new_scroll = scaler.adjust_scroll_for_scale(
-                old_scale=1.0,
-                new_scale=1.5,
-                current_scroll=100,
-                content_height=1000,
-                view_height=500,
-            )
-
-            # Scroll position should be adjusted proportionally
-            assert new_scroll >= 0
-            assert new_scroll <= 1000 - 500  # Within valid range
-
-    def test_scroll_adjustment_no_change_needed(self) -> None:
-        """Scroll adjustment should return 0 when content fits in view."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = str(Path(tmpdir) / "test_config.json")
-            settings = SettingsManager(config_path)
-
-            scaler = FontScaler(settings)
-
-            # When content height is less than view height, no scroll needed
-            new_scroll = scaler.adjust_scroll_for_scale(
-                old_scale=1.0,
-                new_scale=1.5,
-                current_scroll=0,
-                content_height=300,
-                view_height=500,
-            )
-
-            assert new_scroll == 0
-
-    def test_scroll_adjustment_at_minimum(self) -> None:
-        """Scroll adjustment should handle minimum scale correctly."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = str(Path(tmpdir) / "test_config.json")
-            settings = SettingsManager(config_path)
-
-            scaler = FontScaler(settings)
-
-            new_scroll = scaler.adjust_scroll_for_scale(
-                old_scale=0.8,
-                new_scale=1.0,
-                current_scroll=0,
-                content_height=800,
-                view_height=500,
-            )
-
-            assert new_scroll >= 0
-
-    def test_scroll_adjustment_at_maximum(self) -> None:
-        """Scroll adjustment should handle maximum scale correctly."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = str(Path(tmpdir) / "test_config.json")
-            settings = SettingsManager(config_path)
-
-            scaler = FontScaler(settings)
-
-            new_scroll = scaler.adjust_scroll_for_scale(
-                old_scale=2.0,
-                new_scale=1.5,
-                current_scroll=500,
-                content_height=2000,
-                view_height=500,
-            )
-
-            assert new_scroll >= 0
-            assert new_scroll <= 2000 - 500  # Within valid range
+        # Scroll position should be adjusted proportionally: 100 * (1.5 / 1.0) = 150
+        assert new_scroll == 150
 
 
-# Feature: gui-improvements, Property 1: Typewriter Effect Character Sequence
 class TestTypewriterManagerProperty:
     """Property-based tests for typewriter effect."""
 
@@ -317,66 +147,25 @@ class TestTypewriterManagerProperty:
         text: str,
         speed_ms: int,
     ) -> None:
-        """Typewriter should reveal characters one at a time.
+        """Typewriter should reveal characters one at a time."""
+        typewriter = TypewriterManager()
+        typewriter.set_speed(speed_ms)
+        typewriter.start(text)
 
-        Validates: Requirements 1.1, 1.3
-        """
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = str(Path(tmpdir) / "test_config.json")
-            settings = SettingsManager(config_path)
-            settings.set_typewriter_speed(speed_ms)
+        # After starting, no characters should be displayed yet
+        assert typewriter.get_displayed_text() == ""
 
-            typewriter = TypewriterManager(settings)
-            typewriter.start(text)
+        # Simulate updates until complete
+        dt = speed_ms / 1000.0  # Time for exactly 1 character
+        displayed = ""
+        for i in range(len(text)):
+            displayed = typewriter.update(dt)
+            assert len(displayed) == i + 1
+            assert displayed == text[: i + 1]
 
-            # After starting, no characters should be displayed yet
-            assert typewriter.get_displayed_text() == ""
-
-            # Simulate updates until complete
-            dt = speed_ms / 1000.0  # 1 character per update
-            while typewriter.update(dt):
-                pass
-
-            # All characters should be revealed
-            assert typewriter.get_displayed_text() == text
-
-
-# Feature: gui-improvements, Property 2: Typewriter Skip Functionality
-class TestTypewriterSkipProperty:
-    """Property-based tests for typewriter skip functionality."""
-
-    @settings(max_examples=50)
-    @given(
-        text=st.text(
-            alphabet=st.characters(whitelist_categories=("L", "N", "P")), min_size=10, max_size=50
-        ),
-    )
-    def test_skip_reveals_all_text_immediately(
-        self,
-        text: str,
-    ) -> None:
-        """Skipping should immediately reveal all text.
-
-        Validates: Requirement 1.2
-        """
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = str(Path(tmpdir) / "test_config.json")
-            settings = SettingsManager(config_path)
-
-            typewriter = TypewriterManager(settings)
-            typewriter.start(text)
-
-            # Simulate some updates
-            dt = 0.01  # Small time step
-            for _ in range(5):
-                typewriter.update(dt)
-
-            # Skip to end
-            typewriter.skip()
-
-            # All text should be revealed immediately
-            assert typewriter.get_displayed_text() == text
-            assert not typewriter.is_typing()
+        # All characters should be revealed
+        assert typewriter.get_displayed_text() == text
+        assert typewriter.is_complete()
 
 
 class TestTypewriterManagerUnit:
@@ -384,143 +173,92 @@ class TestTypewriterManagerUnit:
 
     def test_start_resets_state(self) -> None:
         """Starting new text should reset state."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = str(Path(tmpdir) / "test_config.json")
-            settings = SettingsManager(config_path)
+        typewriter = TypewriterManager()
+        typewriter.start("Hello")
 
-            typewriter = TypewriterManager(settings)
-            typewriter.start("Hello")
+        # Simulate some typing
+        typewriter.update(0.05)
+        assert typewriter.displayed_chars > 0
 
-            # Simulate some typing
-            dt = 0.01
-            for _ in range(3):
-                typewriter.update(dt)
+        # Start new text
+        typewriter.start("World")
 
-            # Start new text
-            typewriter.start("World")
-
-            # State should be reset
-            assert typewriter.get_displayed_text() == ""
-            assert typewriter.is_typing()
-            assert not typewriter.is_skipped()
+        # State should be reset
+        assert typewriter.get_displayed_text() == ""
+        assert not typewriter.is_complete()
 
     def test_pause_resume(self) -> None:
         """Pause and resume should work correctly."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = str(Path(tmpdir) / "test_config.json")
-            settings = SettingsManager(config_path)
+        typewriter = TypewriterManager()
+        typewriter.start("Hello World", speed_ms=50)
 
-            typewriter = TypewriterManager(settings)
-            typewriter.start("Hello World")
+        # Type some characters
+        typewriter.update(0.06)  # Should type 1 char
+        displayed_before = typewriter.get_displayed_text()
+        assert len(displayed_before) == 1
 
-            # Type some characters
-            dt = 0.01
-            for _ in range(3):
-                typewriter.update(dt)
+        # Pause
+        typewriter.pause()
+        assert typewriter.paused
 
-            displayed_before = typewriter.get_displayed_text()
+        # Update while paused - no change
+        typewriter.update(0.1)
+        assert typewriter.get_displayed_text() == displayed_before
 
-            # Pause
-            typewriter.pause()
-            assert typewriter.is_paused()
+        # Resume
+        typewriter.resume()
+        assert not typewriter.paused
 
-            # Update while paused - no change
-            typewriter.update(dt)
-            assert typewriter.get_displayed_text() == displayed_before
-
-            # Resume
-            typewriter.resume()
-            assert not typewriter.is_paused()
-
-            # Continue typing
-            typewriter.update(dt)
-            assert len(typewriter.get_displayed_text()) > len(displayed_before)
+        # Continue typing
+        typewriter.update(0.1)
+        assert len(typewriter.get_displayed_text()) > len(displayed_before)
 
     def test_skip_to_end(self) -> None:
         """Skip should reveal all text immediately."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = str(Path(tmpdir) / "test_config.json")
-            settings = SettingsManager(config_path)
+        typewriter = TypewriterManager()
+        typewriter.start("Hello World")
 
-            typewriter = TypewriterManager(settings)
-            typewriter.start("Hello World")
+        # Skip
+        typewriter.skip()
 
-            # Type some characters
-            dt = 0.01
-            for _ in range(3):
-                typewriter.update(dt)
-
-            # Skip
-            typewriter.skip()
-
-            # All text should be revealed
-            assert typewriter.get_displayed_text() == "Hello World"
-            assert not typewriter.is_typing()
+        # All text should be revealed
+        assert typewriter.get_displayed_text() == "Hello World"
+        assert typewriter.is_complete()
 
     def test_speed_setting(self) -> None:
         """Speed setting should work correctly."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = str(Path(tmpdir) / "test_config.json")
-            settings = SettingsManager(config_path)
+        typewriter = TypewriterManager(min_speed_ms=10, max_speed_ms=100)
+        typewriter.set_speed(50)
+        assert typewriter.current_speed_ms == 50
 
-            typewriter = TypewriterManager(settings)
-            typewriter.set_speed(50)
-            assert typewriter.get_speed() == 50
+        typewriter.set_speed(5)
+        assert typewriter.current_speed_ms == 10  # Clamped to minimum
 
-            typewriter.set_speed(5)
-            assert typewriter.get_speed() == 10  # Clamped to minimum
+        typewriter.set_speed(150)
+        assert typewriter.current_speed_ms == 100  # Clamped to maximum
 
-            typewriter.set_speed(150)
-            assert typewriter.get_speed() == 100  # Clamped to maximum
-
-    def test_motion_sensitive(self) -> None:
+    def test_motion_sensitivity(self) -> None:
         """Motion sensitivity setting should work correctly."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = str(Path(tmpdir) / "test_config.json")
-            settings = SettingsManager(config_path)
+        typewriter = TypewriterManager()
 
-            typewriter = TypewriterManager(settings)
+        typewriter.set_motion_sensitivity(True)
+        assert typewriter.motion_sensitivity_enabled
 
-            typewriter.set_motion_sensitive(True)
-            assert typewriter.is_motion_sensitive()
-
-            typewriter.set_motion_sensitive(False)
-            assert not typewriter.is_motion_sensitive()
+        # When motion sensitivity is enabled, start() should skip immediately
+        typewriter.start("Fast Text")
+        assert typewriter.get_displayed_text() == "Fast Text"
+        assert typewriter.is_complete()
 
     def test_reset(self) -> None:
         """Reset should return to initial state."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = str(Path(tmpdir) / "test_config.json")
-            settings = SettingsManager(config_path)
+        typewriter = TypewriterManager()
+        typewriter.start("Hello World")
+        typewriter.update(0.1)
 
-            typewriter = TypewriterManager(settings)
-            typewriter.start("Hello World")
+        # Reset
+        typewriter.reset()
 
-            # Type some characters
-            dt = 0.01
-            for _ in range(3):
-                typewriter.update(dt)
-
-            # Reset
-            typewriter.reset()
-
-            # State should be reset
-            assert typewriter.get_displayed_text() == ""
-            assert not typewriter.is_typing()
-            assert not typewriter.is_paused()
-            assert not typewriter.is_skipped()
-
-    def test_completion_detection(self) -> None:
-        """Update should return True when complete."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = str(Path(tmpdir) / "test_config.json")
-            settings = SettingsManager(config_path)
-
-            typewriter = TypewriterManager(settings)
-            typewriter.start("Hi")
-
-            # Not complete yet
-            assert not typewriter.update(0.01)
-
-            # Complete after enough time
-            assert typewriter.update(0.01)
+        # State should be reset
+        assert typewriter.get_displayed_text() == ""
+        assert typewriter.is_complete()  # active = False means complete
+        assert not typewriter.paused

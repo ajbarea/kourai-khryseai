@@ -9,8 +9,7 @@ Validates: Requirements 1.1, 1.2, 1.3, 1.4, 1.5, 1.7, 12.8
 
 from __future__ import annotations
 
-from hypothesis import given, settings
-from hypothesis import strategies as st
+from hypothesis import given, settings, strategies as st
 
 from hosts.gui.typewriter import TypewriterManager
 
@@ -137,6 +136,9 @@ class TestTypewriterCharacterSequenceProperty:
         # displayed after two updates is proportional to 2*dt.
         total_chars = chars_after_second
         expected_chars = (2 * dt * 1000.0) / speed
+
+        # Cap expected to text length — can't display more chars than exist
+        expected_chars = min(expected_chars, len(text))
 
         # Allow for rounding differences
         assert abs(total_chars - expected_chars) <= 3.0

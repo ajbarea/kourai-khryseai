@@ -36,7 +36,7 @@ class TestTechneSystemPrompt:
         assert "EDIT existing files" in SYSTEM_PROMPT
 
     def test_forbids_git_commit(self):
-        assert "NEVER commit" in SYSTEM_PROMPT
+        assert "NEVER run git commit" in SYSTEM_PROMPT
 
     def test_includes_output_format(self):
         assert "ACTION:" in SYSTEM_PROMPT

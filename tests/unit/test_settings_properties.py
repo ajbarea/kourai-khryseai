@@ -10,8 +10,7 @@ import json
 import tempfile
 from pathlib import Path
 
-from hypothesis import given, settings
-from hypothesis import strategies as st
+from hypothesis import given, settings, strategies as st
 
 from hosts.gui.settings import DEFAULT_SETTINGS, SettingsManager
 

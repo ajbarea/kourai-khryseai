@@ -7,10 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from a2a.types import Task, TaskArtifactUpdateEvent, TaskState, TaskStatus
 
-from agents.hephaestus.remote_connections import (
-    AgentInputRequired,
-    RemoteAgentConnection,
-)
+from agents.hephaestus.remote_connections import AgentInputRequired, RemoteAgentConnection
 
 
 class TestRemoteAgentConnectionInit:

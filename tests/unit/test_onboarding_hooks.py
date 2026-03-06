@@ -132,6 +132,7 @@ class TestOnboarding:
 
         increment_session()
         loaded = PlayerProfile.load()
+        assert loaded is not None
         assert loaded.total_sessions == 6
 
 

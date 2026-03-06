@@ -6,11 +6,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from agents.dokimasia.agent import (
-    SYSTEM_PROMPT,
-    PytestRunResult,
-    format_test_results,
-)
+from agents.dokimasia.agent import SYSTEM_PROMPT, PytestRunResult, format_test_results
 
 
 class TestDokimasiaSystemPrompt:

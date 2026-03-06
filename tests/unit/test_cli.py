@@ -6,18 +6,9 @@ from unittest.mock import MagicMock
 
 import httpx
 import pytest
-from a2a.types import (
-    Message,
-    Task,
-    TaskState,
-    TaskStatusUpdateEvent,
-)
+from a2a.types import Message, Task, TaskState, TaskStatusUpdateEvent
 
-from hosts.cli.__main__ import (
-    _extract_artifact_text,
-    _extract_status_text,
-    send_and_stream,
-)
+from hosts.cli.__main__ import _extract_artifact_text, _extract_status_text, send_and_stream
 
 # ---------------------------------------------------------------------------
 # Extract helpers
