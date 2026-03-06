@@ -13,8 +13,9 @@ The brain of the system. Receives user requests, uses its LLM to decide which sp
 **Key behaviors:**
 
 - **LLM-based routing** — Analyzes the user's natural language request against pipeline templates to select agents. Falls back to `mneme` if the LLM returns nothing valid.
-- **ASK_USER** — If the request is ambiguous, responds with `ASK_USER: <question>` instead of guessing.
-- **Sequential execution** — Calls each specialist via A2A `message/send` with `blocking=True`. Accumulated context passes from one agent to the next.
+- **Direct Agent Mentions** — If a request starts with `@<agent>`, Hephaestus completely bypasses LLM routing and initiates a direct 1-on-1 pipeline with that specific specialist.
+- **ASK_USER & Proactive UX** — If the request is ambiguous, responds with `ASK_USER: <question>`. Hephaestus is explicitly instructed to provide A/B multiple-choice options instead of open-ended questions to reduce cognitive load.
+- **Sequential execution** — Calls each specialist via A2A `message/send` with `streaming=True`. Accumulated context passes from one agent to the next, while intermediate "inner thoughts" are dynamically yielded back to the GUI in real-time.
 - **Kallos-Techne feedback loop** — When both are in the pipeline and Kallos finds lint issues, automatically loops Techne (fix) → Kallos (re-check) up to `MAX_ITERATIONS` times.
 - **Graceful degradation** — If a specialist is unreachable, it's skipped and the pipeline continues with remaining agents.
 

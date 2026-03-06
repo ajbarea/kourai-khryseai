@@ -57,26 +57,24 @@ async for result in client.send_message_streaming(request):
     ...
 ```
 
-### Hephaestus ↔ Specialists: Synchronous
+### Hephaestus ↔ Specialists: Asynchronous Streaming (HOTL)
 
-Hephaestus calls specialists using A2A `message/send` with `blocking=True`. This makes each call synchronous — Hephaestus waits for one specialist to complete before calling the next.
+Kourai Khryseai utilizes a **Human-on-the-Loop (HOTL)** architecture. Hephaestus calls specialists using an asynchronous `AsyncGenerator` wrapper over the A2A client with `streaming=True`. 
+
+This enables specialists to actively stream their "inner monologues" (e.g., `⚙️ Coding: def parse_ast(node)...`) to Hephaestus, which immediately pipes them back to the GUI. The execution of the pipeline remains sequential (Hephaestus waits for Techne's final artifact before calling Dokimasia), but the _generation_ phase is entirely transparent.
 
 ```python
 # RemoteAgentConnection.send() — simplified
-request = SendMessageRequest(
-    id=message_id,
-    params=MessageSendParams(
-        message=Message(
-            role=Role.user,
-            parts=[Part(root=TextPart(text=user_text))],
-            context_id=context_id,
-            metadata=get_trace_context(),  # W3C trace headers
-        ),
-        configuration=MessageSendConfiguration(blocking=True),
-    ),
-)
-response = await client.send_message(request)
+async for event in client.send_message(message):
+    if isinstance(event, Message):
+        yield ("result", extract_text(event))
+    elif isinstance(update, TaskStatusUpdateEvent):
+        yield ("status", extract_status(update))
 ```
+
+### Direct Specialist Handoffs
+
+To facilitate true conversational interaction, the GUI supports `@agent` mentions. A request starting with `@techne` will bypass Hephaestus's normal pipeline routing logic entirely, instantly initiating a 1-on-1 pipeline with that agent.
 
 ### Input Required: Clarification Loop
 

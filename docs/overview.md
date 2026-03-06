@@ -59,25 +59,26 @@ Each agent is an independent HTTP server. They communicate through the open [A2A
 
 ## 🔄 How a Request Flows
 
-When you type a request into the CLI, here's what happens:
+When you type a request into the CLI or GUI, here's what happens:
 
 ```mermaid
 sequenceDiagram
     actor User
-    participant CLI
+    participant GUI
     participant Hephaestus as 🔥 Hephaestus
     participant Specialists as 📐⚙️🧪✨📜 Specialists
 
-    User->>CLI: "implement CSV export"
-    CLI->>Hephaestus: A2A message/stream (SSE)
+    User->>GUI: "implement CSV export"
+    GUI->>Hephaestus: A2A message/stream (SSE)
     Hephaestus->>Hephaestus: LLM selects pipeline
     loop Each specialist sequentially
-        Hephaestus->>Specialists: A2A message/send (blocking)
+        Hephaestus->>Specialists: A2A message/stream (AsyncGenerator)
+        Note over Specialists,Hephaestus: Streams "inner thoughts"<br/>line-by-line in real time
         Specialists-->>Hephaestus: Result + context
     end
     Note over Hephaestus,Specialists: If Kallos finds issues,<br/>loops with Techne (max 3×)
-    Hephaestus-->>CLI: SSE status updates + artifacts
-    CLI-->>User: Real-time terminal output
+    Hephaestus-->>GUI: SSE status updates + artifacts
+    GUI-->>User: Real-time UI updates
 ```
 
 Hephaestus selects the pipeline automatically based on your request:
@@ -90,8 +91,10 @@ Hephaestus selects the pipeline automatically based on your request:
 | *"clean up X"* | ✨ → 📜 |
 | *"commit prep"* | 📜 |
 | *"plan feature X"* | 📐 |
+| *"@techne why use a factory?"* | ⚙️ (Direct 1-on-1 Handoff) |
 
-If the request is ambiguous, Hephaestus asks for clarification before proceeding — no wasted work.
+### Human-on-the-Loop (HOTL) UX
+If a request is ambiguous, the system avoids generating thousands of wasted tokens. Instead, Hephaestus initiates an `INPUT_REQUIRED` loop and proactively presents **A/B multiple-choice options** to the user (e.g., "Option A is faster, Option B is more scalable. Which do you prefer?"). Furthermore, as agents draft specifications or code, they stream their "inner thoughts" directly to the UI, allowing you to interrupt and guide them early.
 
 ---
 
