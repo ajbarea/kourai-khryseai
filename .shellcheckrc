@@ -1,0 +1,7 @@
+# ShellCheck configuration for Kourai_Khryseai
+shell=bash
+source-path=SCRIPTDIR
+add-default-enabled-for-supported-shells=true
+
+# SC2034: Variable appears unused (common in sourced libraries)
+# disable=SC2034
