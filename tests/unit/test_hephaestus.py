@@ -13,6 +13,7 @@ from agents.hephaestus.routing_agent import (
     PipelineStep,
     determine_pipeline,
 )
+from kourai_common.player import PlayerProfile
 
 
 class TestRoutingPrompt:
@@ -83,6 +84,25 @@ class TestDeterminePipeline:
             mock.return_value = "mneme"
             await determine_pipeline("test")
             assert mock.call_args[0][0] == "hephaestus"
+
+    @pytest.mark.asyncio
+    async def test_injects_player_context_when_profile_exists(self):
+        """Player context is appended to system prompt when a profile exists."""
+        profile = PlayerProfile(display_name="AJ", title="The Architect", role="divine")
+        with (
+            patch("agents.hephaestus.routing_agent.chat", new_callable=AsyncMock) as mock,
+            patch("agents.hephaestus.routing_agent.PlayerProfile") as mock_cls,
+            patch("agents.hephaestus.routing_agent.build_player_context") as mock_ctx,
+        ):
+            mock.return_value = "mneme"
+            mock_cls.load.return_value = profile
+            mock_ctx.return_value = "=== PLAYER IDENTITY ===\nName: AJ"
+
+            await determine_pipeline("commit prep")
+
+            # System prompt should contain the player context
+            system_msg = mock.call_args[0][1][0]["content"]
+            assert "PLAYER IDENTITY" in system_msg
 
 
 class TestPipelineDataclasses:

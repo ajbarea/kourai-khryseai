@@ -11,11 +11,14 @@ from kourai_common.player import (
     add_player_memory,
     advance_romance,
     build_player_context,
+    decay_memories,
     delete_player_memory,
+    export_player_data,
     get_affinity,
     get_affinity_tier,
     get_all_affinities,
     get_player_memories,
+    import_player_data,
     retrieve_relevant_memories,
     transfer_gossip_memories,
     update_affinity,
@@ -406,3 +409,117 @@ class TestBuildPlayerContext:
         advance_romance(profile.player_id, "metis")
         ctx = build_player_context(profile, "metis")
         assert "Romance" not in ctx
+
+
+# ── Memory Decay Tests ──────────────────────────────────────────────────
+
+
+class TestMemoryDecay:
+    def test_no_decay_for_achievements(self, profile):
+
+        add_player_memory(profile.player_id, "First pipeline", "achievement", importance=0.01)
+        pruned = decay_memories(profile.player_id, half_life_days=0.001, min_importance=0.5)
+        assert pruned == 0  # Achievements are protected
+
+    def test_prunes_low_importance_memories(self, profile):
+
+        # Add a very old, low-importance memory
+        mid = add_player_memory(profile.player_id, "Old note", "moment", importance=0.06)
+        # Manually backdate it
+        from datetime import UTC, datetime, timedelta
+
+        import kourai_common.player as player_mod
+
+        old_date = (datetime.now(UTC) - timedelta(days=200)).isoformat()
+        conn = player_mod._get_player_db()
+        conn.execute(
+            "UPDATE player_memories SET last_accessed = ? WHERE memory_id = ?",
+            (old_date, mid),
+        )
+        conn.commit()
+
+        pruned = decay_memories(profile.player_id, half_life_days=7.0, min_importance=0.04)
+        assert pruned == 1
+
+    def test_preferences_protected(self, profile):
+
+        add_player_memory(profile.player_id, "Likes dark mode", "preference", importance=0.01)
+        pruned = decay_memories(profile.player_id, half_life_days=0.001, min_importance=0.5)
+        assert pruned == 0
+
+
+# ── Export / Import Tests ───────────────────────────────────────────────
+
+
+class TestExportImport:
+    def test_export_roundtrip(self, profile, tmp_path, monkeypatch):
+
+        # Save profile to disk so export can find it
+        monkeypatch.setattr("kourai_common.player.PLAYER_FILE", tmp_path / "player.json")
+        monkeypatch.setattr("kourai_common.player.PLAYER_DIR", tmp_path)
+        profile.save()
+
+        add_player_memory(profile.player_id, "Test memory", "fact", importance=0.7)
+        update_affinity(profile.player_id, "metis", 0.5)
+
+        data = export_player_data(profile.player_id)
+        assert data["version"] == 1
+        assert data["profile"]["display_name"] == "AJ"
+        assert len(data["memories"]) >= 1
+        assert "metis" in data["affinities"]
+
+    def test_import_creates_profile(self, tmp_path, monkeypatch):
+
+        monkeypatch.setattr("kourai_common.player.PLAYER_FILE", tmp_path / "player.json")
+        monkeypatch.setattr("kourai_common.player.PLAYER_DIR", tmp_path)
+
+        data = {
+            "version": 1,
+            "profile": {
+                "player_id": "test123",
+                "display_name": "TestUser",
+                "tts_name": "test user",
+                "title": "The Tester",
+                "role": "mortal",
+                "pronouns": "they/them",
+            },
+            "memories": [{"content": "Imported memory", "category": "fact", "importance": 0.8}],
+            "affinities": {
+                "kallos": {"affinity_score": 0.3, "interaction_count": 5, "romance_stage": "none"}
+            },
+        }
+
+        imported = import_player_data(data)
+        assert imported.display_name == "TestUser"
+        assert imported.player_id == "test123"
+
+        # Verify memories imported
+        mems = get_player_memories("test123", include_shared=True)
+        assert any(m["content"] == "Imported memory" for m in mems)
+
+    def test_import_rejects_bad_version(self):
+
+        with pytest.raises(ValueError, match="Unsupported export version"):
+            import_player_data({"version": 99})
+
+    def test_import_merge_mode(self, profile, tmp_path, monkeypatch):
+
+        monkeypatch.setattr("kourai_common.player.PLAYER_FILE", tmp_path / "player.json")
+        monkeypatch.setattr("kourai_common.player.PLAYER_DIR", tmp_path)
+        profile.save()
+
+        # Add existing memory
+        add_player_memory(profile.player_id, "Existing", "fact")
+
+        data = {
+            "version": 1,
+            "profile": profile.to_dict(),
+            "memories": [{"content": "New imported", "category": "fact", "importance": 0.6}],
+            "affinities": {},
+        }
+
+        import_player_data(data, merge=True)
+        mems = get_player_memories(profile.player_id, include_shared=True)
+        contents = [m["content"] for m in mems]
+        assert "Existing" in contents
+        assert "New imported" in contents

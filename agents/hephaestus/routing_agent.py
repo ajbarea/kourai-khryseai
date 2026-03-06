@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from agents.hephaestus.remote_connections import AgentInputRequired, RemoteAgentConnection
 from kourai_common.config import MAX_ITERATIONS, get_agent_url
 from kourai_common.llm import chat
+from kourai_common.player import PlayerProfile, build_player_context
 from kourai_common.tracing import create_span
 from scripts.git_changes import collect_git_changes
 
@@ -83,8 +84,16 @@ async def determine_pipeline(user_request: str, context_id: str | None = None) -
         with "ASK_USER:" if clarification is needed.
     """
     with create_span("hephaestus.route", {"request_length": str(len(user_request))}):
+        # Inject player identity into routing prompt for personalized responses
+        profile = PlayerProfile.load()
+        system_prompt = ROUTING_PROMPT
+        if profile and profile.display_name:
+            player_ctx = build_player_context(profile, "hephaestus", top_k_memories=4)
+            if player_ctx:
+                system_prompt += f"\n\n{player_ctx}"
+
         messages = [
-            {"role": "system", "content": ROUTING_PROMPT},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_request},
         ]
         response = await chat(
@@ -146,6 +155,14 @@ async def execute_pipeline(
 
     connections: dict[str, RemoteAgentConnection] = {}
     accumulated_context = f"Original request: {user_request}"
+
+    # Append player context so every specialist agent receives it
+    profile = PlayerProfile.load()
+    if profile and profile.display_name:
+        player_ctx = build_player_context(profile, "hephaestus", top_k_memories=6)
+        if player_ctx:
+            accumulated_context += f"\n\n{player_ctx}"
+
     has_techne = "techne" in agents
     has_kallos = "kallos" in agents
 
