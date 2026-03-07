@@ -7,6 +7,7 @@ then executes the pipeline by calling specialists sequentially.
 from __future__ import annotations
 
 import datetime
+import inspect
 import logging
 import uuid
 from collections.abc import AsyncIterable
@@ -122,6 +123,30 @@ def _kallos_found_issues(output: str) -> bool:
     return "fail" in lower and "all clean" not in lower
 
 
+async def _iter_agent_events(
+    conn: RemoteAgentConnection,
+    text: str,
+    context_id: str,
+    attachments: list[tuple[str, str]] | None = None,
+) -> AsyncIterable[tuple[str, str]]:
+    """Normalize streamed and direct-result agent sends into one event stream."""
+    if attachments:
+        send_result = conn.send(text, context_id, attachments=attachments)
+    else:
+        send_result = conn.send(text, context_id)
+
+    if isinstance(send_result, AsyncIterable):
+        async for event_type, content in send_result:
+            yield (event_type, content)
+        return
+
+    if inspect.isawaitable(send_result):
+        send_result = await send_result
+
+    if send_result is not None:
+        yield ("result", str(send_result))
+
+
 async def execute_pipeline(
     agents: list[str],
     user_request: str,
@@ -207,6 +232,7 @@ async def execute_pipeline(
                 try:
                     # Auto-collect git diffs for Mneme so she sees real changes
                     send_context = accumulated_context
+                    attachments = initial_attachments if i == 0 else None
                     if agent_name == "mneme":
                         try:
                             git_context = collect_git_changes()
@@ -220,7 +246,12 @@ async def execute_pipeline(
                             log.warning("Failed to collect git changes for Mneme: %s", e)
 
                     result = ""
-                    async for event_type, content in conn.send(send_context, context_id):
+                    async for event_type, content in _iter_agent_events(
+                        conn,
+                        send_context,
+                        context_id,
+                        attachments=attachments,
+                    ):
                         if event_type == "status":
                             yield (agent_name, content, "")
                         elif event_type == "result":
@@ -273,8 +304,10 @@ async def execute_pipeline(
                             techne_conn = connections["techne"]
                             yield ("techne", f"[fix {iteration}] Applying style fixes...", "")
                             fix_result = ""
-                            async for event_type, content in techne_conn.send(
-                                fix_prompt, context_id
+                            async for event_type, content in _iter_agent_events(
+                                techne_conn,
+                                fix_prompt,
+                                context_id,
                             ):
                                 if event_type == "status":
                                     yield ("techne", content, "")
@@ -290,8 +323,10 @@ async def execute_pipeline(
                             kallos_conn = connections["kallos"]
                             yield ("kallos", f"[fix {iteration}] Re-checking style...", "")
                             result = ""
-                            async for event_type, content in kallos_conn.send(
-                                accumulated_context, context_id
+                            async for event_type, content in _iter_agent_events(
+                                kallos_conn,
+                                accumulated_context,
+                                context_id,
                             ):
                                 if event_type == "status":
                                     yield ("kallos", content, "")
