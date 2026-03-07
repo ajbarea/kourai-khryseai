@@ -26,6 +26,7 @@ nav = [
   { "CLI Reference" = "cli.md" },
   { "GUI Reference" = "gui.md" },
   { "Configuration" = "configuration.md" },
+  { "Pricing" = "pricing.md" },
   { "Style Guides" = [
       { "Python" = "python-style-guide.md" },
       { "Shell" = "shell-style-guide.md" },

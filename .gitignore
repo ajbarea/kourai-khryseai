@@ -26,6 +26,7 @@ venv/
 htmlcov/
 .mypy_cache/
 .hypothesis/
+.playwright-mcp/
 
 # OS
 .DS_Store
