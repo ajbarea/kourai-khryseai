@@ -42,6 +42,11 @@ restart:                   ## Restart all agents
 status:                    ## Show Docker service status/health
 	$(COMPOSE_FULL) ps
 
+dev:					   ## Restart services and launch GUI client
+	@$(MAKE) down
+	@$(MAKE) up
+	@$(MAKE) gui
+
 # ──────────────── Testing & Quality ────────────────
 
 lint:                      ## Run quality checks (ruff, mypy)
