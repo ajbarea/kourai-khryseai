@@ -15,44 +15,29 @@ Usage:
 
 from __future__ import annotations
 
-import asyncio
 import contextlib
-import queue
+import logging
 import random
-
-# Short pipeline-chatter patterns that are system messages, not dialogue
-import re as _re
 import signal
 import sys
 import threading
-import time
+from pathlib import Path
 from typing import Any
 
 import pygame
 from PIL import Image as PILImage
 
-from .alignment_gauges import AlignmentGaugePanel
 from .alignment_theme import compute_alignment_palette
 from .audio_manager import AudioManager
-from .client import GuiClient
 from .constants import (
-    DIALOGUE_H,
-    DIALOGUE_W,
     DIALOGUE_X,
-    FONT_INPUT,
     INPUT_H,
     PORTRAIT_W,
-    H,
-    W,
     theme,
 )
-from .dialogue import DialogueEntry, DialogueHistory, draw_banner
-from .dialogue_pacing import PacingMode
+from .dialogue import DialogueEntry, draw_banner
+from .display_manager import DisplayManager
 from .emote_sfx import play_emote_sfx
-from .flash_effect import FlashEffect
-from .gossip_panel import GossipPanel
-from .gui_components_integration import GUIComponentsIntegration
-from .input_bar import InputBar
 from .loading_screen import run_loading_screen
 from .maidens import (
     AGENTS,
@@ -62,73 +47,37 @@ from .maidens import (
     detect_agent,
     get_avatar_path,
 )
-from .memory_viewer import MemoryViewerPanel
-from .onboarding_ui import OnboardingOverlay
-from .particles import ParticleSystem
-from .portrait import PortraitPanel
+from .message_classifier import is_scratchpad_content, is_system_status
 from .profile_select import run_profile_select
-from .quick_actions import QuickActionBar
-from .settings_ui import SettingsOverlay
-from .tts_gui_integration import TTSGUIManager, extract_speakable
-from .typewriter import TypewriterManager
+from .settings import SettingsManager
+from .subsystem_loader import Subsystems, load_subsystems
+from .tts_gui_integration import extract_speakable
 
-_SYSTEM_STATUS_RE = _re.compile(
-    r"^(?:Analyzing|Processing|Running|Building|Compiling|Testing|Checking|"
-    r"Routing|Delegating|Preparing|Loading|Connecting|Waiting|Scanning|"
-    r"Fetching|Generating|Deploying|Resolving|Verifying|Coding|Drafting|Writing)\b",
-    _re.IGNORECASE,
-)
+logger = logging.getLogger(__name__)
 
 
-def _is_system_status(text: str) -> bool:
-    """Return True if text looks like transient pipeline chatter."""
-    stripped = text.strip()
+def _configure_gui_logging() -> None:
+    """Console + file logging for the GUI host.
 
-    # Strip leading emojis to match status texts like "⚙️ Coding: ..."
-    import emoji
+    Console stays quiet (WARNING) except for display diagnostics.
+    Everything goes to logs/gui.log via the shared logging setup.
+    """
+    from kourai_common.log import setup_logging
 
-    stripped = emoji.replace_emoji(stripped, replace="").strip()
-
-    if len(stripped) > 80:
-        return False
-    if "?" in stripped:
-        return False
-    if "INPUT_REQUIRED:" in stripped:
-        return False
-
-    # Heuristics: if it has newlines or markdown lists/headers, it's likely a CoT/TODO plan
-    if "\n" in stripped and (
-        "- " in stripped or "* " in stripped or "1. " in stripped or "TODO" in stripped.upper()
-    ):
-        return False
-
-    return bool(_SYSTEM_STATUS_RE.match(stripped))
-
-
-def _is_scratchpad_content(text: str) -> bool:
-    """Return True if text looks like a CoT plan or TODO list that belongs in the scratchpad."""
-    stripped = text.strip()
-    # It shouldn't be a system status
-    if _is_system_status(text):
-        return False
-    # If it contains markdown lists or explicit TODOs and is fairly long or multiline
-    return bool(
-        "\n" in stripped
-        and (
-            "- " in stripped
-            or "* " in stripped
-            or "1. " in stripped
-            or "TODO" in stripped.upper()
-            or "[ ]" in stripped
-            or "[x]" in stripped
-        )
-    )
+    setup_logging("gui", level="DEBUG")
+    # Console stays quiet; file gets everything
+    logging.getLogger().setLevel(logging.WARNING)
+    logging.getLogger(__name__).setLevel(logging.DEBUG)
+    logging.getLogger("hosts.gui.display_modes").setLevel(logging.DEBUG)
+    logging.getLogger("hosts.gui.settings_ui").setLevel(logging.DEBUG)
 
 
 # ---------------------------------------------------------------------------
 # Main GUI entry point
 # ---------------------------------------------------------------------------
 def main(agent_url: str | None = None) -> None:
+    _configure_gui_logging()
+
     # Setup shutdown flag and signal handlers for graceful Ctrl+C shutdown
     _shutdown_flag = {"running": True}
     _queues: dict[str, Any] = {"send_q": None}
@@ -158,125 +107,32 @@ def main(agent_url: str | None = None) -> None:
         except Exception:
             pass
 
-    screen = pygame.display.set_mode((W, H), pygame.RESIZABLE)
+    settings_path = Path.home() / ".kourai_khryseai" / "settings.json"
+    startup_settings = SettingsManager(settings_path)
+
+    display = DisplayManager(startup_settings)
+    screen = display.screen
     clock = pygame.time.Clock()
 
     # --- Ambient forge audio starts immediately (before any loading) ---
     audio_manager = AudioManager()
     audio_manager.play_ambient("assets/audio/ambient/forge_loop.ogg")
 
-    # --- Loaded subsystems (populated by the generator, used after) ---
-    _loaded: dict = {}
+    # --- Load subsystems during the loading screen ---
+    _subsystems_box: list[Subsystems] = []
 
-    def _load_subsystems():
-        """Generator that initializes all GUI subsystems one step at a time.
+    def _loading_wrapper():
+        """Wrap the typed loader so run_loading_screen can consume it."""
+        result = yield from load_subsystems(
+            screen.get_size(),
+            settings_path,
+            audio_manager,
+            agent_url,
+            _queues,
+        )
+        _subsystems_box.append(result)
 
-        Yields (progress, description) tuples.  Each ``next()`` call does
-        one unit of work on the main thread (safe for Surface creation).
-        """
-        total_steps = 14
-        step = 0
-
-        # 1. GUI integration (settings, font scaler, etc.)
-        step += 1
-        gui_integration = GUIComponentsIntegration(None)
-        _loaded["gui_integration"] = gui_integration
-        yield step / total_steps, "Loading settings…"
-
-        # 2. Wire audio volumes from saved settings
-        step += 1
-        audio_manager.set_music_volume(gui_integration.settings.get("music_volume", 0.5))
-        audio_manager.set_ambient_volume(gui_integration.settings.get("ambient_volume", 0.5))
-        audio_manager.set_voice_volume(gui_integration.settings.get("voice_volume", 1.0))
-        audio_manager.set_sfx_volume(gui_integration.settings.get("sfx_volume", 0.8))
-        yield step / total_steps, "Configuring audio…"
-
-        # 3. Settings overlay
-        step += 1
-        _loaded["settings_overlay"] = SettingsOverlay(W, H, gui_integration, audio_manager)
-        yield step / total_steps, "Building settings UI…"
-
-        # 4. Alignment gauge panel
-        step += 1
-        _loaded["alignment_panel"] = AlignmentGaugePanel(W, H)
-        yield step / total_steps, "Forging alignment gauges…"
-
-        # 5. Gossip side panel
-        step += 1
-        _loaded["gossip_panel"] = GossipPanel(W, H)
-        yield step / total_steps, "Opening gossip channels…"
-
-        # 6. Onboarding overlay
-        step += 1
-        _loaded["onboarding"] = OnboardingOverlay(W, H)
-        yield step / total_steps, "Preparing introductions…"
-
-        # 7. Memory viewer panel
-        step += 1
-        _loaded["memory_viewer"] = MemoryViewerPanel(W, H)
-        yield step / total_steps, "Cataloging memories…"
-
-        # 8. Particle system
-        step += 1
-        _loaded["particles"] = ParticleSystem()
-        yield step / total_steps, "Igniting forge embers…"
-
-        # 9. Portrait panel + avatar pre-cache
-        step += 1
-        portrait = PortraitPanel()
-        heph_quotes = AGENTS["hephaestus"].get("user_quotes", [])
-        portrait.current_quote = random.choice(heph_quotes) if heph_quotes else ""
-        _loaded["portrait"] = portrait
-        yield step / total_steps, "Summoning the maidens…"
-
-        # 10. Dialogue history + input bar + effects
-        step += 1
-        _loaded["history"] = DialogueHistory()
-        _loaded["input_bar"] = InputBar()
-        reduce_motion = gui_integration.settings.get("reduce_motion", False)
-        _loaded["typewriter"] = TypewriterManager(motion_sensitivity_enabled=reduce_motion)
-        _loaded["flash"] = FlashEffect()
-        yield step / total_steps, "Preparing the forge…"
-
-        # 11. Quick actions
-        step += 1
-        _loaded["quick_actions"] = QuickActionBar()
-        yield step / total_steps, "Forging quick actions…"
-
-        # 12. A2A client thread
-        step += 1
-        send_q: queue.Queue[tuple[str, str] | None] = queue.Queue()
-        recv_q: queue.Queue[dict] = queue.Queue()
-        _queues["send_q"] = send_q
-        client = GuiClient(send_q, recv_q, agent_url)
-
-        def _run_client() -> None:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                loop.run_until_complete(client.run())
-            finally:
-                loop.close()
-
-        _thread = threading.Thread(target=_run_client, daemon=True)
-        _thread.start()
-        _loaded["send_q"] = send_q
-        _loaded["recv_q"] = recv_q
-        yield step / total_steps, "Connecting to Hephaestus…"
-
-        # 13. Audio ready (music deferred until player presses start)
-        step += 1
-        yield step / total_steps, "Tuning the forge…"
-
-        # 14. TTS manager
-        step += 1
-        tts_manager = TTSGUIManager(recv_q, enable_tts=True, pacing_mode=PacingMode.NORMAL)
-        tts_manager.set_current_agent("hephaestus")
-        _loaded["tts_manager"] = tts_manager
-        yield step / total_steps, "Ready"
-
-    # --- Run the title / loading screen ---
-    if not run_loading_screen(screen, clock, _load_subsystems()):
+    if not run_loading_screen(screen, clock, _loading_wrapper()):
         # User closed during loading
         with contextlib.suppress(Exception):
             audio_manager.cleanup()
@@ -285,7 +141,7 @@ def main(agent_url: str | None = None) -> None:
         sys.exit(0)
 
     # --- Music fades in after loading ---
-    audio_manager.play_music("assets/audio/music/sithuaye-2016.ogg", fade_ms=60000)
+    audio_manager.play_music("assets/audio/music/sithuaye-2016.ogg", fade_ms=50000)
 
     # --- Profile selection screen ---
     _selected_profile = None
@@ -319,62 +175,44 @@ def main(agent_url: str | None = None) -> None:
     except Exception:
         pass  # Player module not available — skip
 
-    # --- Unpack loaded subsystems ---
-    gui_integration: GUIComponentsIntegration = _loaded["gui_integration"]
-    settings_overlay: SettingsOverlay = _loaded["settings_overlay"]
-    alignment_panel: AlignmentGaugePanel = _loaded["alignment_panel"]
-    gossip_panel: GossipPanel = _loaded["gossip_panel"]
-    onboarding: OnboardingOverlay = _loaded["onboarding"]
-    memory_viewer: MemoryViewerPanel = _loaded["memory_viewer"]
-    particles: ParticleSystem = _loaded["particles"]
-    portrait: PortraitPanel = _loaded["portrait"]
-    history: DialogueHistory = _loaded["history"]
-    input_bar: InputBar = _loaded["input_bar"]
-    typewriter: TypewriterManager = _loaded["typewriter"]
-    flash: FlashEffect = _loaded["flash"]
-    quick_actions: QuickActionBar = _loaded["quick_actions"]
-    send_q: queue.Queue[tuple[str, str] | None] = _loaded["send_q"]
-    recv_q: queue.Queue[dict] = _loaded["recv_q"]
-    tts_manager: TTSGUIManager = _loaded["tts_manager"]
+    # --- Unpack loaded subsystems (typed dataclass) ---
+    sub = _subsystems_box[0]
+    gui_integration = sub.gui_integration
+    settings_overlay = sub.settings_overlay
+    alignment_panel = sub.alignment_panel
+    gossip_panel = sub.gossip_panel
+    onboarding = sub.onboarding
+    memory_viewer = sub.memory_viewer
+    particles = sub.particles
+    portrait = sub.portrait
+    history = sub.history
+    debug_log = sub.debug_log
+    input_bar = sub.input_bar
+    typewriter = sub.typewriter
+    flash = sub.flash
+    quick_actions = sub.quick_actions
+    send_q = sub.send_q
+    recv_q = sub.recv_q
+    tts_manager = sub.tts_manager
 
     # --- Display mode state ---
-    current_display_mode = gui_integration.settings.get("display_mode", "Windowed")
+    display.mode = gui_integration.settings.get("display_mode", display.mode)
+    dialogue_rect = pygame.Rect(DIALOGUE_X, 34, 0, 0)
 
-    dialogue_rect = pygame.Rect(DIALOGUE_X, 34, DIALOGUE_W, DIALOGUE_H - 34)
+    def sync_layout(screen_w: int, screen_h: int) -> None:
+        dialogue_rect.width = max(screen_w - DIALOGUE_X, 0)
+        dialogue_rect.height = max(screen_h - INPUT_H - dialogue_rect.y, 0)
+        settings_overlay.update_layout(screen_w, screen_h)
+        alignment_panel.update_layout(screen_w, screen_h)
+        gossip_panel.update_layout(screen_w, screen_h)
+        onboarding.update_layout(screen_w, screen_h)
+        memory_viewer.update_layout(screen_w, screen_h)
 
     def apply_display_mode(mode: str) -> None:
-        nonlocal current_display_mode, dialogue_rect, settings_overlay, screen
-        current_display_mode = mode
-
-        flags = pygame.RESIZABLE
-        if mode == "Fullscreen":
-            flags |= pygame.FULLSCREEN
-
-        # Apply mode
-        screen = pygame.display.set_mode((W, H), flags)
-
-        # Handle maximizing for "Borderless" (Borderless Fullscreen with frame)
-        import warnings
-
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            if hasattr(pygame, "Window"):
-                window = pygame.Window.from_display_module()
-                if mode == "Borderless":
-                    window.maximize()
-                elif mode == "Windowed":
-                    window.restore()
-
-        # Small delay to let OS update window
-        time.sleep(0.1)
-
-        # Get the actual screen size after toggle
-        screen_w, screen_h = screen.get_size()
-        dialogue_rect.width = screen_w - DIALOGUE_X
-        dialogue_rect.height = screen_h - INPUT_H
-
-        # Update settings overlay layout
-        settings_overlay.update_layout(screen_w, screen_h)
+        nonlocal screen
+        display.apply_mode(mode, gui_integration.settings)
+        screen = display.screen
+        sync_layout(*screen.get_size())
 
     settings_overlay.set_display_mode_callback(apply_display_mode)
 
@@ -383,11 +221,17 @@ def main(agent_url: str | None = None) -> None:
         send_q.put(None)  # shutdown client
 
     settings_overlay.set_quit_callback(on_quit)
+    sync_layout(*screen.get_size())
 
     # --- State ---
     connected = False
     current_agent = "hephaestus"
     last_agent = "hephaestus"
+    resize_events = {pygame.VIDEORESIZE}
+    for event_name in ("WINDOWRESIZED", "WINDOWSIZECHANGED"):
+        resize_event = getattr(pygame, event_name, None)
+        if resize_event is not None:
+            resize_events.add(resize_event)
     result_agent = "hephaestus"  # tracks which specialist produced the result
     _typewriter_full_text = ""  # full text for the active typewriter entry
     _alignment_refresh_timer = 0.0  # Refresh alignment from profile every 10s
@@ -414,6 +258,9 @@ def main(agent_url: str | None = None) -> None:
         while not recv_q.empty():
             q_event = recv_q.get_nowait()
             etype = q_event.get("type")
+
+            # Tier 3: every A2A event goes to the debug log
+            debug_log.record(q_event)
 
             if etype == "connected":
                 connected = True
@@ -493,8 +340,8 @@ def main(agent_url: str | None = None) -> None:
                         result_agent = agent
 
                     # Classify: pipeline chatter → system, dialogue → normal
-                    is_sys = _is_system_status(text)
-                    is_scratchpad = _is_scratchpad_content(text)
+                    is_sys = is_system_status(text)
+                    is_scratchpad = is_scratchpad_content(text)
 
                     if is_sys:
                         gui_integration.status_bubbles.add_status_message(f"[{agent}] {text}")
@@ -516,8 +363,8 @@ def main(agent_url: str | None = None) -> None:
                                 daemon=True,
                             ).start()
                 else:
-                    is_sys = _is_system_status(text)
-                    is_scratchpad = _is_scratchpad_content(text)
+                    is_sys = is_system_status(text)
+                    is_scratchpad = is_scratchpad_content(text)
 
                     if is_sys:
                         gui_integration.status_bubbles.add_status_message(
@@ -653,7 +500,9 @@ def main(agent_url: str | None = None) -> None:
                         history.add(DialogueEntry("user", submitted, is_user=True))
                         history.scroll_to_bottom()
                         # Send to pipeline
-                        send_q.put((input_bar.waiting_for_agent or current_agent, submitted))
+                        target = input_bar.waiting_for_agent or current_agent
+                        send_q.put((target, submitted))
+                        debug_log.record_user(target, submitted)
                         input_bar.processing = True
 
                         # Reset to Hephaestus for the incoming pipeline
@@ -673,6 +522,19 @@ def main(agent_url: str | None = None) -> None:
                 quick_actions.update(event.pos)
 
             elif event.type == pygame.MOUSEWHEEL:
+                # Route scroll to debug log if it's visible and mouse is near it
+                if gui_integration.settings.get("show_debug_logs", False):
+                    mx, my = pygame.mouse.get_pos()
+                    panel_w = min(520, dialogue_rect.width - 20)
+                    debug_area = pygame.Rect(
+                        dialogue_rect.right - panel_w - 8,
+                        dialogue_rect.top + 8,
+                        panel_w,
+                        int(dialogue_rect.height * 0.45),
+                    )
+                    if debug_area.collidepoint(mx, my):
+                        debug_log.scroll(-event.y * 40)
+                        continue
                 history.scroll(-event.y * 40)
 
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -684,6 +546,7 @@ def main(agent_url: str | None = None) -> None:
 
                         payload = f"{action.display_text}\n\n{action.hidden_prompt}"
                         send_q.put((action.agent, payload))
+                        debug_log.record_user(action.agent, action.display_text)
                         input_bar.processing = True
 
                         portrait.switch_to(action.agent)
@@ -717,14 +580,9 @@ def main(agent_url: str | None = None) -> None:
                     except Exception as e:
                         print(f"Clipboard error: {e}")
 
-            elif event.type == pygame.VIDEORESIZE:
-                # Update layout for new window size
-                screen_w, screen_h = event.size
-                dialogue_rect.width = screen_w - DIALOGUE_X
-                dialogue_rect.height = screen_h - INPUT_H
-
-                # Update settings overlay layout
-                settings_overlay.update_layout(screen_w, screen_h)
+            elif event.type in resize_events:
+                screen_w, screen_h = display.handle_resize(event)
+                sync_layout(screen_w, screen_h)
 
         # --- Updates ---
         settings_overlay.update(dt)
@@ -808,35 +666,9 @@ def main(agent_url: str | None = None) -> None:
         # Bottom: input
         input_bar.draw(screen)
 
-        # Draw debug logs if enabled
+        # Tier 3: debug log panel (toggle in Settings > Gameplay)
         if gui_integration.settings.get("show_debug_logs", False):
-            logs = gui_integration.status_bubbles.get_status_bubbles().get_content()
-            if logs:
-                log_w = min(460, dialogue_rect.width - 20)
-                max_log_h = int(dialogue_rect.height * 0.5)
-                log_h = min(max_log_h, len(logs) * 16 + 20)
-
-                log_rect = pygame.Rect(
-                    dialogue_rect.right - log_w - 10, dialogue_rect.top + 10, log_w, log_h
-                )
-
-                log_panel = pygame.Surface((log_w, log_h), pygame.SRCALPHA)
-                pygame.draw.rect(
-                    log_panel, (15, 12, 10, 235), log_panel.get_rect(), border_radius=6
-                )
-                pygame.draw.rect(
-                    log_panel, (*theme.gold_dim, 150), log_panel.get_rect(), 1, border_radius=6
-                )
-
-                y = log_h - 10 - 16
-                for log in reversed(logs):
-                    disp_log = log if len(log) <= 65 else log[:62] + "..."
-                    FONT_INPUT.render_to(log_panel, (10, y), disp_log, theme.dim_white)
-                    y -= 16
-                    if y < 10:
-                        break
-
-                screen.blit(log_panel, log_rect.topleft)
+            debug_log.draw(screen, dialogue_rect)
 
         # Draw Scratchpad
         gui_integration.get_scratchpad().draw(screen, dialogue_rect)
@@ -851,6 +683,9 @@ def main(agent_url: str | None = None) -> None:
         pygame.display.flip()
 
     # Cleanup (graceful shutdown on Ctrl+C)
+    with contextlib.suppress(Exception):
+        display.save_state(gui_integration.settings)
+        gui_integration.save_all_settings()
     with contextlib.suppress(Exception):
         audio_manager.cleanup()
     with contextlib.suppress(Exception):
