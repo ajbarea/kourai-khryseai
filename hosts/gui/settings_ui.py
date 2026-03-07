@@ -9,13 +9,17 @@ Implements March 2026 UI/UX best practices:
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 import pygame
 import pygame.freetype
 
+from hosts.gui.display_modes import DISPLAY_MODE_OPTIONS, normalize_display_mode
 from hosts.gui.gui_components_integration import GUIComponentsIntegration
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from hosts.gui.audio_manager import AudioManager as _AM
@@ -418,12 +422,23 @@ class SettingsOverlay:
         make_toggle("display", "reduce_motion", "Reduce Motion", start_y + spacing)
 
         # Display Mode Cycle Button
-        display_mode_state = self.gui.settings.get("display_mode", "Windowed")
+        display_mode_state = normalize_display_mode(
+            self.gui.settings.get("display_mode", "Windowed")
+        )
 
         def on_display_mode(new_mode: str):
-            self.gui.settings.set("display_mode", new_mode)
+            previous_mode = normalize_display_mode(
+                self.gui.settings.get("display_mode", "Windowed")
+            )
+            normalized_mode = normalize_display_mode(new_mode)
+            logger.debug(
+                "Player selected display mode in settings overlay: %s -> %s",
+                previous_mode,
+                normalized_mode,
+            )
+            self.gui.settings.set("display_mode", normalized_mode)
             if hasattr(self, "on_display_mode_toggle"):
-                self.on_display_mode_toggle(new_mode)
+                self.on_display_mode_toggle(normalized_mode)
             self.gui.save_all_settings()
 
         self.display_mode_btn = CycleButton(
@@ -431,7 +446,7 @@ class SettingsOverlay:
             start_y + spacing * 2,
             110,
             24,
-            ["Windowed", "Borderless", "Fullscreen"],
+            DISPLAY_MODE_OPTIONS,
             display_mode_state,
             on_display_mode,
         )
@@ -517,9 +532,17 @@ class SettingsOverlay:
             self.gui.high_contrast.disable_high_contrast()
 
         if hasattr(self, "on_display_mode_toggle"):
-            self.on_display_mode_toggle(self.gui.settings.get("display_mode", "Windowed"))
+            logger.debug(
+                "Settings reset restoring display mode to %s",
+                normalize_display_mode(self.gui.settings.get("display_mode", "Windowed")),
+            )
+            self.on_display_mode_toggle(
+                normalize_display_mode(self.gui.settings.get("display_mode", "Windowed"))
+            )
 
-        self.display_mode_btn.value = self.gui.settings.get("display_mode", "Windowed")
+        self.display_mode_btn.value = normalize_display_mode(
+            self.gui.settings.get("display_mode", "Windowed")
+        )
 
         # Re-sync toggles
         for category in self.toggles.values():
