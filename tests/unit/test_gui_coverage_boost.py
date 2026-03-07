@@ -1189,7 +1189,7 @@ class TestGuiClientHelpers:
 
 class TestMainHelpers:
     def test_is_system_status_true(self):
-        from hosts.gui.__main__ import _is_system_status
+        from hosts.gui.message_classifier import is_system_status as _is_system_status
 
         assert _is_system_status("Analyzing code structure") is True
         assert _is_system_status("Processing request") is True
@@ -1197,77 +1197,77 @@ class TestMainHelpers:
         assert _is_system_status("Building artifacts") is True
 
     def test_is_system_status_false_question(self):
-        from hosts.gui.__main__ import _is_system_status
+        from hosts.gui.message_classifier import is_system_status as _is_system_status
 
         assert _is_system_status("What should I do?") is False
 
     def test_is_system_status_false_long(self):
-        from hosts.gui.__main__ import _is_system_status
+        from hosts.gui.message_classifier import is_system_status as _is_system_status
 
         assert _is_system_status("A" * 100) is False
 
     def test_is_system_status_false_input_required(self):
-        from hosts.gui.__main__ import _is_system_status
+        from hosts.gui.message_classifier import is_system_status as _is_system_status
 
         assert _is_system_status("INPUT_REQUIRED: need info") is False
 
     def test_is_system_status_false_multiline_list(self):
-        from hosts.gui.__main__ import _is_system_status
+        from hosts.gui.message_classifier import is_system_status as _is_system_status
 
         text = "Processing\n- step 1\n- step 2"
         assert _is_system_status(text) is False
 
     def test_is_system_status_with_emoji(self):
-        from hosts.gui.__main__ import _is_system_status
+        from hosts.gui.message_classifier import is_system_status as _is_system_status
 
         assert _is_system_status("Coding module") is True
 
     def test_is_system_status_empty(self):
-        from hosts.gui.__main__ import _is_system_status
+        from hosts.gui.message_classifier import is_system_status as _is_system_status
 
         assert _is_system_status("") is False
 
     def test_is_system_status_no_match(self):
-        from hosts.gui.__main__ import _is_system_status
+        from hosts.gui.message_classifier import is_system_status as _is_system_status
 
         assert _is_system_status("Hello world") is False
 
     def test_is_scratchpad_content_true(self):
-        from hosts.gui.__main__ import _is_scratchpad_content
+        from hosts.gui.message_classifier import is_scratchpad_content as _is_scratchpad_content
 
         text = "Plan:\n- step 1\n- step 2\n- step 3"
         assert _is_scratchpad_content(text) is True
 
     def test_is_scratchpad_content_todo(self):
-        from hosts.gui.__main__ import _is_scratchpad_content
+        from hosts.gui.message_classifier import is_scratchpad_content as _is_scratchpad_content
 
         text = "Notes:\nTODO: fix bug\nmore stuff"
         assert _is_scratchpad_content(text) is True
 
     def test_is_scratchpad_content_checkbox(self):
-        from hosts.gui.__main__ import _is_scratchpad_content
+        from hosts.gui.message_classifier import is_scratchpad_content as _is_scratchpad_content
 
         text = "Tasks:\n[ ] first\n[x] done"
         assert _is_scratchpad_content(text) is True
 
     def test_is_scratchpad_content_false_single_line(self):
-        from hosts.gui.__main__ import _is_scratchpad_content
+        from hosts.gui.message_classifier import is_scratchpad_content as _is_scratchpad_content
 
         assert _is_scratchpad_content("- just one line") is False
 
     def test_is_scratchpad_content_false_system_status(self):
-        from hosts.gui.__main__ import _is_scratchpad_content
+        from hosts.gui.message_classifier import is_scratchpad_content as _is_scratchpad_content
 
         assert _is_scratchpad_content("Analyzing code") is False
 
     def test_is_scratchpad_content_numbered_list(self):
-        from hosts.gui.__main__ import _is_scratchpad_content
+        from hosts.gui.message_classifier import is_scratchpad_content as _is_scratchpad_content
 
         text = "Steps:\n1. first\n2. second"
         assert _is_scratchpad_content(text) is True
 
     def test_is_scratchpad_content_asterisk_list(self):
-        from hosts.gui.__main__ import _is_scratchpad_content
+        from hosts.gui.message_classifier import is_scratchpad_content as _is_scratchpad_content
 
         text = "Ideas:\n* idea one\n* idea two"
         assert _is_scratchpad_content(text) is True

@@ -20,6 +20,9 @@ pygame.init()
 from unittest.mock import Mock, patch
 
 import pygame.freetype
+
+pygame.freetype.init()
+
 import pytest
 
 # ---------------------------------------------------------------------------
