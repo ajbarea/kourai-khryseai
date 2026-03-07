@@ -8,9 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 
 # Avatar images are in assets/maidens/golden_avatars/<name>.png
-_GOLDEN_AVATARS = (
-    Path(__file__).parent.parent.parent / "docs" / "assets" / "maidens" / "golden_avatars"
-)
+_GOLDEN_AVATARS = Path(__file__).parent.parent / "assets" / "maidens" / "golden_avatars"
 
 
 def get_avatar_path(name: str) -> Path | None:
