@@ -26,6 +26,7 @@ import signal
 import sys
 import threading
 import time
+from typing import Any
 
 import pygame
 from PIL import Image as PILImage
@@ -34,9 +35,20 @@ from .alignment_gauges import AlignmentGaugePanel
 from .alignment_theme import compute_alignment_palette
 from .audio_manager import AudioManager
 from .client import GuiClient
-from .constants import BANNER_TOTAL_H, DIALOGUE_H, DIALOGUE_W, DIALOGUE_X, INPUT_H, H, W, theme
+from .constants import (
+    DIALOGUE_H,
+    DIALOGUE_W,
+    DIALOGUE_X,
+    FONT_INPUT,
+    INPUT_H,
+    PORTRAIT_W,
+    H,
+    W,
+    theme,
+)
 from .dialogue import DialogueEntry, DialogueHistory, draw_banner
 from .dialogue_pacing import PacingMode
+from .emote_sfx import play_emote_sfx
 from .flash_effect import FlashEffect
 from .gossip_panel import GossipPanel
 from .gui_components_integration import GUIComponentsIntegration
@@ -63,7 +75,7 @@ from .typewriter import TypewriterManager
 _SYSTEM_STATUS_RE = _re.compile(
     r"^(?:Analyzing|Processing|Running|Building|Compiling|Testing|Checking|"
     r"Routing|Delegating|Preparing|Loading|Connecting|Waiting|Scanning|"
-    r"Fetching|Generating|Deploying|Resolving|Verifying)\b",
+    r"Fetching|Generating|Deploying|Resolving|Verifying|Coding|Drafting|Writing)\b",
     _re.IGNORECASE,
 )
 
@@ -71,13 +83,46 @@ _SYSTEM_STATUS_RE = _re.compile(
 def _is_system_status(text: str) -> bool:
     """Return True if text looks like transient pipeline chatter."""
     stripped = text.strip()
+
+    # Strip leading emojis to match status texts like "⚙️ Coding: ..."
+    import emoji
+
+    stripped = emoji.replace_emoji(stripped, replace="").strip()
+
     if len(stripped) > 80:
         return False
     if "?" in stripped:
         return False
     if "INPUT_REQUIRED:" in stripped:
         return False
+
+    # Heuristics: if it has newlines or markdown lists/headers, it's likely a CoT/TODO plan
+    if "\n" in stripped and (
+        "- " in stripped or "* " in stripped or "1. " in stripped or "TODO" in stripped.upper()
+    ):
+        return False
+
     return bool(_SYSTEM_STATUS_RE.match(stripped))
+
+
+def _is_scratchpad_content(text: str) -> bool:
+    """Return True if text looks like a CoT plan or TODO list that belongs in the scratchpad."""
+    stripped = text.strip()
+    # It shouldn't be a system status
+    if _is_system_status(text):
+        return False
+    # If it contains markdown lists or explicit TODOs and is fairly long or multiline
+    return bool(
+        "\n" in stripped
+        and (
+            "- " in stripped
+            or "* " in stripped
+            or "1. " in stripped
+            or "TODO" in stripped.upper()
+            or "[ ]" in stripped
+            or "[x]" in stripped
+        )
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -86,7 +131,7 @@ def _is_system_status(text: str) -> bool:
 def main(agent_url: str | None = None) -> None:
     # Setup shutdown flag and signal handlers for graceful Ctrl+C shutdown
     _shutdown_flag = {"running": True}
-    _queues: dict[str, queue.Queue | None] = {"send_q": None}
+    _queues: dict[str, Any] = {"send_q": None}
 
     def _signal_handler(signum: int, frame) -> None:
         _shutdown_flag["running"] = False
@@ -118,7 +163,7 @@ def main(agent_url: str | None = None) -> None:
 
     # --- Ambient forge audio starts immediately (before any loading) ---
     audio_manager = AudioManager()
-    audio_manager.play_ambient()
+    audio_manager.play_ambient("assets/audio/ambient/forge_loop.ogg")
 
     # --- Loaded subsystems (populated by the generator, used after) ---
     _loaded: dict = {}
@@ -219,7 +264,7 @@ def main(agent_url: str | None = None) -> None:
         _loaded["recv_q"] = recv_q
         yield step / total_steps, "Connecting to Hephaestus…"
 
-        # 13. Audio ready (music deferred until user presses start)
+        # 13. Audio ready (music deferred until player presses start)
         step += 1
         yield step / total_steps, "Tuning the forge…"
 
@@ -239,11 +284,10 @@ def main(agent_url: str | None = None) -> None:
             pygame.quit()
         sys.exit(0)
 
-    # --- Music fades in slowly after the player presses start ---
-    audio_manager.fade_to_music("assets/audio/music/sithuaye-2016.ogg", fade_ms=6000)
+    # --- Music fades in after loading ---
+    audio_manager.play_music("assets/audio/music/sithuaye-2016.ogg", fade_ms=60000)
 
     # --- Profile selection screen ---
-    # Show profile select after title screen; runs its own event loop
     _selected_profile = None
     _run_onboarding = False
     try:
@@ -255,24 +299,19 @@ def main(agent_url: str | None = None) -> None:
 
         profiles = list_profiles()
         if needs_onboarding():
-            # No profiles exist — go straight to onboarding
             _run_onboarding = True
         elif len(profiles) == 1:
-            # Single profile — auto-select it
             _selected_profile = profiles[0]
             set_active_profile(_selected_profile["player_id"])
         else:
-            # Multiple profiles — show selection screen
             result = run_profile_select(screen, clock, profiles)
             if result is False:
-                # User quit
                 with contextlib.suppress(Exception):
                     audio_manager.cleanup()
                 with contextlib.suppress(Exception):
                     pygame.quit()
                 sys.exit(0)
             elif result is None:
-                # New Game
                 _run_onboarding = True
             else:
                 _selected_profile = result
@@ -293,26 +332,40 @@ def main(agent_url: str | None = None) -> None:
     input_bar: InputBar = _loaded["input_bar"]
     typewriter: TypewriterManager = _loaded["typewriter"]
     flash: FlashEffect = _loaded["flash"]
+    quick_actions: QuickActionBar = _loaded["quick_actions"]
     send_q: queue.Queue[tuple[str, str] | None] = _loaded["send_q"]
     recv_q: queue.Queue[dict] = _loaded["recv_q"]
     tts_manager: TTSGUIManager = _loaded["tts_manager"]
-    quick_actions: QuickActionBar = _loaded["quick_actions"]
 
-    # --- Initial layout ---
-    dialogue_rect = pygame.Rect(DIALOGUE_X, BANNER_TOTAL_H, DIALOGUE_W, DIALOGUE_H - BANNER_TOTAL_H)
+    # --- Display mode state ---
+    current_display_mode = gui_integration.settings.get("display_mode", "Windowed")
 
-    # --- Fullscreen state ---
-    is_fullscreen = gui_integration.settings.get("fullscreen", False)
+    dialogue_rect = pygame.Rect(DIALOGUE_X, 34, DIALOGUE_W, DIALOGUE_H - 34)
 
-    if is_fullscreen:
-        pygame.display.toggle_fullscreen()
+    def apply_display_mode(mode: str) -> None:
+        nonlocal current_display_mode, dialogue_rect, settings_overlay, screen
+        current_display_mode = mode
 
-    def toggle_fullscreen(enable: bool) -> None:
-        nonlocal is_fullscreen, dialogue_rect, settings_overlay
-        is_fullscreen = enable
-        pygame.display.toggle_fullscreen()
+        flags = pygame.RESIZABLE
+        if mode == "Fullscreen":
+            flags |= pygame.FULLSCREEN
 
-        # Small delay to let pygame update the display
+        # Apply mode
+        screen = pygame.display.set_mode((W, H), flags)
+
+        # Handle maximizing for "Borderless" (Borderless Fullscreen with frame)
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            if hasattr(pygame, "Window"):
+                window = pygame.Window.from_display_module()
+                if mode == "Borderless":
+                    window.maximize()
+                elif mode == "Windowed":
+                    window.restore()
+
+        # Small delay to let OS update window
         time.sleep(0.1)
 
         # Get the actual screen size after toggle
@@ -320,13 +373,10 @@ def main(agent_url: str | None = None) -> None:
         dialogue_rect.width = screen_w - DIALOGUE_X
         dialogue_rect.height = screen_h - INPUT_H
 
-        # Update settings overlay dimensions
-        settings_overlay.screen_w = screen_w
-        settings_overlay.screen_h = screen_h
-        settings_overlay.panel_rect.centerx = screen_w // 2
-        settings_overlay.panel_rect.centery = screen_h // 2
+        # Update settings overlay layout
+        settings_overlay.update_layout(screen_w, screen_h)
 
-    settings_overlay.set_fullscreen_callback(toggle_fullscreen)
+    settings_overlay.set_display_mode_callback(apply_display_mode)
 
     def on_quit() -> None:
         _shutdown_flag["running"] = False
@@ -338,6 +388,7 @@ def main(agent_url: str | None = None) -> None:
     connected = False
     current_agent = "hephaestus"
     last_agent = "hephaestus"
+    result_agent = "hephaestus"  # tracks which specialist produced the result
     _typewriter_full_text = ""  # full text for the active typewriter entry
     _alignment_refresh_timer = 0.0  # Refresh alignment from profile every 10s
 
@@ -361,33 +412,39 @@ def main(agent_url: str | None = None) -> None:
 
         # --- Process recv_q events ---
         while not recv_q.empty():
-            event = recv_q.get_nowait()
-            etype = event.get("type")
+            q_event = recv_q.get_nowait()
+            etype = q_event.get("type")
 
             if etype == "connected":
                 connected = True
                 # System toast for connection status
+                gui_integration.status_bubbles.add_status_message(
+                    f"[system] Connected to {q_event.get('name', 'Hephaestus')}"
+                )
+                # Character greeting as dialogue
+                greeting = "The forge is hot. What are we building?"
                 history.add(
                     DialogueEntry(
                         "hephaestus",
-                        f"Connected to {event.get('name', 'Hephaestus')}",
-                        is_system=True,
-                    )
-                )
-                # Character greeting as dialogue
-                _add_with_typewriter(
-                    DialogueEntry(
-                        "hephaestus",
-                        "The forge is hot. What are we building?",
+                        greeting,
                     )
                 )
                 history.scroll_to_bottom()
+
+                # Speak the greeting
+                if tts_manager.enable_tts and tts_manager.tts_engine is not None:
+                    threading.Thread(
+                        target=tts_manager.tts_engine.speak_sync,
+                        args=(greeting,),
+                        kwargs={"agent_name": "hephaestus"},
+                        daemon=True,
+                    ).start()
 
             elif etype == "disconnected":
                 connected = False
 
             elif etype == "status":
-                raw = event["text"]
+                raw = q_event["text"]
                 agent, text = detect_agent(raw)
                 if not text:
                     continue
@@ -401,7 +458,7 @@ def main(agent_url: str | None = None) -> None:
                     history.scroll_to_bottom()
                     # Speak the question aloud
                     speaking_agent = agent or current_agent
-                    if tts_manager.tts_engine:
+                    if tts_manager.tts_engine is not None:
                         threading.Thread(
                             target=tts_manager.tts_engine.speak_sync,
                             args=(question,),
@@ -419,6 +476,7 @@ def main(agent_url: str | None = None) -> None:
                         if lines:
                             handoff_line = random.choice(lines)
                             _add_with_typewriter(DialogueEntry(current_agent, handoff_line))
+                            play_emote_sfx(handoff_line, current_agent, audio_manager)
 
                         portrait.switch_to(agent)
                         flash.trigger()
@@ -428,40 +486,79 @@ def main(agent_url: str | None = None) -> None:
                         current_agent = agent
                         last_agent = agent
                         tts_manager.set_current_agent(agent)
+                        gui_integration.get_scratchpad().set_active_agent(agent)
+
+                    # Track which specialist produced the result
+                    if agent != "hephaestus":
+                        result_agent = agent
 
                     # Classify: pipeline chatter → system, dialogue → normal
                     is_sys = _is_system_status(text)
-                    entry = DialogueEntry(agent, text, is_system=is_sys)
+                    is_scratchpad = _is_scratchpad_content(text)
+
                     if is_sys:
-                        history.add(entry)
+                        gui_integration.status_bubbles.add_status_message(f"[{agent}] {text}")
+                    elif is_scratchpad:
+                        gui_integration.get_scratchpad().add_plan(text, agent)
                     else:
-                        _add_with_typewriter(entry)
+                        _add_with_typewriter(DialogueEntry(agent, text))
+                        play_emote_sfx(text, agent, audio_manager)
+                        speakable = extract_speakable(text)
+                        if (
+                            speakable
+                            and tts_manager.enable_tts
+                            and tts_manager.tts_engine is not None
+                        ):
+                            threading.Thread(
+                                target=tts_manager.tts_engine.speak_sync,
+                                args=(speakable,),
+                                kwargs={"agent_name": agent},
+                                daemon=True,
+                            ).start()
                 else:
                     is_sys = _is_system_status(text)
-                    entry = DialogueEntry(current_agent, text, is_system=is_sys)
+                    is_scratchpad = _is_scratchpad_content(text)
+
                     if is_sys:
-                        history.add(entry)
+                        gui_integration.status_bubbles.add_status_message(
+                            f"[{current_agent}] {text}"
+                        )
+                    elif is_scratchpad:
+                        gui_integration.get_scratchpad().add_plan(text, current_agent)
                     else:
-                        _add_with_typewriter(entry)
+                        _add_with_typewriter(DialogueEntry(current_agent, text))
+                        play_emote_sfx(text, current_agent, audio_manager)
+                        speakable = extract_speakable(text)
+                        if (
+                            speakable
+                            and tts_manager.enable_tts
+                            and tts_manager.tts_engine is not None
+                        ):
+                            threading.Thread(
+                                target=tts_manager.tts_engine.speak_sync,
+                                args=(speakable,),
+                                kwargs={"agent_name": current_agent},
+                                daemon=True,
+                            ).start()
 
                 history.scroll_to_bottom()
 
             elif etype == "result":
-                text = event["text"]
-                _add_with_typewriter(DialogueEntry(last_agent, text, is_result=True))
+                text = q_event["text"]
+                _add_with_typewriter(DialogueEntry(result_agent, text, is_result=True))
                 history.scroll_to_bottom()
                 # Speak only the conversational portions (skip commit groups, code, etc.)
                 speakable = extract_speakable(text)
-                if speakable and tts_manager.enable_tts and tts_manager.tts_engine:
+                if speakable and tts_manager.enable_tts and tts_manager.tts_engine is not None:
                     threading.Thread(
                         target=tts_manager.tts_engine.speak_sync,
                         args=(speakable,),
-                        kwargs={"agent_name": last_agent},
+                        kwargs={"agent_name": result_agent},
                         daemon=True,
                     ).start()
 
             elif etype == "complete":
-                elapsed = event.get("elapsed", 0.0)
+                elapsed = q_event.get("elapsed", 0.0)
                 input_bar.processing = False
 
                 # Victory line as dialogue
@@ -469,8 +566,9 @@ def main(agent_url: str | None = None) -> None:
                 if vlines:
                     victory_text = random.choice(vlines)
                     _add_with_typewriter(DialogueEntry(last_agent, victory_text))
+                    play_emote_sfx(victory_text, last_agent, audio_manager)
                     # Speak just the personality line
-                    if tts_manager.enable_tts and tts_manager.tts_engine:
+                    if tts_manager.enable_tts and tts_manager.tts_engine is not None:
                         threading.Thread(
                             target=tts_manager.tts_engine.speak_sync,
                             args=(victory_text,),
@@ -479,23 +577,22 @@ def main(agent_url: str | None = None) -> None:
                         ).start()
 
                 # Elapsed time as system toast
-                history.add(
-                    DialogueEntry(last_agent, f"✦ Completed in {elapsed:.1f}s", is_system=True)
+                gui_integration.status_bubbles.add_status_message(
+                    f"[system] * Completed in {elapsed:.1f}s"
                 )
 
                 history.scroll_to_bottom()
 
             elif etype == "error":
-                history.add(DialogueEntry("hephaestus", event["text"], is_error=True))
+                history.add(DialogueEntry("hephaestus", q_event["text"], is_error=True))
                 input_bar.processing = False
                 history.scroll_to_bottom()
 
         # --- Pygame events ---
-        for pg_event in pygame.event.get():
+        for event in pygame.event.get():
             # Onboarding overlay consumes ALL events while active
             if onboarding.active:
-                onboarding.handle_event(pg_event)
-                # Check if onboarding just completed
+                onboarding.handle_event(event)
                 result = onboarding.get_result()
                 if result:
                     try:
@@ -516,37 +613,41 @@ def main(agent_url: str | None = None) -> None:
                         pass
                 continue
 
-            if settings_overlay.handle_event(pg_event):
+            if settings_overlay.handle_event(event):
                 continue
-            if memory_viewer.handle_event(pg_event):
+            if memory_viewer.handle_event(event):
                 continue
-            if alignment_panel.handle_event(pg_event):
+            if alignment_panel.handle_event(event):
                 continue
-            if gossip_panel.handle_event(pg_event):
+            if gossip_panel.handle_event(event):
+                continue
+            if gui_integration.get_scratchpad().handle_event(event):
                 continue
 
-            if pg_event.type == pygame.QUIT:
+            if event.type == pygame.QUIT:
                 _shutdown_flag["running"] = False
                 send_q.put(None)  # shutdown client
 
-            elif pg_event.type == pygame.KEYDOWN:
-                if pg_event.key == pygame.K_ESCAPE:
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
                     settings_overlay.toggle()
-                elif pg_event.key == pygame.K_F2:
+                elif event.key == pygame.K_TAB:
+                    gui_integration.get_scratchpad().toggle()
+                elif event.key == pygame.K_F2:
                     alignment_panel.toggle()
-                elif pg_event.key == pygame.K_F3:
+                elif event.key == pygame.K_F3:
                     if gossip_panel.active:
                         gossip_panel.dismiss()
                     else:
                         gossip_panel.active = True
-                elif pg_event.key == pygame.K_F4:
+                elif event.key == pygame.K_F4:
                     memory_viewer.toggle()
                 elif typewriter.active and not typewriter.is_complete():
                     # Any key skips the typewriter to show full text
                     typewriter.skip()
                     history.update_last_text(typewriter.get_displayed_text())
                 else:
-                    submitted = input_bar.handle_key(pg_event)
+                    submitted = input_bar.handle_key(event)
                     if submitted:
                         # Show user bubble
                         history.add(DialogueEntry("user", submitted, is_user=True))
@@ -558,60 +659,72 @@ def main(agent_url: str | None = None) -> None:
                         # Reset to Hephaestus for the incoming pipeline
                         portrait.switch_to(input_bar.waiting_for_agent or "hephaestus")
                         current_agent = input_bar.waiting_for_agent or "hephaestus"
+                        result_agent = current_agent
                         input_bar.waiting_for_agent = None
 
                         agent_quotes = AGENTS[current_agent].get("user_quotes", [])
                         portrait.current_quote = random.choice(agent_quotes) if agent_quotes else ""
 
-            elif pg_event.type == pygame.TEXTINPUT:
+            elif event.type == pygame.TEXTINPUT:
                 if not input_bar.processing:
-                    input_bar.handle_textinput(pg_event)
+                    input_bar.handle_textinput(event)
 
-            elif pg_event.type == pygame.MOUSEWHEEL:
-                history.scroll(-pg_event.y * 40)
+            elif event.type == pygame.MOUSEMOTION:
+                quick_actions.update(event.pos)
 
-            elif pg_event.type == pygame.MOUSEMOTION:
-                quick_actions.update(pg_event.pos)
+            elif event.type == pygame.MOUSEWHEEL:
+                history.scroll(-event.y * 40)
 
-            elif pg_event.type == pygame.MOUSEBUTTONDOWN and pg_event.button == 1:
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 if not input_bar.processing:
-                    action = quick_actions.handle_click(pg_event.pos)
+                    action = quick_actions.handle_click(event.pos)
                     if action:
                         history.add(DialogueEntry("user", action.display_text, is_user=True))
+                        history.scroll_to_bottom()
+
                         payload = f"{action.display_text}\n\n{action.hidden_prompt}"
                         send_q.put((action.agent, payload))
+                        input_bar.processing = True
+
                         portrait.switch_to(action.agent)
                         current_agent = action.agent
-                        input_bar.processing = True
-                        agent_quotes = AGENTS.get(action.agent, {}).get("user_quotes", [])
-                        portrait.current_quote = random.choice(agent_quotes) if agent_quotes else ""
+                        result_agent = current_agent
 
-                clicked_agent = history.handle_click(pg_event.pos, dialogue_rect)
+                        agent_quotes = AGENTS.get(current_agent, {}).get("user_quotes", [])
+                        portrait.current_quote = random.choice(agent_quotes) if agent_quotes else ""
+                        continue
+
+                clicked_agent = history.handle_click(event.pos, dialogue_rect)
                 if clicked_agent and clicked_agent in AGENTS:
                     portrait.switch_to(clicked_agent)
                     current_agent = clicked_agent
                     agent_quotes = AGENTS.get(clicked_agent, {}).get("quotes", [])
                     portrait.current_quote = random.choice(agent_quotes) if agent_quotes else ""
 
-            elif pg_event.type == pygame.MOUSEBUTTONDOWN and pg_event.button == 3:
-                clicked_text = history.handle_right_click(pg_event.pos, dialogue_rect)
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
+                clicked_text = history.handle_right_click(event.pos, dialogue_rect)
                 if clicked_text:
                     try:
                         pygame.scrap.put_text(clicked_text)
+                        audio_manager.play_sfx()
+                        history.add(
+                            DialogueEntry(
+                                agent="system",
+                                text="Copied to clipboard.",
+                                is_system=True,
+                            )
+                        )
                     except Exception as e:
                         print(f"Clipboard error: {e}")
 
-            elif pg_event.type == pygame.VIDEORESIZE:
+            elif event.type == pygame.VIDEORESIZE:
                 # Update layout for new window size
-                screen_w, screen_h = pg_event.size
+                screen_w, screen_h = event.size
                 dialogue_rect.width = screen_w - DIALOGUE_X
                 dialogue_rect.height = screen_h - INPUT_H
 
-                # Update settings overlay dimensions
-                settings_overlay.screen_w = screen_w
-                settings_overlay.screen_h = screen_h
-                settings_overlay.panel_rect.centerx = screen_w // 2
-                settings_overlay.panel_rect.centery = screen_h // 2
+                # Update settings overlay layout
+                settings_overlay.update_layout(screen_w, screen_h)
 
         # --- Updates ---
         settings_overlay.update(dt)
@@ -620,17 +733,23 @@ def main(agent_url: str | None = None) -> None:
         onboarding.update(dt)
         memory_viewer.update(dt)
 
+        # Sync history settings
+        history.show_timestamps = gui_integration.settings.get("show_timestamps", True)
+        history.show_metadata = gui_integration.settings.get("show_metadata", True)
+        history.timestamp_format = gui_integration.settings.get("timestamp_format", "24h")
+
         # Apply alignment-based visual theming (blended with high-contrast)
+        # WHY: alignment shifts the palette dynamically; high-contrast overrides it
         if not gui_integration.settings.get("high_contrast", False):
             _alignment_refresh_timer += dt
             if _alignment_refresh_timer >= 10.0:
                 _alignment_refresh_timer = 0.0
                 try:
-                    from kourai_common.player import PlayerProfile
+                    from kourai_common.player import PlayerProfile as _PP
 
-                    _p = PlayerProfile.load()
-                    if _p:
-                        alignment_panel.update_values(_p.sovereignty, _p.devotion, _p.role)
+                    _prof = _PP.load()
+                    if _prof:
+                        alignment_panel.update_values(_prof.sovereignty, _prof.devotion, _prof.role)
                 except Exception:
                     pass
             alignment_palette = compute_alignment_palette(
@@ -638,7 +757,6 @@ def main(agent_url: str | None = None) -> None:
             )
             theme.apply_palette(alignment_palette)
         else:
-            # High-contrast overrides alignment theming
             theme.apply_palette(gui_integration.high_contrast.get_color_palette())
 
         # Sync reduce_motion to typewriter
@@ -652,8 +770,10 @@ def main(agent_url: str | None = None) -> None:
         # Advance portrait flash effect
         flash.update(dt)
 
+        screen_w, screen_h = screen.get_size()
+
         if not gui_integration.settings.get("reduce_motion", False):
-            particles.update(dt)
+            particles.update(dt, screen_w, screen_h)
 
         portrait.update(dt)
         input_bar.update(dt)
@@ -666,38 +786,66 @@ def main(agent_url: str | None = None) -> None:
             particles.draw(screen)
 
         # Left: portrait panel (with handoff flash)
+        portrait.draw(screen)
         _, flash_alpha = flash.update(0.0)  # peek alpha without advancing time
-        portrait.draw(screen, flash_alpha=flash_alpha)
+        if flash_alpha > 0:
+            flash_surf = pygame.Surface((PORTRAIT_W, screen_h), pygame.SRCALPHA)
+            flash_surf.fill((255, 255, 255, flash_alpha))
+            screen.blit(flash_surf, (0, 0))
 
         # Right: banner + dialogue history
         draw_banner(screen, connected, agent_url or "")
         history.draw(screen, dialogue_rect)
 
         # Right panel border
-        pygame.draw.line(screen, theme.gold_dim, (DIALOGUE_X, 0), (DIALOGUE_X, H - INPUT_H), 1)
+        pygame.draw.line(
+            screen, theme.gold_dim, (DIALOGUE_X, 0), (DIALOGUE_X, screen_h - INPUT_H), 1
+        )
+
+        if not input_bar.processing:
+            quick_actions.draw(screen, disabled=False)
 
         # Bottom: input
         input_bar.draw(screen)
 
-        # Quick action pills (above input bar)
-        if not input_bar.processing:
-            quick_actions.draw(screen, disabled=False)
-        else:
-            quick_actions.draw(screen, disabled=True)
+        # Draw debug logs if enabled
+        if gui_integration.settings.get("show_debug_logs", False):
+            logs = gui_integration.status_bubbles.get_status_bubbles().get_content()
+            if logs:
+                log_w = min(460, dialogue_rect.width - 20)
+                max_log_h = int(dialogue_rect.height * 0.5)
+                log_h = min(max_log_h, len(logs) * 16 + 20)
 
-        # Overlay
+                log_rect = pygame.Rect(
+                    dialogue_rect.right - log_w - 10, dialogue_rect.top + 10, log_w, log_h
+                )
+
+                log_panel = pygame.Surface((log_w, log_h), pygame.SRCALPHA)
+                pygame.draw.rect(
+                    log_panel, (15, 12, 10, 235), log_panel.get_rect(), border_radius=6
+                )
+                pygame.draw.rect(
+                    log_panel, (*theme.gold_dim, 150), log_panel.get_rect(), 1, border_radius=6
+                )
+
+                y = log_h - 10 - 16
+                for log in reversed(logs):
+                    disp_log = log if len(log) <= 65 else log[:62] + "..."
+                    FONT_INPUT.render_to(log_panel, (10, y), disp_log, theme.dim_white)
+                    y -= 16
+                    if y < 10:
+                        break
+
+                screen.blit(log_panel, log_rect.topleft)
+
+        # Draw Scratchpad
+        gui_integration.get_scratchpad().draw(screen, dialogue_rect)
+
+        # Overlays
         settings_overlay.draw(screen)
-
-        # Alignment gauge (overlay on top-left)
         alignment_panel.draw(screen)
-
-        # Gossip side panel (overlay on right)
         gossip_panel.draw(screen)
-
-        # Memory viewer (full overlay)
         memory_viewer.draw(screen)
-
-        # Onboarding overlay (blocks everything when active)
         onboarding.draw(screen)
 
         pygame.display.flip()

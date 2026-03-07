@@ -299,9 +299,9 @@ class SettingsOverlay:
         self.active = False
         self.alpha = 0.0
 
-        # Layout — taller panel to hold audio sliders
-        self.panel_w = 400
-        self.panel_h = 480
+        # Layout
+        self.panel_w = 420
+        self.panel_h = 520
         self.panel_rect = pygame.Rect(
             (self.screen_w - self.panel_w) // 2,
             (self.screen_h - self.panel_h) // 2,
@@ -353,44 +353,30 @@ class SettingsOverlay:
         # Tabs
         self.active_tab = "display"
         self.tabs: dict[str, TabButton] = {}
-        tab_width = (self.panel_w - 60) // 3
+        tab_width = (self.panel_w - 60) // 4
 
         def on_tab_click(tab_id: str):
             self.active_tab = tab_id
             for t in self.tabs.values():
                 t.active = t.tab_id == tab_id
 
-        self.tabs["display"] = TabButton(
-            self.panel_rect.x + 30,
-            self.panel_rect.y + 70,
-            tab_width - 5,
-            30,
-            "Display",
-            "display",
-            on_tab_click,
-        )
+        tab_y = self.panel_rect.y + 70
+        tab_x = self.panel_rect.x + 30
+        for i, (tab_id, label) in enumerate(
+            [
+                ("display", "Display"),
+                ("gameplay", "Gameplay"),
+                ("audio", "Audio"),
+                ("controls", "Controls"),
+            ]
+        ):
+            self.tabs[tab_id] = TabButton(
+                tab_x + tab_width * i, tab_y, tab_width - 5, 30, label, tab_id, on_tab_click
+            )
         self.tabs["display"].active = True
-        self.tabs["gameplay"] = TabButton(
-            self.panel_rect.x + 30 + tab_width,
-            self.panel_rect.y + 70,
-            tab_width - 5,
-            30,
-            "Gameplay",
-            "gameplay",
-            on_tab_click,
-        )
-        self.tabs["audio"] = TabButton(
-            self.panel_rect.x + 30 + tab_width * 2,
-            self.panel_rect.y + 70,
-            tab_width - 5,
-            30,
-            "Audio",
-            "audio",
-            on_tab_click,
-        )
 
-        self.toggles: dict[str, dict] = {"display": {}, "gameplay": {}, "audio": {}}
-        self.sliders: dict[str, dict] = {"display": {}, "gameplay": {}, "audio": {}}
+        self.toggles: dict[str, dict] = {"display": {}, "gameplay": {}, "audio": {}, "controls": {}}
+        self.sliders: dict[str, dict] = {"display": {}, "gameplay": {}, "audio": {}, "controls": {}}
 
         start_y = self.panel_rect.y + 130
         spacing = 48
@@ -483,6 +469,22 @@ class SettingsOverlay:
                 ),
                 "y": y,
             }
+
+        # Controls tab — static key map (read-only)
+        self._keymap = [
+            ("ESC", "Open / close settings"),
+            ("TAB", "Toggle scratchpad"),
+            ("F2", "Toggle alignment gauges"),
+            ("F3", "Toggle gossip panel"),
+            ("F4", "Toggle memory viewer"),
+            ("Enter", "Send message"),
+            ("Up / Down", "Message history"),
+            ("Scroll", "Scroll chat"),
+            ("Ctrl+K", "Focus input bar"),
+            ("Ctrl+L", "Clear input bar"),
+            ("Ctrl+Bksp", "Delete last word"),
+            ("Right-click", "Copy message text"),
+        ]
 
         # Buttons
         btn_y = self.panel_rect.bottom - 60
@@ -669,6 +671,26 @@ class SettingsOverlay:
             self.font_small.render_to(
                 overlay, (self.panel_rect.right - 48, s["y"] + 4), pct, dim_color
             )
+
+        # Draw controls key map
+        if self.active_tab == "controls":
+            gold_color = (*palette.get("gold", (218, 165, 32)), int(self.alpha))
+            km_y = self.panel_rect.y + 120
+            row_h = 26
+            key_col_x = self.panel_rect.x + 40
+            desc_col_x = self.panel_rect.x + 160
+
+            for key_label, description in self._keymap:
+                # Key badge
+                key_rect_w = self.font_small.get_rect(key_label).width + 16
+                badge_rect = pygame.Rect(key_col_x, km_y - 2, key_rect_w, 20)
+                pygame.draw.rect(overlay, (50, 45, 40), badge_rect, border_radius=4)
+                pygame.draw.rect(overlay, gold_color, badge_rect, 1, border_radius=4)
+                self.font_small.render_to(overlay, (key_col_x + 8, km_y + 2), key_label, gold_color)
+
+                # Description
+                self.font_small.render_to(overlay, (desc_col_x, km_y + 2), description, text_color)
+                km_y += row_h
 
         # Draw buttons
         self.reset_button.draw(overlay, self.font_label, palette)
