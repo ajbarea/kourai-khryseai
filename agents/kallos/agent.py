@@ -31,12 +31,14 @@ Your cleanup checklist:
 2. Remove WHAT comments (restating code)
 3. Keep WHY comments (rationale, research refs, security)
 4. Add Research citations where missing (algorithms, constraints, thresholds)
+   Use this format: Research: Author et al. (Year) https://example.com/paper
 5. Modern type hints (Python 3.12+: X | None, lowercase generics like list/dict)
 6. Fix `not indexable` mypy errors by guarding Optional types
    (`if X is not None:`)
 7. Fix `dict has no attribute` mypy errors by mocking with classes/Mocks
    instead of dicts, or updating access.
 8. Proactively FIX issues, do not just report them when possible
+9. Avoid marketing language like "robust" and "comprehensive"
 
 When you fix issues, you MUST provide the exact file changes in this format:
 
