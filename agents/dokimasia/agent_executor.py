@@ -10,6 +10,7 @@ from a2a.server.tasks import TaskUpdater
 from a2a.types import Part, Task, TextPart, UnsupportedOperationError
 from a2a.utils.errors import ServerError
 
+from agents.dokimasia.agent import generate_tests
 from kourai_common.a2a_utils import extract_image_parts
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
@@ -90,8 +91,6 @@ class DokimasiaAgentExecutor(BaseAgentExecutor):
 
             else:
                 # Generate tests from provided code/spec
-                from agents.dokimasia.agent import generate_tests_stream
-
                 await send_working_status(
                     updater,
                     task,
@@ -100,25 +99,12 @@ class DokimasiaAgentExecutor(BaseAgentExecutor):
                 )
 
                 with create_span("dokimasia.generate"):
-                    tests = ""
-                    chunk_count = 0
-                    async for chunk in generate_tests_stream(
+                    tests = await generate_tests(
                         source_code=user_input,
                         module_name="provided_code",
                         image_parts=extract_image_parts(context) or None,
                         context_id=task.context_id,
-                    ):
-                        tests += chunk
-                        chunk_count += 1
-                        if chunk_count % 10 == 0:
-                            lines = tests.strip().split("\n")
-                            latest_line = lines[-1] if lines else ""
-                            if len(latest_line) > 50:
-                                latest_line = latest_line[:47] + "..."
-                            if latest_line.strip():
-                                await send_working_status(
-                                    updater, task, f"Testing: {latest_line}", emoji="🧪"
-                                )
+                    )
 
                 await send_working_status(
                     updater,
