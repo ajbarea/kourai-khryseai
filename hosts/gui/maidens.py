@@ -5,18 +5,24 @@ No kaomoji. No text faces. The images do the talking now.
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
+logger = logging.getLogger(__name__)
+
 # Avatar images are in assets/maidens/golden_avatars/<name>.png
-_GOLDEN_AVATARS = Path(__file__).parent.parent / "assets" / "maidens" / "golden_avatars"
+_GOLDEN_AVATARS = Path(__file__).parent.parent.parent / "assets" / "maidens" / "golden_avatars"
 
 
 def get_avatar_path(name: str) -> Path | None:
     """Return the avatar PNG path for an agent, or None if not found."""
     for ext in (".png", ".jpg", ".jpeg", ".webp"):
         p = _GOLDEN_AVATARS / f"{name}{ext}"
+        logger.debug("Checking for avatar at: %s", p)
         if p.exists():
+            logger.debug("Avatar found: %s", p)
             return p
+    logger.debug("Avatar not found for: %s", name)
     return None
 
 

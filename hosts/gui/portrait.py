@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import textwrap
+import logging
 
 import pygame
 from PIL import Image as PILImage
@@ -19,6 +20,8 @@ from .constants import (
 )
 from .maidens import AGENTS, get_avatar_path
 
+logger = logging.getLogger(__name__)
+
 
 # ---------------------------------------------------------------------------
 # Avatar loading — PIL → pygame Surface
@@ -27,14 +30,18 @@ def load_avatar(name: str, size: int = 256) -> pygame.Surface | None:
     """Load a golden avatar PNG as a pygame Surface, scaled to `size`."""
     path = get_avatar_path(name)
     if not path:
+        logger.debug("Avatar path not found for: %s", name)
         return None
     try:
+        logger.debug("Loading avatar from path: %s", path)
         img = PILImage.open(path).convert("RGBA")
         img = img.resize((size, size), PILImage.Resampling.LANCZOS)
         raw = img.tobytes()
         surf = pygame.image.frombytes(raw, (size, size), "RGBA").convert_alpha()
+        logger.debug("Avatar loaded successfully for: %s", name)
         return surf
-    except Exception:
+    except Exception as e:
+        logger.error("Error loading avatar for %s: %s", name, e)
         return None
 
 
