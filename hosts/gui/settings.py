@@ -7,8 +7,11 @@ Supports all settings defined in the Settings data model with sensible defaults.
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 # Default settings values
 DEFAULT_SETTINGS = {
@@ -102,6 +105,12 @@ class SettingsManager:
         try:
             with open(self.config_path, encoding="utf-8") as f:
                 loaded = json.load(f)
+                if "display_mode" not in loaded and loaded.get("fullscreen") is True:
+                    loaded["display_mode"] = "Fullscreen"
+                    logger.debug(
+                        "Migrated legacy fullscreen setting to display_mode=Fullscreen for %s",
+                        self.config_path,
+                    )
                 # Merge loaded settings with defaults to handle new settings
                 self.settings.update(loaded)
         except (OSError, json.JSONDecodeError) as e:
