@@ -9,7 +9,7 @@
 [![A2A Protocol](https://img.shields.io/badge/A2A_Protocol-v0.4-4285F4?style=flat-square&logo=google&logoColor=white)](https://a2a-protocol.org)
 [![Python](https://img.shields.io/badge/Python-3.12+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
 [![uv](https://img.shields.io/badge/uv-package_manager-DE5FE9?style=flat-square)](https://docs.astral.sh/uv/)
-[![codecov](https://codecov.io/gh/ajbarea/Kourai_Khryseai/graph/badge.svg?token=bNiUvETLLU)](https://codecov.io/gh/ajbarea/Kourai_Khryseai)
+[![codecov](https://codecov.io/gh/ajbarea/kourai-khryseai/graph/badge.svg?token=bNiUvETLLU)](https://codecov.io/gh/ajbarea/kourai-khryseai)
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
 
 ---
