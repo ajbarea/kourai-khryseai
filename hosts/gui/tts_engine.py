@@ -19,8 +19,6 @@ from pathlib import Path
 import edge_tts
 import pygame
 
-# Configure logging with proper debug output
-logging.basicConfig(level=logging.DEBUG, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 # Use pygame-ce if available for better mixer features, fall back to pygame

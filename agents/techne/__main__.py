@@ -5,7 +5,6 @@ Start with: python -m agents.techne
 
 from __future__ import annotations
 
-import logging
 import os
 
 import uvicorn
@@ -16,15 +15,11 @@ from a2a.types import AgentCapabilities, AgentCard, AgentSkill
 
 from agents.techne.agent_executor import TechneAgentExecutor
 from kourai_common.config import AGENT_PORTS, OTEL_ENDPOINT, get_agent_url
+from kourai_common.log import setup_logging
 from kourai_common.tracing import setup_tracing
 
-logging.basicConfig(
-    level=os.getenv("KOURAI_LOG_LEVEL", "INFO"),
-    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
-)
-log = logging.getLogger(__name__)
-
 AGENT_NAME = "techne"
+log = setup_logging(AGENT_NAME)
 PORT = int(os.getenv("PORT", str(AGENT_PORTS[AGENT_NAME])))
 HOST = os.getenv("HOST", "0.0.0.0")
 
