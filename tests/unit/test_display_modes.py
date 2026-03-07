@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-import pygame
 import sys
+
+import pygame
 
 from hosts.gui.display_modes import (
     DISPLAY_MODE_BORDERLESS,
