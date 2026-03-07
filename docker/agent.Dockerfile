@@ -4,7 +4,8 @@ ARG PYTHON_VERSION=3.12
 
 FROM python:${PYTHON_VERSION}-slim AS builder
 
-COPY --from=ghcr.io/astral-sh/uv:0.6 /uv /usr/local/bin/uv
+# Install uv and build dependencies
+RUN pip install --no-cache-dir uv
 
 WORKDIR /app
 
@@ -17,7 +18,7 @@ ARG AGENT_NAME
 COPY agents/${AGENT_NAME}/ agents/${AGENT_NAME}/
 
 # Install workspace deps for this agent
-RUN uv sync --no-dev --frozen 2>/dev/null || uv sync --no-dev
+RUN uv sync --no-dev --frozen
 
 # --- Runtime stage ---
 FROM python:${PYTHON_VERSION}-slim AS runtime
