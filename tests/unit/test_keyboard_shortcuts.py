@@ -132,6 +132,7 @@ class TestKeyboardShortcutsUpArrow:
         shortcuts.handle_key(event, "")  # Navigate to Second
         shortcuts.handle_key(event, "")  # Navigate to First
         result = shortcuts.handle_key(event, "")  # Wrap to Second
+        assert result is not None
         assert result["text"] == "Second"
 
 
@@ -252,6 +253,7 @@ class TestKeyboardShortcutsIntegration:
         # Navigate up
         event_up = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_UP)
         result = shortcuts.handle_key(event_up, "")
+        assert result is not None
         assert result["text"] == "Message 2"
 
         # Clear
@@ -261,6 +263,7 @@ class TestKeyboardShortcutsIntegration:
 
         # Navigate again should work
         result = shortcuts.handle_key(event_up, "")
+        assert result is not None
         assert result["text"] == "Message 2"
 
     def test_workflow_focus_and_navigate(self) -> None:

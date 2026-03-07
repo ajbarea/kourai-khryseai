@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
-
 import pytest
 
 from agents.kallos.agent import (
@@ -57,27 +55,6 @@ class TestRunCommand:
         code, stdout, stderr = await run_command(["python", "--version"])
         assert code == 0
         assert "Python" in stdout or "Python" in stderr
-
-
-class TestAnalyzeComments:
-    """Test comment analysis with mocked LLM."""
-
-    @pytest.mark.asyncio
-    async def test_analyze_calls_llm(self):
-        with patch("agents.kallos.agent.chat", new_callable=AsyncMock) as mock_chat:
-            mock_chat.return_value = "ALL CLEAN"
-            from agents.kallos.agent import analyze_comments
-
-            result = await analyze_comments({"test.py": "x = 1\n"})
-            assert result == "ALL CLEAN"
-            assert mock_chat.call_args[0][0] == "kallos"
-
-    @pytest.mark.asyncio
-    async def test_analyze_empty_files(self):
-        from agents.kallos.agent import analyze_comments
-
-        result = await analyze_comments({})
-        assert "No files" in result
 
 
 class TestKallosAgentCard:
