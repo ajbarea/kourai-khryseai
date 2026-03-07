@@ -199,6 +199,26 @@ class TestPlayerProfile:
 
 
 class TestPlayerMemory:
+    def test_ensure_player_tables_handles_new_connection_after_prior_init(self, tmp_path):
+        import kourai_common.player as player_mod
+
+        first = sqlite3.connect(str(tmp_path / "first.db"), check_same_thread=False)
+        second = sqlite3.connect(str(tmp_path / "second.db"), check_same_thread=False)
+
+        try:
+            player_mod._tables_initialized = False
+            _ensure_player_tables(first)
+
+            # Simulate later work on a different connection after prior init.
+            player_mod._tables_initialized = True
+            _ensure_player_tables(second)
+
+            second.execute("DELETE FROM player_memories WHERE player_id = ?", ("test123",))
+            second.execute("DELETE FROM agent_affinity WHERE player_id = ?", ("test123",))
+        finally:
+            first.close()
+            second.close()
+
     def test_add_and_retrieve(self, profile):
         mid = add_player_memory(
             profile.player_id, "Prefers dark themes", "preference", agent_name="kallos"
