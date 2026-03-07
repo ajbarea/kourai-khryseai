@@ -26,7 +26,9 @@ class DialogueEntry:
         "is_result",
         "is_error",
         "is_system",
-        "timestamp",
+        "_timestamp",
+        "_timestamp_source",
+        "_wall_timestamp",
         "processing_time",
         "agent_count",
         "metadata_visible",
@@ -50,10 +52,36 @@ class DialogueEntry:
         self.is_result = is_result
         self.is_error = is_error
         self.is_system = is_system
-        self.timestamp = time.time()
+        self._timestamp = time.monotonic()
+        self._timestamp_source = "monotonic"
+        self._wall_timestamp = time.time()
         self.processing_time = processing_time
         self.agent_count = agent_count
         self.metadata_visible = True
+
+    @property
+    def timestamp(self) -> float:
+        """Expose the creation timestamp for tests and age-based UI logic."""
+        return self._timestamp
+
+    @timestamp.setter
+    def timestamp(self, value: float) -> None:
+        ts = float(value)
+        self._timestamp = ts
+        self._timestamp_source = "manual"
+        self._wall_timestamp = ts
+
+    def get_age_seconds(self) -> float:
+        """Return the entry age using the correct clock source."""
+        if self._timestamp_source == "monotonic":
+            return time.monotonic() - self._timestamp
+        if self._timestamp >= 1_000_000_000:
+            return time.time() - self._timestamp
+        return time.monotonic() - self._timestamp
+
+    def get_display_timestamp(self) -> float:
+        """Return the wall-clock timestamp used for user-visible formatting."""
+        return self._wall_timestamp
 
 
 # ---------------------------------------------------------------------------
@@ -148,8 +176,7 @@ class DialogueHistory:
 
     def _system_alpha(self, e: DialogueEntry) -> float:
         """Return 0.0–1.0 alpha for a system entry based on age."""
-        # Note: system alpha uses time.time() age for consistency with DialogueEntry
-        age = time.time() - e.timestamp
+        age = e.get_age_seconds()
         if age < self.SYSTEM_FADE_START:
             return 1.0
         fade_progress = (age - self.SYSTEM_FADE_START) / self.SYSTEM_FADE_DURATION
@@ -351,7 +378,7 @@ class DialogueHistory:
         """Get formatted timestamp for entry."""
         import datetime
 
-        dt = datetime.datetime.fromtimestamp(entry.timestamp)
+        dt = datetime.datetime.fromtimestamp(entry.get_display_timestamp())
         if fmt == "12h":
             return dt.strftime("%I:%M:%S %p")
         else:
