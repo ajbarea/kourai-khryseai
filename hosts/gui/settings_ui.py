@@ -21,6 +21,12 @@ if TYPE_CHECKING:
     from hosts.gui.audio_manager import AudioManager as _AM
 
 
+def _ensure_freetype_ready() -> None:
+    """Initialize pygame.freetype on demand for test and app entrypoint safety."""
+    if not pygame.freetype.get_init():
+        pygame.freetype.init()
+
+
 class TabButton:
     """A tab button for navigating sections."""
 
@@ -309,6 +315,7 @@ class SettingsOverlay:
             self.panel_h,
         )
 
+        _ensure_freetype_ready()
         self.font_title = pygame.freetype.SysFont("segoeui, inter, arial", 24)
         self.font_label = pygame.freetype.SysFont("segoeui, inter, arial", 16)
         self.font_small = pygame.freetype.SysFont("segoeui, inter, arial", 12)

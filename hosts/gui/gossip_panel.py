@@ -7,6 +7,8 @@ options when available.
 
 from __future__ import annotations
 
+from typing import Protocol
+
 import pygame
 
 from hosts.gui.constants import (
@@ -23,6 +25,10 @@ GOSSIP_MSG_PAD = 8
 GOSSIP_BUBBLE_R = 6
 OPTION_H = 36
 OPTION_PAD = 4
+
+
+class _WrapFont(Protocol):
+    def get_rect(self, *args: object, **kwargs: object) -> pygame.Rect: ...
 
 
 class GossipMessage:
@@ -317,7 +323,7 @@ class GossipPanel:
         return len(self.response_buttons) * (OPTION_H + OPTION_PAD) + GOSSIP_PAD
 
 
-def _word_wrap(text: str, font: pygame.freetype.Font, max_width: int) -> list[str]:
+def _word_wrap(text: str, font: _WrapFont, max_width: int) -> list[str]:
     """Simple word-wrap for pygame freetype fonts."""
     words = text.split()
     lines: list[str] = []
