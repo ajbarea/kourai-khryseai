@@ -265,7 +265,7 @@ Press the settings button (or access via UI) to open the settings overlay:
 | **Auto-Scroll Chat** | On | Automatically scroll to newest messages |
 | **Typewriter Effect** | On | Character-by-character text display |
 | **Collapse Status Bubbles** | Off | Show/hide status message details |
-| **Fullscreen Mode** | Off | Toggle fullscreen display |
+| **Display Mode** | Windowed | Cycle between `Windowed`, `Borderless`, and `Fullscreen` |
 
 ### Settings Persistence
 
