@@ -496,8 +496,6 @@ _tables_initialized = False
 def _ensure_player_tables(conn: sqlite3.Connection) -> None:
     """Create player memory and affinity tables if they don't exist."""
     global _tables_initialized
-    if _tables_initialized:
-        return
 
     conn.execute(
         """
