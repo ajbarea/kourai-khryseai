@@ -56,12 +56,12 @@ class DokimasiaAgentExecutor(BaseAgentExecutor):
                 )
 
                 # Wrapper to adapt run_pytest to fix_loop interface
-                async def _run_pytest_wrapper():
+                async def _run_pytest_wrapper() -> tuple[bool, str]:
                     result = await run_pytest()
                     return result.success, result.output
 
                 # Run iterative test-fix loop
-                all_passed, test_output = await run_fix_loop(
+                all_passed, test_output, _loop_result = await run_fix_loop(
                     tool_name="pytest",
                     run_tool=_run_pytest_wrapper,
                     extract_files=extract_files_from_output,

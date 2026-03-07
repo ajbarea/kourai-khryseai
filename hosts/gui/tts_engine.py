@@ -109,7 +109,7 @@ class TTSEngine:
             # Ensure we have enough channels and reserve channel 0 for TTS
             # so pygame.mixer.stop() from background music can't evict speech.
             pygame.mixer.set_num_channels(8)
-            self._tts_channel: pygame.mixer.Channel = pygame.mixer.Channel(0)
+            self._tts_channel: pygame.mixer.Channel | None = pygame.mixer.Channel(0)
             self._mixer_initialized = True
             logger.info("Pygame mixer initialized successfully (TTS on channel 0)")
         except RuntimeError as e:

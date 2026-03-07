@@ -7,6 +7,7 @@ LLM for code generation. Understands existing code before modifying it.
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -219,7 +220,7 @@ async def generate_code_stream(
     git_context: str = "",
     image_parts: list[dict] | None = None,
     context_id: str | None = None,
-):
+) -> AsyncGenerator[str, None]:
     """Stream code generation for real-time progress.
 
     Args:
