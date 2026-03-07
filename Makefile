@@ -6,6 +6,8 @@ export LC_ALL=en_US.UTF-8
 export LANG=en_US.UTF-8
 export PYTHONIOENCODING=utf-8
 
+COMPOSE_FULL := docker compose --profile full
+
 # ──────────────── Development ────────────────
 
 setup:                     ## Install all dependencies
@@ -24,21 +26,21 @@ gui:                       ## Launch the pygame GUI client (portrait window)
 	uv run python -m hosts.gui
 
 up:                        ## Start all agents in Docker (+ Jaeger)
-	docker compose --profile full up -d --build --wait --wait-timeout 120
+	$(COMPOSE_FULL) up -d --build --wait --wait-timeout 120
 	@echo All services are running and healthy.
 	@echo Jaeger UI: http://localhost:16686
 	@echo Prometheus: http://localhost:9090
-	@$(MAKE) status
+	@$(COMPOSE_FULL) ps
 
 down:                      ## Stop all Docker containers
-	docker compose --profile full down --remove-orphans
+	$(COMPOSE_FULL) down --remove-orphans
 
 restart:                   ## Restart all agents
-	@$(MAKE) down
-	@$(MAKE) up
+	@$(MAKE) --no-print-directory down
+	@$(MAKE) --no-print-directory up
 
 status:                    ## Show Docker service status/health
-	docker compose --profile full ps
+	$(COMPOSE_FULL) ps
 
 # ──────────────── Testing & Quality ────────────────
 
