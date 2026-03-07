@@ -36,7 +36,7 @@ def setup_logging(name: str, *, level: str | None = None) -> logging.Logger:
     Returns:
         A configured logger for the caller.
     """
-    resolved_level = level or os.getenv("KOURAI_LOG_LEVEL", "INFO")
+    resolved_level = level if level is not None else os.getenv("KOURAI_LOG_LEVEL", "INFO")
 
     # Root logger — console handler (only if none exist yet)
     root = logging.getLogger()
