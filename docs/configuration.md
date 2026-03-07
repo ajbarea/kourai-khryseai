@@ -25,7 +25,7 @@ cp .env.example .env
 | `KOURAI_LOG_LEVEL` | `INFO` | Logging level: `DEBUG`, `INFO`, `WARNING`, `ERROR` |
 | `KOURAI_PROVIDER` | `anthropic` | LLM provider: `anthropic`, `google`, or `local` |
 | `KOURAI_MODEL_TIER` | `cheap` | Quality tier within the provider: `cheap`, `standard`, `smart` |
-| `KOURAI_MAX_ITERATIONS` | `3` | Max Kallos ↔ Techne feedback loop iterations before giving up |
+| `KOURAI_MAX_ITERATIONS` | `5` | Max Kallos ↔ Techne feedback loop iterations before giving up |
 | `KOURAI_STREAM_ENABLED` | `true` | Enable SSE streaming for real-time progress |
 
 ### Infrastructure
@@ -62,71 +62,73 @@ KOURAI_PROVIDER=google
 KOURAI_PROVIDER=local
 ```
 
-### Anthropic (Claude) — Default
+=== "Anthropic (Claude) :material-cloud:"
 
-Set `KOURAI_MODEL_TIER` to select a tier:
+    **Default provider.** Set `KOURAI_MODEL_TIER` to select a tier:
 
-#### `cheap` (default) — All Haiku
+    === "`cheap` (default)"
 
-| Agent | Model |
-|---|---|
-| 🔥 Hephaestus | Claude Haiku 4.5 |
-| 📐 Metis | Claude Haiku 4.5 |
-| ⚙️ Techne | Claude Haiku 4.5 |
-| 🧪 Dokimasia | Claude Haiku 4.5 |
-| ✨ Kallos | Claude Haiku 4.5 |
-| 📜 Mneme | Claude Haiku 4.5 |
+        All Haiku — lowest cost, good for testing and iteration.
 
-Lowest cost. Good for testing and iteration.
+        | Agent | Model |
+        |---|---|
+        | 🔥 Hephaestus | Claude Haiku 4.5 |
+        | 📐 Metis | Claude Haiku 4.5 |
+        | ⚙️ Techne | Claude Haiku 4.5 |
+        | 🧪 Dokimasia | Claude Haiku 4.5 |
+        | ✨ Kallos | Claude Haiku 4.5 |
+        | 📜 Mneme | Claude Haiku 4.5 |
 
-#### `standard` — Sonnet for heavy lifting, Haiku for lightweight
+    === "`standard`"
 
-| Agent | Model | Why |
-|---|---|---|
-| 🔥 Hephaestus | Claude Sonnet 4.6 | Routing decisions need to be accurate |
-| 📐 Metis | Claude Sonnet 4.6 | Spec generation needs strong reasoning |
-| ⚙️ Techne | Claude Sonnet 4.6 | Code generation needs strong reasoning |
-| 🧪 Dokimasia | Claude Haiku 4.5 | Test execution is mostly subprocess |
-| ✨ Kallos | Claude Haiku 4.5 | Mostly subprocess work; LLM only for comment analysis |
-| 📜 Mneme | Claude Haiku 4.5 | Commit messages are structured and formulaic |
+        Sonnet for heavy lifting, Haiku for lightweight. Balanced cost and quality.
 
-Balanced cost and quality.
+        | Agent | Model | Why |
+        |---|---|---|
+        | 🔥 Hephaestus | Claude Sonnet 4.6 | Routing decisions need to be accurate |
+        | 📐 Metis | Claude Sonnet 4.6 | Spec generation needs strong reasoning |
+        | ⚙️ Techne | Claude Sonnet 4.6 | Code generation needs strong reasoning |
+        | 🧪 Dokimasia | Claude Haiku 4.5 | Test execution is mostly subprocess |
+        | ✨ Kallos | Claude Haiku 4.5 | Mostly subprocess work; LLM only for comment analysis |
+        | 📜 Mneme | Claude Haiku 4.5 | Commit messages are structured and formulaic |
 
-#### `smart` — Maximum quality
+    === "`smart`"
 
-| Agent | Model | Why |
-|---|---|---|
-| 🔥 Hephaestus | Claude Sonnet 4.6 | Routing decisions need to be fast and accurate |
-| 📐 Metis | Claude Opus 4.6 | Planning quality determines everything downstream |
-| ⚙️ Techne | Claude Sonnet 4.6 | Code generation needs strong reasoning |
-| 🧪 Dokimasia | Claude Sonnet 4.6 | Test generation needs code understanding |
-| ✨ Kallos | Claude Sonnet 4.6 | Higher quality comment analysis |
-| 📜 Mneme | Claude Sonnet 4.6 | Better commit message grouping |
+        Maximum quality — highest cost, best output quality across the board.
 
-Highest cost. Best output quality across the board.
+        | Agent | Model | Why |
+        |---|---|---|
+        | 🔥 Hephaestus | Claude Sonnet 4.6 | Routing decisions need to be fast and accurate |
+        | 📐 Metis | Claude Opus 4.6 | Planning quality determines everything downstream |
+        | ⚙️ Techne | Claude Sonnet 4.6 | Code generation needs strong reasoning |
+        | 🧪 Dokimasia | Claude Sonnet 4.6 | Test generation needs code understanding |
+        | ✨ Kallos | Claude Sonnet 4.6 | Higher quality comment analysis |
+        | 📜 Mneme | Claude Sonnet 4.6 | Better commit message grouping |
 
-### Google (Gemini)
+=== "Google (Gemini) :material-google:"
 
-Set `KOURAI_PROVIDER=google` and add your `GEMINI_API_KEY`. Tiers map to Claude capability equivalents:
+    Set `KOURAI_PROVIDER=google` and add your `GEMINI_API_KEY`. Tiers map to Claude capability equivalents:
 
-| Tier | Model | Claude equivalent |
-|---|---|---|
-| `cheap` | Gemini 2.0 Flash | Haiku 4.5 |
-| `standard` | Gemini 2.5 Pro (heavy) / Flash (light) | Sonnet 4.6 / Haiku 4.5 |
-| `smart` | Gemini 2.5 Pro | Opus 4.6 |
+    | Tier | Model | Claude equivalent |
+    |---|---|---|
+    | `cheap` | Gemini 2.0 Flash | Haiku 4.5 |
+    | `standard` | Gemini 2.5 Pro (heavy) / Flash (light) | Sonnet 4.6 / Haiku 4.5 |
+    | `smart` | Gemini 2.5 Pro | Opus 4.6 |
 
-### Local Models (free)
+=== "Local / Ollama :material-server: (free)"
 
-Set `KOURAI_PROVIDER=local` to use these via [Ollama](https://ollama.com/):
+    Set `KOURAI_PROVIDER=local` to use these via [Ollama](https://ollama.com/):
 
-| Agent | Model | VRAM |
-|---|---|---|
-| 🔥 Hephaestus | llama3.3:70b | ~40GB |
-| 📐 Metis | llama3.3:70b | ~40GB |
-| ⚙️ Techne | llama3.3:70b | ~40GB |
-| 🧪 Dokimasia | qwen2.5-coder:32b | ~20GB |
-| ✨ Kallos | llama3.3:8b | ~5GB |
-| 📜 Mneme | llama3.3:8b | ~5GB |
+    | Agent | Model | VRAM |
+    |---|---|---|
+    | 🔥 Hephaestus | llama3.3:70b | ~40GB |
+    | 📐 Metis | llama3.3:70b | ~40GB |
+    | ⚙️ Techne | llama3.3:70b | ~40GB |
+    | 🧪 Dokimasia | qwen2.5-coder:32b | ~20GB |
+    | ✨ Kallos | llama3.3:8b | ~5GB |
+    | 📜 Mneme | llama3.3:8b | ~5GB |
+
+    No per-token charges. You pay electricity and hardware only.
 
 ---
 
@@ -274,4 +276,6 @@ See [Architecture → TTS System](architecture/tts.md) for complete API referenc
 | `make clean` | Remove `__pycache__`, `.pytest_cache`, build artifacts |
 | `make docs` | Serve documentation locally (Zensical) |
 | `make upgrade` | Update all dependencies to latest versions |
+| `make restart` | Restart all agents (`make down` then `make up`) |
+| `make dev` | Full workflow: restart services + launch GUI |
 | `make help` | Show all available commands |

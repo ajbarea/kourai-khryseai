@@ -15,7 +15,7 @@
 
 ### 1. Clone and install
 
-```bash
+```bash title="Terminal"
 git clone https://github.com/ajbarea/Kourai_Khryseai.git
 cd Kourai_Khryseai
 
@@ -32,7 +32,7 @@ cp .env.example .env
 
 Edit `.env` and add your API key:
 
-```bash
+```bash title=".env"
 ANTHROPIC_API_KEY=sk-ant-your-key-here
 ```
 
@@ -57,11 +57,26 @@ make status          # Show service state/health
 
 Docker Compose profiles for fine control:
 
-```bash
-docker compose up jaeger              # Observability only
-docker compose --profile agents up    # Specialists only (no orchestrator)
-docker compose --profile full up      # Everything
-```
+=== "Full Stack (recommended)"
+
+    ```bash
+    docker compose --profile full up
+    ```
+    All six agents + Jaeger + Prometheus.
+
+=== "Specialists Only"
+
+    ```bash
+    docker compose --profile agents up
+    ```
+    Five specialists without Hephaestus orchestrator.
+
+=== "Observability Only"
+
+    ```bash
+    docker compose up jaeger
+    ```
+    Just Jaeger for trace inspection.
 
 ---
 
@@ -130,9 +145,7 @@ The GUI speaks all agent responses through natural neural voices (Microsoft Edge
 
 #### Quick TTS Test
 
-```bash
-# Just hear what the voices sound like
-python -c "
+```python title="Quick voice demo"
 from hosts.gui.tts_engine import TTSEngine
 import asyncio
 
@@ -144,7 +157,6 @@ async def demo():
     engine.cleanup()
 
 asyncio.run(demo())
-"
 ```
 
 See [GUI Reference → Text-to-Speech System](gui.md#text-to-speech-system-) for voice customization, personality profiles, and advanced audio options.
@@ -169,7 +181,30 @@ make down
 
 ## Next Steps
 
-- **[Agents](agents/index.md)** — Learn what each specialist does and how they work
-- **[Architecture](architecture/index.md)** — Understand the system design and three-layer pattern
-- **[CLI Reference](cli.md)** — All CLI commands, options, and keyboard shortcuts
-- **[Configuration](configuration.md)** — Environment variables, model assignments, timeouts
+<div class="grid cards" markdown>
+
+-   :material-robot:{ .lg .middle } **[Agents](agents/index.md)**
+
+    ---
+
+    Learn what each specialist does and how they work
+
+-   :material-sitemap:{ .lg .middle } **[Architecture](architecture/index.md)**
+
+    ---
+
+    Understand the system design and three-layer pattern
+
+-   :material-console:{ .lg .middle } **[CLI Reference](cli.md)**
+
+    ---
+
+    All CLI commands, options, and keyboard shortcuts
+
+-   :material-cog:{ .lg .middle } **[Configuration](configuration.md)**
+
+    ---
+
+    Environment variables, model assignments, timeouts
+
+</div>

@@ -16,33 +16,33 @@ and what to watch out for cost-wise.
 
 ## Model Tiers
 
-### Anthropic
+=== "Anthropic :material-cloud:"
 
-| Tier | Model | Used by |
-|---|---|---|
-| `cheap` (default) | Claude Haiku 4.5 | All agents |
-| `standard` | Claude Sonnet 4.6 | Hephaestus, Metis, Techne |
-| `smart` | Claude Sonnet 4.6 + Opus 4.6 (Metis) | All agents (Opus for Metis only) |
+    | Tier | Model | Used by |
+    |---|---|---|
+    | `cheap` (default) | Claude Haiku 4.5 | All agents |
+    | `standard` | Claude Sonnet 4.6 | Hephaestus, Metis, Techne |
+    | `smart` | Claude Sonnet 4.6 + Opus 4.6 (Metis) | All agents (Opus for Metis only) |
 
-### Google
+=== "Google :material-google:"
 
-| Tier | Model | Used by |
-|---|---|---|
-| `cheap` | Gemini 2.0 Flash | All agents |
-| `standard` / `smart` | Gemini 2.5 Pro | Heavy agents / all agents |
+    | Tier | Model | Used by |
+    |---|---|---|
+    | `cheap` | Gemini 2.0 Flash | All agents |
+    | `standard` / `smart` | Gemini 2.5 Pro | Heavy agents / all agents |
 
-> Google offers a **free tier** with low rate limits, but prompts are used to
-> improve Google's products. Switch to Paid tier in AI Studio to opt out.
+    !!! warning "Google free tier"
+        Free tier prompts are used to improve Google's products. Switch to Paid tier in AI Studio to opt out.
 
-### Ollama (local)
+=== "Ollama :material-server: (free)"
 
-| Model | Used by | VRAM |
-|---|---|---|
-| `llama3.3:70b` | Hephaestus, Metis, Techne | ~40 GB |
-| `qwen2.5-coder:32b` | Dokimasia | ~20 GB |
-| `llama3.3:8b` | Kallos, Mneme | ~5 GB |
+    | Model | Used by | VRAM |
+    |---|---|---|
+    | `llama3.3:70b` | Hephaestus, Metis, Techne | ~40 GB |
+    | `qwen2.5-coder:32b` | Dokimasia | ~20 GB |
+    | `llama3.3:8b` | Kallos, Mneme | ~5 GB |
 
-No per-token charges. You pay electricity and hardware only.
+    No per-token charges. You pay electricity and hardware only.
 
 ## Rough Cost Per Pipeline
 
@@ -62,17 +62,19 @@ batch API discounts, and context caching storage — Kourai uses none of these.
 
 ## Cost Tips
 
-1. **`smart` tier is expensive.** Opus 4.6 costs ~5× more than Haiku 4.5.
-   Only use when you need maximum planning quality.
-2. **Gemini 2.5 Pro thinking tokens are unpredictable.** Reasoning tokens
-   count as output at full rate. Monitor usage in Google AI Studio.
-3. **Pipeline is sequential** — 6 separate billed API calls, no fan-out.
-4. **`max_tokens=4096`** caps output. Techne and Metis are the most
-   expensive per call due to output length.
-5. **Streaming has the same cost as non-streaming.** Only affects delivery, not billing.
+!!! tip "Keep costs low"
+    1. **`smart` tier is expensive.** Opus 4.6 costs ~5× more than Haiku 4.5.
+       Only use when you need maximum planning quality.
+    2. **Gemini 2.5 Pro thinking tokens are unpredictable.** Reasoning tokens
+       count as output at full rate. Monitor usage in Google AI Studio.
+    3. **Pipeline is sequential** — 6 separate billed API calls, no fan-out.
+    4. **`max_tokens=4096`** caps output. Techne and Metis are the most
+       expensive per call due to output length.
+    5. **Streaming has the same cost as non-streaming.** Only affects delivery, not billing.
 
 ## Prompt Caching (not yet implemented)
 
-Every agent has a large static system prompt — an ideal caching candidate.
-Both Anthropic and Google offer 80–90% input cost savings on cached reads.
-LiteLLM supports this via the `cache_control` content block parameter.
+!!! info "Future optimization"
+    Every agent has a large static system prompt — an ideal caching candidate.
+    Both Anthropic and Google offer 80–90% input cost savings on cached reads.
+    LiteLLM supports this via the `cache_control` content block parameter.

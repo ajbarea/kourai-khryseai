@@ -244,9 +244,8 @@ engine.cleanup()
 
 ## Migration Guide: v1.0 → v2.0
 
-### Backward Compatibility
-
-✅ **Fully backward compatible** - All existing v1.0 code continues to work without changes.
+??? success "Fully backward compatible"
+    All existing v1.0 code continues to work without changes. The new features below are opt-in.
 
 ### What's New (Optional)
 

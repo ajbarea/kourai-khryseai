@@ -97,8 +97,8 @@ DEFAULT_TIMEOUT = 30  # 30 seconds
 _cached_models: dict[str, str] = {}
 
 # ✅ Constraints
-# Max 3 iterations to prevent infinite Kallos ↔ Techne loops
-MAX_ITERATIONS = int(os.getenv("KOURAI_MAX_ITERATIONS", "3"))
+# Max 5 iterations to prevent infinite Kallos ↔ Techne loops
+MAX_ITERATIONS = int(os.getenv("KOURAI_MAX_ITERATIONS", "5"))
 ```
 
 ### Research citations

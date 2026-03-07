@@ -76,7 +76,7 @@ sequenceDiagram
         Note over Specialists,Hephaestus: Streams "inner thoughts"<br/>line-by-line in real time
         Specialists-->>Hephaestus: Result + context
     end
-    Note over Hephaestus,Specialists: If Kallos finds issues,<br/>loops with Techne (max 3×)
+    Note over Hephaestus,Specialists: If Kallos finds issues,<br/>loops with Techne (max 5×)
     Hephaestus-->>GUI: SSE status updates + artifacts
     GUI-->>User: Real-time UI updates
 ```
@@ -100,16 +100,57 @@ If a request is ambiguous, the system avoids generating thousands of wasted toke
 
 ## 🔧 Built With
 
-| | |
-|---|---|
-| :material-api: **Protocol** | [A2A 0.3.x](https://a2a-protocol.org) — open agent-to-agent communication standard |
-| :material-language-python: **Language** | Python 3.12+ · modern type hints · Google docstrings |
-| :material-brain: **LLM** | [LiteLLM](https://docs.litellm.ai/) — Claude in production, Ollama for free local dev |
-| :material-server: **Server** | [Starlette](https://www.starlette.io/) + uvicorn via `a2a-sdk` |
-| :material-magnify: **Observability** | [OpenTelemetry](https://opentelemetry.io/) → [Jaeger](https://www.jaegertracing.io/) |
-| :material-docker: **Containers** | Docker + Docker Compose · optional Terraform for cloud |
-| :material-package-variant: **Packaging** | [uv](https://docs.astral.sh/uv/) workspaces |
-| :material-book-open-variant: **Docs** | [Zensical](https://zensical.dev) |
+<div class="grid cards" markdown>
+
+-   :material-api:{ .lg .middle } **Protocol**
+
+    ---
+
+    [A2A 0.3.x](https://a2a-protocol.org) — open agent-to-agent communication standard
+
+-   :material-language-python:{ .lg .middle } **Language**
+
+    ---
+
+    Python 3.12+ · modern type hints · Google docstrings
+
+-   :material-brain:{ .lg .middle } **LLM**
+
+    ---
+
+    [LiteLLM](https://docs.litellm.ai/) — Claude in production, Ollama for free local dev
+
+-   :material-server:{ .lg .middle } **Server**
+
+    ---
+
+    [Starlette](https://www.starlette.io/) + uvicorn via `a2a-sdk`
+
+-   :material-magnify:{ .lg .middle } **Observability**
+
+    ---
+
+    [OpenTelemetry](https://opentelemetry.io/) → [Jaeger](https://www.jaegertracing.io/)
+
+-   :material-docker:{ .lg .middle } **Containers**
+
+    ---
+
+    Docker + Docker Compose · optional Terraform for cloud
+
+-   :material-package-variant:{ .lg .middle } **Packaging**
+
+    ---
+
+    [uv](https://docs.astral.sh/uv/) workspaces
+
+-   :material-book-open-variant:{ .lg .middle } **Docs**
+
+    ---
+
+    [Zensical](https://zensical.dev)
+
+</div>
 
 ---
 

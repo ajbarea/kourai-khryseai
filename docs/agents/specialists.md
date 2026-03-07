@@ -102,10 +102,11 @@ class PytestRunResult:
     passed: int
     failed: int
     skipped: int
-    error: int
+    errors: int
+    total: int
     duration: float      # seconds
     output: str          # raw pytest output
-    returncode: int
+    success: bool
 ```
 
 **Test generation priorities:**
@@ -134,8 +135,8 @@ Runs linters, cleans up comments, and enforces the project's style guide. Uses a
 
 **Two-stage analysis:**
 
-1. **Subprocess** — Runs `ruff check` and `ruff format --check` concurrently via `asyncio.gather`
-2. **LLM** — Analyzes comments and docstrings against project standards
+1. **Subprocess** — Runs `make lint` (ruff check + format) via `run_make_lint()`
+2. **LLM** — Fixes lint issues and analyzes comments/docstrings against project standards
 
 **Comment analysis rules:**
 
@@ -150,15 +151,16 @@ Runs linters, cleans up comments, and enforces the project's style guide. Uses a
 ```python
 @dataclass
 class LintResult:
+    tool: str
     passed: bool
     output: str
-    errors: int
+    fixed_count: int
 
 @dataclass
 class StyleReport:
-    ruff_check: LintResult
-    ruff_format: LintResult
+    lint_results: list[LintResult]
     comment_analysis: str
+    all_clean: bool
 ```
 
 **Internal Fix Loop:**
@@ -177,7 +179,7 @@ flowchart LR
     DONE["✅ All Clean"]
 
     KAL --> DEC
-    DEC -->|"Yes (≤3 iterations)"| TEC
+    DEC -->|"Yes (≤5 iterations)"| TEC
     TEC --> KAL
     DEC -->|"No"| DONE
 ```
@@ -186,7 +188,7 @@ flowchart LR
 
 | File | Purpose |
 |---|---|
-| `agent.py` | `run_ruff_check()`, `run_ruff_format_check()`, `analyze_comments()` |
+| `agent.py` | `run_make_lint()`, `fix_lint_issues()`, `run_style_check()` |
 | `agent_executor.py` | A2A bridge, report formatting, OTEL spans |
 | `__main__.py` | AgentCard, server startup |
 

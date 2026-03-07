@@ -28,16 +28,18 @@ flowchart TD
 
 ### Example: Mneme's Three Layers
 
-```python
-# agent.py — pure logic, no A2A
+```python title="agents/mneme/agent.py — pure logic, no A2A"
 async def generate_commit_messages(git_output: str) -> str:
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": git_output},
     ]
-    return await chat("mneme", messages)
+    return await chat("mneme", messages)  # (1)!
+```
 
-# agent_executor.py — A2A bridge
+1. `chat()` from `kourai_common.llm` — handles model selection, timeouts, and retries automatically.
+
+```python title="agents/mneme/agent_executor.py — A2A bridge"
 class MnemeAgentExecutor(AgentExecutor):
     async def execute(self, context, event_queue):
         user_input = context.get_user_input()
@@ -48,8 +50,9 @@ class MnemeAgentExecutor(AgentExecutor):
         result = await generate_commit_messages(user_input)
         await updater.add_artifact([Part(root=TextPart(text=result))])
         await updater.complete()
+```
 
-# __main__.py — server config
+```python title="agents/mneme/__main__.py — server config"
 card = AgentCard(
     name="Mneme",
     description="Generates commit messages from git diff output",
@@ -64,18 +67,21 @@ app = A2AStarletteApplication(agent_card=card, agent_executor=MnemeAgentExecutor
 
 ## 📦 Shared Library: `kourai-common`
 
-All agents depend on a shared workspace member at `shared/src/kourai_common/` with four modules:
+All agents depend on a shared workspace member at `shared/src/kourai_common/`. The four foundational modules are:
 
 ### `config.py` — Agent Configuration
 
 Centralized model assignments, ports, timeouts, and environment variable handling.
 
-```python
+```python title="config.py usage"
 from kourai_common.config import get_model, get_agent_url, MAX_ITERATIONS
 
-get_model("metis")       # → depends on KOURAI_MODEL_TIER; "anthropic/claude-opus-4-6" on smart, Haiku on cheap (default)
-get_agent_url("techne")  # → "http://localhost:10002/" (or Docker service name)
+get_model("metis")       # (1)!
+get_agent_url("techne")  # (2)!
 ```
+
+1. Returns model based on `KOURAI_MODEL_TIER` — e.g. `"anthropic/claude-opus-4-6"` on smart, Haiku on cheap (default)
+2. Returns `"http://localhost:10002/"` locally, or Docker service name when `KOURAI_AGENT_HOST=true`
 
 `KOURAI_AGENT_HOST=true` switches URL resolution from `localhost:PORT` to `servicename:PORT` for Docker networking.
 
@@ -83,7 +89,7 @@ get_agent_url("techne")  # → "http://localhost:10002/" (or Docker service name
 
 Wraps [LiteLLM](https://docs.litellm.ai/) for async-compatible calls with per-agent timeout enforcement.
 
-```python
+```python title="llm.py usage"
 from kourai_common.llm import chat, chat_stream
 
 # Synchronous response
@@ -98,7 +104,7 @@ async for chunk in chat_stream("techne", messages):
 
 Sets up distributed tracing with Jaeger as the backend.
 
-```python
+```python title="tracing.py usage"
 from kourai_common.tracing import setup_tracing, create_span, get_trace_context
 
 # Call once at startup
@@ -116,7 +122,7 @@ metadata = get_trace_context()  # → W3C traceparent/tracestate headers
 
 Decorator for transient failure recovery on network calls.
 
-```python
+```python title="retry.py usage"
 from kourai_common.retry import with_retry
 
 @with_retry(max_attempts=3, base_delay=1.0,
@@ -138,4 +144,9 @@ The database implements 2026 Best Practices for A2A Memory (Hierarchical State M
 - **`messages`**: Episodic/working memory. Stores every single message exchanged, tracking the `context_id` (thread), `agent_name`, `role`, and the raw `content`.
 - **`agent_states`**: Semantic memory. Stores structured state objects (goal hierarchies, checkpoints, summaries) for each agent and thread.
 
-> **Visualizing the Database:** The 2026 best practice for debugging these A2A SQLite logs is using a modern database UI like **Beekeeper Studio**, or directly within your IDE using the **SQLite Viewer** extension in VS Code/Cursor. Alternatively, use the CLI: `sqlite3 .cache/agent_memory.db "SELECT role, content FROM messages WHERE agent_name='kallos';"`
+!!! tip "Visualizing the Database"
+    Use a modern database UI like **Beekeeper Studio**, or the **SQLite Viewer** extension in VS Code/Cursor. Alternatively, use the CLI:
+
+    ```bash
+    sqlite3 .cache/agent_memory.db "SELECT role, content FROM messages WHERE agent_name='kallos';"
+    ```

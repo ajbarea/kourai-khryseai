@@ -1,7 +1,7 @@
 # Frontend Style Guide
 
 !!! note "Future Reference"
-    Kourai Khryseai is currently a backend-only system. This guide establishes standards for a future web UI.
+    Kourai Khryseai's current GUI is a Pygame desktop client. This guide establishes standards for a future web UI.
 
 Standards for React + TypeScript development in Kourai Khryseai.
 

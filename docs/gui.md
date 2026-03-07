@@ -54,7 +54,7 @@ uv run python -m hosts.gui --agent http://192.168.1.50:10000/
 - **Title** — Agent role (The Forge Master, The Architect, etc.)
 - **Quote** — Random personality quote that updates on agent switch
 
-### Right Panel (960px)
+### Right Panel (970px)
 - **Status messages** — Pipeline progress with emoji prefixes
 - **Dialogue history** — Scrollable transcript of all messages
 - **User bubbles** — Right-aligned, dim gold border
@@ -300,20 +300,22 @@ Settings are saved to `~/.kourai_khryseai/settings.json` and automatically loade
 
 The GUI uses a deep black + molten gold aesthetic:
 
-| Color | RGB | Usage |
-|---|---|---|
-| **BLACK** | (5, 5, 5) | Background |
-| **DARK_BG** | (12, 10, 8) | Secondary background |
-| **PANEL_BG** | (18, 14, 10) | Portrait panel background |
-| **GOLD** | (218, 165, 32) | Primary accent |
-| **GOLD_BRIGHT** | (255, 215, 0) | Highlights |
-| **GOLD_DIM** | (140, 105, 20) | Secondary accent |
-| **GOLD_GLOW** | (255, 200, 60) | Glow effects |
-| **WHITE** | (240, 235, 225) | Primary text |
-| **DIM_WHITE** | (160, 155, 145) | Secondary text |
-| **INPUT_BG** | (20, 16, 12) | Input bar background |
-| **SCROLLBAR** | (50, 40, 25) | Scrollbar |
-| **ERROR_RED** | (200, 80, 60) | Error indicators |
+??? abstract "Full color table (`constants.py`)"
+
+    | Color | RGB | Usage |
+    |---|---|---|
+    | **BLACK** | (5, 5, 5) | Background |
+    | **DARK_BG** | (12, 10, 8) | Secondary background |
+    | **PANEL_BG** | (18, 14, 10) | Portrait panel background |
+    | **GOLD** | (218, 165, 32) | Primary accent |
+    | **GOLD_BRIGHT** | (255, 215, 0) | Highlights |
+    | **GOLD_DIM** | (140, 105, 20) | Secondary accent |
+    | **GOLD_GLOW** | (255, 200, 60) | Glow effects |
+    | **WHITE** | (240, 235, 225) | Primary text |
+    | **DIM_WHITE** | (160, 155, 145) | Secondary text |
+    | **INPUT_BG** | (20, 16, 12) | Input bar background |
+    | **SCROLLBAR** | (50, 40, 25) | Scrollbar |
+    | **ERROR_RED** | (200, 80, 60) | Error indicators |
 
 ---
 
@@ -421,10 +423,10 @@ The GUI targets WCAG 2.2 Level AA compliance with these features:
 | Component | File | Purpose |
 |---|---|---|
 | **GuiClient** | `client.py` | Async A2A client wrapper |
-| **PortraitPanel** | `__main__.py` | Agent portrait rendering |
-| **DialogueHistory** | `__main__.py` | Scrollable transcript management |
-| **InputBar** | `__main__.py` | Text input handling |
-| **ParticleSystem** | `__main__.py` | Golden ember particles |
+| **PortraitPanel** | `portrait.py` | Agent portrait rendering |
+| **DialogueHistory** | `dialogue.py` | Scrollable transcript management |
+| **InputBar** | `input_bar.py` | Text input handling |
+| **ParticleSystem** | `particles.py` | Golden ember particles |
 | **SettingsOverlay** | `settings_ui.py` | Settings UI panel |
 | **SettingsManager** | `settings.py` | Settings persistence |
 | **GUIComponentsIntegration** | `gui_components_integration.py` | Component integration |
@@ -458,10 +460,10 @@ uv run pytest
 
 ### Customizing Visuals
 
-- **Colors** — Edit color constants at top of `__main__.py`
-- **Layout** — Adjust layout constants (W, H, PORTRAIT_W, etc.)
-- **Fonts** — Modify `_load_font()` call in `__main__.py`
-- **Particle System** — Edit `Ember` and `ParticleSystem` classes
+- **Colors** — Edit color constants in `constants.py`
+- **Layout** — Adjust layout constants (W, H, PORTRAIT_W, etc.) in `constants.py`
+- **Fonts** — Modify font loading in `__main__.py`
+- **Particle System** — Edit `Ember` and `ParticleSystem` classes in `particles.py`
 
 ---
 

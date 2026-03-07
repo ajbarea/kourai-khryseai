@@ -25,13 +25,17 @@ uv run python -m hosts.cli
 | `--agent URL` | Auto-detected from config | Override the Hephaestus URL |
 | `--timeout SECONDS` | `600` | Request timeout |
 | `-v`, `--verbose` | Off | Show timing, event counts, and debug details |
+| `-p`, `--prompt TEXT` | *(interactive)* | Run a single prompt non-interactively (headless mode) |
 
-```bash
+```bash title="Examples"
 # Connect to a specific Hephaestus instance
 uv run python -m hosts.cli --agent http://192.168.1.50:10000/
 
 # Verbose mode for debugging
 uv run python -m hosts.cli --verbose
+
+# Run a single prompt non-interactively
+uv run python -m hosts.cli -p "commit prep"
 ```
 
 ---
@@ -42,6 +46,12 @@ uv run python -m hosts.cli --verbose
 |---|---|
 | `:q` or `quit` or `exit` | Exit the CLI |
 | `:status` | Show agent name, version, URL, context ID, streaming status |
+| `:help` | Show command help |
+| `:maidens` | Meet the Golden Maidens (list all agents) |
+| `:maidens <name>` | Show a specific maiden by name |
+| `:copy` | Copy last result to clipboard |
+| `:save <file>` | Save last result to a file |
+| `:clear` | Clear the screen |
 | Any other text | Send as a request to Hephaestus |
 
 ---

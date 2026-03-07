@@ -35,7 +35,7 @@ Open [`localhost:16686`](http://localhost:16686) and select any service:
 
 A single generic `Dockerfile` at `docker/agent.Dockerfile` builds any agent via the `AGENT_NAME` build arg:
 
-```bash
+```bash title="Build a single agent"
 docker build --build-arg AGENT_NAME=mneme -f docker/agent.Dockerfile -t kourai-mneme .
 ```
 
@@ -59,21 +59,17 @@ Environment variable `KOURAI_AGENT_HOST=true` is set automatically in Docker, sw
 
 ## 🔑 Key Design Decisions
 
-### Why `a2a-sdk` directly, not AgentStack
+??? question "Why `a2a-sdk` directly, not AgentStack?"
+    [AgentStack](https://agentstack.beeai.dev/) requires Kubernetes via Lima VM. Windows support needs WSL2. Frequent breaking changes. Decision: `a2a-sdk` + Starlette + uvicorn gives full A2A compliance without K8s overhead.
 
-[AgentStack](https://agentstack.beeai.dev/) requires Kubernetes via Lima VM. Windows support needs WSL2. Frequent breaking changes. Decision: `a2a-sdk` + Starlette + uvicorn gives full A2A compliance without K8s overhead.
+??? question "Why A2A 0.3.x, not 1.0?"
+    v1.0 RC has breaking changes: Part type unification, enum case changes, method renames, well-known URL rename. Pinned at `a2a-sdk>=0.3.0,<1.0` until v1.0 stabilizes. Current stable: `0.3.24` (Feb 2026).
 
-### Why A2A 0.3.x, not 1.0
+??? question "Why LiteLLM?"
+    Model-agnostic interface. Claude for production, Ollama for free local dev. Swap with one env var: `KOURAI_PROVIDER=local`.
 
-v1.0 RC has breaking changes: Part type unification, enum case changes, method renames, well-known URL rename. Pinned at `a2a-sdk>=0.3.0,<1.0` until v1.0 stabilizes. Current stable: `0.3.24` (Feb 2026).
-
-### Why LiteLLM
-
-Model-agnostic interface. Claude for production, Ollama for free local dev. Swap with one env var: `KOURAI_PROVIDER=local`.
-
-### Why sequential pipelines, not parallel
-
-Agents build on each other's output — Techne needs Metis's spec, Dokimasia needs Techne's code, Kallos needs the files written. Parallelism doesn't help when there's a data dependency chain. The Kallos-Techne loop is the one place where iteration (not parallelism) adds value.
+??? question "Why sequential pipelines, not parallel?"
+    Agents build on each other's output — Techne needs Metis's spec, Dokimasia needs Techne's code, Kallos needs the files written. Parallelism doesn't help when there's a data dependency chain. The Kallos-Techne loop is the one place where iteration (not parallelism) adds value.
 
 ---
 

@@ -54,7 +54,6 @@ Each agent exposes an **A2A Agent Card** — a JSON document at `/.well-known/ag
 
 Hephaestus fetches these cards when connecting to specialists, enabling runtime discovery rather than hardcoded integration.
 
-```bash
-# Inspect any agent's card
+```bash title="Inspect any agent's card"
 curl http://localhost:10005/.well-known/agent-card.json | python -m json.tool
 ```
