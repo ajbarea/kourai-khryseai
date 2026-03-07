@@ -2,7 +2,7 @@
 
 Uses edge-tts for natural neural voices and Pygame for playback.
 Supports streaming, volume control, audio effects, and asynchronous playback.
-Optimized for March 2026 best practices with low-latency streaming and MP3→WAV conversion.
+Optimized with low-latency streaming and MP3→WAV conversion.
 """
 
 from __future__ import annotations

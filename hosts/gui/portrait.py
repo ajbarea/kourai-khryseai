@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import textwrap
 import logging
+import textwrap
 
 import pygame
 from PIL import Image as PILImage
