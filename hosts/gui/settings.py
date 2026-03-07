@@ -23,6 +23,7 @@ DEFAULT_SETTINGS = {
     "show_metadata": True,
     "show_debug_logs": False,
     "reduce_motion": False,
+    "fullscreen": False,
     "display_mode": "Windowed",
     "music_volume": 0.05,
     "ambient_volume": 0.10,
