@@ -88,6 +88,13 @@ class OnboardingOverlay:
             PANEL_H,
         )
 
+    def update_layout(self, screen_w: int, screen_h: int) -> None:
+        """Re-center the overlay for the current window size."""
+
+        self.screen_w = screen_w
+        self.screen_h = screen_h
+        self.panel_rect.center = (screen_w // 2, screen_h // 2)
+
     def start(self) -> None:
         """Activate the onboarding overlay."""
         self.active = True

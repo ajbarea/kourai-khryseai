@@ -78,6 +78,13 @@ class MemoryViewerPanel:
         self._scroll_y = 0.0
         self._content_h = 0.0
 
+    def update_layout(self, screen_w: int, screen_h: int) -> None:
+        """Re-center the panel after a window resize or mode switch."""
+
+        self.screen_w = screen_w
+        self.screen_h = screen_h
+        self.panel_rect.center = (screen_w // 2, screen_h // 2)
+
     def toggle(self) -> None:
         self.active = not self.active
         if self.active:

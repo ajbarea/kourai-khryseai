@@ -100,6 +100,7 @@ class DialogueHistory:
         self._dirty = True
         self._scroll_y = 0
         self._content_h = 0
+        self._viewport_h = constants.DIALOGUE_H
         self.show_timestamps = True
         self.show_metadata = True
         self.timestamp_format = "24h"
@@ -115,11 +116,11 @@ class DialogueHistory:
             self._dirty = True
 
     def scroll(self, dy: int) -> None:
-        max_scroll = max(0, self._content_h - (constants.DIALOGUE_H - self.PAD * 2 - 60))
+        max_scroll = max(0, self._content_h - (self._viewport_h - self.PAD * 2 - 60))
         self._scroll_y = max(0, min(self._scroll_y + dy, max_scroll))
 
     def scroll_to_bottom(self) -> None:
-        self._scroll_y = max(0, self._content_h - (constants.DIALOGUE_H - self.PAD * 2 - 60))
+        self._scroll_y = max(0, self._content_h - (self._viewport_h - self.PAD * 2 - 60))
 
     def handle_click(self, pos: tuple[int, int], dest_rect: pygame.Rect) -> str | None:
         """Handle mouse click and return the agent of the clicked message."""
@@ -149,6 +150,7 @@ class DialogueHistory:
 
     def _render(self, dest_rect: pygame.Rect) -> None:
         """Re-render all entries onto self._surf."""
+        self._viewport_h = dest_rect.height
         total_h = self.PAD
         dest_w = dest_rect.width
 

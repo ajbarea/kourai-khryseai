@@ -59,6 +59,12 @@ class AlignmentGaugePanel:
         self._sov_display = 0.0
         self._dev_display = 0.0
 
+    def update_layout(self, screen_w: int, screen_h: int) -> None:
+        """Track the current window size for future layout decisions."""
+
+        self.screen_w = screen_w
+        self.screen_h = screen_h
+
     def toggle(self) -> None:
         self.active = not self.active
 

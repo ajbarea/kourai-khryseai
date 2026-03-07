@@ -87,6 +87,14 @@ class GossipPanel:
             self.screen_w - GOSSIP_PANEL_W, 40, GOSSIP_PANEL_W, self.screen_h - 120
         )
 
+    def update_layout(self, screen_w: int, screen_h: int) -> None:
+        """Refresh the panel anchor after a window resize or mode switch."""
+
+        self.screen_w = screen_w
+        self.screen_h = screen_h
+        self._update_rect()
+        self._scroll_y = max(0, min(self._scroll_y, self._content_h - self.panel_rect.height + 100))
+
     def start_session(self, agent_a: str, agent_b: str) -> None:
         """Begin a new gossip session display."""
         self.agent_a = agent_a
