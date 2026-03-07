@@ -12,13 +12,14 @@ WORKDIR /app
 # Copy workspace root config + lockfile for reproducible builds
 COPY pyproject.toml uv.lock ./
 COPY shared/ shared/
+COPY scripts/ scripts/
 
 # Copy agent source (set by build arg)
 ARG AGENT_NAME
 COPY agents/${AGENT_NAME}/ agents/${AGENT_NAME}/
 
-# Install workspace deps for this agent
-RUN uv sync --no-dev --frozen
+# Install the selected workspace package and its transitive dependencies.
+RUN uv sync --package kourai-${AGENT_NAME} --no-dev --frozen
 
 # --- Runtime stage ---
 FROM python:${PYTHON_VERSION}-slim AS runtime
@@ -31,6 +32,7 @@ WORKDIR /app
 # Copy installed venv from builder
 COPY --from=builder /app/.venv /app/.venv
 COPY --from=builder /app/shared /app/shared
+COPY --from=builder /app/scripts /app/scripts
 COPY --from=builder /app/agents/${AGENT_NAME} /app/agents/${AGENT_NAME}
 COPY --from=builder /app/pyproject.toml /app/pyproject.toml
 
