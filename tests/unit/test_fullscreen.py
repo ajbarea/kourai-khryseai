@@ -1,5 +1,6 @@
 """Test fullscreen toggle functionality."""
 
+import json
 from pathlib import Path
 
 import pytest
@@ -44,6 +45,15 @@ def test_fullscreen_toggle():
         # Toggle off
         settings.set("fullscreen", False)
         assert settings.get("fullscreen") is False
+
+
+def test_legacy_fullscreen_setting_migrates_to_display_mode(tmp_path):
+    config_file = tmp_path / "legacy_settings.json"
+    config_file.write_text(json.dumps({"fullscreen": True}), encoding="utf-8")
+
+    settings = SettingsManager(config_file)
+
+    assert settings.get("display_mode") == "Fullscreen"
 
 
 if __name__ == "__main__":

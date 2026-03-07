@@ -123,6 +123,15 @@ class TestDialogueHistory:
         h.scroll_to_bottom()
         assert h._scroll_y > 0
 
+    def test_scroll_uses_current_viewport_height(self):
+        h = DialogueHistory()
+        h._content_h = 2000
+        h._viewport_h = 400
+
+        h.scroll_to_bottom()
+
+        assert h._scroll_y == 2000 - (400 - h.PAD * 2 - 60)
+
     def test_wrap_text(self):
         h = DialogueHistory()
         lines = h._wrap_text("Hello world this is a test", 200)
@@ -343,6 +352,14 @@ class TestGossipPanel:
         assert p.slide_x == 0.0
         assert len(p.messages) == 0
 
+    def test_update_layout_reanchors_panel(self):
+        p = GossipPanel(800, 600)
+
+        p.update_layout(1280, 720)
+
+        assert p.panel_rect.right == 1280
+        assert p.panel_rect.height == 600
+
     def test_start_session(self):
         p = GossipPanel(800, 600)
         p.start_session("metis", "kallos")
@@ -510,6 +527,13 @@ class TestMemoryViewerPanel:
         assert mv.alpha == 0.0
         assert mv._profile_data is None
 
+    def test_update_layout_repositions_panel(self):
+        mv = MemoryViewerPanel(800, 600)
+
+        mv.update_layout(1280, 720)
+
+        assert mv.panel_rect.center == (640, 360)
+
     def test_toggle_activates(self):
         mv = MemoryViewerPanel(800, 600)
         with patch.object(mv, "_refresh_data"):
@@ -672,6 +696,14 @@ class TestAlignmentGaugePanel:
         assert p.sovereignty == 0
         assert p.devotion == 0
 
+    def test_update_layout_tracks_screen_size(self):
+        p = AlignmentGaugePanel(800, 600)
+
+        p.update_layout(1280, 720)
+
+        assert p.screen_w == 1280
+        assert p.screen_h == 720
+
     def test_toggle(self):
         p = AlignmentGaugePanel(800, 600)
         p.toggle()
@@ -803,6 +835,13 @@ class TestOnboardingOverlay:
         assert o.active is False
         assert o.step == STEP_NAME
         assert o._result is None
+
+    def test_update_layout_repositions_panel(self):
+        o = OnboardingOverlay(800, 600)
+
+        o.update_layout(1280, 720)
+
+        assert o.panel_rect.center == (640, 360)
 
     def test_start(self):
         o = OnboardingOverlay(800, 600)
