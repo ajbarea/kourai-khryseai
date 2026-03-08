@@ -14,7 +14,7 @@ import re
 from uuid import uuid4
 
 import httpx
-from a2a.client import ClientConfig, ClientFactory
+from a2a.client import A2ACardResolver, ClientConfig, ClientFactory
 from a2a.types import (
     Message,
     Part,
@@ -53,9 +53,11 @@ class GuiClient:
         # --- Connect and announce ---
         try:
             async with httpx.AsyncClient(timeout=10.0) as http:
-                config = ClientConfig(streaming=True, httpx_client=http)
-                client = await ClientFactory.connect(self._default_url, client_config=config)
-                card = await client.get_card()
+                resolver = A2ACardResolver(http, self._default_url)
+                card = await resolver.get_agent_card()
+                # Override card URL — the agent may advertise a Docker-internal
+                # hostname that the host machine cannot reach.
+                card.url = self._default_url
                 self._put({"type": "connected", "name": card.name, "url": self._default_url})
         except Exception as e:
             self._put({"type": "error", "text": f"Cannot reach Hephaestus: {e}"})
@@ -98,7 +100,12 @@ class GuiClient:
         try:
             async with httpx.AsyncClient(timeout=300.0) as http:
                 config = ClientConfig(streaming=True, httpx_client=http)
-                client = await ClientFactory.connect(target_url, client_config=config)
+                # Fetch card and override URL so Docker-internal hostnames
+                # are replaced with the reachable target_url.
+                resolver = A2ACardResolver(http, target_url)
+                card = await resolver.get_agent_card()
+                card.url = target_url
+                client = await ClientFactory.connect(card, client_config=config)
 
                 async for event in client.send_message(message):
                     if isinstance(event, Message):

@@ -22,7 +22,7 @@ from uuid import uuid4
 
 import asyncclick as click
 import httpx
-from a2a.client import ClientConfig, ClientFactory
+from a2a.client import A2ACardResolver, ClientConfig, ClientFactory
 from a2a.client.client import Client
 from a2a.types import (
     FilePart,
@@ -968,6 +968,26 @@ async def send_and_stream(
 # ---------------------------------------------------------------------------
 # Headless mode (non-interactive, like Gemini's -p flag)
 # ---------------------------------------------------------------------------
+async def _connect_with_url_override(
+    url: str,
+    config: ClientConfig,
+) -> Client:
+    """Connect to an agent, overriding the card URL with the reachable URL.
+
+    Agent cards in Docker advertise internal hostnames (e.g. http://hephaestus:10000/)
+    that the host machine cannot resolve. This fetches the card, patches the URL
+    to the one we actually connected through, then hands it to the SDK.
+    """
+    http = config.httpx_client
+    if http is None:
+        raise ValueError("ClientConfig must have an httpx_client")
+    resolver = A2ACardResolver(http, url)
+    card = await resolver.get_agent_card()
+    card.url = url
+    return await ClientFactory.connect(card, client_config=config)
+
+
+# ---------------------------------------------------------------------------
 async def _headless(agent_url: str, prompt: str, timeout: int, verbose: bool) -> None:
     """Run a single prompt non-interactively and exit. For scripts and piping."""
     config = ClientConfig(
@@ -976,7 +996,7 @@ async def _headless(agent_url: str, prompt: str, timeout: int, verbose: bool) ->
     )
 
     try:
-        client = await ClientFactory.connect(agent_url, client_config=config)
+        client = await _connect_with_url_override(agent_url, config)
     except httpx.ConnectError:
         click.echo(f"Error: cannot reach Hephaestus at {agent_url}", err=True)
         click.echo("Start agents with: make up", err=True)
@@ -1161,7 +1181,7 @@ async def main(agent: str | None, timeout: int, verbose: bool, prompt: str | Non
     )
 
     try:
-        client = await ClientFactory.connect(agent, client_config=config)
+        client = await _connect_with_url_override(agent, config)
     except httpx.ConnectError:
         _echo(f"{_RED}\U0001f525 Cannot reach Hephaestus at {agent}{_RESET}")
         _echo(f"Start the forge with: {_GOLD}make up{_RESET}")
