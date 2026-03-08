@@ -165,4 +165,15 @@ async def run_fix_loop(
             emoji=emoji,
         )
 
+        # Break if LLM couldn't generate valid fixes
+        if fixes_applied == 0:
+            log.warning(
+                "LLM could not generate valid fixes for %s (iteration %d/%d). "
+                "Stopping to avoid infinite loop.",
+                tool_name,
+                iteration,
+                max_iterations,
+            )
+            break
+
     return result.all_passed, result.final_output, result
