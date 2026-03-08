@@ -3,7 +3,11 @@ name = "kourai-kallos"
 version = "0.1.0"
 description = "Style agent — linting, formatting, comment cleanup"
 requires-python = ">=3.12"
-dependencies = ["kourai-common"]
+dependencies = [
+    "kourai-common",
+    "ruff>=0.9",
+    "mypy>=1.15.0",
+]
 
 [build-system]
 requires = ["hatchling"]

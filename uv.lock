@@ -1086,10 +1086,14 @@ version = "0.1.0"
 source = { editable = "agents/dokimasia" }
 dependencies = [
     { name = "kourai-common" },
+    { name = "pytest" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "kourai-common", editable = "shared" }]
+requires-dist = [
+    { name = "kourai-common", editable = "shared" },
+    { name = "pytest", specifier = ">=8.0" },
+]
 
 [[package]]
 name = "kourai-gui"
@@ -1135,10 +1139,16 @@ version = "0.1.0"
 source = { editable = "agents/kallos" }
 dependencies = [
     { name = "kourai-common" },
+    { name = "mypy" },
+    { name = "ruff" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "kourai-common", editable = "shared" }]
+requires-dist = [
+    { name = "kourai-common", editable = "shared" },
+    { name = "mypy", specifier = ">=1.15.0" },
+    { name = "ruff", specifier = ">=0.9" },
+]
 
 [[package]]
 name = "kourai-khryseai"
