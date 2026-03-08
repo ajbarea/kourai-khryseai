@@ -13,6 +13,7 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 COPY shared/ shared/
 COPY scripts/ scripts/
+COPY tests/ tests/
 
 # Copy agent source (set by build arg)
 ARG AGENT_NAME
@@ -37,6 +38,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends git \
 COPY --from=builder /app/.venv /app/.venv
 COPY --from=builder /app/shared /app/shared
 COPY --from=builder /app/scripts /app/scripts
+COPY --from=builder /app/tests /app/tests
 COPY --from=builder /app/agents/${AGENT_NAME} /app/agents/${AGENT_NAME}
 COPY --from=builder /app/pyproject.toml /app/pyproject.toml
 

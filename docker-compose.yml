@@ -63,6 +63,8 @@ services:
         PORT: 10005
     ports:
       - "10005:10005"
+    volumes:
+      - ./tests:/app/tests
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
       PORT: 10005
@@ -78,6 +80,8 @@ services:
         PORT: 10004
     ports:
       - "10004:10004"
+    volumes:
+      - ./tests:/app/tests
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
       PORT: 10004
@@ -93,6 +97,8 @@ services:
         PORT: 10002
     ports:
       - "10002:10002"
+    volumes:
+      - ./tests:/app/tests
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
       PORT: 10002
@@ -108,6 +114,8 @@ services:
         PORT: 10003
     ports:
       - "10003:10003"
+    volumes:
+      - ./tests:/app/tests
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
       PORT: 10003
@@ -123,6 +131,8 @@ services:
         PORT: 10001
     ports:
       - "10001:10001"
+    volumes:
+      - ./tests:/app/tests
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
       PORT: 10001
