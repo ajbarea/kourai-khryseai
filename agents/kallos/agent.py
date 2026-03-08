@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from kourai_common.llm import chat
+from kourai_common.player import get_enriched_system_prompt
 from kourai_common.prompts import CURRENT_DATE, build_system_prompt
 from kourai_common.subprocess import run_command
 
@@ -84,10 +85,35 @@ class StyleReport:
 
 
 async def run_make_lint(cwd: str | None = None) -> tuple[bool, str]:
-    """Run make lint."""
-    code, stdout, stderr = await run_command(["make", "lint"], cwd=cwd)
-    output = stdout + stderr
-    return code == 0, output
+    """Run ruff + mypy."""
+    import sys
+
+    python = sys.executable
+    all_passed = True
+    combined: list[str] = []
+
+    # ruff format
+    code, stdout, stderr = await run_command([python, "-m", "ruff", "format", "."], cwd=cwd)
+    combined.append(stdout + stderr)
+    if code != 0:
+        all_passed = False
+
+    # ruff check --fix
+    code, stdout, stderr = await run_command(
+        [python, "-m", "ruff", "check", "--fix", "--unsafe-fixes", "--show-fixes", "."],
+        cwd=cwd,
+    )
+    combined.append(stdout + stderr)
+    if code != 0:
+        all_passed = False
+
+    # mypy
+    code, stdout, stderr = await run_command([python, "-m", "mypy", "."], cwd=cwd)
+    combined.append(stdout + stderr)
+    if code != 0:
+        all_passed = False
+
+    return all_passed, "\n".join(combined)
 
 
 async def fix_lint_issues(
@@ -102,7 +128,7 @@ async def fix_lint_issues(
             files_block += f"\n--- {file_path} ---\n{content}\n"
 
     messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": get_enriched_system_prompt(SYSTEM_PROMPT, "kallos")},
         {
             "role": "user",
             "content": (
