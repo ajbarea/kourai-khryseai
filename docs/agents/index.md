@@ -6,7 +6,7 @@ Every agent in Kourai Khryseai is an independent HTTP server that exposes an [A2
 
 ## 🔥 Hephaestus — Orchestrator
 
-**Port `10000`** · Model varies by [tier](../configuration.md#cloud-model-tiers) · [`agents/hephaestus/`](https://github.com/ajbarea/Kourai_Khryseai/tree/main/agents/hephaestus)
+**Port `10000`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/hephaestus/`](https://github.com/ajbarea/Kourai_Khryseai/tree/main/agents/hephaestus)
 
 The brain of the system. Receives user requests, uses its LLM to decide which specialists to invoke and in what order, then executes the pipeline sequentially while streaming progress back to the CLI.
 

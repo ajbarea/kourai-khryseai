@@ -68,8 +68,10 @@ This enables specialists to actively stream their "inner monologues" (e.g., `⚙
 async for event in client.send_message(message):
     if isinstance(event, Message):
         yield ("result", extract_text(event))
-    elif isinstance(update, TaskStatusUpdateEvent):
-        yield ("status", extract_status(update))
+    else:
+        task, update = event
+        if isinstance(update, TaskStatusUpdateEvent):
+            yield ("status", extract_status(update))
 ```
 
 ### Direct Specialist Handoffs

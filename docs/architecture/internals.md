@@ -29,45 +29,56 @@ flowchart TD
 ### Example: Mneme's Three Layers
 
 ```python title="agents/mneme/agent.py — pure logic, no A2A"
-async def generate_commit_messages(git_output: str) -> str:
+async def generate_commit_messages(git_output: str, context_id: str | None = None) -> str:
     messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": git_output},
+        {"role": "system", "content": get_enriched_system_prompt(SYSTEM_PROMPT, "mneme")},
+        {"role": "user", "content": f"Generate commit message groups for these changes:\n\n```\n{git_output}\n```"},
     ]
-    return await chat("mneme", messages)  # (1)!
+    return await chat("mneme", messages, temperature=0.2, max_tokens=2048, context_id=context_id)  # (1)!
 ```
 
 1. `chat()` from `kourai_common.llm` — handles model selection, timeouts, and retries automatically.
 
 ```python title="agents/mneme/agent_executor.py — A2A bridge"
-class MnemeAgentExecutor(AgentExecutor):
-    async def execute(self, context, event_queue):
+class MnemeAgentExecutor(BaseAgentExecutor):  # (1)!
+    @executor_error_handler(agent_name="mneme")
+    async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
+        await super().execute(context, event_queue)
+
+    async def execute_agent_logic(self, context, task, updater) -> None:
         user_input = context.get_user_input()
-        task = new_task(context.message)
-        await event_queue.enqueue_event(task)
-        updater = TaskUpdater(event_queue, task.id, task.context_id)
-        await updater.update_status(TaskState.working, new_agent_text_message("Generating commit messages...", ...))
-        result = await generate_commit_messages(user_input)
-        await updater.add_artifact([Part(root=TextPart(text=result))])
+        await send_working_status(updater, task, "Analyzing git changes...", emoji="📜")
+        full_response = ""
+        async for chunk in generate_commit_messages_stream(user_input):
+            full_response += chunk
+        await updater.add_artifact([Part(root=TextPart(text=full_response))])
         await updater.complete()
 ```
 
+1. `BaseAgentExecutor` from `kourai_common.base_executor` — handles task creation, input validation, and common setup. Subclasses override `execute_agent_logic()`.
+
 ```python title="agents/mneme/__main__.py — server config"
-card = AgentCard(
-    name="Mneme",
-    description="Generates commit messages from git diff output",
+agent_card = AgentCard(
+    name="Mneme — Scribe",
+    description="Commit message specialist. Analyzes git diffs and generates grouped commit messages.",
+    url=get_agent_url(AGENT_NAME),
     version="0.1.0",
-    skills=[AgentSkill(name="generate_commit_messages", ...)],
+    skills=[skill],
+    capabilities=AgentCapabilities(streaming=True),
     ...
 )
-app = A2AStarletteApplication(agent_card=card, agent_executor=MnemeAgentExecutor)
+request_handler = DefaultRequestHandler(
+    agent_executor=MnemeAgentExecutor(),
+    task_store=InMemoryTaskStore(),
+)
+server = A2AStarletteApplication(agent_card=agent_card, http_handler=request_handler)
 ```
 
 ---
 
 ## 📦 Shared Library: `kourai-common`
 
-All agents depend on a shared workspace member at `shared/src/kourai_common/`. The four foundational modules are:
+All agents depend on a shared workspace member at `shared/src/kourai_common/`. The core modules are:
 
 ### `config.py` — Agent Configuration
 
@@ -130,6 +141,57 @@ from kourai_common.retry import with_retry
 async def send(self, text, context_id):
     ...
 ```
+
+### `log.py` — Structured Logging
+
+Configures per-agent console + rotating file logging (`logs/<name>.log`).
+
+```python title="log.py usage"
+from kourai_common.log import setup_logging
+
+log = setup_logging("mneme")  # → console + logs/mneme.log (5MB, 3 rotations)
+```
+
+### `base_executor.py` — Agent Executor Base Class
+
+Common base for all agent executors. Handles task creation, input validation, and the `execute` → `execute_agent_logic` dispatch pattern. Subclasses override `execute_agent_logic()`.
+
+```python title="base_executor.py usage"
+from kourai_common.base_executor import BaseAgentExecutor
+
+class MnemeAgentExecutor(BaseAgentExecutor):
+    async def execute_agent_logic(self, context, task, updater) -> None:
+        ...  # agent-specific logic
+```
+
+### `prompts.py` — System Prompt Builder
+
+Constructs structured system prompts with shared personality directives and Python style standards.
+
+```python title="prompts.py usage"
+from kourai_common.prompts import build_system_prompt
+
+SYSTEM_PROMPT = build_system_prompt(
+    agent_name="Mneme",
+    role="commit message specialist",
+    personality="...",
+    specific_instructions="...",
+)
+```
+
+### `messaging.py` — A2A Status Helpers
+
+Convenience functions for emitting A2A status updates with consistent formatting.
+
+```python title="messaging.py usage"
+from kourai_common.messaging import send_working_status
+
+await send_working_status(updater, task, "Analyzing git changes...", emoji="📜")
+```
+
+### `memory.py` — SQLite Conversational Memory
+
+Implements the persistence layer for conversational memory (see [Conversational Memory](#conversational-memory) below).
 
 ---
 
