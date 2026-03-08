@@ -456,6 +456,29 @@ class SettingsOverlay:
         make_toggle("gameplay", "typewriter_enabled", "Typewriter Effect", start_y + spacing, True)
         make_toggle("gameplay", "show_debug_logs", "Show Debug Logs", start_y + spacing * 2, False)
 
+        # Role selector (Gameplay tab)
+        from kourai_common.player import PlayerProfile
+
+        _profile = PlayerProfile.load()
+        current_role = _profile.role if _profile else "mortal"
+        role_options = ["divine", "mortal", "hero", "devoted", "name_only"]
+
+        def on_role_change(new_role: str) -> None:
+            profile = PlayerProfile.load()
+            if profile:
+                profile.role = new_role
+                profile.save()
+
+        self.role_btn = CycleButton(
+            self.panel_rect.right - 140,
+            start_y + spacing * 3,
+            110,
+            24,
+            role_options,
+            current_role,
+            on_role_change,
+        )
+
         # Audio Sliders
         slider_spacing = 48
         slider_w = self.panel_w - 140
@@ -593,6 +616,8 @@ class SettingsOverlay:
 
             if self.active_tab == "display":
                 self.display_mode_btn.update(mouse_pos)
+            if self.active_tab == "gameplay":
+                self.role_btn.update(mouse_pos)
 
             # Update button hover state
             self.reset_button.update(mouse_pos)
@@ -627,6 +652,9 @@ class SettingsOverlay:
                     return True
 
             if self.active_tab == "display" and self.display_mode_btn.handle_click(event.pos):
+                return True
+
+            if self.active_tab == "gameplay" and self.role_btn.handle_click(event.pos):
                 return True
 
             for s in self.sliders[self.active_tab].values():
@@ -689,6 +717,15 @@ class SettingsOverlay:
                 text_color,
             )
             self.display_mode_btn.draw(overlay, self.font_label, palette)
+
+        if self.active_tab == "gameplay":
+            self.font_label.render_to(
+                overlay,
+                (self.panel_rect.x + 30, self.role_btn.rect.y + 4),
+                "Player Role",
+                text_color,
+            )
+            self.role_btn.draw(overlay, self.font_label, palette)
 
         # Draw volume sliders
         for s in self.sliders[self.active_tab].values():

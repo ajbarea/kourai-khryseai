@@ -29,10 +29,11 @@ STEP_PRONOUNS = 3
 STEP_WELCOME = 4
 STEP_DONE = 5
 
-# Title options
-TITLE_OPTIONS = [
+# Role options (role_id, display_label, description)
+ROLE_OPTIONS = [
     ("divine", "As a God among mortals", "Divine honorifics, reverent tone"),
     ("mortal", "As a fellow artisan", "Casual, warm, collaborative"),
+    ("hero", "As a proven champion", "Comradely respect, earned trust"),
     ("devoted", "As their beloved master", "Devoted, formal, adoring"),
     ("name_only", "Just by name", "Natural, no special treatment"),
 ]
@@ -41,7 +42,7 @@ TITLE_OPTIONS = [
 PRONOUN_OPTIONS = ["he/him", "she/her", "they/them", ""]
 
 PANEL_W = 600
-PANEL_H = 480
+PANEL_H = 530
 BUTTON_W = 260
 BUTTON_H = 44
 BUTTON_PAD = 8
@@ -158,7 +159,7 @@ class OnboardingOverlay:
         if self.step == STEP_TITLE:
             for i, rect in enumerate(self._button_rects):
                 if rect.collidepoint(pos):
-                    role, _label, _desc = TITLE_OPTIONS[i]
+                    role, _label, _desc = ROLE_OPTIONS[i]
                     self.selected_role = role
                     self.selected_title = _label
                     self.step = STEP_PRONOUNS
@@ -285,7 +286,7 @@ class OnboardingOverlay:
         y += 50
 
         self._button_rects.clear()
-        for i, (_role, label, desc) in enumerate(TITLE_OPTIONS):
+        for i, (_role, label, desc) in enumerate(ROLE_OPTIONS):
             btn_y = y + i * (BUTTON_H + BUTTON_PAD)
             rect = pygame.Rect(
                 self.panel_rect.x + 30,

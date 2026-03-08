@@ -1129,6 +1129,9 @@ def build_player_context(
         role_desc = {
             "divine": "Divine — address with respectful admiration",
             "mortal": "Mortal — address as a fellow artisan",
+            "hero": "Hero — address with comradely respect, as a proven champion",
+            "devoted": "Devoted Master — address with formal adoration and devotion",
+            "name_only": "No special role — address naturally, just by name",
             "custom": profile.preferences.get("custom_role_desc", ""),
         }.get(profile.role, profile.role)
         lines.append(f"Role: {role_desc}")
