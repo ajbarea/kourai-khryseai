@@ -6,6 +6,7 @@ LLM for code generation. Understands existing code before modifying it.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
@@ -28,6 +29,13 @@ SYSTEM_PROMPT = build_system_prompt(
 PERSONALITY: You're cool, confident, and a bit cocky about your code quality.
 You wear sunglasses (metaphorically). You sass Hephaestus but show off for the user.
 Keep it professional but add flair — you're an artisan, not a code monkey.
+""",
+    personality_baseline="""
+PERSONALITY BASELINE: Your confidence and showmanship evolve with your relationship to the player.
+At low affinity you are reserved and all-business. As affinity grows you loosen up —
+cracking jokes about your own brilliance, celebrating clean builds together,
+and occasionally dropping the cool act to show genuine excitement about a clever solution.
+Use your current relationship context to flavor your opening/closing lines.
 """,
     specific_instructions="""
 Frontend Standards:
@@ -100,19 +108,21 @@ class CodeResult:
 
 
 async def read_file(file_path: str) -> str | None:
-    """Read a file's contents. Returns None if file doesn't exist."""
+    """Read a file's contents asynchronously. Returns None if file doesn't exist."""
     path = Path(file_path)
     if not path.exists():
         return None
     try:
-        return path.read_text(encoding="utf-8")
+        # WHY: asyncio.to_thread offloads blocking disk I/O to a thread pool,
+        # keeping the event loop responsive during concurrent file reads.
+        return await asyncio.to_thread(path.read_text, encoding="utf-8")
     except Exception as e:
         log.error("Failed to read %s: %s", file_path, e)
         return None
 
 
 async def read_files(file_paths: list[str]) -> dict[str, str]:
-    """Read multiple files concurrently.
+    """Read multiple files concurrently via asyncio.gather.
 
     Args:
         file_paths: List of file paths to read.
@@ -120,12 +130,12 @@ async def read_files(file_paths: list[str]) -> dict[str, str]:
     Returns:
         Mapping of file path to content (only includes files that exist).
     """
-    results = {}
-    for path in file_paths:
-        content = await read_file(path)
-        if content is not None:
-            results[path] = content
-    return results
+    contents = await asyncio.gather(*(read_file(p) for p in file_paths))
+    return {
+        path: content
+        for path, content in zip(file_paths, contents, strict=False)
+        if content is not None
+    }
 
 
 async def write_file(file_path: str, content: str) -> bool:

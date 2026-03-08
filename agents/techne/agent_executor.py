@@ -7,11 +7,11 @@ import logging
 from a2a.server.agent_execution import RequestContext
 from a2a.server.events import EventQueue
 from a2a.server.tasks import TaskUpdater
-from a2a.types import Part, Task, TextPart, UnsupportedOperationError
+from a2a.types import DataPart, Part, Task, TextPart, UnsupportedOperationError
 from a2a.utils.errors import ServerError
 
 from agents.techne.agent import (
-    generate_code,
+    generate_code_stream,
     get_git_context,
     parse_file_paths,
     read_files,
@@ -72,15 +72,26 @@ class TechneAgentExecutor(BaseAgentExecutor):
                 "Generating code changes...",
             )
 
-            # Step 4: Generate code
+            # Step 4: Stream code generation with inner-thought updates
             with create_span("techne.generate", {"task": user_input[:100]}):
-                result = await generate_code(
+                result = ""
+                chunk_count = 0
+                async for chunk in generate_code_stream(
                     task_description=user_input,
                     file_contents=file_contents,
                     git_context=git_context,
                     image_parts=extract_image_parts(context) or None,
                     context_id=task.context_id,
-                )
+                ):
+                    result += chunk
+                    chunk_count += 1
+                    if chunk_count % 5 == 0:
+                        lines = result.strip().split("\n")
+                        latest = lines[-1] if lines else ""
+                        if len(latest) > 60:
+                            latest = latest[:57] + "..."
+                        if latest.strip():
+                            await send_working_status(updater, task, f"Coding: {latest}")
 
             # Step 5: Apply code changes to disk
             # WHY: Without this, cross-agent fix loops are broken — Kallos/Dokimasia
@@ -94,9 +105,20 @@ class TechneAgentExecutor(BaseAgentExecutor):
                 f"Applied {fixes_applied} code changes to disk",
             )
 
-            # Step 6: Emit final artifact
+            # Step 6: Emit both human-readable text and machine-readable structured data
             await updater.add_artifact(
-                [Part(root=TextPart(text=result))],
+                [
+                    Part(root=TextPart(text=result)),
+                    Part(
+                        root=DataPart(
+                            data={
+                                "files_read": len(file_contents),
+                                "files_changed": fixes_applied,
+                                "file_paths": file_paths,
+                            }
+                        )
+                    ),
+                ],
                 name="code_changes",
             )
             await updater.complete()

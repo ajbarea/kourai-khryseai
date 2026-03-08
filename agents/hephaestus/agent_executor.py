@@ -7,7 +7,7 @@ import logging
 from a2a.server.agent_execution import RequestContext
 from a2a.server.events import EventQueue
 from a2a.server.tasks import TaskUpdater
-from a2a.types import Part, Task, TextPart, UnsupportedOperationError
+from a2a.types import DataPart, Part, Task, TextPart, UnsupportedOperationError
 from a2a.utils.errors import ServerError
 
 from agents.hephaestus.routing_agent import determine_pipeline, execute_pipeline
@@ -62,17 +62,66 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
 
             pipeline = await determine_pipeline(user_input)
 
-            # Handle clarification request
+            # Handle non-pipeline responses
             if isinstance(pipeline, str):
-                clarification = pipeline.replace("ASK_USER:", "").strip()
-                await send_input_required(
-                    updater,
-                    task,
-                    clarification,
-                )
-                return
+                if pipeline.startswith("ASK_USER:"):
+                    clarification = pipeline.removeprefix("ASK_USER:").strip()
+                    await send_input_required(
+                        updater,
+                        task,
+                        clarification,
+                    )
+                    return
 
-            # Step 2: Report the pipeline
+                if pipeline.startswith("CHAT:"):
+                    chat_body = pipeline.removeprefix("CHAT:").strip()
+                    # Check for agent-directed chat: "CHAT:kallos: ..."
+                    target_agent = None
+                    for agent_name in ("metis", "techne", "dokimasia", "kallos", "mneme"):
+                        prefix = f"{agent_name}:"
+                        if chat_body.lower().startswith(prefix):
+                            target_agent = agent_name
+                            chat_body = chat_body[len(prefix) :].strip()
+                            break
+
+                    if target_agent:
+                        # Route to specific agent for casual chat
+                        emoji = AGENT_EMOJI.get(target_agent, "")
+                        await send_working_status(
+                            updater,
+                            task,
+                            chat_body or f"Connecting to {target_agent}...",
+                            emoji=emoji,
+                        )
+                    else:
+                        # Hephaestus responds directly
+                        await send_working_status(
+                            updater,
+                            task,
+                            chat_body,
+                            emoji=AGENT_EMOJI["hephaestus"],
+                        )
+
+                    await updater.add_artifact(
+                        [
+                            Part(root=TextPart(text=chat_body)),
+                            Part(
+                                root=DataPart(
+                                    data={
+                                        "mode": "chat",
+                                        "target_agent": target_agent,
+                                    }
+                                )
+                            ),
+                        ],
+                        name="chat_response",
+                    )
+                    await updater.complete()
+                    log.info("Hephaestus chat — target: %s", target_agent or "self")
+                    return
+
+            # Step 2: Report the pipeline (pipeline must be list[str] here)
+            assert isinstance(pipeline, list), "Pipeline should be list[str] at this point"
             pipeline_display = " -> ".join(pipeline)
             await send_working_status(
                 updater,
@@ -114,9 +163,20 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
             if input_required:
                 return
 
-            # Step 4: Emit final artifact with the last agent's actual output
+            # Step 4: Emit both human-readable and structured pipeline result
             await updater.add_artifact(
-                [Part(root=TextPart(text=last_agent_output or "Pipeline complete"))],
+                [
+                    Part(root=TextPart(text=last_agent_output or "Pipeline complete")),
+                    Part(
+                        root=DataPart(
+                            data={
+                                "mode": "pipeline",
+                                "agents": pipeline,
+                                "agent_count": len(pipeline),
+                            }
+                        )
+                    ),
+                ],
                 name="pipeline_result",
             )
             await updater.complete()

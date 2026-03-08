@@ -44,8 +44,8 @@ def build_agent_card() -> AgentCard:
         name="Techne — Coder",
         description=(
             "Coding specialist. Reads existing code, generates changes "
-            "following AJ's exact standards, and outputs structured diffs. "
-            "Supports Python, TypeScript, and React."
+            "following AJ's standards, and applies them to disk. "
+            "Emits structured artifacts for downstream agents."
         ),
         url=get_agent_url(AGENT_NAME),
         version="0.1.0",

@@ -51,19 +51,33 @@ def build_agent_card() -> AgentCard:
             "style check and commit prep",
         ],
     )
+    chat_skill = AgentSkill(
+        id="chat",
+        name="Casual Conversation",
+        description=(
+            "Handle greetings, casual talk, and requests to chat with "
+            "specific maidens without requiring a development task"
+        ),
+        tags=["chat", "conversation", "social"],
+        examples=[
+            "hey, how's it going?",
+            "talk to Kallos",
+            "@dokimasia what's up?",
+        ],
+    )
     return AgentCard(
         name="Hephaestus — Orchestrator",
         description=(
-            "Master orchestrator of Kourai Khryseai. Receives user requests, "
-            "determines which specialist agents to invoke, executes the pipeline, "
-            "and streams real-time progress back to the user."
+            "Master orchestrator of Kourai Khryseai. Routes development tasks "
+            "to specialist pipelines and handles casual conversation directly. "
+            "Emits structured metadata for downstream routing."
         ),
         url=get_agent_url(AGENT_NAME),
         version="0.1.0",
         default_input_modes=["text", "image"],
         default_output_modes=["text"],
         capabilities=AgentCapabilities(streaming=True),
-        skills=[route_skill, pipeline_skill],
+        skills=[route_skill, pipeline_skill, chat_skill],
     )
 
 

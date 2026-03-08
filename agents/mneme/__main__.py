@@ -43,8 +43,8 @@ def build_agent_card() -> AgentCard:
         name="Mneme — Scribe",
         description=(
             "Commit message specialist. Analyzes git diffs and generates "
-            "grouped commit messages in AJ's exact format. Never commits — "
-            "only generates messages for review."
+            "grouped commit messages. Emits structured metadata with "
+            "commit counts and types. Never commits — generates only."
         ),
         url=get_agent_url(AGENT_NAME),
         version="0.1.0",

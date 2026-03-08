@@ -124,14 +124,15 @@ class TestPipelineDataclasses:
 class TestHephaestusAgentCard:
     """Test the agent card configuration."""
 
-    def test_card_has_two_skills(self):
+    def test_card_has_three_skills(self):
         from agents.hephaestus.__main__ import build_agent_card
 
         card = build_agent_card()
-        assert len(card.skills) == 2
+        assert len(card.skills) == 3
         skill_ids = {s.id for s in card.skills}
         assert "route_request" in skill_ids
         assert "pipeline_execution" in skill_ids
+        assert "chat" in skill_ids
 
     def test_card_has_streaming(self):
         from agents.hephaestus.__main__ import build_agent_card

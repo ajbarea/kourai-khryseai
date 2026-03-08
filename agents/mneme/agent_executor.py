@@ -8,7 +8,7 @@ import re
 from a2a.server.agent_execution import RequestContext
 from a2a.server.events import EventQueue
 from a2a.server.tasks import TaskUpdater
-from a2a.types import Part, Task, TextPart, UnsupportedOperationError
+from a2a.types import DataPart, Part, Task, TextPart, UnsupportedOperationError
 from a2a.utils.errors import ServerError
 
 from agents.mneme.agent import generate_commit_messages_stream
@@ -115,13 +115,39 @@ class MnemeAgentExecutor(BaseAgentExecutor):
             if spoken_intro:
                 await send_working_status(updater, task, spoken_intro, emoji="📜")
 
-            # Emit the final artifact with only the commit messages
+            # Parse commit groups for structured metadata
+            commit_groups = [
+                line
+                for line in artifact_body.split("\n")
+                if re.match(
+                    r"^\s*(?:feat|fix|docs|chore|refactor|test|perf|style|ci|build)\s*[\(\(]",
+                    line,
+                    re.IGNORECASE,
+                )
+            ]
+
+            # Emit both human-readable text and machine-readable structured data
             await updater.add_artifact(
-                [Part(root=TextPart(text=artifact_body))],
+                [
+                    Part(root=TextPart(text=artifact_body)),
+                    Part(
+                        root=DataPart(
+                            data={
+                                "commit_count": len(commit_groups),
+                                "commit_types": [
+                                    g.split("(")[0].split("（")[0].strip() for g in commit_groups
+                                ],
+                            }
+                        )
+                    ),
+                ],
                 name="commit_messages",
             )
             await updater.complete()
-            log.info("Mneme completed — generated commit messages")
+            log.info(
+                "Mneme completed — generated %d commit groups",
+                len(commit_groups),
+            )
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
         raise ServerError(error=UnsupportedOperationError())

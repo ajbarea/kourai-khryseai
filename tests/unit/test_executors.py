@@ -18,6 +18,12 @@ from a2a.utils.errors import ServerError
 # ---------------------------------------------------------------------------
 
 
+async def _async_gen(items: list[str]):
+    """Yield items as an async generator (for mocking streaming functions)."""
+    for item in items:
+        yield item
+
+
 def _make_context(user_input: str | None = "test input") -> MagicMock:
     ctx = MagicMock()
     ctx.get_user_input.return_value = user_input
@@ -162,14 +168,32 @@ class TestMetisExecutor:
         ctx = _make_context("implement CSV export")
         queue = _make_queue()
 
+        # Return 5+ chunks to trigger inner-loop status updates (every 5th chunk)
+        spec_chunks = [
+            "## Spec\nDo things",
+            "## Spec\nDo things",
+            "## Spec\nDo things",
+            "## Spec\nDo things",
+            "## Spec\nDo things",
+            "## Spec\nDo things",
+            "## Spec\nDo things",
+            "## Spec\nDo things",
+            "## Spec\nDo things",
+            "## Spec\nDo things",
+        ]
         with (
             patch("agents.metis.agent_executor.create_span"),
             patch("agents.metis.agent_executor.get_project_context", return_value="project ctx"),
-            patch("agents.metis.agent_executor.create_spec", return_value="## Spec\nDo things"),
+            patch(
+                "agents.metis.agent_executor.create_spec_stream",
+                return_value=_async_gen(spec_chunks),
+            ),
+            patch("agents.metis.agent_executor.send_working_status"),
         ):
             await executor.execute(ctx, queue)
 
-        assert queue.enqueue_event.call_count >= 4
+        # Enqueue events: task creation + add_artifact + complete (send_working_status is mocked)
+        assert queue.enqueue_event.call_count >= 3
 
 
 class TestDokimasiaExecutor:
@@ -207,11 +231,16 @@ class TestDokimasiaExecutor:
 
         with (
             patch("agents.dokimasia.agent_executor.create_span"),
-            patch("agents.dokimasia.agent_executor.generate_tests", return_value="def test_add():"),
+            patch(
+                "agents.dokimasia.agent_executor.generate_tests_stream",
+                return_value=_async_gen(["def test_add():"]),
+            ),
+            patch("agents.dokimasia.agent_executor.send_working_status"),
         ):
             await executor.execute(ctx, queue)
 
-        assert queue.enqueue_event.call_count >= 4
+        # Enqueue events: task creation + add_artifact + complete (send_working_status is mocked)
+        assert queue.enqueue_event.call_count >= 3
 
 
 class TestTechneExecutor:
@@ -230,11 +259,30 @@ class TestTechneExecutor:
             patch("agents.techne.agent_executor.parse_file_paths", return_value=["auth.py"]),
             patch("agents.techne.agent_executor.read_files", return_value={"auth.py": "code"}),
             patch("agents.techne.agent_executor.get_git_context", return_value="M auth.py"),
-            patch("agents.techne.agent_executor.generate_code", return_value="ACTION: EDIT\n..."),
+            patch(
+                "agents.techne.agent_executor.generate_code_stream",
+                return_value=_async_gen(
+                    [
+                        "ACTION: EDIT\n...",
+                        "ACTION: EDIT\n...",
+                        "ACTION: EDIT\n...",
+                        "ACTION: EDIT\n...",
+                        "ACTION: EDIT\n...",
+                        "ACTION: EDIT\n...",
+                        "ACTION: EDIT\n...",
+                        "ACTION: EDIT\n...",
+                        "ACTION: EDIT\n...",
+                        "ACTION: EDIT\n...",
+                    ]
+                ),
+            ),
+            patch("agents.techne.agent_executor.send_working_status"),
+            patch("agents.techne.agent_executor.parse_and_apply_fixes", return_value=1),
         ):
             await executor.execute(ctx, queue)
 
-        assert queue.enqueue_event.call_count >= 5
+        # Enqueue events: task creation + add_artifact + complete (send_working_status is mocked)
+        assert queue.enqueue_event.call_count >= 3
 
 
 class TestHephaestusExecutor:

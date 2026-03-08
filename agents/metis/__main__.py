@@ -43,9 +43,9 @@ def build_agent_card() -> AgentCard:
     return AgentCard(
         name="Metis — Planner",
         description=(
-            "Planning specialist. Transforms rough ideas into detailed, "
-            "implementable specifications with file lists, steps, "
-            "acceptance criteria, and edge cases."
+            "Planning specialist. Transforms rough ideas into structured "
+            "implementation specs. Emits machine-readable metadata "
+            "for downstream pipeline routing."
         ),
         url=get_agent_url(AGENT_NAME),
         version="0.1.0",
