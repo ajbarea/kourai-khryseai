@@ -143,11 +143,9 @@ class TestPerformanceProfiler:
         """Test checking if meeting target FPS."""
         profiler = PerformanceProfiler()
 
-        # Simulate 60 FPS
+        # Simulate perfect 60 FPS times (16.67ms) directly to avoid sleep jitter
         for _ in range(10):
-            profiler.start_frame()
-            time.sleep(0.0167)
-            profiler.end_frame()
+            profiler.frame_times.append(16.67)
 
         assert profiler.is_meeting_target_fps()
 

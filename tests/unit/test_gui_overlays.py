@@ -105,7 +105,6 @@ class TestGossipPanelModel:
         pygame.init()
         pygame.freetype.init()
         yield
-        pygame.quit()
 
     def test_start_session_clears_state(self):
         from hosts.gui.gossip_panel import GossipPanel
@@ -197,7 +196,6 @@ class TestOnboardingOverlay:
         pygame.init()
         pygame.freetype.init()
         yield
-        pygame.quit()
 
     def test_initial_state(self):
         from hosts.gui.onboarding_ui import STEP_NAME, OnboardingOverlay
@@ -270,7 +268,6 @@ class TestAlignmentGaugePanel:
         pygame.init()
         pygame.freetype.init()
         yield
-        pygame.quit()
 
     def test_toggle(self):
         from hosts.gui.alignment_gauges import AlignmentGaugePanel
@@ -318,7 +315,6 @@ class TestMemoryViewerPanel:
         pygame.init()
         pygame.freetype.init()
         yield
-        pygame.quit()
 
     def test_toggle(self):
         from hosts.gui.memory_viewer import MemoryViewerPanel
