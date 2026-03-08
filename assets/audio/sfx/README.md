@@ -8,7 +8,7 @@ in dialogue text to these files by keyword.
 ### Physical sounds
 | File              | Description                         | Used by           |
 |-------------------|-------------------------------------|--------------------|
-| `anvil_strike.ogg`| Metallic clang on anvil             | Hephaestus         |
+| `anvil_strike.ogg`| Metallic clang on anvil             | Hephaestus         | [FOUND]
 | `hammer_thud.ogg` | Heavy hammer set down               | Hephaestus         |
 | `knuckle_crack.ogg`| Knuckle/joint crack                | Dokimasia, Hephaestus |
 | `paper_slide.ogg` | Paper sliding across surface        | Metis              |
@@ -18,11 +18,11 @@ in dialogue text to these files by keyword.
 ### Vocal reactions
 | File              | Description                         | Used by           |
 |-------------------|-------------------------------------|--------------------|
-| `grunt.ogg`       | Gruff short grunt                   | Hephaestus         |
+| `grunt.ogg`       | Gruff short grunt                   | Hephaestus         | [FOUND]
 | `sigh.ogg`        | General sigh                        | Kallos, Mneme, Hephaestus |
 | `scoff.ogg`       | Dismissive scoff/tsk                | Techne, Kallos, Hephaestus |
 | `chuckle.ogg`     | Warm chuckle                        | Hephaestus, Techne |
-| `giggle.ogg`      | Light playful giggle                | Metis              |
+| `giggle.ogg`      | Light playful giggle                | Metis              | [FOUND]
 | `laugh.ogg`       | Confident laugh                     | Techne             |
 | `snicker.ogg`     | Smug/knowing snicker                | Mneme              |
 | `hum.ogg`         | Contented thoughtful hum            | Kallos             |
