@@ -108,10 +108,11 @@ async def _manage_memory(context_id: str, agent_name: str) -> None:
                 save_agent_state(context_id, agent_name, state)
                 mark_messages_summarized(context_id, agent_name, max_idx)
                 log.info(
-                    f"Summarized {len(to_summarize)} messages for {agent_name} in {context_id}"
+                    "Summarized %d messages for %s in %s",
+                    len(to_summarize), agent_name, context_id,
                 )
         except Exception as e:
-            log.warning(f"Failed to summarize memory for {agent_name}: {e}")
+            log.warning("Failed to summarize memory for %s: %s", agent_name, e)
 
 
 async def _build_contextual_messages(
@@ -164,7 +165,7 @@ async def chat(
 
     full_messages = await _build_contextual_messages(agent_name, messages, context_id)
 
-    log.debug(f"LLM call: {agent_name} -> {model} ({len(full_messages)} messages)")
+    log.debug("LLM call: %s -> %s (%d messages)", agent_name, model, len(full_messages))
 
     try:
         response = await _execute_completion(
@@ -200,7 +201,7 @@ async def chat_stream(
 
     full_messages = await _build_contextual_messages(agent_name, messages, context_id)
 
-    log.debug(f"LLM stream: {agent_name} -> {model} ({len(full_messages)} messages)")
+    log.debug("LLM stream: %s -> %s (%d messages)", agent_name, model, len(full_messages))
 
     try:
         response = await _execute_completion(

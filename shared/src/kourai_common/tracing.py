@@ -43,9 +43,11 @@ def setup_tracing(
     try:
         exporter = OTLPSpanExporter(endpoint=f"{endpoint}/v1/traces")
         provider.add_span_processor(BatchSpanProcessor(exporter))
-    except Exception:
+    except Exception as e:
         # Jaeger may not be running — tracing is optional
-        pass
+        import logging
+
+        logging.getLogger(__name__).warning("OTEL exporter setup failed (tracing disabled): %s", e)
 
     trace.set_tracer_provider(provider)
 

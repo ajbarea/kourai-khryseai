@@ -73,16 +73,17 @@ def with_retry(
                     if requested_delay is not None:
                         delay = requested_delay + 0.5  # Add a small 500ms buffer
                         log.warning(
-                            f"{fn.__name__} hit rate limit, API requested wait of {delay:.1f}s. "
-                            "Pausing until quota refreshes..."
+                            "%s hit rate limit, API requested wait of %.1fs. "
+                            "Pausing until quota refreshes...",
+                            fn.__name__, delay,
                         )
                     else:
                         # Cap exponential backoff at a reasonable max (e.g. ~64s) for rate limits
                         exp_attempt = min(attempt, 6) if is_rate_limit else attempt
                         delay = base_delay * (2**exp_attempt)
                         log.warning(
-                            f"{fn.__name__} failed (attempt {attempt + 1}), "
-                            f"retrying in {delay:.1f}s: {exc_name}"
+                            "%s failed (attempt %d), retrying in %.1fs: %s",
+                            fn.__name__, attempt + 1, delay, exc_name,
                         )
 
                     await asyncio.sleep(delay)
