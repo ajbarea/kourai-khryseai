@@ -1,5 +1,4 @@
-"""Comprehensive tests to push hosts/gui coverage toward 90%.
-
+"""
 Covers remaining gaps in: auto_scroll, dialogue_history_integration,
 performance_profiler, alignment_theme, connection_manager, settings,
 typewriter, keyboard_shortcuts, message_history, constants, font_scaler,
@@ -10,7 +9,6 @@ helpers, loading_screen helpers, input_bar shortcuts.
 from __future__ import annotations
 
 import tempfile
-from collections import deque
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -236,150 +234,7 @@ class TestDialogueHistoryWithAutoScroll:
 
 
 # ===================================================================
-# 3. performance_profiler.py
-# ===================================================================
-
-
-class TestPerformanceProfiler:
-    def test_init(self):
-        from hosts.gui.performance_profiler import PerformanceProfiler
-
-        p = PerformanceProfiler()
-        assert p.max_samples == 100
-        assert p.target_fps == 60
-
-    def test_init_custom_samples(self):
-        from hosts.gui.performance_profiler import PerformanceProfiler
-
-        p = PerformanceProfiler(max_samples=50)
-        assert p.max_samples == 50
-
-    def test_frame_timing(self):
-        from hosts.gui.performance_profiler import PerformanceProfiler
-
-        p = PerformanceProfiler()
-        p.start_frame()
-        p.end_frame()
-        assert len(p.frame_times) == 1
-
-    def test_end_frame_without_start(self):
-        from hosts.gui.performance_profiler import PerformanceProfiler
-
-        p = PerformanceProfiler()
-        p.end_frame()
-        assert len(p.frame_times) == 0
-
-    def test_component_timing(self):
-        from hosts.gui.performance_profiler import PerformanceProfiler
-
-        p = PerformanceProfiler()
-        p.start_component("render")
-        p.end_component("render")
-        assert "render" in p.component_times
-        assert len(p.component_times["render"]) == 1
-
-    def test_end_component_without_start(self):
-        from hosts.gui.performance_profiler import PerformanceProfiler
-
-        p = PerformanceProfiler()
-        p.end_component("unknown")
-        assert "unknown" not in p.component_times
-
-    def test_get_fps_empty(self):
-        from hosts.gui.performance_profiler import PerformanceProfiler
-
-        p = PerformanceProfiler()
-        assert p.get_fps() == 0.0
-
-    def test_get_fps_with_data(self):
-        from hosts.gui.performance_profiler import PerformanceProfiler
-
-        p = PerformanceProfiler()
-        p.frame_times.append(16.67)  # ~60fps
-        fps = p.get_fps()
-        assert fps > 50
-
-    def test_get_average_frame_time(self):
-        from hosts.gui.performance_profiler import PerformanceProfiler
-
-        p = PerformanceProfiler()
-        assert p.get_average_frame_time() == 0.0
-        p.frame_times.append(10.0)
-        p.frame_times.append(20.0)
-        assert p.get_average_frame_time() == 15.0
-
-    def test_get_max_frame_time(self):
-        from hosts.gui.performance_profiler import PerformanceProfiler
-
-        p = PerformanceProfiler()
-        assert p.get_max_frame_time() == 0.0
-        p.frame_times.append(10.0)
-        p.frame_times.append(20.0)
-        assert p.get_max_frame_time() == 20.0
-
-    def test_get_min_frame_time(self):
-        from hosts.gui.performance_profiler import PerformanceProfiler
-
-        p = PerformanceProfiler()
-        assert p.get_min_frame_time() == 0.0
-        p.frame_times.append(10.0)
-        p.frame_times.append(20.0)
-        assert p.get_min_frame_time() == 10.0
-
-    def test_get_component_average_time(self):
-        from hosts.gui.performance_profiler import PerformanceProfiler
-
-        p = PerformanceProfiler()
-        assert p.get_component_average_time("render") == 0.0
-        p.component_times["render"] = deque()
-        assert p.get_component_average_time("render") == 0.0
-        p.start_component("render")
-        p.end_component("render")
-        avg = p.get_component_average_time("render")
-        assert avg >= 0.0
-
-    def test_get_component_max_time(self):
-        from hosts.gui.performance_profiler import PerformanceProfiler
-
-        p = PerformanceProfiler()
-        assert p.get_component_max_time("x") == 0.0
-        p.component_times["x"] = deque()
-        assert p.get_component_max_time("x") == 0.0
-
-    def test_get_performance_report(self):
-        from hosts.gui.performance_profiler import PerformanceProfiler
-
-        p = PerformanceProfiler()
-        p.start_frame()
-        p.end_frame()
-        p.start_component("draw")
-        p.end_component("draw")
-        report = p.get_performance_report()
-        assert "fps" in report
-        assert "components" in report
-        assert "draw" in report["components"]
-
-    def test_is_meeting_target_fps(self):
-        from hosts.gui.performance_profiler import PerformanceProfiler
-
-        p = PerformanceProfiler()
-        assert p.is_meeting_target_fps() is False
-        p.frame_times.append(16.0)
-        assert p.is_meeting_target_fps() is True
-
-    def test_reset(self):
-        from hosts.gui.performance_profiler import PerformanceProfiler
-
-        p = PerformanceProfiler()
-        p.frame_times.append(16.0)
-        p.component_times["x"] = deque([1.0])
-        p.reset()
-        assert len(p.frame_times) == 0
-        assert len(p.component_times) == 0
-
-
-# ===================================================================
-# 4. alignment_theme.py
+# 3. alignment_theme.py
 # ===================================================================
 
 

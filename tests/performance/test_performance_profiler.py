@@ -185,3 +185,12 @@ class TestPerformanceProfiler:
             profiler.end_frame()
 
         assert len(profiler.frame_times) == 5
+
+    def test_init_custom_samples(self):
+        p = PerformanceProfiler(max_samples=50)
+        assert p.max_samples == 50
+
+    def test_end_frame_without_start(self):
+        p = PerformanceProfiler()
+        p.end_frame()
+        assert len(p.frame_times) == 0
