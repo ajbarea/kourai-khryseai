@@ -75,7 +75,8 @@ def with_retry(
                         log.warning(
                             "%s hit rate limit, API requested wait of %.1fs. "
                             "Pausing until quota refreshes...",
-                            fn.__name__, delay,
+                            fn.__name__,
+                            delay,
                         )
                     else:
                         # Cap exponential backoff at a reasonable max (e.g. ~64s) for rate limits
@@ -83,7 +84,10 @@ def with_retry(
                         delay = base_delay * (2**exp_attempt)
                         log.warning(
                             "%s failed (attempt %d), retrying in %.1fs: %s",
-                            fn.__name__, attempt + 1, delay, exc_name,
+                            fn.__name__,
+                            attempt + 1,
+                            delay,
+                            exc_name,
                         )
 
                     await asyncio.sleep(delay)

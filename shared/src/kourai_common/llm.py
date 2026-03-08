@@ -109,7 +109,9 @@ async def _manage_memory(context_id: str, agent_name: str) -> None:
                 mark_messages_summarized(context_id, agent_name, max_idx)
                 log.info(
                     "Summarized %d messages for %s in %s",
-                    len(to_summarize), agent_name, context_id,
+                    len(to_summarize),
+                    agent_name,
+                    context_id,
                 )
         except Exception as e:
             log.warning("Failed to summarize memory for %s: %s", agent_name, e)
