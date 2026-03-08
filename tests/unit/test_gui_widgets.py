@@ -8,7 +8,6 @@ Covers:
 - hosts/gui/quick_actions.py (QuickAction, QuickActionBar)
 - hosts/gui/particles.py    (Ember, ParticleSystem)
 
-Target: 90%+ line coverage.
 """
 
 from __future__ import annotations

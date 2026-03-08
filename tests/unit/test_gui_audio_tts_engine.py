@@ -9,7 +9,6 @@ Covers:
 - hosts/gui/connection_gui_integration.py
 - hosts/gui/agent_handoff_personality_integration.py
 
-Target: push coverage toward 90%.
 """
 
 from __future__ import annotations

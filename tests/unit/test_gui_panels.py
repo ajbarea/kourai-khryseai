@@ -20,8 +20,6 @@ Covers:
 - hosts/gui/audio_manager.py (AudioManager)
 - hosts/gui/tts_engine.py (VoiceConfig, VOICE_ROSTER, AGENT_VOICES)
 - hosts/gui/dialogue_history_integration.py (DialogueHistoryWithAutoScroll)
-
-Target: bring overall hosts/gui coverage to 90%+.
 """
 
 from __future__ import annotations

@@ -25,7 +25,7 @@ class TestDokimasiaSystemPrompt:
         assert "80%" in SYSTEM_PROMPT
 
     def test_includes_file_pattern(self):
-        assert "test_{{module_name}}" in SYSTEM_PROMPT
+        assert "test_{module_name}" in SYSTEM_PROMPT
 
     def test_includes_class_pattern(self):
         assert "TestClassName" in SYSTEM_PROMPT

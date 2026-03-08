@@ -5,7 +5,6 @@ Covers:
   extract_speakable, TTSGUIManager, TTSSettingsPanel)
 - hosts/gui/tts_settings_config.py (TTSSettingsConfig)
 
-Target: 90%+ line coverage for both modules.
 """
 
 from __future__ import annotations
