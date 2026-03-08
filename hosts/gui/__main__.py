@@ -195,8 +195,6 @@ def main(agent_url: str | None = None) -> None:
     recv_q = sub.recv_q
     tts_manager = sub.tts_manager
 
-    # --- Display mode state ---
-    display.mode = gui_integration.settings.get("display_mode", display.mode)
     dialogue_rect = pygame.Rect(DIALOGUE_X, 34, 0, 0)
 
     def sync_layout(screen_w: int, screen_h: int) -> None:
@@ -243,6 +241,10 @@ def main(agent_url: str | None = None) -> None:
     def _add_with_typewriter(entry: DialogueEntry) -> None:
         """Add a dialogue entry, animating it with the typewriter effect."""
         nonlocal _typewriter_full_text
+        # Finalize any in-progress typewriter entry before starting a new one
+        if typewriter.active or _typewriter_full_text:
+            history.update_last_text(_typewriter_full_text)
+            typewriter.reset()
         _typewriter_full_text = entry.text
         if not entry.is_system and not entry.is_user:
             entry.text = ""  # start empty; typewriter fills it in
@@ -250,6 +252,7 @@ def main(agent_url: str | None = None) -> None:
             typewriter.start(_typewriter_full_text)
         else:
             history.add(entry)
+            _typewriter_full_text = ""
 
     while _shutdown_flag["running"]:
         dt = clock.tick(60) / 1000.0
@@ -581,7 +584,8 @@ def main(agent_url: str | None = None) -> None:
                         print(f"Clipboard error: {e}")
 
             elif event.type in resize_events:
-                screen_w, screen_h = display.handle_resize(event)
+                screen_w, screen_h = display.handle_resize(event, settings=gui_integration.settings)
+                screen = display.screen
                 sync_layout(screen_w, screen_h)
 
         # --- Updates ---

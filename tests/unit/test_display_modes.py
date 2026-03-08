@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import sys
-
 import pygame
 
 from hosts.gui.display_modes import (
@@ -57,12 +55,8 @@ def test_build_display_mode_spec_fullscreen_uses_desktop_size() -> None:
 
     assert spec.mode == DISPLAY_MODE_FULLSCREEN
     assert spec.size == (1920, 1080)
-    if sys.platform == "win32":
-        assert spec.flags == pygame.NOFRAME
-        assert spec.position == (0, 0)
-    else:
-        assert spec.flags == pygame.FULLSCREEN
-        assert spec.position is None
+    assert spec.flags == pygame.FULLSCREEN
+    assert spec.position is None
 
 
 def test_get_saved_windowed_size_uses_adaptive_default_when_unset() -> None:

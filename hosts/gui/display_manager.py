@@ -60,8 +60,16 @@ class DisplayManager:
         settings.set("display_mode", self.mode)
         self.screen = self._set_screen_mode(self.mode)
 
-    def handle_resize(self, event: pygame.event.Event) -> tuple[int, int]:
-        """Process a resize event, return the new (w, h)."""
+    def handle_resize(
+        self, event: pygame.event.Event, settings: SettingsManager | None = None
+    ) -> tuple[int, int]:
+        """Process a resize event, return the new (w, h).
+
+        Args:
+            event: The pygame resize event.
+            settings: If provided, persist the new windowed size immediately
+                so it survives a crash.
+        """
         if hasattr(event, "size"):
             w, h = event.size
         elif hasattr(event, "x") and hasattr(event, "y"):
@@ -78,13 +86,17 @@ class DisplayManager:
 
         if self.mode == DISPLAY_MODE_WINDOWED:
             self.windowed_size = clamp_windowed_size((w, h), get_primary_desktop_size())
+            # Re-create the surface so pygame has the correct buffer size
+            self.screen = pygame.display.set_mode(self.windowed_size, pygame.RESIZABLE)
+            if settings is not None:
+                save_windowed_size(settings, self.windowed_size)
             logger.debug(
-                "Updated tracked windowed size after resize to %sx%s",
+                "Updated windowed surface to %sx%s",
                 self.windowed_size[0],
                 self.windowed_size[1],
             )
 
-        return w, h
+        return self.screen.get_size()
 
     def save_state(self, settings: SettingsManager) -> None:
         """Persist current display state to settings (called on shutdown)."""

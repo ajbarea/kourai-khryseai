@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import sys
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -157,18 +156,6 @@ def build_display_mode_spec(
     resolved_desktop = desktop_size or get_primary_desktop_size()
 
     if normalized == DISPLAY_MODE_FULLSCREEN:
-        if sys.platform == "win32":
-            spec = DisplayModeSpec(
-                mode=normalized,
-                size=_sanitize_size(resolved_desktop),
-                flags=pygame.NOFRAME,
-                position=(0, 0),
-            )
-            logger.debug(
-                "Built Windows-safe fullscreen spec using desktop borderless mode: %s", spec
-            )
-            return spec
-
         spec = DisplayModeSpec(
             mode=normalized,
             size=_sanitize_size(resolved_desktop),
