@@ -29,6 +29,10 @@ ENV AGENT_NAME=${AGENT_NAME}
 
 WORKDIR /app
 
+# Metis/Techne need git at runtime for project context
+RUN apt-get update && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy installed venv from builder
 COPY --from=builder /app/.venv /app/.venv
 COPY --from=builder /app/shared /app/shared
