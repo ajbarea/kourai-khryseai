@@ -345,7 +345,7 @@ make docs    # Serve docs locally
 
 <div align="center">
 
-[![codecov sunburst](https://codecov.io/gh/ajbarea/kourai-khryseai/graphs/sunburst.svg?token=bNiUvETLLU)](https://codecov.io/gh/ajbarea/Kourai_Khryseai)
+[![codecov sunburst](https://codecov.io/gh/ajbarea/kourai-khryseai/graphs/sunburst.svg?token=bNiUvETLLU)](https://app.codecov.io/gh/ajbarea/kourai-khryseai)
 </div>
 
 ---
