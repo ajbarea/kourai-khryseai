@@ -15,6 +15,7 @@ Usage:
 from __future__ import annotations
 
 import logging
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -29,9 +30,14 @@ TRUNCATION_NOTICE = "\n... [truncated — diff too large] ...\n"
 
 def _run_git(*args: str, cwd: str | Path | None = None) -> str:
     """Run a git command and return stdout, or empty string on failure."""
+    git_bin = shutil.which("git")
+    if not git_bin:
+        log.warning("git binary not found in PATH")
+        return ""
+
     try:
-        result = subprocess.run(
-            ["git", *args],
+        result = subprocess.run(  # noqa: S603 — no untrusted input to git args
+            [git_bin, *args],
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -115,4 +121,5 @@ def collect_git_changes(cwd: str | Path | None = None) -> str:
 
 
 if __name__ == "__main__":
-    print(collect_git_changes())
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    log.info(collect_git_changes())
