@@ -109,6 +109,12 @@ class DialogueHistory:
         self._entries.append(entry)
         self._dirty = True
 
+    def update_layout(self, width: int, height: int) -> None:
+        """Force a re-render if the width has changed."""
+        if self._surf is None or width != self._surf.get_width():
+            self._dirty = True
+        self._viewport_h = height
+
     def update_last_text(self, text: str) -> None:
         """Append text to the last entry (for typewriter streaming)."""
         if self._entries:

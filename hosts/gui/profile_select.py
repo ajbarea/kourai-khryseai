@@ -9,12 +9,15 @@ Each profile card shows: name, role icon, alignment bars (mini), session count.
 
 from __future__ import annotations
 
+import logging
 from typing import Literal
 
 import pygame
 import pygame.freetype
 
 from .constants import DARK_BG, GOLD, GOLD_BRIGHT, GOLD_DIM
+
+logger = logging.getLogger(__name__)
 
 # Layout
 CARD_W = 480
@@ -131,7 +134,7 @@ def run_profile_select(
 
                             delete_profile(profile_to_delete["player_id"])
                         except Exception:
-                            pass
+                            logger.debug("Failed to delete profile", exc_info=True)
                         sorted_profiles.pop(confirm_delete_idx)
                         confirm_delete_idx = -1
                         continue

@@ -9,7 +9,10 @@ from __future__ import annotations
 import io
 import logging
 import math
+import os
+import random
 import struct
+import threading
 import wave
 from pathlib import Path
 
@@ -24,65 +27,85 @@ class AudioManager:
     _instance = None
 
     def __new__(cls):
-        # Optional singleton pattern or just allow normal instantiation.
-        # We'll stick to normal instantiation for safety but keep instance tracking
-        # if other modules need global access without passing it around.
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
 
     def __init__(self):
-        # Prevent re-initialization
         if hasattr(self, "_initialized") and self._initialized:
             return
         self._initialized: bool = False
+        self.audio_available = False
+        self.voice_channel: pygame.mixer.Channel | None = None
+        self.ambient_channel: pygame.mixer.Channel | None = None
 
-        # 1. Pre-init for low latency
         try:
             pygame.mixer.pre_init(44100, -16, 2, 512)
             pygame.mixer.init()
             # Ensure enough channels (0: voice, 1: ambient, 2-7: sfx)
             pygame.mixer.set_num_channels(8)
+            self.audio_available = True
             logger.info("AudioManager initialized Pygame mixer.")
-        except RuntimeError as e:
-            logger.warning(f"Pygame mixer init error (may be already init): {e}")
+        except (RuntimeError, pygame.error) as e:
+            if pygame.mixer.get_init() is not None:
+                self.audio_available = True
+                pygame.mixer.set_num_channels(8)
+                logger.warning("Pygame mixer init reported an error; reusing existing mixer: %s", e)
+            else:
+                logger.warning("Audio disabled; pygame mixer unavailable: %s", e)
 
-        # Reserve channels
-        self.voice_channel = pygame.mixer.Channel(0)
-        self.ambient_channel = pygame.mixer.Channel(1)
+        if self.audio_available:
+            try:
+                # Channel allocation: 0=voice, 1=ambient, 2=TTS, 3-7=SFX
+                # This is coordinated with TTSEngine which reserves channel 2
+                self.voice_channel = pygame.mixer.Channel(0)
+                self.ambient_channel = pygame.mixer.Channel(1)
+            except pygame.error as e:
+                self.audio_available = False
+                self.voice_channel = None
+                self.ambient_channel = None
+                logger.warning("Audio disabled; failed to reserve mixer channels: %s", e)
 
-        # Volumes
         self.music_volume = 0.25
         self.ambient_volume = 0.5
         self.voice_volume = 1.0
         self.sfx_volume = 0.8
-
         self.ambient_sound = None
 
         # SFX cache: path → loaded Sound object
         self._sfx_cache: dict[str, pygame.mixer.Sound] = {}
 
+        self._playlist = []
+        self._current_track_index = 0
         self._initialized = True
+
+    def _mixer_ready(self) -> bool:
+        return self.audio_available and pygame.mixer.get_init() is not None
 
     # --- Volume Controls ---
     def set_music_volume(self, volume: float) -> None:
         self.music_volume = max(0.0, min(1.0, volume))
-        if pygame.mixer.music.get_busy():
+        if self._mixer_ready() and pygame.mixer.music.get_busy():
             pygame.mixer.music.set_volume(self.music_volume)
 
     def set_ambient_volume(self, volume: float) -> None:
         self.ambient_volume = max(0.0, min(1.0, volume))
-        self.ambient_channel.set_volume(self.ambient_volume)
+        if self.ambient_channel is not None:
+            self.ambient_channel.set_volume(self.ambient_volume)
 
     def set_voice_volume(self, volume: float) -> None:
         self.voice_volume = max(0.0, min(1.0, volume))
-        self.voice_channel.set_volume(self.voice_volume)
+        if self.voice_channel is not None:
+            self.voice_channel.set_volume(self.voice_volume)
 
     def set_sfx_volume(self, volume: float) -> None:
         self.sfx_volume = max(0.0, min(1.0, volume))
 
     # --- Music (Streamed) ---
     def play_music(self, path: str | Path, loops: int = -1, fade_ms: int = 0) -> None:
+        if not self._mixer_ready():
+            logger.info("Skipping music playback; audio is disabled.")
+            return
         try:
             pygame.mixer.music.load(str(path))
             pygame.mixer.music.set_volume(self.music_volume)
@@ -93,35 +116,37 @@ class AudioManager:
 
     def fade_to_music(self, path: str | Path, fade_ms: int = 1000) -> None:
         self.stop_music(fade_ms)
-        # In a full game, we'd use a USEREVENT to start the next track when fadeout ends.
-        # For now, just load and play with fade_in if the API supports it.
-        # pygame.mixer.music.fadeout blocks or is async? It's async.
-        # A simple implementation just loads and plays with fade.
         try:
             pygame.mixer.music.load(str(path))
             pygame.mixer.music.set_volume(self.music_volume)
-            # Pygame 2+ allows fade_ms in play()
             pygame.mixer.music.play(loops=-1, fade_ms=fade_ms)
         except Exception as e:
             logger.error(f"Failed to fade music: {e}")
 
     def stop_music(self, fade_ms: int = 0) -> None:
+        if not self._mixer_ready():
+            return
         if fade_ms > 0:
             pygame.mixer.music.fadeout(fade_ms)
         else:
             pygame.mixer.music.stop()
 
     def pause_music(self) -> None:
-        pygame.mixer.music.pause()
+        if self._mixer_ready():
+            pygame.mixer.music.pause()
 
     def resume_music(self) -> None:
-        pygame.mixer.music.unpause()
+        if self._mixer_ready():
+            pygame.mixer.music.unpause()
 
     # --- Ambient ---
     def play_ambient(self, path: str | Path | None = None) -> None:
         """Plays an ambient background sound, looping indefinitely.
         If no path is provided, falls back to the generated synth pad.
         """
+        if not self._mixer_ready() or self.ambient_channel is None:
+            logger.info("Skipping ambient playback; audio is disabled.")
+            return
         try:
             if path:
                 self.ambient_sound = pygame.mixer.Sound(file=str(path))
@@ -178,11 +203,14 @@ class AudioManager:
 
     # --- SFX (one-shot on free channel) ---
     def play_sfx(self, path: str | Path | None = None) -> None:
-        """Play a one-shot SFX file on the next free channel (2-7).
+        """Play a one-shot SFX file on the next free channel (3-7, skipping 2 reserved for TTS).
 
         Loads and caches the Sound object on first use. If no path is provided,
         falls back to a generated UI blip.
         """
+        if not self._mixer_ready():
+            logger.info("Skipping SFX playback; audio is disabled.")
+            return
         try:
             if path:
                 key = str(path)
@@ -201,7 +229,6 @@ class AudioManager:
 
                 for i in range(num_samples):
                     t = i / sample_rate
-                    # Simple sine wave
                     sample = math.sin(2 * math.pi * frequency * t)
 
                     # Quick fade out to avoid clicking
@@ -236,6 +263,9 @@ class AudioManager:
 
     def cleanup(self) -> None:
         """Clean up mixer resources."""
+        if not self._mixer_ready():
+            self._sfx_cache.clear()
+            return
         self.stop_music()
         if self.ambient_channel:
             self.ambient_channel.stop()
@@ -244,3 +274,48 @@ class AudioManager:
         self._sfx_cache.clear()
         # Do not call pygame.mixer.quit() if TTSEngine might still need to cleanup,
         # but it's safe if it's the last thing.
+
+    def load_playlist(self, directory: str) -> None:
+        """Load and shuffle all .ogg files from the given directory."""
+        if not self._mixer_ready():
+            logger.info("Skipping playlist loading; audio is disabled.")
+            return
+        try:
+            self._playlist = [
+                os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".ogg")
+            ]
+            random.shuffle(self._playlist)
+            self._current_track_index = 0
+            logger.info(f"Loaded playlist with {len(self._playlist)} tracks from {directory}.")
+        except Exception as e:
+            logger.error(f"Failed to load playlist: {e}")
+
+    def play_next_track(self) -> None:
+        """Play the next track in the playlist, looping back to the start if necessary."""
+        if not self._playlist:
+            logger.warning("Playlist is empty. Cannot play next track.")
+            return
+        track = self._playlist[self._current_track_index]
+        self._current_track_index = (self._current_track_index + 1) % len(self._playlist)
+        self.play_music(track, fade_ms=1000)
+
+    def is_music_playing(self) -> bool:
+        """Check if music is currently playing."""
+        return pygame.mixer.music.get_busy()
+
+    def play_playlist(self) -> None:
+        """Start playing the shuffled playlist on loop."""
+        if not self._mixer_ready():
+            logger.info("Skipping playlist playback; audio is disabled.")
+            return
+        if not self._playlist:
+            logger.warning("Playlist is empty. Load a playlist before playing.")
+            return
+
+        def _play_loop():
+            while True:
+                if not self.is_music_playing():
+                    self.play_next_track()
+                pygame.time.wait(100)  # Check every 100ms
+
+        threading.Thread(target=_play_loop, daemon=True).start()

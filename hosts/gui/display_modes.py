@@ -13,11 +13,9 @@ from .constants import H, W
 logger = logging.getLogger(__name__)
 
 DISPLAY_MODE_WINDOWED = "Windowed"
-DISPLAY_MODE_BORDERLESS = "Borderless"
 DISPLAY_MODE_FULLSCREEN = "Fullscreen"
 DISPLAY_MODE_OPTIONS = [
     DISPLAY_MODE_WINDOWED,
-    DISPLAY_MODE_BORDERLESS,
     DISPLAY_MODE_FULLSCREEN,
 ]
 
@@ -156,15 +154,6 @@ def build_display_mode_spec(
     resolved_desktop = desktop_size or get_primary_desktop_size()
 
     if normalized == DISPLAY_MODE_FULLSCREEN:
-        spec = DisplayModeSpec(
-            mode=normalized,
-            size=_sanitize_size(resolved_desktop),
-            flags=pygame.FULLSCREEN,
-        )
-        logger.debug("Built display mode spec: %s", spec)
-        return spec
-
-    if normalized == DISPLAY_MODE_BORDERLESS:
         spec = DisplayModeSpec(
             mode=normalized,
             size=_sanitize_size(resolved_desktop),

@@ -7,8 +7,9 @@ Returns a typed Subsystems dataclass instead of a raw dict.
 from __future__ import annotations
 
 import asyncio
+import logging
 import queue
-import random
+import secrets
 import threading
 from collections.abc import Generator
 from dataclasses import dataclass
@@ -33,6 +34,8 @@ from .quick_actions import QuickActionBar
 from .settings_ui import SettingsOverlay
 from .tts_gui_integration import TTSGUIManager
 from .typewriter import TypewriterManager
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -83,102 +86,190 @@ def load_subsystems(
     total_steps = 14
     step = 0
     screen_w, screen_h = screen_size
+    logger.debug(f"Starting subsystem load: {screen_w}x{screen_h}")
 
     # 1. GUI integration (settings, font scaler, etc.)
     step += 1
-    gui_integration = GUIComponentsIntegration(None, settings_path)
+    try:
+        logger.debug("Initializing GUI components integration...")
+        gui_integration = GUIComponentsIntegration(None, settings_path)
+        logger.debug("GUI integration OK")
+    except Exception:
+        logger.exception("Failed to initialize GUI integration")
+        raise
     yield step / total_steps, "Loading settings…"
 
     # 2. Wire audio volumes from saved settings
     step += 1
-    audio_manager.set_music_volume(gui_integration.settings.get("music_volume", 0.5))
-    audio_manager.set_ambient_volume(gui_integration.settings.get("ambient_volume", 0.5))
-    audio_manager.set_voice_volume(gui_integration.settings.get("voice_volume", 1.0))
-    audio_manager.set_sfx_volume(gui_integration.settings.get("sfx_volume", 0.8))
+    try:
+        logger.debug("Configuring audio volumes...")
+        audio_manager.set_music_volume(gui_integration.settings.get("music_volume", 0.5))
+        audio_manager.set_ambient_volume(gui_integration.settings.get("ambient_volume", 0.5))
+        audio_manager.set_voice_volume(gui_integration.settings.get("voice_volume", 1.0))
+        audio_manager.set_sfx_volume(gui_integration.settings.get("sfx_volume", 0.8))
+        logger.debug("Audio volumes OK")
+    except Exception:
+        logger.exception("Failed to configure audio")
+        raise
     yield step / total_steps, "Configuring audio…"
 
     # 3. Settings overlay
     step += 1
-    settings_overlay = SettingsOverlay(screen_w, screen_h, gui_integration, audio_manager)
+    try:
+        logger.debug("Creating settings overlay...")
+        settings_overlay = SettingsOverlay(screen_w, screen_h, gui_integration, audio_manager)
+        logger.debug("Settings overlay OK")
+    except Exception:
+        logger.exception("Failed to create settings overlay")
+        raise
     yield step / total_steps, "Building settings UI…"
 
     # 4. Alignment gauge panel
     step += 1
-    alignment_panel = AlignmentGaugePanel(screen_w, screen_h)
+    try:
+        logger.debug("Creating alignment panel...")
+        alignment_panel = AlignmentGaugePanel(screen_w, screen_h)
+        logger.debug("Alignment panel OK")
+    except Exception:
+        logger.exception("Failed to create alignment panel")
+        raise
     yield step / total_steps, "Forging alignment gauges…"
 
     # 5. Gossip side panel
     step += 1
-    gossip_panel = GossipPanel(screen_w, screen_h)
+    try:
+        logger.debug("Creating gossip panel...")
+        gossip_panel = GossipPanel(screen_w, screen_h)
+        logger.debug("Gossip panel OK")
+    except Exception:
+        logger.exception("Failed to create gossip panel")
+        raise
     yield step / total_steps, "Opening gossip channels…"
 
     # 6. Onboarding overlay
     step += 1
-    onboarding = OnboardingOverlay(screen_w, screen_h)
+    try:
+        logger.debug("Creating onboarding overlay...")
+        onboarding = OnboardingOverlay(screen_w, screen_h)
+        logger.debug("Onboarding overlay OK")
+    except Exception:
+        logger.exception("Failed to create onboarding overlay")
+        raise
     yield step / total_steps, "Preparing introductions…"
 
     # 7. Memory viewer panel
     step += 1
-    memory_viewer = MemoryViewerPanel(screen_w, screen_h)
+    try:
+        logger.debug("Creating memory viewer...")
+        memory_viewer = MemoryViewerPanel(screen_w, screen_h)
+        logger.debug("Memory viewer OK")
+    except Exception:
+        logger.exception("Failed to create memory viewer")
+        raise
     yield step / total_steps, "Cataloging memories…"
 
     # 8. Particle system
     step += 1
-    particles = ParticleSystem()
+    try:
+        logger.debug("Creating particle system...")
+        particles = ParticleSystem()
+        logger.debug("Particle system OK")
+    except Exception:
+        logger.exception("Failed to create particle system")
+        raise
     yield step / total_steps, "Igniting forge embers…"
 
     # 9. Portrait panel + avatar pre-cache
     step += 1
-    portrait = PortraitPanel()
-    heph_quotes = AGENTS["hephaestus"].get("user_quotes", [])
-    portrait.current_quote = random.choice(heph_quotes) if heph_quotes else ""
+    try:
+        logger.debug("Creating portrait panel...")
+        portrait = PortraitPanel()
+        heph_quotes = AGENTS["hephaestus"].get("user_quotes", [])
+        portrait.current_quote = secrets.choice(heph_quotes) if heph_quotes else ""
+        logger.debug("Portrait panel OK")
+    except Exception:
+        logger.exception("Failed to create portrait panel")
+        raise
     yield step / total_steps, "Summoning the maidens…"
 
     # 10. Dialogue history + input bar + effects + debug log
     step += 1
-    history = DialogueHistory()
-    input_bar = InputBar()
-    debug_log = DebugLog()
-    reduce_motion = gui_integration.settings.get("reduce_motion", False)
-    typewriter = TypewriterManager(motion_sensitivity_enabled=reduce_motion)
-    flash = FlashEffect()
+    try:
+        logger.debug("Creating dialogue, input, and effects...")
+        history = DialogueHistory()
+        input_bar = InputBar()
+        debug_log = DebugLog()
+        reduce_motion = gui_integration.settings.get("reduce_motion", False)
+        typewriter = TypewriterManager(motion_sensitivity_enabled=reduce_motion)
+        flash = FlashEffect()
+        logger.debug("Dialogue/input/effects OK")
+    except Exception:
+        logger.exception("Failed to create dialogue/input/effects")
+        raise
     yield step / total_steps, "Preparing the forge…"
 
     # 11. Quick actions
     step += 1
-    quick_actions = QuickActionBar()
+    try:
+        logger.debug("Creating quick actions...")
+        quick_actions = QuickActionBar()
+        logger.debug("Quick actions OK")
+    except Exception:
+        logger.exception("Failed to create quick actions")
+        raise
     yield step / total_steps, "Forging quick actions…"
 
     # 12. A2A client thread
     step += 1
-    send_q: queue.Queue[tuple[str, str] | None] = queue.Queue()
-    recv_q: queue.Queue[dict] = queue.Queue()
-    queues_hook["send_q"] = send_q
-    client = GuiClient(send_q, recv_q, agent_url)
+    try:
+        logger.debug(f"Starting A2A client (agent_url={agent_url})...")
+        send_q: queue.Queue[tuple[str, str] | None] = queue.Queue()
+        recv_q: queue.Queue[dict] = queue.Queue()
+        queues_hook["send_q"] = send_q
+        client = GuiClient(send_q, recv_q, agent_url)
 
-    def _run_client() -> None:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            loop.run_until_complete(client.run())
-        finally:
-            loop.close()
+        def _run_client() -> None:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                logger.debug("A2A client event loop starting")
+                loop.run_until_complete(client.run())
+            except Exception:
+                logger.exception("A2A client error")
+            finally:
+                loop.close()
 
-    _thread = threading.Thread(target=_run_client, daemon=True)
-    _thread.start()
+        _thread = threading.Thread(target=_run_client, daemon=True)
+        _thread.start()
+        logger.debug("A2A client thread OK")
+    except Exception:
+        logger.exception("Failed to start A2A client")
+        raise
     yield step / total_steps, "Connecting to Hephaestus…"
 
     # 13. Audio ready (music deferred until player presses start)
     step += 1
+    try:
+        logger.debug("Audio ready")
+    except Exception:
+        logger.exception("Audio ready check failed")
+        raise
     yield step / total_steps, "Tuning the forge…"
 
     # 14. TTS manager
     step += 1
-    tts_manager = TTSGUIManager(recv_q, enable_tts=True, pacing_mode=PacingMode.NORMAL)
-    tts_manager.set_current_agent("hephaestus")
+    try:
+        logger.debug("Creating TTS manager...")
+        tts_manager = TTSGUIManager(recv_q, enable_tts=True, pacing_mode=PacingMode.NORMAL)
+        tts_manager.set_current_agent("hephaestus")
+        logger.debug("TTS manager OK")
+    except Exception:
+        logger.exception("Failed to create TTS manager")
+        raise
     yield step / total_steps, "Ready"
 
     # Return the typed result via StopIteration.value
+    logger.debug("All subsystems loaded successfully")
     return Subsystems(
         gui_integration=gui_integration,
         settings_overlay=settings_overlay,

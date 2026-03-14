@@ -11,9 +11,12 @@ from __future__ import annotations
 import asyncio
 import base64
 import io as _io
+import logging
 import os
-import random
 import re
+import secrets
+import shutil
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -35,12 +38,15 @@ from a2a.types import (
     TaskStatusUpdateEvent,
     TextPart,
 )
+from anyio import Path as AnyioPath
 from prompt_toolkit import PromptSession
 from prompt_toolkit.formatted_text import ANSI
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.patch_stdout import patch_stdout
 
 from kourai_common.config import get_agent_url
+
+logger = logging.getLogger(__name__)
 
 # Windows consoles default to cp1252 — force UTF-8 so emoji and box-drawing work.
 # Skip when imported under pytest — replacing streams breaks pytest's capture system.
@@ -581,7 +587,7 @@ def _handoff_chatter(from_agent: str, to_agent: str) -> str | None:
     key = (from_agent.lower(), to_agent.lower())
     lines = _HANDOFF_LINES.get(key) or _HANDOFF_GENERIC.get(from_agent.lower())
     if lines:
-        return random.choice(lines)  # noqa: S311
+        return secrets.choice(lines)
     return None
 
 
@@ -593,7 +599,7 @@ def _victory_chatter(last_agent: str) -> str | None:
     """
     lines = _VICTORY_LINES.get(last_agent.lower())
     if lines:
-        return random.choice(lines)  # noqa: S311
+        return secrets.choice(lines)
     return None
 
 
@@ -635,7 +641,7 @@ def _maiden_card(name: str) -> str:
     if not m:
         return f"{_DIM}Unknown maiden: {name}{_RESET}"
 
-    quote = random.choice(m["quotes"])  # noqa: S311
+    quote = secrets.choice(m["quotes"])
 
     # Load avatar (PNG/JPG anime portrait > kaomoji fallback)
     raw_art = _get_maiden_art(name, str(m["face"]), size="card")
@@ -669,7 +675,7 @@ def _maiden_gallery() -> str:
 
 
 def _banner() -> str:
-    tagline = random.choice(_TAGLINES)  # noqa: S311
+    tagline = secrets.choice(_TAGLINES)
     return (
         f"{_GOLD_BOLD}\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e{_RESET}\n"
         f"{_GOLD_BOLD}\u2502     Kourai Khryseai \u2014 Golden Maidens     \u2502{_RESET}\n"
@@ -988,11 +994,11 @@ async def _connect_with_url_override(
 
 
 # ---------------------------------------------------------------------------
-async def _headless(agent_url: str, prompt: str, timeout: int, verbose: bool) -> None:
+async def _headless(agent_url: str, prompt: str, timeout_seconds: int, verbose: bool) -> None:
     """Run a single prompt non-interactively and exit. For scripts and piping."""
     config = ClientConfig(
         streaming=True,
-        httpx_client=httpx.AsyncClient(timeout=timeout),
+        httpx_client=httpx.AsyncClient(timeout=timeout_seconds),
     )
 
     try:
@@ -1091,35 +1097,39 @@ def _copy_to_clipboard(text: str) -> bool:
     """Copy text to the system clipboard. Returns True on success."""
     try:
         if sys.platform == "win32":
-            import subprocess
-
-            proc = subprocess.Popen(
-                ["clip"],
-                stdin=subprocess.PIPE,
-                shell=True,
-            )
+            exe = shutil.which("clip")
+            if not exe:
+                return False
+            proc = subprocess.Popen([exe], stdin=subprocess.PIPE)  # noqa: S603
             proc.communicate(text.encode("utf-16le"))
             return proc.returncode == 0
         elif sys.platform == "darwin":
-            import subprocess
-
-            proc = subprocess.Popen(
-                ["pbcopy"],
-                stdin=subprocess.PIPE,
-            )
+            exe = shutil.which("pbcopy")
+            if not exe:
+                return False
+            proc = subprocess.Popen([exe], stdin=subprocess.PIPE)  # noqa: S603
             proc.communicate(text.encode())
             return proc.returncode == 0
         else:
             # Linux — try xclip, then xsel
-            import subprocess
+            for cmd_name in ("xclip", "xsel"):
+                exe = shutil.which(cmd_name)
+                if not exe:
+                    continue
 
-            for cmd in (["xclip", "-selection", "clipboard"], ["xsel", "--clipboard", "--input"]):
+                args = [exe]
+                if cmd_name == "xclip":
+                    args.extend(["-selection", "clipboard"])
+                elif cmd_name == "xsel":
+                    args.extend(["--clipboard", "--input"])
+
                 try:
-                    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+                    proc = subprocess.Popen(args, stdin=subprocess.PIPE)  # noqa: S603
                     proc.communicate(text.encode())
                     if proc.returncode == 0:
                         return True
-                except FileNotFoundError:
+                except Exception:
+                    logger.debug("Clipboard command %s failed", exe, exc_info=True)
                     continue
             return False
     except Exception:
@@ -1137,6 +1147,7 @@ def _copy_to_clipboard(text: str) -> bool:
 )
 @click.option(
     "--timeout",
+    "timeout_seconds",
     default=600,
     help="Request timeout in seconds",
 )
@@ -1153,14 +1164,14 @@ def _copy_to_clipboard(text: str) -> bool:
     default=None,
     help="Run a single prompt non-interactively (headless mode)",
 )
-async def main(agent: str | None, timeout: int, verbose: bool, prompt: str | None) -> None:
+async def main(agent: str | None, timeout_seconds: int, verbose: bool, prompt: str | None) -> None:
     """Interactive CLI for Kourai Khryseai agent swarm."""
     if not agent:
         agent = get_agent_url("hephaestus")
 
     # Headless mode — run a single prompt and exit (for scripts / piping)
     if prompt:
-        await _headless(agent, prompt, timeout, verbose)
+        await _headless(agent, prompt, timeout_seconds, verbose)
         return
 
     _echo(_banner())
@@ -1177,7 +1188,7 @@ async def main(agent: str | None, timeout: int, verbose: bool, prompt: str | Non
 
     config = ClientConfig(
         streaming=True,
-        httpx_client=httpx.AsyncClient(timeout=timeout),
+        httpx_client=httpx.AsyncClient(timeout=timeout_seconds),
     )
 
     try:
@@ -1198,10 +1209,10 @@ async def main(agent: str | None, timeout: int, verbose: bool, prompt: str | Non
 
     # Random maiden greeting on startup — maidens flirt with the user,
     # Hephaestus is gruff but welcoming. user_quotes are the warm ones.
-    _greet_name = random.choice(list(_MAIDENS.keys()))  # noqa: S311
+    _greet_name = secrets.choice(list(_MAIDENS.keys()))
     _greet_m = _MAIDENS[_greet_name]
     _greet_quotes = _greet_m.get("user_quotes", _greet_m["quotes"])
-    _greet_quote = random.choice(_greet_quotes)  # noqa: S311
+    _greet_quote = secrets.choice(_greet_quotes)
     _echo(f"\n  {_GOLD}{_MAIDEN_FACES[_greet_name]}{_RESET} {_ITALIC}{_greet_quote}{_RESET}")
     _echo("")
 
@@ -1277,7 +1288,7 @@ async def main(agent: str | None, timeout: int, verbose: bool, prompt: str | Non
                         parts_split[1].strip() if len(parts_split) > 1 else "kourai_output.md"
                     )
                     try:
-                        Path(filename).write_text(_last_result, encoding="utf-8")
+                        await AnyioPath(filename).write_text(_last_result, encoding="utf-8")
                         _echo(f"{_GOLD_BRIGHT}\u2728 Saved to {filename}{_RESET}")
                     except Exception as e:
                         _echo(f"{_RED}Save failed: {e}{_RESET}")

@@ -21,10 +21,6 @@ import pygame
 
 logger = logging.getLogger(__name__)
 
-# Use pygame-ce if available for better mixer features, fall back to pygame
-with contextlib.suppress(ImportError, AttributeError):
-    pass
-
 
 @dataclass
 class VoiceConfig:
@@ -32,12 +28,11 @@ class VoiceConfig:
 
     name: str
     edge_id: str
-    speed: float = 1.0  # 0.5 to 2.0
-    pitch: float = 1.0  # 0.5 to 2.0 (perceptual pitch)
-    emotion: str = "default"  # natural, sad, cheerful, angry, etc.
+    speed: float = 1.0
+    pitch: float = 1.0
+    emotion: str = "default"
 
 
-# Curated voice roster for agent personalities
 VOICE_ROSTER = {
     "aria": VoiceConfig("Aria", "en-US-AriaNeural", 0.95),
     "jenny": VoiceConfig("Jenny", "en-US-JennyNeural", 0.90),
@@ -46,7 +41,6 @@ VOICE_ROSTER = {
     "guy": VoiceConfig("Guy", "en-US-GuyNeural", 0.95),
 }
 
-# Map agent names to voice personalities
 AGENT_VOICES = {
     "hephaestus": "guy",
     "metis": "aria",
@@ -94,30 +88,53 @@ class TTSEngine:
         logger.info(f"TTSEngine initialized: temp_dir={self.temp_dir}, volume={self.master_volume}")
 
     def _init_mixer(self) -> None:
-        """Initialize pygame mixer with optimal settings."""
+        """Initialize pygame mixer with optimal settings.
+
+        Uses channel 2 (reserved for TTS) to avoid collision with AudioManager which uses
+        channels 0 (voice) and 1 (ambient). If mixer is already initialized by AudioManager,
+        reuse it without reinitializing.
+        """
         if self._mixer_initialized:
             return
         try:
+            # Try to init mixer — will fail if AudioManager already initialized it,
+            # which is fine; we'll reuse the existing mixer.
             pygame.mixer.init(
-                frequency=44100,  # Standard CD quality
-                size=-16,  # 16-bit
-                channels=2,  # Stereo
-                buffer=512,  # Low latency buffer
+                frequency=44100,
+                size=-16,
+                channels=2,
+                buffer=512,
             )
-            # Ensure we have enough channels and reserve channel 0 for TTS
-            # so pygame.mixer.stop() from background music can't evict speech.
             pygame.mixer.set_num_channels(8)
-            self._tts_channel: pygame.mixer.Channel | None = pygame.mixer.Channel(0)
-            self._mixer_initialized = True
-            logger.info("Pygame mixer initialized successfully (TTS on channel 0)")
-        except RuntimeError as e:
-            # Mixer already initialized — grab the channel anyway
-            logger.warning(f"Pygame mixer init error (may be already init): {e}")
-            try:
-                self._tts_channel = pygame.mixer.Channel(0)
-            except Exception:
+            logger.debug("Pygame mixer initialized (fresh)")
+        except (RuntimeError, pygame.error) as e:
+            if pygame.mixer.get_init() is None:
                 self._tts_channel = None
+                self._mixer_initialized = False
+                logger.warning("TTS audio disabled; pygame mixer unavailable: %s", e)
+                return
+            # Mixer already initialized (likely by AudioManager) — reuse it
+            logger.debug("Pygame mixer already initialized; reusing existing mixer")
+
+        # Reserve channel 2 for TTS (channels 0-1 belong to AudioManager)
+        try:
+            self._tts_channel = pygame.mixer.Channel(2)
             self._mixer_initialized = True
+            logger.info("Pygame mixer ready for TTS (using channel 2)")
+        except pygame.error as channel_error:
+            self._tts_channel = None
+            self._mixer_initialized = False
+            logger.warning(
+                "TTS audio disabled; failed to reserve mixer channel 2: %s",
+                channel_error,
+            )
+        except Exception as e:
+            self._tts_channel = None
+            self._mixer_initialized = False
+            logger.error(
+                "Unexpected error while reserving mixer channel 2: %s",
+                e,
+            )
 
     def set_master_volume(self, volume: float) -> None:
         """Set master volume (0.0 to 1.0)."""
@@ -135,7 +152,7 @@ class TTSEngine:
         """Find available audio converter (ffmpeg or avconv)."""
         for converter in ["ffmpeg", "avconv"]:
             try:
-                subprocess.run([converter, "-version"], capture_output=True, timeout=2)
+                subprocess.run([converter, "-version"], capture_output=True, timeout=2)  # noqa: S603
                 logger.debug(f"Found converter: {converter}")
                 return converter
             except (FileNotFoundError, subprocess.TimeoutExpired):
@@ -164,16 +181,13 @@ class TTSEngine:
             logger.debug("Empty text, skipping TTS")
             return
 
-        # Determine voice
         if voice_key is None:
             voice_key = AGENT_VOICES.get(agent_name or "hephaestus", "aria")
 
         voice_cfg = VOICE_ROSTER.get(voice_key, VOICE_ROSTER["aria"])
         final_speed = speed if speed is not None else voice_cfg.speed
 
-        # Generate audio with edge-tts (MP3 format)
         temp_mp3 = self.temp_dir / f"speech_{abs(hash(text)) % 1000000}.mp3"
-        # Also prepare WAV path for pygame compatibility
         temp_wav = self.temp_dir / f"speech_{abs(hash(text)) % 1000000}.wav"
 
         try:
@@ -183,7 +197,6 @@ class TTSEngine:
                 f"speed={final_speed}, text_len={len(text)}"
             )
 
-            # Generate audio with prosody (speed applied via edge-tts)
             communicate = edge_tts.Communicate(
                 text, voice_cfg.edge_id, rate=f"{(final_speed - 1.0) * 50:+.0f}%"
             )
@@ -194,46 +207,53 @@ class TTSEngine:
 
             logger.debug(f"TTS: MP3 generated ({temp_mp3.stat().st_size} bytes)")
 
-            # Convert MP3 to WAV using ffmpeg (pygame mixer compatible)
             converter = self._get_converter()
             playback_path = temp_mp3
             if converter:
                 logger.debug(f"TTS: Converting MP3→WAV using {converter}")
                 try:
-                    result = subprocess.run(
-                        [
-                            converter,
-                            "-i",
-                            str(temp_mp3),
-                            "-acodec",
-                            "pcm_s16le",
-                            "-ar",
-                            "44100",
-                            "-ac",
-                            "2",
-                            str(temp_wav),
-                            "-y",
-                        ],
-                        capture_output=True,
-                        timeout=10,
-                        text=True,
+                    proc = await asyncio.create_subprocess_exec(
+                        converter,
+                        "-i",
+                        str(temp_mp3),
+                        "-acodec",
+                        "pcm_s16le",
+                        "-ar",
+                        "44100",
+                        "-ac",
+                        "2",
+                        str(temp_wav),
+                        "-y",
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE,
                     )
-                    if result.returncode != 0:
+                    try:
+                        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=10)
+                    except TimeoutError:
+                        with contextlib.suppress(Exception):
+                            proc.kill()
+                        await proc.wait()
+                        logger.warning("TTS: Converter timed out, falling back to MP3")
+                        _stdout, stderr = b"", b""
+
+                    if proc.returncode != 0 and proc.returncode is not None:
                         logger.warning(
-                            f"TTS: Converter returned code {result.returncode}: {result.stderr}"
+                            f"TTS: Converter returned code {proc.returncode}: {stderr.decode()}"
                         )
                     if temp_wav.exists():
                         logger.debug(f"TTS: WAV generated ({temp_wav.stat().st_size} bytes)")
                         playback_path = temp_wav
                     else:
                         logger.warning("TTS: WAV not created, falling back to MP3")
-                except subprocess.TimeoutExpired:
-                    logger.warning("TTS: Converter timed out, falling back to MP3")
+                except Exception as e:
+                    logger.warning(f"TTS: Conversion error, falling back to MP3: {e}")
             else:
                 logger.warning("TTS: No converter available, using MP3 directly (may fail)")
 
-            # Initialize mixer and play
             self._init_mixer()
+            if pygame.mixer.get_init() is None:
+                logger.info("Skipping TTS playback; audio is disabled.")
+                return
             self.is_playing = True
 
             logger.debug(f"TTS: Loading sound from {playback_path}")
@@ -245,17 +265,15 @@ class TTSEngine:
             else:
                 sound.set_volume(self.master_volume)
 
-            # Use dedicated channel so mixer.stop() from background music can't kill us
             channel: pygame.mixer.Channel | None = getattr(self, "_tts_channel", None)
             playback_duration: float = 0.0
             if channel is not None:
-                logger.info(f"TTS: Playing on reserved channel 0, volume={sound.get_volume():.2f}")
+                logger.info(f"TTS: Playing on reserved channel 2, volume={sound.get_volume():.2f}")
                 channel.play(sound)
             else:
                 logger.info(f"TTS: Playing on default, volume={sound.get_volume():.2f}")
                 sound.play()
 
-            # Wait for this specific channel to finish
             if channel is not None:
                 while channel.get_busy():
                     await asyncio.sleep(0.05)
@@ -271,7 +289,6 @@ class TTSEngine:
             logger.error(f"TTS playback error: {type(e).__name__}: {e}", exc_info=True)
         finally:
             self.is_playing = False
-            # Clean up both MP3 and WAV
             for temp_file in [temp_mp3, temp_wav]:
                 if temp_file.exists():
                     try:
@@ -311,11 +328,15 @@ class TTSEngine:
         channel = getattr(self, "_tts_channel", None)
         if channel is not None and channel.get_busy():
             channel.stop()
-            logger.info("TTS playback stopped (channel 0)")
+            logger.info("TTS playback stopped (channel 2)")
         self.is_playing = False
 
     def cleanup(self) -> None:
-        """Clean up temporary files and mixer resources."""
+        """Clean up temporary files.
+
+        NOTE: Does NOT call pygame.mixer.quit() because the mixer is shared with
+        AudioManager and other GUI components. Mixer lifecycle is managed globally.
+        """
         self.stop()
         if self.temp_dir.exists():
             for f in self.temp_dir.glob("*.mp3"):
@@ -324,10 +345,4 @@ class TTSEngine:
             for f in self.temp_dir.glob("*.wav"):
                 with contextlib.suppress(OSError):
                     f.unlink()
-        if self._mixer_initialized:
-            try:
-                pygame.mixer.quit()
-                self._mixer_initialized = False
-                logger.info("Pygame mixer shut down")
-            except RuntimeError:
-                pass
+        logger.debug("TTSEngine cleanup complete")

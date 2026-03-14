@@ -61,14 +61,15 @@ class _LoadingEmber:
         self._reset(max_w, max_h)
 
     def _reset(self, max_w: int, max_h: int) -> None:
-        self.x = random.uniform(0, max_w)
-        self.y = random.uniform(0, max_h)
-        self.vx = random.uniform(-0.2, 0.2)
-        self.vy = random.uniform(-0.5, -0.1)
-        self.radius = random.uniform(1.0, 2.2)
-        self.alpha = random.uniform(40, 150)
-        self.decay = random.uniform(0.12, 0.4)
-        r, g = random.randint(200, 255), random.randint(140, 200)
+        self.x = random.uniform(0, max_w)  # noqa: S311
+        self.y = random.uniform(0, max_h)  # noqa: S311
+        self.vx = random.uniform(-0.2, 0.2)  # noqa: S311
+        self.vy = random.uniform(-0.5, -0.1)  # noqa: S311
+        self.radius = random.uniform(1.0, 2.2)  # noqa: S311
+        self.alpha = random.uniform(40, 150)  # noqa: S311
+        self.decay = random.uniform(0.12, 0.4)  # noqa: S311
+        r = random.randint(200, 255)  # noqa: S311
+        g = random.randint(140, 200)  # noqa: S311
         self.color = (r, g, 20)
 
     def update(self, dt: float, max_w: int, max_h: int) -> None:

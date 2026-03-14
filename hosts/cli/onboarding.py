@@ -6,9 +6,11 @@ selection, and pronoun preferences. Saves to PlayerProfile JSON.
 
 from __future__ import annotations
 
-import sys
+import logging
 
 from kourai_common.player import PlayerProfile, set_active_profile
+
+logger = logging.getLogger(__name__)
 
 # Reuse CLI color palette
 _GOLD = "\033[38;2;218;165;32m"
@@ -36,7 +38,7 @@ PRONOUN_OPTIONS = [
 
 
 def _echo(text: str = "") -> None:
-    print(text, file=sys.stdout, flush=True)
+    logger.info(text)
 
 
 def _input(prompt_text: str) -> str:

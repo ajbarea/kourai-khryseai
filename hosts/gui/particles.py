@@ -35,14 +35,15 @@ class Ember:
         self._reset(W, H)
 
     def _reset(self, max_w: int, max_h: int) -> None:
-        self.x = random.uniform(0, max_w)
-        self.y = random.uniform(0, max_h)
-        self.vx = random.uniform(-0.25, 0.25)
-        self.vy = random.uniform(-0.6, -0.15)
-        self.radius = random.uniform(1.0, 2.5)
-        self.alpha = random.uniform(60, 180)
-        self.decay = random.uniform(0.15, 0.5)
-        r, g = random.randint(200, 255), random.randint(140, 200)
+        self.x = random.uniform(0, max_w)  # noqa: S311
+        self.y = random.uniform(0, max_h)  # noqa: S311
+        self.vx = random.uniform(-0.25, 0.25)  # noqa: S311
+        self.vy = random.uniform(-0.6, -0.15)  # noqa: S311
+        self.radius = random.uniform(1.0, 2.5)  # noqa: S311
+        self.alpha = random.uniform(60, 180)  # noqa: S311
+        self.decay = random.uniform(0.15, 0.5)  # noqa: S311
+        r = random.randint(200, 255)  # noqa: S311
+        g = random.randint(140, 200)  # noqa: S311
         self.color = (r, g, 20)
 
     def update(self, dt: float) -> bool:

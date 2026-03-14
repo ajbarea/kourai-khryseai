@@ -86,7 +86,7 @@ class SettingsManager:
                 json.dump(self.settings, f, indent=2, ensure_ascii=False)
         except OSError as e:
             # Gracefully handle file I/O errors
-            print(f"Warning: Failed to save settings to {self.config_path}: {e}")
+            logger.warning(f"Failed to save settings to {self.config_path}: {e}")
 
     def reset_to_defaults(self) -> None:
         """Reset all settings to their default values."""
@@ -115,5 +115,5 @@ class SettingsManager:
                 self.settings.update(loaded)
         except (OSError, json.JSONDecodeError) as e:
             # Gracefully handle file I/O and JSON parsing errors
-            print(f"Warning: Failed to load settings from {self.config_path}: {e}")
+            logger.warning(f"Failed to load settings from {self.config_path}: {e}")
             # Keep default settings
