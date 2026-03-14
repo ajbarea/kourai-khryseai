@@ -18,6 +18,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
+from anyio import Path as AnyioPath
 
 # ===================================================================
 # 1. TTSEngine — mock pygame.mixer to avoid hardware dependency
@@ -201,13 +202,16 @@ class TestTTSEngineSpeak:
         mock_sound.get_volume.return_value = 0.5
 
         with (
-            patch("hosts.gui.tts_engine.edge_tts.Communicate", return_value=mock_communicate),
+            patch(
+                "hosts.gui.tts_engine.edge_tts.Communicate",
+                return_value=mock_communicate,
+            ),
             patch("pygame.mixer.Sound", return_value=mock_sound),
             patch.object(engine, "_get_converter", return_value=None),
         ):
             # Make the temp file exist after "save"
             async def fake_save(path):
-                Path(path).touch()
+                await AnyioPath(path).touch()
 
             mock_communicate.save = fake_save
             await engine.speak("Hello world", agent_name="metis")
@@ -221,7 +225,7 @@ class TestTTSEngineSpeak:
         engine = TTSEngine()
 
         async def fake_save(path):
-            Path(path).touch()
+            await AnyioPath(path).touch()
 
         mock_communicate = MagicMock()
         mock_communicate.save = fake_save
@@ -232,7 +236,10 @@ class TestTTSEngineSpeak:
         mock_run = Mock(returncode=0, stderr="")
 
         with (
-            patch("hosts.gui.tts_engine.edge_tts.Communicate", return_value=mock_communicate),
+            patch(
+                "hosts.gui.tts_engine.edge_tts.Communicate",
+                return_value=mock_communicate,
+            ),
             patch("pygame.mixer.Sound", return_value=mock_sound),
             patch.object(engine, "_get_converter", return_value="ffmpeg"),
             patch("subprocess.run", return_value=mock_run),

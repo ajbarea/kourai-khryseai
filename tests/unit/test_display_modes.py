@@ -5,7 +5,6 @@ from __future__ import annotations
 import pygame
 
 from hosts.gui.display_modes import (
-    DISPLAY_MODE_BORDERLESS,
     DISPLAY_MODE_FULLSCREEN,
     DISPLAY_MODE_WINDOWED,
     build_display_mode_spec,
@@ -41,22 +40,13 @@ def test_build_display_mode_spec_windowed_centers_window() -> None:
     assert spec.position == (160, 90)
 
 
-def test_build_display_mode_spec_borderless_uses_desktop_size() -> None:
-    spec = build_display_mode_spec(DISPLAY_MODE_BORDERLESS, (1600, 900), (1920, 1080))
-
-    assert spec.mode == DISPLAY_MODE_BORDERLESS
-    assert spec.size == (1920, 1080)
-    assert spec.flags == pygame.NOFRAME
-    assert spec.position == (0, 0)
-
-
 def test_build_display_mode_spec_fullscreen_uses_desktop_size() -> None:
     spec = build_display_mode_spec(DISPLAY_MODE_FULLSCREEN, (1600, 900), (1920, 1080))
 
     assert spec.mode == DISPLAY_MODE_FULLSCREEN
     assert spec.size == (1920, 1080)
-    assert spec.flags == pygame.FULLSCREEN
-    assert spec.position is None
+    assert spec.flags == pygame.NOFRAME
+    assert spec.position == (0, 0)
 
 
 def test_get_saved_windowed_size_uses_adaptive_default_when_unset() -> None:

@@ -15,7 +15,13 @@ class TestHighContrastAccessibilityProperty:
 
     @given(
         bg_name=st.sampled_from(
-            ["background", "bubble_bg", "user_bubble_bg", "result_bubble_bg", "error_bubble_bg"]
+            [
+                "background",
+                "bubble_bg",
+                "user_bubble_bg",
+                "result_bubble_bg",
+                "error_bubble_bg",
+            ]
         ),
         text_name=st.sampled_from(["text", "gold", "gold_dim", "error_red", "bubble_border"]),
     )

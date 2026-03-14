@@ -55,7 +55,13 @@ def _import_integration():
         should_speak,
     )
 
-    return _is_artifact_line, should_speak, extract_speakable, TTSGUIManager, TTSSettingsPanel
+    return (
+        _is_artifact_line,
+        should_speak,
+        extract_speakable,
+        TTSGUIManager,
+        TTSSettingsPanel,
+    )
 
 
 def _import_config():

@@ -9,7 +9,10 @@ from hosts.gui.dialogue import DialogueEntry, DialogueHistory
 class TestTimestampDisplayProperty:
     """Property-based tests for timestamp display consistency."""
 
-    @given(timestamp=st.floats(min_value=0, max_value=2e9), fmt=st.sampled_from(["12h", "24h"]))
+    @given(
+        timestamp=st.floats(min_value=0, max_value=2e9),
+        fmt=st.sampled_from(["12h", "24h"]),
+    )
     @settings(max_examples=100)
     def test_timestamp_display_consistency(self, timestamp, fmt):
         """Property: When timestamps are enabled, the timestamp shall be displayed consistently with

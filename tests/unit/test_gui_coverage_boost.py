@@ -1088,41 +1088,55 @@ class TestMainHelpers:
         assert _is_system_status("Hello world") is False
 
     def test_is_scratchpad_content_true(self):
-        from hosts.gui.message_classifier import is_scratchpad_content as _is_scratchpad_content
+        from hosts.gui.message_classifier import (
+            is_scratchpad_content as _is_scratchpad_content,
+        )
 
         text = "Plan:\n- step 1\n- step 2\n- step 3"
         assert _is_scratchpad_content(text) is True
 
     def test_is_scratchpad_content_todo(self):
-        from hosts.gui.message_classifier import is_scratchpad_content as _is_scratchpad_content
+        from hosts.gui.message_classifier import (
+            is_scratchpad_content as _is_scratchpad_content,
+        )
 
         text = "Notes:\nTODO: fix bug\nmore stuff"
         assert _is_scratchpad_content(text) is True
 
     def test_is_scratchpad_content_checkbox(self):
-        from hosts.gui.message_classifier import is_scratchpad_content as _is_scratchpad_content
+        from hosts.gui.message_classifier import (
+            is_scratchpad_content as _is_scratchpad_content,
+        )
 
         text = "Tasks:\n[ ] first\n[x] done"
         assert _is_scratchpad_content(text) is True
 
     def test_is_scratchpad_content_false_single_line(self):
-        from hosts.gui.message_classifier import is_scratchpad_content as _is_scratchpad_content
+        from hosts.gui.message_classifier import (
+            is_scratchpad_content as _is_scratchpad_content,
+        )
 
         assert _is_scratchpad_content("- just one line") is False
 
     def test_is_scratchpad_content_false_system_status(self):
-        from hosts.gui.message_classifier import is_scratchpad_content as _is_scratchpad_content
+        from hosts.gui.message_classifier import (
+            is_scratchpad_content as _is_scratchpad_content,
+        )
 
         assert _is_scratchpad_content("Analyzing code") is False
 
     def test_is_scratchpad_content_numbered_list(self):
-        from hosts.gui.message_classifier import is_scratchpad_content as _is_scratchpad_content
+        from hosts.gui.message_classifier import (
+            is_scratchpad_content as _is_scratchpad_content,
+        )
 
         text = "Steps:\n1. first\n2. second"
         assert _is_scratchpad_content(text) is True
 
     def test_is_scratchpad_content_asterisk_list(self):
-        from hosts.gui.message_classifier import is_scratchpad_content as _is_scratchpad_content
+        from hosts.gui.message_classifier import (
+            is_scratchpad_content as _is_scratchpad_content,
+        )
 
         text = "Ideas:\n* idea one\n* idea two"
         assert _is_scratchpad_content(text) is True
@@ -1153,7 +1167,15 @@ class TestProfileSelectDrawHelpers:
             "is_active": False,
         }
         _draw_profile_card(
-            surf, rect, profile, self._make_font(), self._make_font(), 255, False, False, False
+            surf,
+            rect,
+            profile,
+            self._make_font(),
+            self._make_font(),
+            255,
+            False,
+            False,
+            False,
         )
 
     def test_draw_profile_card_hovered(self):
@@ -1171,7 +1193,15 @@ class TestProfileSelectDrawHelpers:
             "devotion": 0,
         }
         _draw_profile_card(
-            surf, rect, profile, self._make_font(), self._make_font(), 255, True, False, False
+            surf,
+            rect,
+            profile,
+            self._make_font(),
+            self._make_font(),
+            255,
+            True,
+            False,
+            False,
         )
 
     def test_draw_profile_card_active(self):
@@ -1190,7 +1220,15 @@ class TestProfileSelectDrawHelpers:
             "is_active": True,
         }
         _draw_profile_card(
-            surf, rect, profile, self._make_font(), self._make_font(), 200, False, True, False
+            surf,
+            rect,
+            profile,
+            self._make_font(),
+            self._make_font(),
+            200,
+            False,
+            True,
+            False,
         )
 
     def test_draw_profile_card_delete_hovered(self):
@@ -1206,7 +1244,15 @@ class TestProfileSelectDrawHelpers:
             "total_sessions": 1,
         }
         _draw_profile_card(
-            surf, rect, profile, self._make_font(), self._make_font(), 255, False, False, True
+            surf,
+            rect,
+            profile,
+            self._make_font(),
+            self._make_font(),
+            255,
+            False,
+            False,
+            True,
         )
 
     def test_draw_new_game_button(self):

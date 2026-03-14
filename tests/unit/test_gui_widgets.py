@@ -495,7 +495,8 @@ class TestSettingsOverlay:
             s["slider"].dragging = True
             break
         event = pygame.event.Event(
-            pygame.MOUSEMOTION, pos=(overlay.panel_rect.centerx, overlay.panel_rect.centery)
+            pygame.MOUSEMOTION,
+            pos=(overlay.panel_rect.centerx, overlay.panel_rect.centery),
         )
         result = overlay.handle_event(event)
         assert result is True

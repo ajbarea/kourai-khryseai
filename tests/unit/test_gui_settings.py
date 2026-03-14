@@ -138,7 +138,9 @@ class TestTypewriterManagerProperty:
     @settings(max_examples=50)
     @given(
         text=st.text(
-            alphabet=st.characters(whitelist_categories=("L", "N", "P")), min_size=1, max_size=50
+            alphabet=st.characters(whitelist_categories=("L", "N", "P")),
+            min_size=1,
+            max_size=50,
         ),
         speed_ms=st.integers(min_value=10, max_value=100),
     )
