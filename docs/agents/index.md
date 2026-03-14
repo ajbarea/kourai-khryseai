@@ -1,12 +1,14 @@
 # The Agents
 
-Every agent in Kourai Khryseai is an independent HTTP server that exposes an [A2A Agent Card](https://a2a-protocol.org) at `/.well-known/agent-card.json`. Hephaestus discovers specialists by fetching their cards at connection time.
+Every agent in Kourai Khryseai is an **independent HTTP server** that exposes an [A2A Agent Card](https://a2a-protocol.org). Rather than running autonomously, each agent shows its work in real-time, asks clarifying questions when decisions matter, and participates in feedback loops with you and other agents.
+
+Hephaestus discovers specialists by fetching their cards at connection time, enabling runtime composition rather than hardcoded integrations.
 
 ---
 
 ## 🔥 Hephaestus — Orchestrator
 
-**Port `10000`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/hephaestus/`](https://github.com/ajbarea/Kourai_Khryseai/tree/main/agents/hephaestus)
+**Port `10000`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/hephaestus/`](https://github.com/ajbarea/kourai_khryseai/tree/main/agents/hephaestus)
 
 The brain of the system. Receives user requests, uses its LLM to decide which specialists to invoke and in what order, then executes the pipeline sequentially while streaming progress back to the CLI.
 

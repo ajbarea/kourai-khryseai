@@ -1,6 +1,6 @@
 [project]
 site_name = "Kourai Khryseai"
-site_description = "A multi-agent system framework for AI-accelerated development"
+site_description = "Interactive multi-agent development. Collaborate with six specialized AI agents in real-time—you guide each step, they show their work, iterate on feedback."
 site_author = "AJ Barea"
 copyright = "AJ Barea &middot; 2026"
 extra_css = ["stylesheets/extra.css"]
@@ -87,5 +87,5 @@ generator = false
 
 [[project.extra.social]]
 icon = "fontawesome/brands/github"
-link = "https://github.com/ajbarea/Kourai_Khryseai"
+link = "https://github.com/ajbarea/kourai-khryseai"
 name = "Kourai Khryseai on GitHub"

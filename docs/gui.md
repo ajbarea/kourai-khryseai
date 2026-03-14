@@ -378,11 +378,11 @@ Type your response and press Enter to continue. Press ESC to close settings if n
 The GUI maintains a `context_id` across requests within a session. This means follow-up requests can reference previous context:
 
 ```
-kourai: plan a user authentication system
+❯ plan a user authentication system
 ...
-kourai: implement it
+❯ implement it
 ...
-kourai: add tests for it
+❯ add tests for it
 ```
 
 Each request in the same session shares the same conversation context.

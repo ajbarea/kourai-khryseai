@@ -2,7 +2,7 @@
 
 ## 📐 Metis — Planner
 
-**Port `10001`** · Model varies by [tier](../configuration.md#llm-models) (Opus on `smart`) · [`agents/metis/`](https://github.com/ajbarea/Kourai_Khryseai/tree/main/agents/metis)
+**Port `10001`** · Model varies by [tier](../configuration.md#llm-models) (Opus on `smart`) · [`agents/metis/`](https://github.com/ajbarea/kourai_khryseai/tree/main/agents/metis)
 
 Transforms rough ideas into detailed implementation specs. On the `smart` tier, uses the most capable model (Opus) because planning quality determines everything downstream.
 
@@ -37,7 +37,7 @@ This context is injected into the LLM prompt so specs are grounded in the actual
 
 ## ⚙️ Techne — Coder
 
-**Port `10002`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/techne/`](https://github.com/ajbarea/Kourai_Khryseai/tree/main/agents/techne)
+**Port `10002`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/techne/`](https://github.com/ajbarea/kourai_khryseai/tree/main/agents/techne)
 
 Implements code changes from specs or fix requests. Reads existing files first, understands patterns, then generates targeted edits.
 
@@ -85,7 +85,7 @@ Supported actions: `CREATE`, `EDIT`, `DELETE`.
 
 ## 🧪 Dokimasia — Tester
 
-**Port `10003`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/dokimasia/`](https://github.com/ajbarea/Kourai_Khryseai/tree/main/agents/dokimasia)
+**Port `10003`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/dokimasia/`](https://github.com/ajbarea/kourai_khryseai/tree/main/agents/dokimasia)
 
 Writes pytest test suites and runs them. Handles both test generation (LLM) and test execution (subprocess).
 
@@ -129,7 +129,7 @@ Target: **80%+ code coverage**.
 
 ## ✨ Kallos — Stylist
 
-**Port `10004`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/kallos/`](https://github.com/ajbarea/Kourai_Khryseai/tree/main/agents/kallos)
+**Port `10004`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/kallos/`](https://github.com/ajbarea/kourai_khryseai/tree/main/agents/kallos)
 
 Runs linters, cleans up comments, and enforces the project's style guide. Uses a lightweight model on `cheap`/`standard` tiers because most of its work is subprocess-based (ruff), with LLM only for comment analysis.
 
@@ -196,7 +196,7 @@ flowchart LR
 
 ## 📜 Mneme — Scribe
 
-**Port `10005`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/mneme/`](https://github.com/ajbarea/Kourai_Khryseai/tree/main/agents/mneme)
+**Port `10005`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/mneme/`](https://github.com/ajbarea/kourai_khryseai/tree/main/agents/mneme)
 
 Generates grouped commit messages from git diff output. The simplest agent — pure LLM, no subprocess or file I/O. Uses Haiku on `cheap`/`standard` tiers for speed.
 

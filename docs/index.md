@@ -9,7 +9,7 @@ hide:
 
 # KOURAI KHRYSEAI
 
-**Six AI agents. One command. Ship faster.**
+**Collaborate with six AI specialists in real-time. You guide each step, they show their work.**
 { .hero-subtitle }
 
 <div class="hero-buttons" markdown>

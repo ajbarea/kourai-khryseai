@@ -27,6 +27,14 @@ Open [`localhost:16686`](http://localhost:16686) and select any service:
 - **Error locations** — Which agent failed and at which operation
 - **Fix loop iterations** — How many Kallos-Techne rounds were needed
 
+### 📊 Service Performance Monitoring (SPM)
+
+Jaeger generates RED metrics (Rate, Error, Duration) from traces and stores them in Prometheus. This enables the "Monitor" tab in the Jaeger UI for high-level service health visualization.
+
+- **RED Metrics** — Instant visibility into request volume, error percentages, and latency percentiles (P50, P95, P99).
+- **Metric Exploration** — Use the Prometheus UI at [`localhost:9090`](http://localhost:9090) for raw PromQL queries and custom dashboarding.
+- **Span-to-Metrics** — Jaeger's internal collector generates these metrics in real-time as traces arrive via OTLP.
+
 ---
 
 ## 🐳 Infrastructure
@@ -98,3 +106,4 @@ Environment variable `KOURAI_AGENT_HOST=true` is set automatically in Docker, sw
 - [uv](https://docs.astral.sh/uv/)
 - [OpenTelemetry Python](https://opentelemetry.io/docs/languages/python/)
 - [Jaeger](https://www.jaegertracing.io/)
+- [Prometheus](https://prometheus.io/)

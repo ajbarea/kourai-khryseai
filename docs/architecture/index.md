@@ -1,5 +1,17 @@
 # Architecture
 
+## 🎯 Design Principles
+
+Kourai Khryseai is built around **transparency** and **interactivity**:
+
+- **Specialization**: Each agent handles one discipline (planning, coding, testing, style, commits). Specialists are focused and use appropriate model tiers.
+- **Real-time feedback**: Agents stream their work as it happens. You don't wait for "final output"—you see reasoning in progress.
+- **Human-on-the-loop**: When decisions matter (architecture choices, scope boundaries, validation rules), agents ask. You're never out of control.
+- **Composable**: Agents are independent HTTP services. They can be deployed separately, tested independently, or replaced with custom implementations.
+- **Observable**: Every request creates a distributed trace. See exactly what each agent did and how long it took.
+
+---
+
 ## 🗺️ System Diagram
 
 ```mermaid
@@ -12,6 +24,7 @@ flowchart TD
     KAL["✨ <b>KALLOS</b><br/>Stylist · :10004"]
     MNE["📜 <b>MNEME</b><br/>Scribe · :10005"]
     JAE["🔍 <b>JAEGER</b><br/>:16686 UI · :4318 OTLP"]
+    PRO["📊 <b>PROMETHEUS</b><br/>:9090 UI · Metrics"]
 
     CLI -->|"A2A message/stream (SSE)"| HEP
     HEP -->|"A2A blocking"| MET
@@ -25,6 +38,7 @@ flowchart TD
     DOK -.-> JAE
     KAL -.-> JAE
     MNE -.-> JAE
+    JAE <-->|"RED metrics (SPM)"| PRO
 ```
 
 ---

@@ -1,5 +1,14 @@
 # Getting Started
 
+Kourai Khryseai works as a **real-time conversation** with six AI specialists. You describe what you need, they ask clarifying questions, show their work as they build it, and iterate based on your feedback. Two paths to the same system:
+
+- **CLI** — Fast, scriptable, terminal-based
+- **GUI** — Rich visual experience with agent profiles and voices
+
+Both are equally capable. Pick whichever fits your workflow.
+
+---
+
 ## Prerequisites
 
 | Requirement | Version | Notes |
@@ -16,13 +25,25 @@
 ### 1. Clone and install
 
 ```bash title="Terminal"
-git clone https://github.com/ajbarea/Kourai_Khryseai.git
-cd Kourai_Khryseai
+git clone https://github.com/ajbarea/kourai_khryseai.git
+cd kourai_khryseai
 
 # Install all workspace packages
 make setup
 # (equivalent to: uv sync --all-packages)
 ```
+
+??? tip "Multiple terminals / OS environments (WSL, Docker, Windows)"
+
+    `make setup` automatically selects the right virtual environment for your platform:
+
+    | Environment | venv folder |
+    |---|---|
+    | WSL | `.venv-wsl` |
+    | Windows (Git Bash / PowerShell) | `.venv-win` |
+    | Docker | `.venv` (inside container only) |
+
+    If you run `uv sync` directly (without `make`), set `UV_PROJECT_ENVIRONMENT` in your shell profile to match the table above — otherwise `uv` defaults to `.venv` and collides across environments.
 
 ### 2. Configure environment
 
@@ -100,26 +121,26 @@ Connecting to Hephaestus at http://localhost:10000/...
 Connected to Hephaestus — Orchestrator v0.1.0
 Skills: Route Development Request, Execute Development Pipeline
 
-kourai:
+❯
 ```
 
 Type a request in plain English:
 
 ```bash
 # Full pipeline: plan → code → test → lint → commit messages
-kourai: implement CSV export with tests
+❯ implement CSV export with tests
 
 # Fix a bug
-kourai: fix the null check in auth.py
+❯ fix the null check in auth.py
 
 # Add tests
-kourai: add tests for the payment module
+❯ add tests for the payment module
 
 # Style cleanup
-kourai: clean up comments in src/utils/
+❯ clean up comments in src/utils/
 
 # Just commit messages
-kourai: commit prep
+❯ commit prep
 ```
 
 Hephaestus automatically routes your request to the right pipeline of specialists. You'll see real-time progress with agent emojis as each step completes.
@@ -163,11 +184,12 @@ See [GUI Reference → Text-to-Speech System](gui.md#text-to-speech-system-) for
 
 ---
 
-## Viewing Traces
+## Viewing Traces & Metrics
 
-Every request creates a distributed trace across all agents. Jaeger starts automatically with `make up`.
+Every request creates a distributed trace across all agents and generates performance metrics. Both Jaeger and Prometheus start automatically with `make up`.
 
-Open the Jaeger UI at [`localhost:16686`](http://localhost:16686) and select any agent from the service dropdown to see its spans, timings, and any errors.
+- **Jaeger** — Trace inspection at [`localhost:16686`](http://localhost:16686). Select any agent from the service dropdown to see its spans, timings, and any errors.
+- **Prometheus** — Metric inspection at [`localhost:9090`](http://localhost:9090). View RED metrics (Rate, Error, Duration) across all services, powering the "Monitor" tab in Jaeger.
 
 ---
 

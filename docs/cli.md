@@ -79,7 +79,7 @@ Connecting to Hephaestus at http://localhost:10000/...
 Connected to Hephaestus — Orchestrator v0.1.0
 Skills: Route Development Request, Execute Development Pipeline
 
-kourai: fix the off-by-one error in pagination
+❯ fix the off-by-one error in pagination
 
 🔥 [1/4] Sending task to Techne...
 ⚙️ [1/4] Techne completed
@@ -106,7 +106,7 @@ Files: src/api/pagination.py, tests/unit/test_pagination.py
 When an agent needs clarification, the CLI prompts you for a response:
 
 ```
-kourai: refactor the data layer
+❯ refactor the data layer
 
 🔥 Hephaestus: Request needs clarification
 ↳ Your response: Which specific module? The ORM layer, the API clients, or the caching layer?
@@ -121,11 +121,11 @@ Type your response and the pipeline continues. Type `:q` to abort.
 The CLI maintains a `context_id` across requests within a session. This means follow-up requests can reference previous context:
 
 ```
-kourai: plan a user authentication system
+❯ plan a user authentication system
 ...
-kourai: implement it
+❯ implement it
 ...
-kourai: add tests for it
+❯ add tests for it
 ```
 
 Each request in the same session shares the same conversation context.
