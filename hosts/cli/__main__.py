@@ -1230,7 +1230,7 @@ async def main(agent: str | None, timeout_seconds: int, verbose: bool, prompt: s
             while True:
                 try:
                     prompt_text = await session.prompt_async(
-                        ANSI(f"{_GOLD}kourai{_RESET} \u276f "),
+                        ANSI(f"{_GOLD}\u276f{_RESET} "),
                         bottom_toolbar=_toolbar,
                     )
                 except (EOFError, KeyboardInterrupt):
