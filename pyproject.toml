@@ -19,6 +19,9 @@ dev = [
     "hypothesis>=6.151.9",
 ]
 
+[tool.uv]
+package = false
+
 [tool.uv.workspace]
 members = [
     "shared",
@@ -81,7 +84,7 @@ no_implicit_optional = true
 ignore_missing_imports = false
 follow_imports = "normal"
 mypy_path = "shared/src"
-exclude = ["\\.venv.*", "build", "dist", "\\.git"]
+exclude = ["\\.venv.*", "build", "dist", "\\.git", "templates"]
 
 # External libraries without type hints
 [[tool.mypy.overrides]]

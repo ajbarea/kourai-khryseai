@@ -6,14 +6,7 @@ __pycache__/
 .ruff_cache/
 
 # Virtual env
-.venv/
-.venv-win/
-.venv-wsl/
-.venv-win-host/
-.venv-wsl-host/
-.venv-host/
-.venv-host-win/
-.venv-host-wsl/
+.venv*/
 
 # IDE
 .idea/
