@@ -7,6 +7,13 @@ __pycache__/
 
 # Virtual env
 .venv/
+.venv-win/
+.venv-wsl/
+.venv-win-host/
+.venv-wsl-host/
+.venv-host/
+.venv-host-win/
+.venv-host-wsl/
 
 # IDE
 .idea/
@@ -40,11 +47,10 @@ logs/
 Thumbs.db
 .DS_Store
 
-# Claude
+# Agents
 .claude/
+.gemini/
+.kiro/
 
-# Tests (not needed in prod images)
+# Tests
 tests/
-
-# A2A samples repo
-a2a-samples/

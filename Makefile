@@ -1,63 +1,141 @@
-.PHONY: setup docs upgrade cli gui up down restart status lint test clean help
+##
+## Kourai Khryseai — Makefile
+## Multi-agent A2A development system with Pygame GUI or CLI interfaces, 
+## Dockerized agents, and integrated monitoring (Jaeger + Prometheus)
+##
+## Usage:
+##   make help          Show all available commands
+##   make dev           Full development stack: agents + GUI + monitoring
+##   make up            Start all services (background)
+##   make down          Stop all services
+##
+
+.PHONY: help setup upgrade dev up down restart status gui cli docs lint test test-unit test-integration test-performance clean
 .DEFAULT_GOAL := help
 
-# ──────────────── Portability ────────────────
+# ════════════════════════════════════════════════════════════════════════════
+# Environment
+# ════════════════════════════════════════════════════════════════════════════
+
 export LC_ALL=en_US.UTF-8
 export LANG=en_US.UTF-8
 export PYTHONIOENCODING=utf-8
 
+# Isolate platform-specific virtual environments to prevent binary conflicts
+ifeq ($(OS),Windows_NT)
+    ifdef WSL_DISTRO_NAME
+        export UV_PROJECT_ENVIRONMENT ?= .venv-wsl
+    else
+        export UV_PROJECT_ENVIRONMENT ?= .venv-win
+    endif
+else
+    # macOS and native Linux use standard .venv
+    export UV_PROJECT_ENVIRONMENT ?= .venv
+endif
+
+# Universally detect the available Python executable (handles Windows, Mac, Linux, WSL)
+ifeq ($(OS),Windows_NT)
+    PYTHON ?= python
+else
+    PYTHON ?= $(shell command -v python3 || command -v python || echo python)
+endif
 COMPOSE_FULL := docker compose --profile full
+HOST_UV_RUN := $(PYTHON) scripts/run_in_host_env.py --
+GUI_ARGS ?= --agent http://localhost:10000/
+CLI_ARGS ?=
 
-# ──────────────── Development ────────────────
+# ════════════════════════════════════════════════════════════════════════════
+# Setup & Maintenance (run first time, or when dependencies change)
+# ════════════════════════════════════════════════════════════════════════════
 
-setup:                     ## Install all dependencies
-	uv sync --all-packages
+setup:                     ## Install all Python dependencies (workspace + all packages)
+	uv sync --all-packages --no-active
 
-docs:                      ## Serve documentation (Zensical)
-	uv run zensical serve
+upgrade:                   ## Update all dependencies to latest versions
+	$(PYTHON) scripts/upgrade.py
 
-upgrade:                   ## Update dependencies to latest versions
-	@bash scripts/update_dependencies.sh
+# ════════════════════════════════════════════════════════════════════════════
+# Core Development Workflows (primary entry points)
+# ════════════════════════════════════════════════════════════════════════════
 
-cli:                       ## Launch the interactive CLI client (terminal)
-	uv run python -m hosts.cli
+dev:                       ## Start services + GUI (full development stack in one command)
+	@$(MAKE) --no-print-directory down
+	@$(MAKE) --no-print-directory up
+	@echo
+	@echo Starting GUI...
+	@$(MAKE) --no-print-directory gui
 
-gui:                       ## Launch the pygame GUI client (portrait window)
-	uv run python -m hosts.gui
-
-up:                        ## Start all agents in Docker (+ Jaeger)
-	$(COMPOSE_FULL) up -d --build --wait --wait-timeout 120
-	@echo All services are running and healthy.
-	@echo Jaeger UI: http://localhost:16686
-	@echo Prometheus: http://localhost:9090
+up:                        ## Start all agents + infrastructure (background, waits for health)
+	$(COMPOSE_FULL) up -d --build --pull always --wait --wait-timeout 180
+	@echo All services running and healthy
+	@echo Dashboards:
+	@echo   Jaeger traces:      http://localhost:16686
+	@echo   Prometheus metrics: http://localhost:9090
 	@$(COMPOSE_FULL) ps
 
-down:                      ## Stop all Docker containers
+down:                      ## Stop all services and remove containers
 	$(COMPOSE_FULL) down --remove-orphans
 
-restart:                   ## Restart all agents
+restart:                   ## Restart all services (same as: make down && make up)
 	@$(MAKE) --no-print-directory down
 	@$(MAKE) --no-print-directory up
 
-status:                    ## Show Docker service status/health
+status:                    ## Show current service status and health
 	$(COMPOSE_FULL) ps
 
-dev:					   ## Restart services and launch GUI client
-	@$(MAKE) down
-	@$(MAKE) up
-	@$(MAKE) gui
+# ════════════════════════════════════════════════════════════════════════════
+# Client Interfaces (connect to running services)
+# ════════════════════════════════════════════════════════════════════════════
 
-# ──────────────── Testing & Quality ────────────────
+gui:                       ## Launch Pygame GUI (runs on host machine)
+	$(HOST_UV_RUN) python -m hosts.gui $(GUI_ARGS)
 
-lint:                      ## Run quality checks (ruff, mypy)
-	@bash scripts/lint.sh
+cli:                       ## Launch terminal CLI client (runs on host machine)
+	$(HOST_UV_RUN) python -m hosts.cli $(CLI_ARGS)
 
-test:                      ## Run quality checks + full test suite
-	@bash scripts/lint.sh --test
+# ════════════════════════════════════════════════════════════════════════════
+# Documentation & Utilities
+# ════════════════════════════════════════════════════════════════════════════
 
-clean:                     ## Clean build artifacts
-	@bash scripts/clean.sh
+docs:                      ## Serve project documentation (Zensical on http://localhost:8000)
+	uv run --no-active zensical serve
+
+# ════════════════════════════════════════════════════════════════════════════
+# Quality Gates (run before commit; cross-platform via Python scripts)
+# ════════════════════════════════════════════════════════════════════════════
+
+lint:                      ## Run code quality checks (ruff format, ruff check, mypy)
+	uv run --no-active ruff format .
+	uv run --no-active ruff check --fix --unsafe-fixes --show-fixes .
+	uv run --no-active mypy --config-file=pyproject.toml .
+
+test:                      ## Run full test suite with quality checks (unit + integration + performance)
+	@$(MAKE) --no-print-directory lint
+	@$(MAKE) --no-print-directory test-unit
+	@$(MAKE) --no-print-directory test-integration
+	@$(MAKE) --no-print-directory test-performance
+
+test-unit:                 ## Run unit tests only (parallel with auto CPU detection)
+	uv run --no-active pytest -n auto tests/unit/ -v --tb=short --cov=. --cov-report=xml:logs/coverage.xml --cov-report=term-missing
+
+test-integration:          ## Run integration tests only
+	uv run --no-active pytest tests/integration/ -v --tb=short --cov=. --cov-append --cov-report=xml:logs/coverage.xml --cov-report=term-missing
+
+test-performance:          ## Run performance tests only
+	uv run --no-active pytest tests/performance/ -v --tb=short --cov=. --cov-append --cov-report=xml:logs/coverage.xml --cov-report=term-missing
+
+clean:                     ## Remove build artifacts, cache, and temp files
+	$(PYTHON) scripts/clean_build.py
+
+clean-cache:               ## Remove cache directories only
+	$(PYTHON) scripts/clean_build.py --cache-only
+
+clean-tests:               ## Remove test artifacts only
+	$(PYTHON) scripts/clean_build.py --tests-only
+
+# ════════════════════════════════════════════════════════════════════════════
+# Help
+# ════════════════════════════════════════════════════════════════════════════
 
 help:                      ## Show this help message
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
-		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
+	$(PYTHON) scripts/show_help.py

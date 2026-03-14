@@ -4,22 +4,32 @@
 #   docker compose up jaeger             # observability only
 #   docker compose --profile agents up   # agents + infra
 #   docker compose up mneme              # single agent + deps
+#   docker compose --profile gui up      # GUI + agents + infra
 
 x-agent-common: &agent-common
   build:
     context: .
-    dockerfile: docker/agent.Dockerfile
+    dockerfile: docker/host.Dockerfile
+    args:
+      HOST_TYPE: agent
   env_file: .env
   environment:
     OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
     KOURAI_LOG_LEVEL: ${KOURAI_LOG_LEVEL:-INFO}
     KOURAI_STREAM_ENABLED: ${KOURAI_STREAM_ENABLED:-true}
+  volumes:
+    - ./shared:/app/shared                    # hot reload shared code
   networks:
     - kourai
   restart: unless-stopped
   depends_on:
     jaeger:
       condition: service_started
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "10m"
+      max-file: "3"
 
 services:
   # ──────────────── Infrastructure ────────────────
@@ -41,6 +51,15 @@ services:
     networks:
       - kourai
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   prometheus:
     image: prom/prometheus:v2.54.1
@@ -51,91 +70,205 @@ services:
     networks:
       - kourai
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # ──────────────── Specialist Agents ────────────────
   mneme:
     <<: *agent-common
     build:
       context: .
-      dockerfile: docker/agent.Dockerfile
+      dockerfile: docker/host.Dockerfile
       args:
-        AGENT_NAME: mneme
+        HOST_TYPE: agent
+        PACKAGE_NAME: mneme
         PORT: 10005
     ports:
       - "10005:10005"
     volumes:
+      - ./agents/mneme:/app/agents/mneme      # hot reload mneme code
+      - ./shared:/app/shared                  # hot reload shared code
       - ./tests:/app/tests
+    develop:
+      watch:
+        - action: sync
+          path: ./agents/mneme
+          target: /app/agents/mneme
+        - action: sync
+          path: ./shared
+          target: /app/shared
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
       PORT: 10005
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:10005/.well-known/agent-card.json"]
+      interval: 15s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 1G
     profiles: ["agents", "full"]
 
   kallos:
     <<: *agent-common
     build:
       context: .
-      dockerfile: docker/agent.Dockerfile
+      dockerfile: docker/host.Dockerfile
       args:
-        AGENT_NAME: kallos
+        HOST_TYPE: agent
+        PACKAGE_NAME: kallos
         PORT: 10004
     ports:
       - "10004:10004"
     volumes:
+      - ./agents/kallos:/app/agents/kallos    # hot reload kallos code
+      - ./shared:/app/shared                  # hot reload shared code
       - ./tests:/app/tests
+    develop:
+      watch:
+        - action: sync
+          path: ./agents/kallos
+          target: /app/agents/kallos
+        - action: sync
+          path: ./shared
+          target: /app/shared
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
       PORT: 10004
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:10004/.well-known/agent-card.json"]
+      interval: 15s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 1G
     profiles: ["agents", "full"]
 
   techne:
     <<: *agent-common
     build:
       context: .
-      dockerfile: docker/agent.Dockerfile
+      dockerfile: docker/host.Dockerfile
       args:
-        AGENT_NAME: techne
+        HOST_TYPE: agent
+        PACKAGE_NAME: techne
         PORT: 10002
     ports:
       - "10002:10002"
     volumes:
+      - ./agents/techne:/app/agents/techne    # hot reload techne code
+      - ./shared:/app/shared                  # hot reload shared code
       - ./tests:/app/tests
+    develop:
+      watch:
+        - action: sync
+          path: ./agents/techne
+          target: /app/agents/techne
+        - action: sync
+          path: ./shared
+          target: /app/shared
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
       PORT: 10002
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:10002/.well-known/agent-card.json"]
+      interval: 15s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 1G
     profiles: ["agents", "full"]
 
   dokimasia:
     <<: *agent-common
     build:
       context: .
-      dockerfile: docker/agent.Dockerfile
+      dockerfile: docker/host.Dockerfile
       args:
-        AGENT_NAME: dokimasia
+        HOST_TYPE: agent
+        PACKAGE_NAME: dokimasia
         PORT: 10003
     ports:
       - "10003:10003"
     volumes:
+      - ./agents/dokimasia:/app/agents/dokimasia  # hot reload dokimasia code
+      - ./shared:/app/shared                      # hot reload shared code
       - ./tests:/app/tests
+    develop:
+      watch:
+        - action: sync
+          path: ./agents/dokimasia
+          target: /app/agents/dokimasia
+        - action: sync
+          path: ./shared
+          target: /app/shared
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
       PORT: 10003
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:10003/.well-known/agent-card.json"]
+      interval: 15s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 1G
     profiles: ["agents", "full"]
 
   metis:
     <<: *agent-common
     build:
       context: .
-      dockerfile: docker/agent.Dockerfile
+      dockerfile: docker/host.Dockerfile
       args:
-        AGENT_NAME: metis
+        HOST_TYPE: agent
+        PACKAGE_NAME: metis
         PORT: 10001
     ports:
       - "10001:10001"
     volumes:
+      - ./agents/metis:/app/agents/metis      # hot reload metis code
+      - ./shared:/app/shared                  # hot reload shared code
       - ./tests:/app/tests
+    develop:
+      watch:
+        - action: sync
+          path: ./agents/metis
+          target: /app/agents/metis
+        - action: sync
+          path: ./shared
+          target: /app/shared
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
       PORT: 10001
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:10001/.well-known/agent-card.json"]
+      interval: 15s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 1G
     profiles: ["agents", "full"]
 
   # ──────────────── Orchestrator ────────────────
@@ -143,17 +276,39 @@ services:
     <<: *agent-common
     build:
       context: .
-      dockerfile: docker/agent.Dockerfile
+      dockerfile: docker/host.Dockerfile
       args:
-        AGENT_NAME: hephaestus
+        HOST_TYPE: agent
+        PACKAGE_NAME: hephaestus
         PORT: 10000
     ports:
       - "10000:10000"
+    volumes:
+      - ./agents/hephaestus:/app/agents/hephaestus  # hot reload hephaestus code
+      - ./shared:/app/shared                        # hot reload shared code
+    develop:
+      watch:
+        - action: sync
+          path: ./agents/hephaestus
+          target: /app/agents/hephaestus
+        - action: sync
+          path: ./shared
+          target: /app/shared
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
       PORT: 10000
       # In Docker, agents talk via service names not localhost
       KOURAI_AGENT_HOST: "true"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:10000/.well-known/agent-card.json"]
+      interval: 15s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 1G
     depends_on:
       jaeger:
         condition: service_started
@@ -169,10 +324,94 @@ services:
         condition: service_healthy
     profiles: ["full"]
 
+  # ──────────────── Client Interfaces ────────────────
+  cli:
+    build:
+      context: .
+      dockerfile: docker/host.Dockerfile
+      args:
+        HOST_TYPE: cli
+        PACKAGE_NAME: cli
+        PORT: 10100
+    env_file: .env
+    healthcheck:
+      disable: true
+    volumes:
+      - ./hosts/cli:/app/hosts/cli            # hot reload CLI code
+      - ./shared:/app/shared                  # hot reload shared code
+    develop:
+      watch:
+        - action: sync
+          path: ./hosts/cli
+          target: /app/hosts/cli
+        - action: sync
+          path: ./shared
+          target: /app/shared
+    environment:
+      KOURAI_AGENT_HOST: "true"
+      KOURAI_LOG_LEVEL: ${KOURAI_LOG_LEVEL:-INFO}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      PORT: 10100
+    networks:
+      - kourai
+    restart: no
+    depends_on:
+      jaeger:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    profiles: ["cli"]
+
+  gui:
+    build:
+      context: .
+      dockerfile: docker/host.Dockerfile
+      args:
+        HOST_TYPE: gui
+        PACKAGE_NAME: gui
+    env_file: .env
+    healthcheck:
+      disable: true
+    volumes:
+      - ./hosts/gui:/app/hosts/gui            # hot reload GUI code
+      - ./shared:/app/shared                  # hot reload shared code
+    develop:
+      watch:
+        - action: sync
+          path: ./hosts/gui
+          target: /app/hosts/gui
+        - action: sync
+          path: ./shared
+          target: /app/shared
+    environment:
+      KOURAI_AGENT_HOST: "true"
+      KOURAI_LOG_LEVEL: ${KOURAI_LOG_LEVEL:-INFO}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+    networks:
+      - kourai
+    restart: no
+    depends_on:
+      jaeger:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    profiles: ["gui"]
+
 networks:
   kourai:
     driver: bridge
 
-volumes:
-  workspace:
-    driver: local
