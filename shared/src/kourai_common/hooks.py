@@ -28,8 +28,14 @@ NAME_BONUS = 0.005
 # ── Preference / achievement extraction patterns ────────────────────────
 
 _PREFERENCE_PATTERNS = [
-    re.compile(r"(?:I\s+(?:prefer|like|want|love|always|hate|never))\s+(.{10,80})", re.IGNORECASE),
-    re.compile(r"(?:use|switch to|go with)\s+(\S+)\s+(?:instead|rather|from now)", re.IGNORECASE),
+    re.compile(
+        r"(?:I\s+(?:prefer|like|want|love|always|hate|never))\s+(.{10,80})",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"(?:use|switch to|go with)\s+(\S+)\s+(?:instead|rather|from now)",
+        re.IGNORECASE,
+    ),
 ]
 _ACHIEVEMENT_PATTERNS = [
     re.compile(r"all\s+\d+\s+tests?\s+pass", re.IGNORECASE),

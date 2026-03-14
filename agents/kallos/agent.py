@@ -7,12 +7,13 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from pathlib import Path
+
+from anyio import Path as AnyioPath
 
 from kourai_common.llm import chat
 from kourai_common.player import get_enriched_system_prompt
 from kourai_common.prompts import CURRENT_DATE, build_system_prompt
-from kourai_common.subprocess import run_command
+from kourai_common.subprocess import StatusCallback, run_command
 
 log = logging.getLogger(__name__)
 
@@ -84,8 +85,22 @@ class StyleReport:
     all_clean: bool = False
 
 
-async def run_make_lint(cwd: str | None = None) -> tuple[bool, str]:
-    """Run ruff + mypy."""
+async def run_make_lint(
+    cwd: str | None = None,
+    status_callback: StatusCallback | None = None,
+) -> tuple[bool, str]:
+    """Run ruff + mypy.
+
+    Args:
+        cwd: Working directory (defaults to process cwd).
+        status_callback: Optional async callback for live subprocess output.
+            When provided, each stdout line is forwarded to the caller so it
+            can surface tool I/O in the player scratchpad.
+
+    TODO: When supporting player projects, cwd should come from task context
+    and must use the project's own pyproject.toml via --config-file.
+    Currently runs against workspace root (Kourai codebase).
+    """
     import sys
 
     python = sys.executable
@@ -93,7 +108,11 @@ async def run_make_lint(cwd: str | None = None) -> tuple[bool, str]:
     combined: list[str] = []
 
     # ruff format
-    code, stdout, stderr = await run_command([python, "-m", "ruff", "format", "."], cwd=cwd)
+    code, stdout, stderr = await run_command(
+        [python, "-m", "ruff", "format", "."],
+        cwd=cwd,
+        status_callback=status_callback,
+    )
     combined.append(stdout + stderr)
     if code != 0:
         all_passed = False
@@ -102,13 +121,18 @@ async def run_make_lint(cwd: str | None = None) -> tuple[bool, str]:
     code, stdout, stderr = await run_command(
         [python, "-m", "ruff", "check", "--fix", "--unsafe-fixes", "--show-fixes", "."],
         cwd=cwd,
+        status_callback=status_callback,
     )
     combined.append(stdout + stderr)
     if code != 0:
         all_passed = False
 
-    # mypy
-    code, stdout, stderr = await run_command([python, "-m", "mypy", "."], cwd=cwd)
+    # mypy with config file from cwd (currently Kourai root, later player project)
+    code, stdout, stderr = await run_command(
+        [python, "-m", "mypy", "--config-file=pyproject.toml", "."],
+        cwd=cwd,
+        status_callback=status_callback,
+    )
     combined.append(stdout + stderr)
     if code != 0:
         all_passed = False
@@ -122,13 +146,16 @@ async def fix_lint_issues(
     """Use LLM to fix lint issues."""
     files_block = ""
     for file_path in file_paths:
-        path = Path(file_path)
-        if path.exists():
-            content = path.read_text(encoding="utf-8")
+        path = AnyioPath(file_path)
+        if await path.exists():
+            content = await path.read_text(encoding="utf-8")
             files_block += f"\n--- {file_path} ---\n{content}\n"
 
     messages = [
-        {"role": "system", "content": get_enriched_system_prompt(SYSTEM_PROMPT, "kallos")},
+        {
+            "role": "system",
+            "content": get_enriched_system_prompt(SYSTEM_PROMPT, "kallos"),
+        },
         {
             "role": "user",
             "content": (

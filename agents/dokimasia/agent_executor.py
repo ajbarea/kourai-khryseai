@@ -56,9 +56,13 @@ class DokimasiaAgentExecutor(BaseAgentExecutor):
                     parse_and_apply_fixes,
                 )
 
+                # Callback streams each pytest output line to the player scratchpad.
+                async def _pytest_status(line: str) -> None:
+                    await send_working_status(updater, task, line, emoji="🧪")
+
                 # Wrapper to adapt run_pytest to fix_loop interface
                 async def _run_pytest_wrapper() -> tuple[bool, str]:
-                    result = await run_pytest()
+                    result = await run_pytest(status_callback=_pytest_status)
                     return result.success, result.output
 
                 # Run iterative test-fix loop with personality messages

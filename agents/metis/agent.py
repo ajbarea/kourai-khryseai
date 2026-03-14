@@ -14,7 +14,7 @@ from typing import Any
 from kourai_common.llm import chat, chat_stream
 from kourai_common.player import get_enriched_system_prompt
 from kourai_common.prompts import CURRENT_DATE, build_system_prompt
-from kourai_common.subprocess import run_command
+from kourai_common.subprocess import StatusCallback, run_command
 
 log = logging.getLogger(__name__)
 
@@ -57,19 +57,29 @@ Rules:
 )
 
 
-async def get_project_context(project_root: str | None = None) -> str:
+async def get_project_context(
+    project_root: str | None = None,
+    status_callback: StatusCallback | None = None,
+) -> str:
     """Gather project structure and git context for planning.
 
     Args:
         project_root: Root directory to analyze.
+        status_callback: Optional async callback forwarding git output lines
+            to the player scratchpad for transparency.
 
     Returns:
         String with project structure and recent git history.
+
+    TODO: When supporting player projects, pass project_root from task context.
+    Currently defaults to workspace root (Kourai codebase).
     """
     parts = []
 
     # Git status
-    code, stdout, _ = await run_command(["git", "status", "--short"], cwd=project_root)
+    code, stdout, _ = await run_command(
+        ["git", "status", "--short"], cwd=project_root, status_callback=status_callback
+    )
     if code == 0 and stdout.strip():
         parts.append(f"Git status:\n{stdout.strip()}")
 
@@ -77,6 +87,7 @@ async def get_project_context(project_root: str | None = None) -> str:
     code, stdout, _ = await run_command(
         ["git", "log", "--oneline", "-10"],
         cwd=project_root,
+        status_callback=status_callback,
     )
     if code == 0 and stdout.strip():
         parts.append(f"Recent commits:\n{stdout.strip()}")

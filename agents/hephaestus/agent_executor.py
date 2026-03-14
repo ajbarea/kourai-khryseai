@@ -121,7 +121,11 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
                     return
 
             # Step 2: Report the pipeline (pipeline must be list[str] here)
-            assert isinstance(pipeline, list), "Pipeline should be list[str] at this point"
+            if not isinstance(pipeline, list):
+                raise TypeError(
+                    f"Pipeline should be list[str] at this point, but got {type(pipeline)}"
+                )
+
             pipeline_display = " -> ".join(pipeline)
             await send_working_status(
                 updater,

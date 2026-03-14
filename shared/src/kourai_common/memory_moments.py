@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import random
+import secrets
 from dataclasses import dataclass
 
 from kourai_common.player import (
@@ -113,7 +114,7 @@ def _select_moment_type(
     if category == "achievement":
         return "growth"
 
-    return random.choices(options, weights=weights, k=1)[0]
+    return random.choices(options, weights=weights, k=1)[0]  # noqa: S311
 
 
 def should_trigger_moment(
@@ -138,7 +139,7 @@ def should_trigger_moment(
     romance_bonus = ROMANCE_MOMENT_BONUS.get(romance_stage, 0.0)
 
     total_prob = min(base_prob + romance_bonus, 0.5)  # Cap at 50%
-    return random.random() < total_prob
+    return random.random() < total_prob  # noqa: S311
 
 
 def select_memory_for_moment(
@@ -179,7 +180,7 @@ def select_memory_for_moment(
 
     # Weight by importance
     weights = [m.get("importance", 0.5) for m in candidates]
-    selected = random.choices(candidates, weights=weights, k=1)[0]
+    selected = random.choices(candidates, weights=weights, k=1)[0]  # noqa: S311
 
     aff = get_affinity(player_id, agent_name)
     tier = get_affinity_tier(aff["affinity_score"])
@@ -190,7 +191,7 @@ def select_memory_for_moment(
 
     # Pick a template
     templates = MOMENT_TEMPLATES.get(moment_type, MOMENT_TEMPLATES["callback"])
-    template = random.choice(templates)
+    template = secrets.choice(templates)
     prompt_hint = template.format(content=selected["content"])
 
     return MemoryMoment(

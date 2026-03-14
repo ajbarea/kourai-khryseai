@@ -10,13 +10,14 @@ import asyncio
 import logging
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any
+
+from anyio import Path as AnyioPath
 
 from kourai_common.llm import chat, chat_stream
 from kourai_common.player import get_enriched_system_prompt
 from kourai_common.prompts import CURRENT_DATE, build_system_prompt
-from kourai_common.subprocess import run_command
+from kourai_common.subprocess import StatusCallback, run_command
 
 log = logging.getLogger(__name__)
 
@@ -109,13 +110,11 @@ class CodeResult:
 
 async def read_file(file_path: str) -> str | None:
     """Read a file's contents asynchronously. Returns None if file doesn't exist."""
-    path = Path(file_path)
-    if not path.exists():
+    path = AnyioPath(file_path)
+    if not await path.exists():
         return None
     try:
-        # WHY: asyncio.to_thread offloads blocking disk I/O to a thread pool,
-        # keeping the event loop responsive during concurrent file reads.
-        return await asyncio.to_thread(path.read_text, encoding="utf-8")
+        return await path.read_text(encoding="utf-8")
     except Exception as e:
         log.error("Failed to read %s: %s", file_path, e)
         return None
@@ -149,9 +148,9 @@ async def write_file(file_path: str, content: str) -> bool:
         True if successful.
     """
     try:
-        path = Path(file_path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content, encoding="utf-8")
+        path = AnyioPath(file_path)
+        await path.parent.mkdir(parents=True, exist_ok=True)
+        await path.write_text(content, encoding="utf-8")
         log.info("Wrote %d bytes to %s", len(content), file_path)
         return True
     except Exception as e:
@@ -159,17 +158,29 @@ async def write_file(file_path: str, content: str) -> bool:
         return False
 
 
-async def get_git_context(cwd: str | None = None) -> str:
-    """Get git status and recent changes for context."""
+async def get_git_context(
+    cwd: str | None = None,
+    status_callback: StatusCallback | None = None,
+) -> str:
+    """Get git status and recent changes for context.
+
+    Args:
+        cwd: Working directory (defaults to process cwd).
+        status_callback: Optional async callback forwarding git output lines
+            to the player scratchpad for transparency.
+    """
     parts = []
 
-    code, stdout, _ = await run_command(["git", "status", "--short"], cwd=cwd)
+    code, stdout, _ = await run_command(
+        ["git", "status", "--short"], cwd=cwd, status_callback=status_callback
+    )
     if code == 0 and stdout.strip():
         parts.append(f"Git status:\n{stdout.strip()}")
 
     code, stdout, _ = await run_command(
         ["git", "diff", "--stat", "HEAD~3..HEAD"],
         cwd=cwd,
+        status_callback=status_callback,
     )
     if code == 0 and stdout.strip():
         parts.append(f"Recent changes:\n{stdout.strip()}")

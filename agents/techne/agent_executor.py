@@ -62,9 +62,12 @@ class TechneAgentExecutor(BaseAgentExecutor):
                 with create_span("techne.read_files", {"count": str(len(file_paths))}):
                     file_contents = await read_files(file_paths)
 
-            # Step 3: Get git context
+            # Step 3: Get git context — stream output
+            async def _git_status(line: str) -> None:
+                await send_working_status(updater, task, line, emoji="🔍")
+
             with create_span("techne.git_context"):
-                git_context = await get_git_context()
+                git_context = await get_git_context(status_callback=_git_status)
 
             await send_working_status(
                 updater,

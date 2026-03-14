@@ -21,7 +21,7 @@ from kourai_common.tracing import setup_tracing
 AGENT_NAME = "metis"
 log = setup_logging(AGENT_NAME)
 PORT = int(os.getenv("PORT", str(AGENT_PORTS[AGENT_NAME])))
-HOST = os.getenv("HOST", "0.0.0.0")
+HOST = os.getenv("HOST", "0.0.0.0")  # noqa: S104
 
 
 def build_agent_card() -> AgentCard:

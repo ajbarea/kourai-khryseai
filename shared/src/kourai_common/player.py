@@ -619,7 +619,7 @@ def get_player_memories(
         WHERE {where}
         ORDER BY importance DESC, last_accessed DESC
         LIMIT ?
-    """
+    """  # noqa: S608
     params.append(limit)
 
     rows = conn.execute(query, tuple(params)).fetchall()
@@ -1082,7 +1082,7 @@ def get_enriched_system_prompt(base_prompt: str, agent_name: str) -> str:
         if adaptation:
             parts.append(adaptation)
     except Exception:
-        pass  # Non-critical
+        log.debug("Failed to get personality adaptation (non-critical)", exc_info=True)
 
     # Memory moments (probabilistic nostalgia callbacks)
     try:
@@ -1092,7 +1092,7 @@ def get_enriched_system_prompt(base_prompt: str, agent_name: str) -> str:
         if moment:
             parts.append(moment)
     except Exception:
-        pass  # Non-critical
+        log.debug("Failed to generate memory moment (non-critical)", exc_info=True)
 
     return "\n\n".join(parts)
 

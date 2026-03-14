@@ -127,7 +127,7 @@ def select_gossip_topic(
 
     topics = list(weights.keys())
     w = [weights[t] for t in topics]
-    return random.choices(topics, weights=w, k=1)[0]
+    return random.choices(topics, weights=w, k=1)[0]  # noqa: S311
 
 
 # ── Gossip session data ─────────────────────────────────────────────────
@@ -323,7 +323,7 @@ def select_gossip_pair(
     if not candidates:
         return None
 
-    return random.choices(candidates, weights=weights, k=1)[0]
+    return random.choices(candidates, weights=weights, k=1)[0]  # noqa: S311
 
 
 def start_gossip_session(
@@ -720,7 +720,11 @@ def check_jealousy_trigger(
     if player_response_tone not in (ResponseTone.FLIRT, ResponseTone.JOIN):
         return None
 
-    from kourai_common.player import JEALOUSY_TRAITS, ROMANCE_STAGES, get_active_romances
+    from kourai_common.player import (
+        JEALOUSY_TRAITS,
+        ROMANCE_STAGES,
+        get_active_romances,
+    )
 
     romances = get_active_romances(profile.player_id)
     if len(romances) < 2:

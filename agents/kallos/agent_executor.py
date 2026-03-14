@@ -12,6 +12,7 @@ from a2a.utils.errors import ServerError
 
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
+from kourai_common.messaging import send_working_status
 from kourai_common.tracing import create_span
 
 log = logging.getLogger(__name__)
@@ -37,12 +38,22 @@ class KallosAgentExecutor(BaseAgentExecutor):
         with create_span("kallos.execute", {"a2a.method": "execute"}):
             from agents.kallos.agent import fix_lint_issues, run_make_lint
             from kourai_common.fix_loop import KALLOS_MESSAGES, run_fix_loop
-            from kourai_common.subprocess import extract_files_from_output, parse_and_apply_fixes
+            from kourai_common.subprocess import (
+                extract_files_from_output,
+                parse_and_apply_fixes,
+            )
+
+            # Callback streams each tool output line to the player scratchpad.
+            async def _lint_status(line: str) -> None:
+                await send_working_status(updater, task, line, emoji="💻")
+
+            async def _run_lint_with_status() -> tuple[bool, str]:
+                return await run_make_lint(status_callback=_lint_status)
 
             # Run iterative lint-fix loop with personality messages
             all_clean, final_output, result = await run_fix_loop(
                 tool_name="make lint",
-                run_tool=run_make_lint,
+                run_tool=_run_lint_with_status,
                 extract_files=extract_files_from_output,
                 fix_issues=fix_lint_issues,
                 apply_fixes=parse_and_apply_fixes,

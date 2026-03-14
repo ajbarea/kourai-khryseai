@@ -10,6 +10,7 @@ import asyncio
 import json
 import logging
 import re
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 log = logging.getLogger(__name__)
@@ -17,22 +18,70 @@ log = logging.getLogger(__name__)
 # Context lines above/below each diagnostic when windowing file content
 _CONTEXT_LINES = 10
 
+# Type alias for the streaming callback passed to run_command
+StatusCallback = Callable[[str], Awaitable[None]]
 
-async def run_command(cmd: list[str], cwd: str | None = None) -> tuple[int, str, str]:
-    """Run a shell command and return (returncode, stdout, stderr)."""
-    log.debug("Running: %s", " ".join(cmd))
+
+async def run_command(
+    cmd: list[str],
+    cwd: str | None = None,
+    status_callback: StatusCallback | None = None,
+) -> tuple[int, str, str]:
+    """Run a shell command and return (returncode, stdout, stderr).
+
+    Args:
+        cmd: Command and arguments to run.
+        cwd: Working directory (defaults to process cwd).
+        status_callback: Optional async callback called with each stdout line
+            as it arrives. Also receives the invoked command on start and the
+            exit code on failure. Skips blank lines to reduce noise.
+    """
+    cmd_str = " ".join(cmd)
+    log.debug("Running: %s", cmd_str)
+
     proc = await asyncio.create_subprocess_exec(
         *cmd,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         cwd=cwd,
     )
-    stdout, stderr = await proc.communicate()
-    return (
-        proc.returncode or 0,
-        stdout.decode("utf-8", errors="replace"),
-        stderr.decode("utf-8", errors="replace"),
-    )
+
+    if status_callback is None:
+        # Fast path: no streaming needed — communicate() handles deadlocks safely.
+        stdout, stderr = await proc.communicate()
+        return (
+            proc.returncode or 0,
+            stdout.decode("utf-8", errors="replace"),
+            stderr.decode("utf-8", errors="replace"),
+        )
+
+    # Streaming path: emit command invocation, then stream stdout line by line
+    # while draining stderr concurrently to prevent pipe buffer deadlocks.
+    await status_callback(f"$ {cmd_str}")
+
+    stdout_lines: list[str] = []
+
+    async def _drain_stdout() -> None:
+        assert proc.stdout is not None  # noqa: S101
+        async for raw in proc.stdout:
+            line = raw.decode("utf-8", errors="replace").rstrip()
+            stdout_lines.append(line)
+            if line.strip():  # skip blank lines
+                await status_callback(line)
+
+    async def _drain_stderr() -> bytes:
+        assert proc.stderr is not None  # noqa: S101
+        return await proc.stderr.read()
+
+    # Run both drains concurrently so neither pipe buffers up and deadlocks
+    stderr_bytes, _ = await asyncio.gather(_drain_stderr(), _drain_stdout())
+    await proc.wait()
+
+    rc = proc.returncode or 0
+    if rc != 0:
+        await status_callback(f"exit {rc}")
+
+    return rc, "\n".join(stdout_lines), stderr_bytes.decode("utf-8", errors="replace")
 
 
 # ── Ruff JSON output parsing ────────────────────────────────────────

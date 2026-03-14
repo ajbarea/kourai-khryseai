@@ -48,8 +48,12 @@ class MetisAgentExecutor(BaseAgentExecutor):
                 emoji="📐",
             )
 
+            # Stream git output to player scratchpad for transparency
+            async def _git_status(line: str) -> None:
+                await send_working_status(updater, task, line, emoji="🔍")
+
             with create_span("metis.context"):
-                project_context = await get_project_context()
+                project_context = await get_project_context(status_callback=_git_status)
 
             # Step 2: Stream spec generation with inner-thought updates
             await send_working_status(

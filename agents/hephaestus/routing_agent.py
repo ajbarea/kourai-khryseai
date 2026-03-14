@@ -185,6 +185,13 @@ async def execute_pipeline(
     lint issues, the pipeline loops techne→kallos up to MAX_ITERATIONS
     times to auto-fix style violations.
 
+    TODO: When supporting player projects, add project_root to task context.
+    Currently all agents work on the Kourai codebase. Future flow:
+    1. Parse project_root from user_request or task metadata
+    2. Append project_root to accumulated_context
+    3. Each agent receives it and adapts (metis discovers project config,
+       kallos uses project's pyproject.toml, techne writes to project dirs)
+
     Args:
         agents: Ordered list of agent names to call.
         user_request: Original user request.

@@ -63,9 +63,10 @@ class LLMResponseError(LLMError):
         litellm.exceptions.Timeout,
     ),
 )
-async def _execute_completion(timeout: float, **kwargs: Any) -> Any:
+async def _execute_completion(timeout_seconds: float, **kwargs: Any) -> Any:
     """Execute acompletion with built-in retries for capacity/network issues."""
-    return await asyncio.wait_for(litellm.acompletion(**kwargs), timeout=timeout)
+    async with asyncio.timeout(timeout_seconds):
+        return await litellm.acompletion(**kwargs)
 
 
 async def _manage_memory(context_id: str, agent_name: str) -> None:
@@ -93,10 +94,13 @@ async def _manage_memory(context_id: str, agent_name: str) -> None:
             # We use the same model but could theoretically use a cheaper/faster one
             model = get_model(agent_name)
             response = await _execute_completion(
-                timeout=60.0,
+                timeout_seconds=60.0,
                 model=model,
                 messages=[
-                    {"role": "system", "content": "You are a memory condensation module."},
+                    {
+                        "role": "system",
+                        "content": "You are a memory condensation module.",
+                    },
                     {"role": "user", "content": prompt},
                 ],
                 temperature=0.1,
@@ -171,7 +175,7 @@ async def chat(
 
     try:
         response = await _execute_completion(
-            timeout=timeout,
+            timeout_seconds=timeout,
             model=model,
             messages=full_messages,
             temperature=temperature,
@@ -207,7 +211,7 @@ async def chat_stream(
 
     try:
         response = await _execute_completion(
-            timeout=timeout,
+            timeout_seconds=timeout,
             model=model,
             messages=full_messages,
             temperature=temperature,

@@ -1,12 +1,44 @@
 """Shared A2A protocol utilities for Kourai Khryseai agents.
 
 Centralizes common A2A message handling patterns used across multiple agents.
+
+# A2A Spec v1.0 migration notes
+# WHY: The v1.0 spec replaces TextPart/FilePart/DataPart with a unified Part
+# type using member-based discrimination ("text" in part, "url" in part, etc.)
+# and renames mimeType → mediaType. All Part inspection is funnelled through
+# _is_file_part() and _get_file_bytes() so migration is a single-function change.
 """
 
 from __future__ import annotations
 
+from typing import Any
+
 from a2a.server.agent_execution import RequestContext
 from a2a.types import FileWithBytes
+
+# ── Part inspection helpers (v1.0 migration firewall) ────────────────
+
+
+def _is_file_part(root: Any) -> bool:
+    """Return True if the Part root contains embedded file bytes.
+
+    Currently checks SDK 0.3.x FilePart structure. When SDK reaches 1.0,
+    update to check `"raw" in root` or `"url" in root` per the new spec.
+    """
+    return hasattr(root, "file") and isinstance(root.file, FileWithBytes)
+
+
+def _get_file_bytes(root: Any) -> tuple[str, str]:
+    """Extract (base64_bytes, mime_type) from a file Part root.
+
+    Returns:
+        (bytes_str, mime_type) — mime defaults to 'image/png' if unset.
+    """
+    # SDK 0.3.x path
+    return root.file.bytes, root.file.mime_type or "image/png"  # type: ignore[union-attr]
+
+
+# ── Public API ───────────────────────────────────────────────────────
 
 
 def extract_image_parts(context: RequestContext) -> list[dict]:
@@ -31,10 +63,13 @@ def extract_image_parts(context: RequestContext) -> list[dict]:
 
     for part in context.message.parts:
         root = part.root
-        if hasattr(root, "file") and isinstance(root.file, FileWithBytes):
-            mime = root.file.mime_type or "image/png"
+        if _is_file_part(root):
+            b64, mime = _get_file_bytes(root)
             image_parts.append(
-                {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{root.file.bytes}"}}
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:{mime};base64,{b64}"},
+                }
             )
     return image_parts
 
@@ -59,6 +94,6 @@ def extract_file_attachments(context: RequestContext) -> list[tuple[str, str]]:
 
     for part in context.message.parts:
         root = part.root
-        if hasattr(root, "file") and isinstance(root.file, FileWithBytes):
-            attachments.append((root.file.bytes, root.file.mime_type or "image/png"))
+        if _is_file_part(root):
+            attachments.append(_get_file_bytes(root))
     return attachments

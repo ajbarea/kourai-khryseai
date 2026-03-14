@@ -11,13 +11,14 @@ import logging
 import sys
 from collections.abc import AsyncIterable
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
+
+from anyio import Path as AnyioPath
 
 from kourai_common.llm import chat, chat_stream
 from kourai_common.player import get_enriched_system_prompt
 from kourai_common.prompts import CURRENT_DATE, build_system_prompt
-from kourai_common.subprocess import run_command
+from kourai_common.subprocess import StatusCallback, run_command
 
 log = logging.getLogger(__name__)
 
@@ -106,9 +107,9 @@ async def fix_test_issues(
     """Use LLM to fix failing tests or code."""
     files_block = ""
     for file_path in file_paths:
-        path = Path(file_path)
-        if path.exists():
-            content = path.read_text(encoding="utf-8")
+        path = AnyioPath(file_path)
+        if await path.exists():
+            content = await path.read_text(encoding="utf-8")
             files_block += f"\n--- {file_path} ---\n{content}\n"
 
     messages = [
@@ -144,6 +145,7 @@ async def run_pytest(
     target_path: str = "tests/",
     cwd: str | None = None,
     extra_args: list[str] | None = None,
+    status_callback: StatusCallback | None = None,
 ) -> PytestRunResult:
     """Run pytest and parse results.
 
@@ -151,12 +153,15 @@ async def run_pytest(
         target_path: Path to test directory or file.
         cwd: Working directory for pytest.
         extra_args: Additional pytest arguments.
+        status_callback: Optional async callback for live pytest output.
+            Each test result line (PASSED/FAILED/ERROR) is forwarded so the
+            player can watch the test suite run in the scratchpad.
     """
     cmd = [sys.executable, "-m", "pytest", target_path, "-v", "--tb=short"]
     if extra_args:
         cmd.extend(extra_args)
 
-    code, stdout, stderr = await run_command(cmd, cwd=cwd)
+    code, stdout, stderr = await run_command(cmd, cwd=cwd, status_callback=status_callback)
     output = stdout + stderr
 
     result = PytestRunResult(output=output, success=(code == 0))
