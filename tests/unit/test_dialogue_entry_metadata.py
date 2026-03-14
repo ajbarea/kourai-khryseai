@@ -65,7 +65,11 @@ class TestDialogueEntryMetadata:
     def test_dialogue_entry_is_result(self):
         """Test DialogueEntry with is_result flag."""
         entry = DialogueEntry(
-            "Hephaestus", "Test result", is_result=True, processing_time=1.0, agent_count=2
+            "Hephaestus",
+            "Test result",
+            is_result=True,
+            processing_time=1.0,
+            agent_count=2,
         )
         assert entry.is_result is True
         assert entry.processing_time == 1.0

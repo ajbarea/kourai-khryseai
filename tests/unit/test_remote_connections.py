@@ -7,7 +7,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from a2a.types import Task, TaskArtifactUpdateEvent, TaskState, TaskStatus
 
-from agents.hephaestus.remote_connections import AgentInputRequired, RemoteAgentConnection
+from agents.hephaestus.remote_connections import (
+    AgentInputRequired,
+    RemoteAgentConnection,
+)
 
 
 class TestRemoteAgentConnectionInit:
@@ -124,7 +127,10 @@ class TestRemoteAgentConnectionSend:
 
         with (
             patch("agents.hephaestus.remote_connections.create_span"),
-            patch("agents.hephaestus.remote_connections.get_trace_context", return_value={}),
+            patch(
+                "agents.hephaestus.remote_connections.get_trace_context",
+                return_value={},
+            ),
         ):
             conn = RemoteAgentConnection("techne", "http://localhost:10002/")
             conn.client = mock_client
@@ -152,7 +158,10 @@ class TestRemoteAgentConnectionSend:
 
         with (
             patch("agents.hephaestus.remote_connections.create_span"),
-            patch("agents.hephaestus.remote_connections.get_trace_context", return_value={}),
+            patch(
+                "agents.hephaestus.remote_connections.get_trace_context",
+                return_value={},
+            ),
         ):
             conn = RemoteAgentConnection("techne", "http://localhost:10002/")
             conn.client = mock_client
@@ -184,7 +193,10 @@ class TestRemoteAgentConnectionSend:
 
         with (
             patch("agents.hephaestus.remote_connections.create_span"),
-            patch("agents.hephaestus.remote_connections.get_trace_context", return_value={}),
+            patch(
+                "agents.hephaestus.remote_connections.get_trace_context",
+                return_value={},
+            ),
         ):
             conn = RemoteAgentConnection("metis", "http://localhost:10001/")
             conn.client = mock_client

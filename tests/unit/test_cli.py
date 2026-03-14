@@ -8,7 +8,11 @@ import httpx
 import pytest
 from a2a.types import Message, Task, TaskState, TaskStatusUpdateEvent
 
-from hosts.cli.__main__ import _extract_artifact_text, _extract_status_text, send_and_stream
+from hosts.cli.__main__ import (
+    _extract_artifact_text,
+    _extract_status_text,
+    send_and_stream,
+)
 
 # ---------------------------------------------------------------------------
 # Extract helpers
@@ -172,4 +176,4 @@ class TestMainCommand:
         from hosts.cli.__main__ import main
 
         param_names = [p.name for p in main.params]
-        assert "timeout" in param_names
+        assert "timeout_seconds" in param_names

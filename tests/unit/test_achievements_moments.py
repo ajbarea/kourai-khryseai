@@ -149,7 +149,15 @@ class TestAchievementChecking:
         p = PlayerProfile(display_name="AJ")
         update_affinity(p.player_id, "metis", 0.01)
 
-        ctx = {"agents_used_this_session": {"metis", "techne", "dokimasia", "kallos", "mneme"}}
+        ctx = {
+            "agents_used_this_session": {
+                "metis",
+                "techne",
+                "dokimasia",
+                "kallos",
+                "mneme",
+            }
+        }
         unlocked = check_achievements(p.player_id, p, context=ctx)
         ids = [a.id for a in unlocked]
         assert "full_pipeline" in ids
@@ -201,7 +209,10 @@ class TestAchievementProgress:
         assert "alignment" in progress["by_category"]
 
     def test_notification_format(self):
-        from kourai_common.achievements import ACHIEVEMENTS, format_achievement_notification
+        from kourai_common.achievements import (
+            ACHIEVEMENTS,
+            format_achievement_notification,
+        )
 
         ach = ACHIEVEMENTS["first_forge"]
         text = format_achievement_notification(ach)

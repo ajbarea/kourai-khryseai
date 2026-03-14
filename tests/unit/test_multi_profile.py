@@ -70,7 +70,11 @@ class TestMultiProfileBackend:
         assert list_profiles() == []
 
     def test_list_profiles_multiple(self):
-        from kourai_common.player import PlayerProfile, list_profiles, set_active_profile
+        from kourai_common.player import (
+            PlayerProfile,
+            list_profiles,
+            set_active_profile,
+        )
 
         p1 = PlayerProfile(display_name="Player1", role="divine", sovereignty=80)
         p1.save()
@@ -179,7 +183,11 @@ class TestMultiProfileBackend:
 
     def test_profile_data_in_list(self):
         """Verify list_profiles returns all expected fields."""
-        from kourai_common.player import PlayerProfile, list_profiles, set_active_profile
+        from kourai_common.player import (
+            PlayerProfile,
+            list_profiles,
+            set_active_profile,
+        )
 
         p = PlayerProfile(
             display_name="FullProfile",

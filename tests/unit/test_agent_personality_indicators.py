@@ -1,6 +1,9 @@
 """Tests for agent personality indicators."""
 
-from hosts.gui.agent_personality_indicators import AgentPersonality, AgentPersonalityIndicators
+from hosts.gui.agent_personality_indicators import (
+    AgentPersonality,
+    AgentPersonalityIndicators,
+)
 
 
 class TestAgentPersonality:
@@ -116,7 +119,11 @@ class TestAgentPersonalityIndicators:
         indicators = AgentPersonalityIndicators()
         all_personalities = indicators.get_all_personalities()
         all_personalities["NewAgent"] = AgentPersonality(
-            name="NewAgent", color=(0, 0, 0), icon="●", animation_style="none", description="New"
+            name="NewAgent",
+            color=(0, 0, 0),
+            icon="●",
+            animation_style="none",
+            description="New",
         )
         # Original should not be modified
         assert "NewAgent" not in indicators.personalities
@@ -143,7 +150,14 @@ class TestAgentPersonalityIndicators:
     def test_all_default_agents_present(self):
         """Test that all default agents are present."""
         indicators = AgentPersonalityIndicators()
-        expected_agents = ["Hephaestus", "Metis", "Techne", "Dokimasia", "Kallos", "Mneme"]
+        expected_agents = [
+            "Hephaestus",
+            "Metis",
+            "Techne",
+            "Dokimasia",
+            "Kallos",
+            "Mneme",
+        ]
         for agent in expected_agents:
             assert agent in indicators.personalities
 

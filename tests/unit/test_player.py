@@ -181,7 +181,10 @@ class TestPlayerProfile:
         with (
             patch("kourai_common.player.PROFILES_DIR", tmp_path / "profiles"),
             patch("kourai_common.player.ACTIVE_PROFILE_FILE", tmp_path / "active.txt"),
-            patch("kourai_common.player._LEGACY_PLAYER_FILE", tmp_path / "nonexistent.json"),
+            patch(
+                "kourai_common.player._LEGACY_PLAYER_FILE",
+                tmp_path / "nonexistent.json",
+            ),
         ):
             assert PlayerProfile.load() is None
 
@@ -189,7 +192,10 @@ class TestPlayerProfile:
         with (
             patch("kourai_common.player.PROFILES_DIR", tmp_path / "profiles"),
             patch("kourai_common.player.ACTIVE_PROFILE_FILE", tmp_path / "active.txt"),
-            patch("kourai_common.player._LEGACY_PLAYER_FILE", tmp_path / "nonexistent.json"),
+            patch(
+                "kourai_common.player._LEGACY_PLAYER_FILE",
+                tmp_path / "nonexistent.json",
+            ),
         ):
             p = PlayerProfile.load_or_default()
             assert p.display_name == ""
@@ -446,13 +452,11 @@ class TestBuildPlayerContext:
 
 class TestMemoryDecay:
     def test_no_decay_for_achievements(self, profile):
-
         add_player_memory(profile.player_id, "First pipeline", "achievement", importance=0.01)
         pruned = decay_memories(profile.player_id, half_life_days=0.001, min_importance=0.5)
         assert pruned == 0  # Achievements are protected
 
     def test_prunes_low_importance_memories(self, profile):
-
         # Add a very old, low-importance memory
         mid = add_player_memory(profile.player_id, "Old note", "moment", importance=0.06)
         # Manually backdate it
@@ -472,7 +476,6 @@ class TestMemoryDecay:
         assert pruned == 1
 
     def test_preferences_protected(self, profile):
-
         add_player_memory(profile.player_id, "Likes dark mode", "preference", importance=0.01)
         pruned = decay_memories(profile.player_id, half_life_days=0.001, min_importance=0.5)
         assert pruned == 0
@@ -483,7 +486,6 @@ class TestMemoryDecay:
 
 class TestExportImport:
     def test_export_roundtrip(self, profile, tmp_path, monkeypatch):
-
         # Save profile to disk so export can find it
         monkeypatch.setattr("kourai_common.player.PROFILES_DIR", tmp_path / "profiles")
         monkeypatch.setattr("kourai_common.player.ACTIVE_PROFILE_FILE", tmp_path / "active.txt")
@@ -500,7 +502,6 @@ class TestExportImport:
         assert "metis" in data["affinities"]
 
     def test_import_creates_profile(self, tmp_path, monkeypatch):
-
         monkeypatch.setattr("kourai_common.player.PROFILES_DIR", tmp_path / "profiles")
         monkeypatch.setattr("kourai_common.player.ACTIVE_PROFILE_FILE", tmp_path / "active.txt")
         monkeypatch.setattr("kourai_common.player.PLAYER_DIR", tmp_path)
@@ -517,7 +518,11 @@ class TestExportImport:
             },
             "memories": [{"content": "Imported memory", "category": "fact", "importance": 0.8}],
             "affinities": {
-                "kallos": {"affinity_score": 0.3, "interaction_count": 5, "romance_stage": "none"}
+                "kallos": {
+                    "affinity_score": 0.3,
+                    "interaction_count": 5,
+                    "romance_stage": "none",
+                }
             },
         }
 
@@ -530,12 +535,10 @@ class TestExportImport:
         assert any(m["content"] == "Imported memory" for m in mems)
 
     def test_import_rejects_bad_version(self):
-
         with pytest.raises(ValueError, match="Unsupported export version"):
             import_player_data({"version": 99})
 
     def test_import_merge_mode(self, profile, tmp_path, monkeypatch):
-
         monkeypatch.setattr("kourai_common.player.PROFILES_DIR", tmp_path / "profiles")
         monkeypatch.setattr("kourai_common.player.ACTIVE_PROFILE_FILE", tmp_path / "active.txt")
         monkeypatch.setattr("kourai_common.player.PLAYER_DIR", tmp_path)

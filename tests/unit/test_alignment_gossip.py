@@ -579,7 +579,11 @@ class TestGossipPlayerResponse:
 
     @pytest.mark.asyncio
     async def test_process_custom_text(self):
-        from kourai_common.gossip import GossipSession, GossipTopic, process_player_response
+        from kourai_common.gossip import (
+            GossipSession,
+            GossipTopic,
+            process_player_response,
+        )
 
         session = GossipSession(
             agent_a="metis",
@@ -623,7 +627,11 @@ class TestGossipPlayerResponse:
 
     @pytest.mark.asyncio
     async def test_complete_session_no_response(self):
-        from kourai_common.gossip import GossipSession, GossipTopic, process_player_response
+        from kourai_common.gossip import (
+            GossipSession,
+            GossipTopic,
+            process_player_response,
+        )
 
         session = GossipSession(
             agent_a="metis",
@@ -1156,7 +1164,11 @@ class TestJealousyTrigger:
             conn.commit()
 
     def test_no_trigger_without_romance(self):
-        from kourai_common.gossip import ResponseTone, check_jealousy_trigger, start_gossip_session
+        from kourai_common.gossip import (
+            ResponseTone,
+            check_jealousy_trigger,
+            start_gossip_session,
+        )
 
         p = PlayerProfile(display_name="AJ")
         session = start_gossip_session("metis", "kallos")
@@ -1164,7 +1176,11 @@ class TestJealousyTrigger:
         assert result is None
 
     def test_no_trigger_with_single_romance(self):
-        from kourai_common.gossip import ResponseTone, check_jealousy_trigger, start_gossip_session
+        from kourai_common.gossip import (
+            ResponseTone,
+            check_jealousy_trigger,
+            start_gossip_session,
+        )
 
         p = PlayerProfile(display_name="AJ", romance_targets=["metis"])
         self._setup_multi_romance(p, [("metis", "kindling")])
@@ -1173,7 +1189,11 @@ class TestJealousyTrigger:
         assert result is None
 
     def test_no_trigger_on_scold(self):
-        from kourai_common.gossip import ResponseTone, check_jealousy_trigger, start_gossip_session
+        from kourai_common.gossip import (
+            ResponseTone,
+            check_jealousy_trigger,
+            start_gossip_session,
+        )
 
         p = PlayerProfile(display_name="AJ", romance_targets=["metis", "kallos", "dokimasia"])
         self._setup_multi_romance(
@@ -1189,7 +1209,11 @@ class TestJealousyTrigger:
         assert result is None
 
     def test_trigger_on_flirt_with_absent_rival(self):
-        from kourai_common.gossip import ResponseTone, check_jealousy_trigger, start_gossip_session
+        from kourai_common.gossip import (
+            ResponseTone,
+            check_jealousy_trigger,
+            start_gossip_session,
+        )
 
         p = PlayerProfile(display_name="AJ", romance_targets=["metis", "kallos", "dokimasia"])
         self._setup_multi_romance(
@@ -1210,7 +1234,11 @@ class TestJealousyTrigger:
         assert len(result.response_options) >= 2
 
     def test_no_trigger_when_absent_romance_is_spark_only(self):
-        from kourai_common.gossip import ResponseTone, check_jealousy_trigger, start_gossip_session
+        from kourai_common.gossip import (
+            ResponseTone,
+            check_jealousy_trigger,
+            start_gossip_session,
+        )
 
         p = PlayerProfile(display_name="AJ", romance_targets=["metis", "dokimasia"])
         self._setup_multi_romance(
@@ -1275,7 +1303,11 @@ class TestResolveJealousy:
         )
 
     def test_reassure_positive_affinity(self, tmp_path, monkeypatch):
-        from kourai_common.gossip import GossipResponseOption, ResponseTone, resolve_jealousy
+        from kourai_common.gossip import (
+            GossipResponseOption,
+            ResponseTone,
+            resolve_jealousy,
+        )
 
         monkeypatch.setattr("kourai_common.player.PLAYER_DIR", tmp_path)
         monkeypatch.setattr("kourai_common.player.PROFILES_DIR", tmp_path / "profiles")
@@ -1297,7 +1329,11 @@ class TestResolveJealousy:
         assert event.resolution_text != ""
 
     def test_assert_authority_sovereignty_agent(self, tmp_path, monkeypatch):
-        from kourai_common.gossip import GossipResponseOption, ResponseTone, resolve_jealousy
+        from kourai_common.gossip import (
+            GossipResponseOption,
+            ResponseTone,
+            resolve_jealousy,
+        )
 
         monkeypatch.setattr("kourai_common.player.PLAYER_DIR", tmp_path)
         monkeypatch.setattr("kourai_common.player.PROFILES_DIR", tmp_path / "profiles")
@@ -1318,7 +1354,11 @@ class TestResolveJealousy:
         assert result["affinity_delta"] > 0  # hephaestus respects authority
 
     def test_assert_authority_devotion_agent_negative(self, tmp_path, monkeypatch):
-        from kourai_common.gossip import GossipResponseOption, ResponseTone, resolve_jealousy
+        from kourai_common.gossip import (
+            GossipResponseOption,
+            ResponseTone,
+            resolve_jealousy,
+        )
 
         monkeypatch.setattr("kourai_common.player.PLAYER_DIR", tmp_path)
         monkeypatch.setattr("kourai_common.player.PROFILES_DIR", tmp_path / "profiles")
@@ -1338,7 +1378,11 @@ class TestResolveJealousy:
         assert result["affinity_delta"] < 0  # kallos is hurt
 
     def test_deflect_mixed_results(self, tmp_path, monkeypatch):
-        from kourai_common.gossip import GossipResponseOption, ResponseTone, resolve_jealousy
+        from kourai_common.gossip import (
+            GossipResponseOption,
+            ResponseTone,
+            resolve_jealousy,
+        )
 
         monkeypatch.setattr("kourai_common.player.PLAYER_DIR", tmp_path)
         monkeypatch.setattr("kourai_common.player.PROFILES_DIR", tmp_path / "profiles")

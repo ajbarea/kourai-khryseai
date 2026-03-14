@@ -7,6 +7,7 @@ import tempfile
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from anyio import Path as AnyioPath
 
 from agents.techne.agent import (
     SYSTEM_PROMPT,
@@ -85,12 +86,11 @@ class TestFileOperations:
 
     @pytest.mark.asyncio
     async def test_read_existing_file(self):
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
-            f.write("x = 1\n")
-            f.flush()
-            content = await read_file(f.name)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "test_read.py")
+            await AnyioPath(path).write_text("x = 1\n")
+            content = await read_file(path)
             assert content == "x = 1\n"
-        os.unlink(f.name)
 
     @pytest.mark.asyncio
     async def test_read_nonexistent_file(self):
@@ -103,9 +103,8 @@ class TestFileOperations:
             path = os.path.join(tmpdir, "test.py")
             success = await write_file(path, "x = 42\n")
             assert success
-            assert os.path.exists(path)
-            with open(path) as f:
-                assert f.read() == "x = 42\n"
+            assert await AnyioPath(path).exists()
+            assert await AnyioPath(path).read_text() == "x = 42\n"
 
     @pytest.mark.asyncio
     async def test_write_creates_parent_dirs(self):
@@ -113,17 +112,15 @@ class TestFileOperations:
             path = os.path.join(tmpdir, "sub", "dir", "test.py")
             success = await write_file(path, "y = 1\n")
             assert success
-            assert os.path.exists(path)
+            assert await AnyioPath(path).exists()
 
     @pytest.mark.asyncio
     async def test_read_files_multiple(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             p1 = os.path.join(tmpdir, "a.py")
             p2 = os.path.join(tmpdir, "b.py")
-            with open(p1, "w") as f:
-                f.write("a = 1")
-            with open(p2, "w") as f:
-                f.write("b = 2")
+            await AnyioPath(p1).write_text("a = 1")
+            await AnyioPath(p2).write_text("b = 2")
 
             result = await read_files([p1, p2, "/nonexistent.py"])
             assert len(result) == 2

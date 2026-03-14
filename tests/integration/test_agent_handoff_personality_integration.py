@@ -2,7 +2,9 @@
 
 from unittest.mock import Mock
 
-from hosts.gui.agent_handoff_personality_integration import AgentHandoffPersonalityIntegration
+from hosts.gui.agent_handoff_personality_integration import (
+    AgentHandoffPersonalityIntegration,
+)
 from hosts.gui.agent_personality_indicators import AgentPersonalityIndicators
 
 

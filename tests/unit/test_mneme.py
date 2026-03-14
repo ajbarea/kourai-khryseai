@@ -93,7 +93,10 @@ class TestCollectGitChanges:
     def test_collects_status_and_diffs(self):
         with patch("scripts.git_changes._run_git") as mock_git:
             mock_git.side_effect = lambda *args, **kw: {
-                ("status", "--porcelain"): "M agents/mneme/agent.py\nM scripts/status.py\n",
+                (
+                    "status",
+                    "--porcelain",
+                ): "M agents/mneme/agent.py\nM scripts/status.py\n",
                 ("diff",): (
                     "diff --git a/agents/mneme/agent.py b/agents/mneme/agent.py\n"
                     "--- a/agents/mneme/agent.py\n"

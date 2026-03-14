@@ -144,7 +144,7 @@ class TestKallosExecutor:
         queue = _make_queue()
 
         # Mock the run_make_lint function to return success
-        async def mock_run_make_lint():
+        async def mock_run_make_lint(**kwargs):
             return (True, "All checks passed")
 
         with (
@@ -183,7 +183,10 @@ class TestMetisExecutor:
         ]
         with (
             patch("agents.metis.agent_executor.create_span"),
-            patch("agents.metis.agent_executor.get_project_context", return_value="project ctx"),
+            patch(
+                "agents.metis.agent_executor.get_project_context",
+                return_value="project ctx",
+            ),
             patch(
                 "agents.metis.agent_executor.create_spec_stream",
                 return_value=_async_gen(spec_chunks),
@@ -256,8 +259,14 @@ class TestTechneExecutor:
 
         with (
             patch("agents.techne.agent_executor.create_span"),
-            patch("agents.techne.agent_executor.parse_file_paths", return_value=["auth.py"]),
-            patch("agents.techne.agent_executor.read_files", return_value={"auth.py": "code"}),
+            patch(
+                "agents.techne.agent_executor.parse_file_paths",
+                return_value=["auth.py"],
+            ),
+            patch(
+                "agents.techne.agent_executor.read_files",
+                return_value={"auth.py": "code"},
+            ),
             patch("agents.techne.agent_executor.get_git_context", return_value="M auth.py"),
             patch(
                 "agents.techne.agent_executor.generate_code_stream",
