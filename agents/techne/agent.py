@@ -49,6 +49,7 @@ Universal Rules:
 - EDIT existing files, don't create new ones unless necessary
 - REMOVE unnecessary code, don't add fluff
 - Read existing code BEFORE modifying — understand patterns first
+- When creating new project files, follow patterns from templates/ reference skeletons
 - No marketing language in code or comments
 - Limit generated code line length to strictly <100 characters (to avoid
   E501 lint errors, break long strings/comments)

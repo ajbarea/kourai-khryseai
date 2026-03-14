@@ -20,6 +20,7 @@ from kourai_common.a2a_utils import extract_image_parts
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
 from kourai_common.messaging import send_working_status
+from kourai_common.stack import looks_like_scaffolding
 from kourai_common.subprocess import parse_and_apply_fixes
 from kourai_common.tracing import create_span
 
@@ -61,6 +62,31 @@ class TechneAgentExecutor(BaseAgentExecutor):
             if file_paths:
                 with create_span("techne.read_files", {"count": str(len(file_paths))}):
                     file_contents = await read_files(file_paths)
+
+            # Step 2b: Load template reference files for new project scaffolding
+            if looks_like_scaffolding(user_input):
+                backend_templates = [
+                    "templates/backend/pyproject.toml",
+                    "templates/backend/src/app/main.py",
+                    "templates/backend/src/app/models.py",
+                    "templates/backend/tests/conftest.py",
+                ]
+                frontend_templates = [
+                    "templates/frontend/package.json",
+                    "templates/frontend/src/App.tsx",
+                ]
+                lower = user_input.lower()
+                paths: list[str] = []
+                if "frontend" in lower or "react" in lower or "full" in lower:
+                    paths.extend(frontend_templates)
+                if "backend" in lower or "api" in lower or "full" in lower:
+                    paths.extend(backend_templates)
+                # Default to both if neither side is specified
+                if not paths:
+                    paths = backend_templates + frontend_templates
+                with create_span("techne.read_templates"):
+                    templates = await read_files(paths)
+                    file_contents.update(templates)
 
             # Step 3: Get git context — stream output
             async def _git_status(line: str) -> None:

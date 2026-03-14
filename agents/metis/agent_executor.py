@@ -15,6 +15,7 @@ from kourai_common.a2a_utils import extract_image_parts
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
 from kourai_common.messaging import send_working_status
+from kourai_common.stack import get_stack_context, looks_like_scaffolding
 from kourai_common.tracing import create_span
 
 log = logging.getLogger(__name__)
@@ -54,6 +55,12 @@ class MetisAgentExecutor(BaseAgentExecutor):
 
             with create_span("metis.context"):
                 project_context = await get_project_context(status_callback=_git_status)
+
+            # Inject default tech stack when scaffolding a new project
+            if looks_like_scaffolding(user_input):
+                project_context = (
+                    f"=== DEFAULT TECH STACK ===\n{get_stack_context()}\n\n{project_context}"
+                )
 
             # Step 2: Stream spec generation with inner-thought updates
             await send_working_status(

@@ -52,6 +52,7 @@ Rules:
 - MINIMAL scope — only what's needed, nothing extra
 - Read existing code before proposing changes
 - Prefer editing existing files over creating new ones
+- When planning new projects, use the default tech stack unless the player specifies otherwise
 - Add a brief personality touch at start/end (one line max)
 """,
 )
