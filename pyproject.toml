@@ -3,7 +3,6 @@ name = "kourai-khryseai"
 version = "0.1.0"
 description = "Multi-agent A2A development system — Golden Maidens of Hephaestus"
 requires-python = ">=3.12"
-readme = "IMPLEMENTATION_PLAN.md"
 dependencies = [
     "psutil>=7.2.2",
 ]
@@ -15,7 +14,6 @@ dev = [
     "pytest-cov>=6.0.0",
     "pytest-xdist>=3.6.1",
     "ruff>=0.9",
-    "isort>=6.0.0",
     "mypy>=1.15.0",
     "zensical>=0.0.24",
     "hypothesis>=6.151.9",
@@ -36,7 +34,7 @@ kourai-common = { workspace = true }
 line-length = 100
 target-version = "py312"
 exclude = [
-    ".venv",
+    ".venv*",
     "__pycache__",
     ".mypy_cache",
     ".pytest_cache",
@@ -45,16 +43,18 @@ exclude = [
 ]
 
 [tool.ruff.lint]
-# "I" enables Ruff's isort-compatible import sorting
-select = ["E", "F", "I", "UP", "B", "SIM", "W", "C4"]
+select = ["E", "F", "I", "UP", "B", "SIM", "W", "C4", "S", "ASYNC", "T20"]
 fixable = ["ALL"]
-unfixable = []
+unfixable = ["T20"]  # Don't auto-remove print statements
 ignore = [
     "E501",   # Handled by formatter
-    "B008",   # Function calls in defaults (useful for FastAPI/Click)
+    "B008",   # Function calls in defaults
     "SIM102", # Nested if statements
     "SIM108", # Use ternary operator
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]  # Assert is appropriate in test code
 
 [tool.ruff.lint.isort]
 known-first-party = ["kourai_common", "agents", "hosts"]
@@ -78,10 +78,22 @@ warn_unused_configs = true
 warn_redundant_casts = true
 show_error_codes = true
 no_implicit_optional = true
-ignore_missing_imports = true
+ignore_missing_imports = false
 follow_imports = "normal"
 mypy_path = "shared/src"
-exclude = ["\\.venv", "build", "dist", "\\.git"]
+exclude = ["\\.venv.*", "build", "dist", "\\.git"]
+
+# External libraries without type hints
+[[tool.mypy.overrides]]
+module = [
+    "pygame.*",
+    "hypothesis.*",
+    "pytest.*",
+    "a2a.*",
+    "litellm.*",
+    "uvicorn.*",
+]
+ignore_errors = true
 
 # Enforce strict typing on core shared logic
 [[tool.mypy.overrides]]
