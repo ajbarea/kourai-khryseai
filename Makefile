@@ -33,14 +33,8 @@ else
     export UV_PROJECT_ENVIRONMENT ?= .venv
 endif
 
-# Universally detect the available Python executable (handles Windows, Mac, Linux, WSL)
-ifeq ($(OS),Windows_NT)
-    PYTHON ?= python
-else
-    PYTHON ?= $(shell command -v python3 || command -v python || echo python)
-endif
 COMPOSE_FULL := docker compose --profile full
-HOST_UV_RUN := $(PYTHON) scripts/run_in_host_env.py --
+HOST_UV_RUN := uv run --no-active python scripts/run_in_host_env.py --
 GUI_ARGS ?= --agent http://localhost:10000/
 CLI_ARGS ?=
 
@@ -52,7 +46,7 @@ setup:                     ## Install all Python dependencies (workspace + all p
 	uv sync --all-packages --no-active
 
 upgrade:                   ## Update all dependencies to latest versions
-	$(PYTHON) scripts/upgrade.py
+	uv run --no-active python scripts/upgrade.py
 
 # ════════════════════════════════════════════════════════════════════════════
 # Core Development Workflows (primary entry points)
@@ -125,17 +119,17 @@ test-performance:          ## Run performance tests only
 	uv run --no-active pytest tests/performance/ -v --tb=short --cov=. --cov-append --cov-report=xml:logs/coverage.xml --cov-report=term-missing
 
 clean:                     ## Remove build artifacts, cache, and temp files
-	$(PYTHON) scripts/clean_build.py
+	uv run --no-active python scripts/clean_build.py
 
 clean-cache:               ## Remove cache directories only
-	$(PYTHON) scripts/clean_build.py --cache-only
+	uv run --no-active python scripts/clean_build.py --cache-only
 
 clean-tests:               ## Remove test artifacts only
-	$(PYTHON) scripts/clean_build.py --tests-only
+	uv run --no-active python scripts/clean_build.py --tests-only
 
 # ════════════════════════════════════════════════════════════════════════════
 # Help
 # ════════════════════════════════════════════════════════════════════════════
 
 help:                      ## Show this help message
-	$(PYTHON) scripts/show_help.py
+	uv run --no-active python scripts/show_help.py
