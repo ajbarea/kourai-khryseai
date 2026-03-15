@@ -27,6 +27,7 @@ htmlcov/
 .mypy_cache/
 .hypothesis/
 .playwright-mcp/
+.ruff_cache/
 
 # OS
 .DS_Store
