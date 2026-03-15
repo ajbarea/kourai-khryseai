@@ -9,6 +9,7 @@ Usage:
 
 from __future__ import annotations
 
+import glob
 import logging
 import os
 import shutil
@@ -74,6 +75,13 @@ def clean_hypothesis() -> None:
         shutil.rmtree(".hypothesis", ignore_errors=True)
 
 
+def clean_uv_backups() -> None:
+    """Remove uv.lock backup files."""
+    for backup_file in glob.glob("uv.lock.backup.*"):
+        logger.info(f"Removing {backup_file}")
+        os.remove(backup_file)
+
+
 def main() -> int:
     """Clean all artifacts."""
     args = sys.argv[1:]
@@ -94,6 +102,7 @@ def main() -> int:
         clean_ruff()
         clean_build()
         clean_hypothesis()
+        clean_uv_backups()
 
     logger.info("Done. Workspace cleaned.")
     return 0
