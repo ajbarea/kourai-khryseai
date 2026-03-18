@@ -19,7 +19,7 @@ _LIBS_DIR = Path(__file__).parents[2] / "hosts/vn/kourai_vn/game/libs"
 if str(_LIBS_DIR) not in sys.path:
     sys.path.insert(0, str(_LIBS_DIR))
 
-from bridge import RenPyBridge, _find_project_root  # noqa: E402
+from bridge import RenPyBridge, _find_project_root  # type: ignore[import-not-found]  # noqa: E402
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────
 
