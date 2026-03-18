@@ -51,3 +51,12 @@ crash.log
 
 # Project Documentation Site
 site/
+
+# Ren'Py VN
+hosts/vn/renpy-8.5.2-sdk/
+hosts/vn/kourai_vn/build/
+hosts/vn/kourai_vn/game/cache/
+hosts/vn/kourai_vn/game/saves/
+hosts/vn/kourai_vn/game/log.txt
+hosts/vn/kourai_vn/.ren'py_compiler_cache
+hosts/vn/kourai_vn/logs/

@@ -141,4 +141,4 @@ def get_agent_url(agent_name: str) -> str:
     port = AGENT_PORTS[agent_name]
     if DOCKER_MODE:
         return f"http://{agent_name}:{port}/"
-    return f"http://localhost:{port}/"
+    return f"http://127.0.0.1:{port}/"

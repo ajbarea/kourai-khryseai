@@ -10,7 +10,7 @@
 ##   make down          Stop all services
 ##
 
-.PHONY: help setup upgrade dev up down restart status gui cli docs lint test test-unit test-integration test-performance clean
+.PHONY: help setup upgrade dev dev-vn up down restart status gui cli vn docs lint test test-unit test-integration test-performance clean
 .DEFAULT_GOAL := help
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -59,6 +59,13 @@ dev:                       ## Start services + GUI (full development stack in on
 	@echo Starting GUI...
 	@$(MAKE) --no-print-directory gui
 
+dev-vn:                    ## Start services + Ren'Py VN (full development stack with visual novel)
+	@$(MAKE) --no-print-directory down
+	@$(MAKE) --no-print-directory up
+	@echo
+	@echo Starting Ren\'Py VN...
+	@$(MAKE) --no-print-directory vn
+
 up:                        ## Start all agents + infrastructure (background, waits for health)
 	$(COMPOSE_FULL) up -d --build --pull always --wait --wait-timeout 180
 	@echo All services running and healthy
@@ -86,6 +93,9 @@ gui:                       ## Launch Pygame GUI (runs on host machine)
 
 cli:                       ## Launch terminal CLI client (runs on host machine)
 	$(HOST_UV_RUN) python -m hosts.cli $(CLI_ARGS)
+
+vn:                        ## Launch Ren'Py Visual Novel GUI (runs on host machine)
+	./hosts/vn/renpy-8.5.2-sdk/renpy.exe ./hosts/vn/kourai_vn/
 
 # ════════════════════════════════════════════════════════════════════════════
 # Documentation & Utilities
