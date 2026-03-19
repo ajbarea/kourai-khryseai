@@ -51,5 +51,5 @@ def test_symlink_escape(tmp_path):
     # Try to write inside the symlink which points outside
     escape_via_link = "link/main.py"
 
-    with pytest.raises(PathViolation, match="Symlink escape detected"):
+    with pytest.raises(PathViolation, match="Path escape detected"):
         validate_file_path(project_root, escape_via_link)
