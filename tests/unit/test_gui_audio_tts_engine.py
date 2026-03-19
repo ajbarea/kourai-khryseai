@@ -83,6 +83,7 @@ class TestTTSEngineInit:
 
         with (
             patch("pygame.mixer.init", side_effect=RuntimeError("already init")),
+            patch("pygame.mixer.get_init", return_value=MagicMock()),
             patch("pygame.mixer.Channel", return_value=mock_channel),
         ):
             from hosts.gui.tts_engine import TTSEngine
@@ -292,6 +293,7 @@ def mock_audio_mixer():
         patch("pygame.mixer.pre_init"),
         patch("pygame.mixer.init"),
         patch("pygame.mixer.set_num_channels"),
+        patch("pygame.mixer.get_init", return_value=MagicMock()),
         patch("pygame.mixer.Channel", return_value=mock_channel),
         patch("pygame.mixer.quit"),
         patch("pygame.mixer.music") as mock_music,
