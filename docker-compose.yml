@@ -271,6 +271,156 @@ services:
           memory: 1G
     profiles: ["agents", "full"]
 
+  # ──────────────── Companion Spirits ────────────────
+  puck:
+    <<: *agent-common
+    build:
+      context: .
+      dockerfile: docker/host.Dockerfile
+      args:
+        HOST_TYPE: agent
+        PACKAGE_NAME: puck
+        PORT: 10006
+    ports:
+      - "10006:10006"
+    volumes:
+      - ./agents/puck:/app/agents/puck
+      - ./shared:/app/shared
+    develop:
+      watch:
+        - action: sync
+          path: ./agents/puck
+          target: /app/agents/puck
+        - action: sync
+          path: ./shared
+          target: /app/shared
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      PORT: 10006
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:10006/.well-known/agent-card.json"]
+      interval: 15s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    profiles: ["agents", "full"]
+
+  cupid:
+    <<: *agent-common
+    build:
+      context: .
+      dockerfile: docker/host.Dockerfile
+      args:
+        HOST_TYPE: agent
+        PACKAGE_NAME: cupid
+        PORT: 10007
+    ports:
+      - "10007:10007"
+    volumes:
+      - ./agents/cupid:/app/agents/cupid
+      - ./shared:/app/shared
+    develop:
+      watch:
+        - action: sync
+          path: ./agents/cupid
+          target: /app/agents/cupid
+        - action: sync
+          path: ./shared
+          target: /app/shared
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      PORT: 10007
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:10007/.well-known/agent-card.json"]
+      interval: 15s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    profiles: ["agents", "full"]
+
+  # ──────────────── Quality Spirits ────────────────
+  aidos:
+    <<: *agent-common
+    build:
+      context: .
+      dockerfile: docker/host.Dockerfile
+      args:
+        HOST_TYPE: agent
+        PACKAGE_NAME: aidos
+        PORT: 10008
+    ports:
+      - "10008:10008"
+    volumes:
+      - ./agents/aidos:/app/agents/aidos
+      - ./shared:/app/shared
+    develop:
+      watch:
+        - action: sync
+          path: ./agents/aidos
+          target: /app/agents/aidos
+        - action: sync
+          path: ./shared
+          target: /app/shared
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      PORT: 10008
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:10008/.well-known/agent-card.json"]
+      interval: 15s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    profiles: ["agents", "full"]
+
+  aletheia:
+    <<: *agent-common
+    build:
+      context: .
+      dockerfile: docker/host.Dockerfile
+      args:
+        HOST_TYPE: agent
+        PACKAGE_NAME: aletheia
+        PORT: 10009
+    ports:
+      - "10009:10009"
+    volumes:
+      - ./agents/aletheia:/app/agents/aletheia
+      - ./shared:/app/shared
+    develop:
+      watch:
+        - action: sync
+          path: ./agents/aletheia
+          target: /app/agents/aletheia
+        - action: sync
+          path: ./shared
+          target: /app/shared
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      PORT: 10009
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:10009/.well-known/agent-card.json"]
+      interval: 15s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    profiles: ["agents", "full"]
+
   # ──────────────── Orchestrator ────────────────
   hephaestus:
     <<: *agent-common
@@ -321,6 +471,14 @@ services:
       dokimasia:
         condition: service_healthy
       metis:
+        condition: service_healthy
+      puck:
+        condition: service_healthy
+      cupid:
+        condition: service_healthy
+      aidos:
+        condition: service_healthy
+      aletheia:
         condition: service_healthy
     profiles: ["full"]
 
