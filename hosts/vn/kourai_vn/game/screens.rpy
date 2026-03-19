@@ -265,6 +265,8 @@ screen quick_menu():
             textbutton _("Q.Save") action QuickSave()
             textbutton _("Q.Load") action QuickLoad()
             textbutton _("Prefs") action ShowMenu('preferences')
+            textbutton _("Journal") action ShowMenu('forge_journal')
+            textbutton _("Project") action ShowMenu('project_selection')
 
 
 ## This code ensures that the quick_menu screen is displayed in-game, whenever
@@ -435,7 +437,75 @@ screen thinking():
 
     ## Ren'Py only redraws when something changes; force periodic refresh so
     ## status text updates land immediately without requiring a click.
-    timer 0.4 repeat True action RestartInteraction()
+    timer 0.4 repeat True action Function(renpy.restart_interaction)
+
+
+## Agent Choice screen ###########################################################
+##
+## Shown when the bridge sends {"action": "choice", "choices": ["option A", "option B", ...]}
+## Displays up to 4 forge-styled choice buttons. The selected choice is returned
+## via bridge.send_message({"action": "choice", "choice": selected_text}).
+## Trigger: script.rpy checks for vn_response.action == "choice" and shows this screen.
+
+screen agent_choice(choices, speaker_name="Hephaestus", prompt="Choose your path"):
+    zorder 30
+    modal True
+
+    frame:
+        xalign 0.5
+        yalign 0.65
+        xmaximum 700
+        xminimum 400
+        background "#1A1610F0"
+        padding (32, 20, 32, 20)
+
+        vbox:
+            spacing 8
+            xfill True
+
+            ## Prompt label
+            text prompt:
+                color gui.accent_color
+                size gui.text_size
+                xalign 0.5
+
+            null height 8
+
+            ## Choice buttons
+            for choice_text in choices:
+                textbutton choice_text:
+                    action Return(choice_text)
+                    xfill True
+                    background "#2A1800CC"
+                    hover_background "#FF950033"
+                    padding (16, 10)
+                    text_style "choice_button_text"
+
+style choice_button_text:
+    color "#F0E8D0"
+    size gui.text_size
+    hover_color gui.accent_color
+    xalign 0.0
+
+
+## Agent Portrait screen ########################################################
+##
+## Displays the current speaking agent's portrait on the left side of the screen.
+## Portrait assets live at game/images/portraits/{agent_id}_{state}.png.
+## Falls back to neutral state if the requested state image is missing.
+## Call: renpy.show_screen("agent_portrait", agent_id="techne", state="neutral")
+## Hide: renpy.hide_screen("agent_portrait")
+
+screen agent_portrait(agent_id="hephaestus", state="neutral"):
+    zorder 5
+
+    ## Portrait anchor: lower-left, overlapping the textbox just enough for
+    ## the Jen Zee / Hades style of characters rising from below the frame.
+    add _portrait_image(agent_id, state):
+        xalign 0.0
+        yalign 1.0
+        xoffset 40
+        yoffset -160
 
 
 ################################################################################
@@ -807,11 +877,21 @@ screen file_slots(title):
 
                         add FileScreenshot(slot) xalign 0.5
 
+                        $ save_portrait = FileJson(slot, "agent_portrait", empty=None)
+                        if save_portrait:
+                            # Safely attempt to load portrait
+                            if renpy.loadable("images/portraits/" + save_portrait + ".png"):
+                                add "images/portraits/" + save_portrait + ".png" zoom 0.25 xalign 0.0 yalign 0.0
+
                         text FileTime(slot, format=_("{#file_time}%A, %B %d %Y, %H:%M"), empty=_("empty slot")):
                             style "slot_time_text"
 
                         text FileSaveName(slot):
                             style "slot_name_text"
+                            
+                        $ save_note = FileJson(slot, "save_note", empty="")
+                        if save_note:
+                            text save_note style "slot_time_text" italic True
 
                         key "save_delete" action FileDelete(slot)
 
@@ -1783,3 +1863,41 @@ style slider_vbox:
 style slider_slider:
     variant "small"
     xsize 900
+
+## Forge Journal screen ########################################################
+
+screen forge_journal():
+    tag menu
+    # _get_virtue_text() is defined in init python in script.rpy.
+    # It runs once when the screen opens (not every render frame).
+    $ virtue_text = _get_virtue_text()
+    use game_menu(_("Forge Journal"), scroll="viewport"):
+        vbox:
+            spacing 20
+            text "The Forge Observes" size 30 color "#D4AF37" bold True
+            text virtue_text size 20 color "#E8E8E8"
+
+## Project Selection screen ####################################################
+
+screen project_selection():
+    tag menu
+    use game_menu(_("Project Selection"), scroll="viewport"):
+        vbox:
+            spacing 20
+            text "Select Active Project" size 30 color "#D4AF37" bold True
+            
+            text "Current Project Path:" size 20 color "#E8E8E8"
+            $ current_path = getattr(renpy.persistent, "project_path", "None selected")
+            text current_path size 18 color "#A0A0A0"
+            
+            null height 20
+            
+            text "Enter new absolute path to project directory:" size 20 color "#E8E8E8"
+            
+            # Simple text input for project path
+            button:
+                action ui.callsinnewcontext("project_input_label")
+                background Frame(Solid("#3A2A00"), 2, 2)
+                xsize 600 ysize 50
+                text "Click to set path" align (0.5, 0.5) color "#D4AF37"
+

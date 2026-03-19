@@ -7,6 +7,7 @@ needing to manage HTTP connections or ports directly.
 import asyncio
 import json
 import logging
+import re
 import sys
 from pathlib import Path
 from typing import cast
@@ -17,12 +18,31 @@ from a2a.client import A2ACardResolver, ClientConfig, ClientFactory
 from a2a.types import Message, Part, Role, TaskArtifactUpdateEvent, TaskStatusUpdateEvent, TextPart
 
 from kourai_common.config import get_agent_url
+from kourai_common.facts import process_agent_output
 
 # Configure logging to both stderr and a file
 PROJECT_ROOT = Path(__file__).parent.parent
 LOG_DIR = PROJECT_ROOT / "logs"
 LOG_DIR.mkdir(exist_ok=True)
 LOG_FILE = LOG_DIR / "bridge_agents.log"
+
+# Agent names for attribution tracking
+AGENT_NAMES = {
+    "hephaestus",
+    "techne",
+    "kallos",
+    "metis",
+    "dokimasia",
+    "mneme",
+    "puck",
+    "cupid",
+    "aidos",
+    "aletheia",
+}
+
+# Status keywords that are meaningful enough to surface as dialogue beats
+# (rather than silently updating the "thinking" overlay)
+DIALOGUE_KEYWORDS = ["pipeline:", "dispatching", "complete", "failed", "error"]
 
 
 def setup_logging() -> logging.Logger:
@@ -45,6 +65,74 @@ def setup_logging() -> logging.Logger:
 
 
 log = setup_logging()
+
+
+def _infer_portrait_state(agent: str, text: str) -> str:
+    """Infer portrait emotional state from text content.
+
+    Maps key emotional signals to per-agent portrait state names.
+    All states fall back to "neutral" if the asset doesn't exist —
+    handled by validate_portrait_state() in script.rpy.
+    """
+    lower = text.lower()
+
+    # Vulnerability / warmth signals → "vulnerable" state
+    vulnerable_signals = [
+        "i'm glad",
+        "i care",
+        "i appreciate",
+        "thank you",
+        "means a lot",
+        "i worry",
+        "proud of you",
+        "you did well",
+        "nicely done",
+        "well done",
+        "good work",
+        "i noticed",
+        "honest with you",
+        "vulnerable",
+    ]
+    if any(sig in lower for sig in vulnerable_signals):
+        return "vulnerable"
+
+    # Per-agent tertiary states from PORTRAIT_GENERATION_GUIDE.md
+    tertiary: dict[str, tuple[list[str], str]] = {
+        "hephaestus": (["approved", "well done", "as expected", "good"], "approving"),
+        "techne": (["analyzing", "let me check", "running", "executing", "compiling"], "focused"),
+        "kallos": (
+            ["style violation", "messy", "inconsistent", "beautiful", "elegant", "clean"],
+            "appraising",
+        ),
+        "metis": (
+            ["consider", "the architecture", "planning", "structure", "design"],
+            "contemplating",
+        ),
+        "dokimasia": (
+            ["test", "assertion", "coverage", "failure", "passing", "green"],
+            "scrutinizing",
+        ),
+        "mneme": (
+            ["remember", "recorded", "stored", "history", "last time", "recall"],
+            "remembering",
+        ),
+    }
+
+    signals, state = tertiary.get(agent, ([], "neutral"))
+    if any(sig in lower for sig in signals):
+        return state
+
+    return "neutral"
+
+
+def _paginate(text: str) -> list[str]:
+    """Split text into sentence-level dialogue beats.
+
+    Splits on sentence boundaries (.!?) so each beat fits a Ren'Py dialogue
+    box without walls of text. Empty sentences are discarded.
+    """
+    sentences = re.split(r"(?<=[.!?])\s+", text.strip())
+    return [s.strip() for s in sentences if s.strip()]
 
 
 async def main() -> None:
@@ -89,11 +177,52 @@ async def main() -> None:
 
             log.info(f"Received from Ren'Py: {line[:200]}")
             request = json.loads(line)
-            user_text = request.get("text", "")
 
+            # Handle resume action (sent after save/load reconnect)
+            action = request.get("action", "message")
+
+            # Handle player choice selection — sent when player picks from a
+            # choice screen. The choice text is forwarded as a new user message.
+            if action == "choice":
+                choice_text = request.get("choice", "")
+                if choice_text:
+                    # Treat the chosen option as the player's next message
+                    request = {
+                        "action": "message",
+                        "text": choice_text,
+                        "context_id": request.get("context_id", ""),
+                        "player_id": request.get("player_id", ""),
+                    }
+                    action = "message"
+                    log.info(f"Choice selected: {choice_text!r}")
+                else:
+                    continue
+
+            if action == "resume":
+                resume_context = request.get("context_id")
+                if resume_context:
+                    context_id = resume_context
+                    log.info(f"Resuming context: {context_id}")
+                out = {"action": "status", "message": "The forge rekindles. Context restored."}
+                print(json.dumps(out))  # noqa: T201 - IPC to Ren'Py subprocess
+                sys.stdout.flush()
+                continue
+
+            user_text = request.get("text", "")
             if not user_text:
                 log.warning("Empty message received from Ren'Py")
                 continue
+
+            # Use context_id from the message if provided (supports save/load slots)
+            msg_context_id = request.get("context_id", "").strip()
+            if msg_context_id:
+                context_id = msg_context_id
+
+            # Track player_id for fact storage (sent by script.rpy with every message)
+            current_player_id = request.get("player_id", "").strip()
+
+            # Track which agent is currently active — reset per request
+            current_agent = "hephaestus"
 
             # Create A2A message
             message = Message(
@@ -109,9 +238,15 @@ async def main() -> None:
                     text = "\n".join(p.root.text for p in event.parts if hasattr(p.root, "text"))
                     if text:
                         log.info(f"Sending direct response to Ren'Py: {text[:100]}...")
-                        msg = {"agent": "hephaestus", "message": text, "portrait": "neutral"}
-                        print(json.dumps(msg))  # noqa: T201 - IPC to Ren'Py subprocess
-                        sys.stdout.flush()
+                        portrait_state = _infer_portrait_state(current_agent, text)
+                        for beat in _paginate(text):
+                            msg = {
+                                "agent": current_agent,
+                                "message": beat,
+                                "portrait": portrait_state,
+                            }
+                            print(json.dumps(msg))  # noqa: T201 - IPC to Ren'Py subprocess
+                            sys.stdout.flush()
                         found_artifact = True
                     continue
 
@@ -120,7 +255,6 @@ async def main() -> None:
                     task, update = event
 
                     if isinstance(update, TaskStatusUpdateEvent):
-                        # Forward status updates to Ren'Py for "Thinking" UI
                         status_msg = ""
                         if update.status.message and hasattr(update.status.message, "parts"):
                             status_msg = "\n".join(
@@ -129,12 +263,32 @@ async def main() -> None:
                                 if hasattr(p.root, "text")
                             )
 
-                        if status_msg:
-                            log.info(f"Status update: {status_msg[:100]}")
-                            # Forward to Ren'Py so the thinking screen can show live progress
+                        if not status_msg:
+                            continue
+
+                        # Step 1 — Infer active agent from status message content
+                        lower = status_msg.lower()
+                        for name in AGENT_NAMES:
+                            if name in lower:
+                                current_agent = name
+                                break
+
+                        log.info(f"Status update (agent={current_agent}): {status_msg[:100]}")
+
+                        # Step 2 — Promote key pipeline events to dialogue beats;
+                        # everything else stays as a lightweight thinking overlay
+                        if any(kw in lower for kw in DIALOGUE_KEYWORDS):
+                            out = {
+                                "agent": "hephaestus",
+                                "message": status_msg[:200],
+                                "portrait": "neutral",
+                            }
+                            log.info(f"Promoting status to dialogue beat: {status_msg[:60]}")
+                        else:
                             out = {"action": "status", "message": status_msg[:120]}
-                            print(json.dumps(out))  # noqa: T201 - IPC to Ren'Py subprocess
-                            sys.stdout.flush()
+
+                        print(json.dumps(out))  # noqa: T201 - IPC to Ren'Py subprocess
+                        sys.stdout.flush()
 
                     elif isinstance(update, TaskArtifactUpdateEvent):
                         if update.artifact and update.artifact.parts:
@@ -144,15 +298,26 @@ async def main() -> None:
                                 if hasattr(p.root, "text")
                             )
                             if text:
-                                log.info(f"Artifact received! Sending to Ren'Py: {text[:100]}...")
-                                # Send final message to Ren'Py
-                                msg = {
-                                    "agent": "hephaestus",
-                                    "message": text,
-                                    "portrait": "neutral",
-                                }
-                                print(json.dumps(msg))  # noqa: T201 - IPC to Ren'Py subprocess
-                                sys.stdout.flush()
+                                log.info(
+                                    f"Artifact received (agent={current_agent})! "
+                                    f"Sending to Ren'Py: {text[:100]}..."
+                                )
+                                # Extract <FACT> tags (player personalization) and strip them
+                                # from the displayed text before forwarding to Ren'Py.
+                                text = process_agent_output(
+                                    text, current_player_id, source_agent=current_agent
+                                )
+                                # Step 3 & 4 — Attribute to correct agent, paginate sentences
+                                # Infer portrait state from first beat's content (full text context)
+                                portrait_state = _infer_portrait_state(current_agent, text)
+                                for beat in _paginate(text):
+                                    msg = {
+                                        "agent": current_agent,
+                                        "message": beat,
+                                        "portrait": portrait_state,
+                                    }
+                                    print(json.dumps(msg))  # noqa: T201 - IPC to Ren'Py subprocess
+                                    sys.stdout.flush()
                                 found_artifact = True
 
             if not found_artifact:

@@ -226,3 +226,14 @@ class RenPyBridge:
             with contextlib.suppress(Exception):
                 self.process.terminate()
         self._log("Bridge shutdown.")
+
+    def __getstate__(self) -> dict:
+        """Ren'Py save system (pickle) hook — only persist the script path.
+        The subprocess, threads, and queues cannot be pickled and must be
+        restarted after load via the after_load label in script.rpy.
+        """
+        return {"agent_script": self.agent_script}
+
+    def __setstate__(self, state: dict) -> None:
+        """Ren'Py load hook — reconstruct a fresh (not-started) bridge."""
+        self.__init__(agent_script=state.get("agent_script", "agents/vn_bridge.py"))
