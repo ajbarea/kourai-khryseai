@@ -9,6 +9,7 @@ from __future__ import annotations
 import datetime
 import inspect
 import logging
+import re
 import uuid
 from collections.abc import AsyncIterable
 from dataclasses import dataclass, field
@@ -61,14 +62,52 @@ Response format — reply with EXACTLY ONE of these:
    Example: CHAT: The forge is always hot. What brings you here today?
 
 3. CHAT:<agent_name>: <routing note> — when the player wants to talk to a specific
-   maiden (e.g., "@kallos", "talk to Dokimasia", "bring me Techne").
+   maiden (e.g., "@kallos", "talk to Dokimasia", "bring me Techne"),
+   or summon a companion spirit (e.g., "@puck", "where's Cupid", "I need advice about Kallos").
+   Companion spirits: puck (tutorial/nudge), cupid (romance/emotional).
    Example: CHAT:kallos: Player wants to chat with Kallos.
+   Example: CHAT:puck: Player seems confused about the workflow.
+   Example: CHAT:cupid: Player is asking about relationship dynamics.
 
 4. ASK_USER: <your clarifying question> — when a development request is ambiguous.
 """
 
-# Agents available for routing
+# Agents available for routing (pipeline specialists)
 AVAILABLE_AGENTS = {"metis", "techne", "dokimasia", "kallos", "mneme"}
+
+# Companion spirits — routable via CHAT:<name>: prefix, not in pipelines
+COMPANION_AGENTS = {"puck", "cupid"}
+
+# @mention shorthand aliases — expand before routing so the LLM sees full names
+# Ordered longest-first to avoid partial matches (e.g. @heph before @he)
+_MENTION_ALIASES: list[tuple[re.Pattern, str]] = [
+    (re.compile(r"@hephaestus\b", re.IGNORECASE), "@hephaestus"),
+    (re.compile(r"@heph?\b", re.IGNORECASE), "@hephaestus"),
+    (re.compile(r"@techne\b", re.IGNORECASE), "@techne"),
+    (re.compile(r"@tech\b", re.IGNORECASE), "@techne"),
+    (re.compile(r"@dokimasia\b", re.IGNORECASE), "@dokimasia"),
+    (re.compile(r"@doki?\b", re.IGNORECASE), "@dokimasia"),
+    (re.compile(r"@kallos\b", re.IGNORECASE), "@kallos"),
+    (re.compile(r"@kal\b", re.IGNORECASE), "@kallos"),
+    (re.compile(r"@metis\b", re.IGNORECASE), "@metis"),
+    (re.compile(r"@met\b", re.IGNORECASE), "@metis"),
+    (re.compile(r"@mneme\b", re.IGNORECASE), "@mneme"),
+    (re.compile(r"@mne?\b", re.IGNORECASE), "@mneme"),
+    (re.compile(r"@puck\b", re.IGNORECASE), "@puck"),
+    (re.compile(r"@cupid\b", re.IGNORECASE), "@cupid"),
+]
+
+
+def expand_mentions(text: str) -> str:
+    """Expand @shorthand aliases to canonical agent names.
+
+    Allows players to type ``@doki`` instead of ``@dokimasia``.
+    The expanded text is sent to the routing LLM so it can reliably detect
+    agent-directed chat.
+    """
+    for pattern, replacement in _MENTION_ALIASES:
+        text = pattern.sub(replacement, text)
+    return text
 
 
 @dataclass
@@ -101,6 +140,9 @@ async def determine_pipeline(user_request: str, context_id: str | None = None) -
         List of agent names in execution order, or a string starting
         with "ASK_USER:" or "CHAT:" if not a dev task.
     """
+    # Expand @mention shorthands before sending to LLM for reliable detection
+    user_request = expand_mentions(user_request)
+
     with create_span("hephaestus.route", {"request_length": str(len(user_request))}):
         # Inject player identity into routing prompt for personalized responses
         profile = PlayerProfile.load()

@@ -15,7 +15,14 @@ from kourai_common.a2a_utils import extract_file_attachments
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
 from kourai_common.messaging import send_input_required, send_working_status
+from kourai_common.player import (
+    PlayerProfile,
+    get_affinity_tier,
+    get_all_affinities,
+    update_affinity,
+)
 from kourai_common.tracing import create_span
+from kourai_common.virtues import update_virtue
 
 log = logging.getLogger(__name__)
 
@@ -60,7 +67,7 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
                 emoji=AGENT_EMOJI["hephaestus"],
             )
 
-            pipeline = await determine_pipeline(user_input)
+            pipeline = await determine_pipeline(user_input, context_id=task.context_id)
 
             # Handle non-pipeline responses
             if isinstance(pipeline, str):
@@ -76,8 +83,17 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
                 if pipeline.startswith("CHAT:"):
                     chat_body = pipeline.removeprefix("CHAT:").strip()
                     # Check for agent-directed chat: "CHAT:kallos: ..."
+                    # Includes companion spirits puck and cupid
                     target_agent = None
-                    for agent_name in ("metis", "techne", "dokimasia", "kallos", "mneme"):
+                    for agent_name in (
+                        "metis",
+                        "techne",
+                        "dokimasia",
+                        "kallos",
+                        "mneme",
+                        "puck",
+                        "cupid",
+                    ):
                         prefix = f"{agent_name}:"
                         if chat_body.lower().startswith(prefix):
                             target_agent = agent_name
@@ -118,6 +134,20 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
                     )
                     await updater.complete()
                     log.info("Hephaestus chat — target: %s", target_agent or "self")
+
+                    # Update affinity for the agent that spoke
+                    _responding_agent = target_agent or "hephaestus"
+                    _profile = PlayerProfile.load()
+                    if _profile:
+                        _new_score = update_affinity(
+                            _profile.player_id, _responding_agent, delta=0.02
+                        )
+                        log.info(
+                            "Affinity updated: %s → %.2f (tier %d)",
+                            _responding_agent,
+                            _new_score,
+                            get_affinity_tier(_new_score),
+                        )
                     return
 
             # Step 2: Report the pipeline (pipeline must be list[str] here)
@@ -185,6 +215,42 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
             )
             await updater.complete()
             log.info("Hephaestus pipeline completed: %s", pipeline_display)
+
+            # Virtue update: completed pipeline → Sophia (quality of intent)
+            _profile = PlayerProfile.load()
+            if _profile:
+                update_virtue(_profile.player_id, "sophia", 0.005)
+                update_virtue(_profile.player_id, "synergy", 0.005)
+
+            # Update affinity for each agent that participated in the pipeline
+            if _profile:
+                for _agent_name in pipeline:
+                    _new_score = update_affinity(_profile.player_id, _agent_name, delta=0.01)
+                    log.debug(
+                        "Affinity updated: %s → %.2f (tier %d)",
+                        _agent_name,
+                        _new_score,
+                        get_affinity_tier(_new_score),
+                    )
+
+                # Task 4: Jealousy Trigger Check (>0.3 delta)
+                all_aff = get_all_affinities(_profile.player_id)
+                if len(all_aff) > 1:
+                    scores = [a["affinity_score"] for a in all_aff.values()]
+                    if max(scores) - min(scores) > 0.3:
+                        # Find top and bottom agents for the message
+                        sorted_agents = sorted(
+                            all_aff.items(), key=lambda x: x[1]["affinity_score"], reverse=True
+                        )
+                        top_agent = sorted_agents[0][0]
+                        bottom_agent = sorted_agents[-1][0]
+
+                        await send_working_status(
+                            updater,
+                            task,
+                            f"CHAT:cupid: Jealousy triggered — {top_agent} is far ahead of {bottom_agent}.",
+                            emoji="💘",
+                        )
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
         raise ServerError(error=UnsupportedOperationError())
