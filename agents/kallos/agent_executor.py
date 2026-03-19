@@ -10,10 +10,13 @@ from a2a.server.tasks import TaskUpdater
 from a2a.types import DataPart, Part, Task, TextPart, UnsupportedOperationError
 from a2a.utils.errors import ServerError
 
+from agents.aidos.agent import analyze_slop, flag_slop_words
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
 from kourai_common.messaging import send_working_status
+from kourai_common.player import PlayerProfile
 from kourai_common.tracing import create_span
+from kourai_common.virtues import update_virtue
 
 log = logging.getLogger(__name__)
 
@@ -69,6 +72,19 @@ class KallosAgentExecutor(BaseAgentExecutor):
             else:
                 final_output = f"✨ Linting completed with issues.\n\n{final_output}"
 
+            # Run Aidos slop detection on the fix output (comments/docstrings)
+            slop_words = flag_slop_words(final_output)
+            if slop_words:
+                await send_working_status(
+                    updater,
+                    task,
+                    f"Aidos: {len(slop_words)} slop word(s) found — {', '.join(slop_words[:3])}",
+                    emoji="🚫",
+                )
+                slop_analysis = await analyze_slop(final_output, context_id=task.context_id)
+                if slop_analysis != "CLEAN":
+                    final_output += f"\n\n[Aidos — Language Review]\n{slop_analysis}"
+
             # Emit both human-readable text and machine-readable structured data
             await updater.add_artifact(
                 [
@@ -81,6 +97,12 @@ class KallosAgentExecutor(BaseAgentExecutor):
             status = "all clean" if all_clean else "issues remain"
             await updater.complete()
             log.info("Kallos completed — %s", status)
+
+            # Virtue update: clean lint pass → Techne (craft precision)
+            _profile = PlayerProfile.load()
+            if _profile:
+                _delta = 0.01 if all_clean else 0.005
+                update_virtue(_profile.player_id, "techne_v", _delta)
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
         raise ServerError(error=UnsupportedOperationError())
