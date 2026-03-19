@@ -78,6 +78,10 @@ KOURAI_PROVIDER=local
         | 🧪 Dokimasia | Claude Haiku 4.5 |
         | ✨ Kallos | Claude Haiku 4.5 |
         | 📜 Mneme | Claude Haiku 4.5 |
+        | 🎭 Puck | Claude Haiku 4.5 |
+        | 💘 Cupid | Claude Haiku 4.5 |
+        | 🪞 Aidos | Claude Haiku 4.5 |
+        | 📚 Aletheia | Claude Haiku 4.5 |
 
     === "`standard`"
 
@@ -91,6 +95,10 @@ KOURAI_PROVIDER=local
         | 🧪 Dokimasia | Claude Haiku 4.5 | Test execution is mostly subprocess |
         | ✨ Kallos | Claude Haiku 4.5 | Mostly subprocess work; LLM only for comment analysis |
         | 📜 Mneme | Claude Haiku 4.5 | Commit messages are structured and formulaic |
+        | 🎭 Puck | Claude Haiku 4.5 | Companion dialogue — fast and light |
+        | 💘 Cupid | Claude Haiku 4.5 | Relationship coaching — fast and light |
+        | 🪞 Aidos | Claude Haiku 4.5 | Regex pre-screening handles most work |
+        | 📚 Aletheia | Claude Sonnet 4.6 | Research validation benefits from reasoning |
 
     === "`smart`"
 
@@ -104,6 +112,10 @@ KOURAI_PROVIDER=local
         | 🧪 Dokimasia | Claude Sonnet 4.6 | Test generation needs code understanding |
         | ✨ Kallos | Claude Sonnet 4.6 | Higher quality comment analysis |
         | 📜 Mneme | Claude Sonnet 4.6 | Better commit message grouping |
+        | 🎭 Puck | Claude Haiku 4.5 | Companion dialogue — personality over power |
+        | 💘 Cupid | Claude Sonnet 4.6 | Deeper emotional context building |
+        | 🪞 Aidos | Claude Haiku 4.5 | Fast regex screening, no heavy reasoning needed |
+        | 📚 Aletheia | Claude Sonnet 4.6 | Research validation benefits from reasoning |
 
 === "Google (Gemini) :material-google:"
 
@@ -111,9 +123,12 @@ KOURAI_PROVIDER=local
 
     | Tier | Model | Claude equivalent |
     |---|---|---|
-    | `cheap` | Gemini 2.0 Flash | Haiku 4.5 |
+    | `cheap` | Gemini 2.0 Flash (all agents) | Haiku 4.5 |
     | `standard` | Gemini 2.5 Pro (heavy) / Flash (light) | Sonnet 4.6 / Haiku 4.5 |
-    | `smart` | Gemini 2.5 Pro | Opus 4.6 |
+    | `smart` | Gemini 2.5 Pro (all agents) | Opus 4.6 |
+
+    !!! warning "Google free tier"
+        Free tier prompts are used to improve Google's products. Switch to Paid tier in AI Studio to opt out.
 
 === "Local / Ollama :material-server: (free)"
 
@@ -121,12 +136,10 @@ KOURAI_PROVIDER=local
 
     | Agent | Model | VRAM |
     |---|---|---|
-    | 🔥 Hephaestus | llama3.3:70b | ~40GB |
-    | 📐 Metis | llama3.3:70b | ~40GB |
-    | ⚙️ Techne | llama3.3:70b | ~40GB |
+    | 🔥 Hephaestus, 📐 Metis, ⚙️ Techne | llama3.3:70b | ~40GB |
     | 🧪 Dokimasia | qwen2.5-coder:32b | ~20GB |
-    | ✨ Kallos | llama3.3:8b | ~5GB |
-    | 📜 Mneme | llama3.3:8b | ~5GB |
+    | ✨📜🎭💘🪞 Others | llama3.3:8b | ~5GB |
+    | 📚 Aletheia | llama3.3:70b | ~40GB |
 
     No per-token charges. You pay electricity and hardware only.
 
@@ -144,6 +157,10 @@ Each agent runs on a fixed port:
 | Dokimasia | `10003` | `http://localhost:10003/.well-known/agent-card.json` |
 | Kallos | `10004` | `http://localhost:10004/.well-known/agent-card.json` |
 | Mneme | `10005` | `http://localhost:10005/.well-known/agent-card.json` |
+| Puck | `10006` | `http://localhost:10006/.well-known/agent-card.json` |
+| Cupid | `10007` | `http://localhost:10007/.well-known/agent-card.json` |
+| Aidos | `10008` | `http://localhost:10008/.well-known/agent-card.json` |
+| Aletheia | `10009` | `http://localhost:10009/.well-known/agent-card.json` |
 
 ---
 
@@ -155,10 +172,14 @@ Per-agent timeouts are defined in `shared/src/kourai_common/config.py`:
 |---|---|---|
 | Agent card fetch | 5s | Initial connection to discover agent capabilities |
 | Mneme | 30s | Lightweight commit message generation |
+| Puck | 30s | Companion dialogue |
 | Kallos | 60s | Linting is fast; comment analysis takes longer |
+| Cupid | 60s | Relationship context building |
+| Aidos | 60s | Anti-slop analysis |
 | Techne | 120s | Code generation with large context |
 | Dokimasia | 120s | Test generation and execution |
 | Metis | 120s | Spec generation with project context |
+| Aletheia | 120s | Research validation with claim checking |
 | Full pipeline | 600s | End-to-end timeout for the CLI |
 
 ---
@@ -176,23 +197,9 @@ Agents use Docker's internal DNS to resolve service names within the `kourai` br
 
 ---
 
----
-
 ## Text-to-Speech Configuration
 
-The GUI includes a full text-to-speech system with neural voices and real-time audio control. Configure it in `~/.kourai_khryseai/settings.json` or through the settings overlay (`Press S` in GUI).
-
-### TTS Dependencies
-
-Automatically installed with `make setup`:
-
-```toml
-[project]
-dependencies = [
-    "edge-tts>=0.30.0",           # Microsoft neural voice synthesis
-    "pygame-ce>=2.5.0",            # Enhanced audio mixer (community edition)
-]
-```
+The Pygame GUI includes a full text-to-speech system with neural voices and real-time audio control. Configure it in `~/.kourai_khryseai/settings.json` or through the settings overlay.
 
 ### TTS Settings
 
@@ -214,50 +221,7 @@ dependencies = [
 | **SLOW** | 3.0s | Light-novel style, immersive |
 | **CUSTOM** | User-defined | Custom millisecond-based timing |
 
-### Voice Personality Profiles
-
-Each agent's voice is optimized for personality. Customize per-agent characteristics through the TTS settings:
-
-```json
-{
-  "tts_agent_voices": {
-    "hephaestus": {"voice": "Guy", "speed": 0.95, "pitch": 1.0},
-    "metis": {"voice": "Aria", "speed": 0.90, "pitch": 1.1},
-    "kallos": {"voice": "Jenny", "speed": 1.05, "pitch": 1.15},
-    "mneme": {"voice": "Michelle", "speed": 0.92, "pitch": 0.95},
-    "techne": {"voice": "Sonia", "speed": 0.93, "pitch": 1.05},
-    "dokimasia": {"voice": "Aria", "speed": 0.88, "pitch": 1.0}
-  }
-}
-```
-
-### Audio Quality Settings
-
-**Sample Rate:** 44.1 kHz (CD quality) — fixed for compatibility  
-**Depth:** 16-bit — fixed for quality  
-**Format:** MP3 — ~90% smaller than WAV, still high quality  
-**Buffer:** 512 bytes — <100ms latency  
-
-### Advanced Features
-
-**Volume Normalization:**
-- Peak normalization prevents clipping
-- RMS loudness normalization ensures consistency
-- Automatic loudness metering in LUFS (professional standard)
-
-**Fade Effects:**
-- Smooth fade-in for dialogue start
-- Fade-out for transitions
-- Configurable fade duration (100-500ms)
-
-**Real-Time Control:**
-- Adjust volume while speaking: `engine.set_master_volume(0.6)`
-- Modulate pitch on-the-fly: `await engine.speak(text, pitch=1.2)`
-- Adjust speed: `await engine.speak(text, speed=1.3)`
-
-### For Technical Details
-
-See [Architecture → TTS System](architecture/tts.md) for complete API reference, audio processing pipeline, performance metrics, and advanced usage examples.
+See [GUI Reference](gui.md#text-to-speech-system-) for voice profiles and audio customization.
 
 ---
 
@@ -268,8 +232,8 @@ See [Architecture → TTS System](architecture/tts.md) for complete API referenc
 | `make setup` | Install all dependencies (`uv sync --all-packages`) |
 | `make cli` | Launch the interactive CLI client |
 | `make gui` | Launch the visual GUI with voice synthesis |
-| `make up` | Start all agents in Docker + Jaeger + Prometheus (build + wait healthy) |
-| `make down` | Stop all Docker containers from the full profile |
+| `make up` | Start all agents in Docker + Jaeger + Prometheus |
+| `make down` | Stop all Docker containers |
 | `make status` | Show Docker service status and health |
 | `make lint` | Run ruff + mypy |
 | `make test` | Run linters + full test suite with coverage |

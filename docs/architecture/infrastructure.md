@@ -4,7 +4,7 @@
 
 ### Distributed Tracing
 
-Every A2A call creates an OpenTelemetry span. W3C Trace Context headers are propagated via A2A message `metadata`, allowing Jaeger to stitch traces across all six agents into a single view.
+Every A2A call creates an OpenTelemetry span. W3C Trace Context headers are propagated via A2A message `metadata`, allowing Jaeger to stitch traces across all ten agents into a single view.
 
 **Span naming convention:**
 
@@ -54,8 +54,8 @@ Multi-stage build: builder installs deps with `uv`, runtime copies only the venv
 `docker-compose.yml` defines all agents + infrastructure with profiles:
 
 - **No profile** — Jaeger + Prometheus only
-- **`agents`** — All five specialists
-- **`full`** — Specialists + Hephaestus (depends on all others)
+- **`agents`** — All nine specialists (core + companion spirits + quality validators)
+- **`full`** — All specialists + Hephaestus orchestrator (depends on all others)
 
 Environment variable `KOURAI_AGENT_HOST=true` is set automatically in Docker, switching URL resolution to service names.
 

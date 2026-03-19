@@ -4,7 +4,7 @@
 
 Kourai Khryseai is built around **transparency** and **interactivity**:
 
-- **Specialization**: Each agent handles one discipline (planning, coding, testing, style, commits). Specialists are focused and use appropriate model tiers.
+- **Specialization**: Each agent handles one discipline — planning, coding, testing, style, commits, companionship, romance, quality screening, or research validation. Specialists are focused and use appropriate model tiers.
 - **Real-time feedback**: Agents stream their work as it happens. You don't wait for "final output"—you see reasoning in progress.
 - **Human-on-the-loop**: When decisions matter (architecture choices, scope boundaries, validation rules), agents ask. You're never out of control.
 - **Composable**: Agents are independent HTTP services. They can be deployed separately, tested independently, or replaced with custom implementations.
@@ -17,27 +17,44 @@ Kourai Khryseai is built around **transparency** and **interactivity**:
 ```mermaid
 flowchart TD
     CLI["🖥️ <b>CLI REPL</b><br/><code>make cli</code>"]
-    HEP["🔥 <b>HEPHAESTUS</b><br/>Orchestrator · :10000<br/><i>LLM routing · pipeline · context accumulation</i>"]
-    MET["📐 <b>METIS</b><br/>Planner · :10001"]
-    TEC["⚙️ <b>TECHNE</b><br/>Coder · :10002"]
-    DOK["🧪 <b>DOKIMASIA</b><br/>Tester · :10003"]
-    KAL["✨ <b>KALLOS</b><br/>Stylist · :10004"]
-    MNE["📜 <b>MNEME</b><br/>Scribe · :10005"]
+    GUI["🎮 <b>Pygame GUI</b><br/><code>make gui</code>"]
+    VN["📖 <b>Ren'Py VN</b><br/>Hades-inspired"]
+    HEP["🔥 <b>HEPHAESTUS</b><br/>Orchestrator · :10000<br/><i>LLM routing · pipeline · context</i>"]
+
+    subgraph core ["Core Specialists"]
+        MET["📐 <b>METIS</b><br/>Planner · :10001"]
+        TEC["⚙️ <b>TECHNE</b><br/>Coder · :10002"]
+        DOK["🧪 <b>DOKIMASIA</b><br/>Tester · :10003"]
+        KAL["✨ <b>KALLOS</b><br/>Stylist · :10004"]
+        MNE["📜 <b>MNEME</b><br/>Scribe · :10005"]
+    end
+
+    subgraph spirits ["Companion Spirits"]
+        PUC["🎭 <b>PUCK</b><br/>Guide · :10006"]
+        CUP["💘 <b>CUPID</b><br/>Romance · :10007"]
+    end
+
+    subgraph validators ["Quality Validators"]
+        AID["🪞 <b>AIDOS</b><br/>Anti-Slop · :10008"]
+        ALE["📚 <b>ALETHEIA</b><br/>Research · :10009"]
+    end
+
     JAE["🔍 <b>JAEGER</b><br/>:16686 UI · :4318 OTLP"]
     PRO["📊 <b>PROMETHEUS</b><br/>:9090 UI · Metrics"]
 
     CLI -->|"A2A message/stream (SSE)"| HEP
+    GUI -->|"A2A message/stream (SSE)"| HEP
+    VN -->|"JSON IPC (subprocess)"| HEP
     HEP -->|"A2A blocking"| MET
     HEP -->|"A2A blocking"| TEC
     HEP -->|"A2A blocking"| DOK
     HEP -->|"A2A blocking"| KAL
     HEP -->|"A2A blocking"| MNE
+    HEP -->|"A2A on-demand"| PUC
+    HEP -->|"A2A on-demand"| CUP
+    HEP -->|"A2A on-demand"| AID
+    HEP -->|"A2A on-demand"| ALE
     HEP -.->|"OTLP traces"| JAE
-    MET -.-> JAE
-    TEC -.-> JAE
-    DOK -.-> JAE
-    KAL -.-> JAE
-    MNE -.-> JAE
     JAE <-->|"RED metrics (SPM)"| PRO
 ```
 
@@ -47,7 +64,7 @@ flowchart TD
 
 ### User ↔ Hephaestus: Streaming (SSE)
 
-The CLI connects to Hephaestus using A2A `message/stream` with Server-Sent Events. This means you see real-time progress as each agent reports status — not a single response after everything finishes.
+All three hosts (CLI, Pygame GUI, Ren'Py VN) connect to Hephaestus using A2A `message/stream` with Server-Sent Events. This means you see real-time progress as each agent reports status — not a single response after everything finishes. The VN uses a subprocess JSON IPC bridge that translates between Ren'Py and the A2A protocol.
 
 ```python
 # CLI sends a streaming request
