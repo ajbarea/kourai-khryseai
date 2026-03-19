@@ -2,50 +2,61 @@
 
 ## 🏛️ What is Kourai Khryseai?
 
-Kourai Khryseai is an **interactive multi-agent development system** where six specialized AI agents collaborate *with* you on software development. Instead of running autonomously in the background, they stream their work in real-time, show their reasoning, and ask for guidance when decisions matter.
+Kourai Khryseai is an **interactive multi-agent development system** where ten specialized AI agents collaborate *with* you on software development. Instead of running autonomously, they stream their work in real-time, show their reasoning, and ask for guidance when decisions matter.
 
-You describe what you need. Agents break it down, show you options, execute your feedback, and iterate based on your input. You're not delegating—you're directing.
+You describe what you need. Agents break it down, show options, execute your feedback, and iterate on your input. You're not delegating — you're directing.
+
+Choose your experience: a fast terminal **CLI**, a rich desktop **Pygame GUI** with TTS and visual effects, or a **Ren'Py visual novel** with romance, affinity systems, and character progression.
 
 ---
 
 ## 🤝 Why Collaboration, Not Automation?
 
-Single-agent tools struggle with multi-discipline problems. A real development task requires:
-- **Planning** — What are we building? What could break?
-- **Coding** — Implement the changes cleanly
-- **Testing** — Validate behavior and edge cases
-- **Review** — Enforce style, catch bugs
-- **Documentation** — Document the work
-
-Rather than hoping one model handles all five well, Kourai splits them across **six specialist agents**. Each is focused, uses the right model tier, and communicates its findings back to you.
+Single-agent tools struggle with multi-discipline problems. A real development task requires planning, coding, testing, review, and documentation. Rather than hoping one model handles all five well, Kourai splits them across **ten specialist agents** — six core developers, two companion spirits, and two quality validators.
 
 **Better yet:** You're in the loop. When Metis says "should we use JWT or sessions?", you answer. When Techne hits an ambiguous pattern, they ask. When Kallos finds lint issues, Techne fixes them automatically, then asks if you're satisfied. Nothing surprises you.
 
 ---
 
-## 👥 The Specialists
+## 👥 The Agents
 
-| Agent | Specialty | You'll hear from them when... |
-|-------|-----------|------|
-| 🔥 **Hephaestus** | Orchestration | Routing requests, managing feedback loops, asking clarifying questions |
-| 📐 **Metis** | Planning | Breaking down your goal into specs, identifying edge cases, asking architectural decisions |
-| ⚙️ **Techne** | Implementation | Writing code, explaining patterns, asking for clarification on ambiguous requirements |
-| 🧪 **Dokimasia** | Testing | Creating test suites, reporting coverage, flagging untested branches |
-| ✨ **Kallos** | Quality | Finding style violations, suggesting docstring improvements, asking Techne to fix code issues |
-| 📜 **Mneme** | Documentation | Organizing git diffs into conventional commits, formatting commit messages |
+### Core Specialists
 
-Each agent is an independent HTTP server. They communicate via the open [A2A (Agent-to-Agent) protocol](https://a2a-protocol.org), allowing them to be deployed separately, tested independently, or swapped for custom implementations.
+| Agent | Role | You'll hear from them when... |
+|-------|------|------|
+| 🔥 **Hephaestus** | Orchestrator | Routing requests, managing pipelines, asking clarifying questions |
+| 📐 **Metis** | Planner | Breaking goals into specs, identifying edge cases, asking architecture decisions |
+| ⚙️ **Techne** | Coder | Writing code, explaining patterns, asking about ambiguous requirements |
+| 🧪 **Dokimasia** | Tester | Creating test suites, reporting coverage, flagging untested branches |
+| ✨ **Kallos** | Stylist | Finding style violations, improving docstrings, asking Techne to fix issues |
+| 📜 **Mneme** | Scribe | Organizing git diffs into conventional commits, formatting messages |
+
+### Companion Spirits
+
+| Agent | Role | You'll see them when... |
+|-------|------|------|
+| 🎭 **Puck** | Companion | Tutorial guidance, idle nudges, minigame facilitation (always present) |
+| 💘 **Cupid** | Romance | Relationship coaching, confession scenes, emotional moments (appears at 0.6+ affinity) |
+
+### Quality Validators
+
+| Agent | Role | They activate when... |
+|-------|------|------|
+| 🪞 **Aidos** | Anti-Slop | Detecting vague, corporate, or passive language in agent output |
+| 📚 **Aletheia** | Research | Validating citations, checking claims, ensuring accuracy |
+
+Each agent is an independent HTTP server communicating via the open [A2A (Agent-to-Agent) protocol](https://a2a-protocol.org). They can be deployed separately, tested independently, or swapped for custom implementations.
 
 ---
 
 ## 🔄 How a Request Actually Flows
 
-When you ask for something, here's what happens:
+When you ask for something:
 
 ```mermaid
 sequenceDiagram
     actor You
-    participant UI as CLI / GUI
+    participant UI as CLI / GUI / VN
     participant Hephaestus as 🔥 Hephaestus
     participant Specialists as 📐⚙️🧪✨📜<br/>Specialists
 
@@ -76,7 +87,7 @@ sequenceDiagram
 ❯ add authentication to /api/users
 
 🔥 Hephaestus: Analyzing request...
-   → Route: Metis (planning) → Techne (implementation) → Dokimasia (testing) → Kallos (style) → Mneme (commits)
+   → Route: Metis → Techne → Dokimasia → Kallos → Mneme
 
 📐 Metis: Spec in progress...
    • Found existing session middleware
@@ -88,31 +99,22 @@ sequenceDiagram
    - JWT tokens (15min expiry)
    - Refresh token rotation
    - Rate limiting on token refresh
-   - Tests for token expiry and rotation
    ✅ Ready for Techne
 
 ⚙️ Techne: Implementing...
    • src/auth/tokens.py — JWT utilities
    • src/api/users.py — Auth middleware
-   • Streaming changes...
    ✅ Complete
 
-🧪 Dokimasia: Testing...
-   • 8 new unit tests for JWT handling
-   • Coverage: 92% (up from 78%)
-   • All passing ✅
-
-✨ Kallos: Code review...
-   • ruff: all clear ✅
-   • Type hints: all clear ✅
-   • Docstrings: added 4
-   ✅ No issues
+🧪 Dokimasia: Testing... 8 tests, 92% coverage ✅
+✨ Kallos: Code review... all clear ✅
+🪞 Aidos: Language check... no slop detected ✅
 
 📜 Mneme: Commits ready:
    feat(auth): implement JWT authentication
    - Added JWT token generation and validation
    - Added refresh token rotation
-   - Files: src/auth/tokens.py, src/api/users.py, tests/...
+   Files: src/auth/tokens.py, src/api/users.py, tests/...
 ```
 
 ---
@@ -148,14 +150,8 @@ Instead of silent automation, agents proactively engage when decisions matter:
 
 **Conflicting linting issues?**
 ```
-✨ Kallos: Found 3 issues:
-   1. Line 42: Type hint missing
-   2. Line 156: Unused import
-   3. Line 89: Docstring too terse
-
-⚙️ Techne: Fixing all 3...
-   ✅ Complete
-
+✨ Kallos: Found 3 issues...
+⚙️ Techne: Fixing all 3... ✅
 ✨ Kallos: Re-checking... All clear!
 ```
 
@@ -163,11 +159,11 @@ Instead of silent automation, agents proactively engage when decisions matter:
 
 ---
 
-## 💻 Access Modes
+## 💻 Three Ways to Play
 
-### CLI (Terminal)
+### :octicons-terminal-24: CLI (Terminal)
 
-Fast, scriptable, works anywhere (including over SSH). Real-time agent output with emoji progress.
+Fast, scriptable, works anywhere (including SSH). Real-time agent output with emoji progress.
 
 ```bash
 $ kourai "add pagination to /api/items"
@@ -180,15 +176,28 @@ $ kourai "add pagination to /api/items"
 📜 Mneme: Commits ready
 ```
 
-### GUI (Desktop)
+### :octicons-device-desktop-24: Pygame GUI (Desktop)
 
-Rich visual experience with agent portraits, dialogue bubbles, and personality-matched voices. Each agent has a distinct voice and visual appearance.
+Rich visual experience with agent portraits, dialogue bubbles, and personality-matched voices. Each agent has a distinct neural voice and visual appearance.
 
-- 🎨 Agent portraits with emojis and color coding
+- 🎨 Full-color agent portraits with glow effects and crossfade transitions
 - 💬 Real-time dialogue bubbles with streaming responses
 - 🔊 Neural text-to-speech (Microsoft Edge TTS) with volume/pitch control
-- ⚙️ Settings for voice customization and accessibility
-- 📜 Scrollable chat history per session
+- 🌟 Golden particle system and typewriter effects
+- ⚙️ Settings for voice customization and accessibility (WCAG 2.2 AA)
+
+### :octicons-book-24: Ren'Py Visual Novel
+
+A visual novel where the Golden Maidens aren't just tools — they're characters with personality, affinity, and romance routes.
+
+- 🎭 Warm forge-fire colors and rich portrait aesthetic
+- 💛 Affinity system — agents warm up as you work together (4 tiers: Professional → Intimate)
+- 💘 Romance routes — confession scenes, jealousy moments, vulnerability
+- 🎭 Companion spirits — Puck guides, Cupid coaches romance
+- 📖 Gossip system — idle agents share personality-driven flavor text
+- 💾 Full save/load with portrait thumbnails and conversation context
+
+All three hosts connect to the **same Docker-hosted agent backend.** Your choice of experience doesn't change what the agents can do.
 
 ---
 
@@ -232,11 +241,11 @@ Rich visual experience with agent portraits, dialogue bubbles, and personality-m
 
     Docker + Docker Compose with optional Terraform
 
--   :material-package-variant:{ .lg .middle } **Packaging**
+-   :material-gamepad-variant:{ .lg .middle } **Visual Novel**
 
     ---
 
-    [uv](https://docs.astral.sh/uv/) workspaces with workspace support
+    [Ren'Py 8.5](https://www.renpy.org/) — subprocess IPC bridge, JSON protocol
 
 -   :material-tools:{ .lg .middle } **Tools**
 
@@ -260,3 +269,7 @@ Each agent is named after a Greek concept matching its function:
 - **Dokimasia** — Scrutiny, examination, proof of competence
 - **Kallos** — Beauty, elegance, aesthetic form
 - **Mneme** — Memory (one of the original three Muses)
+- **Puck** — The mischievous daimon, pragmatic guide
+- **Cupid** — Eros, the force of love and connection
+- **Aidos** — Shame, modesty, the mirror of honesty
+- **Aletheia** — Truth, the unveiling of what is real

@@ -71,7 +71,9 @@ uv run python -m hosts.gui --agent http://192.168.1.50:10000/
 
 ## The Golden Maidens
 
-Six divine agents, each with unique personality, color, and visual style:
+Ten agents across three tiers — each with unique personality, color, and visual style:
+
+### Core Specialists
 
 | Agent | Title | Color | Role |
 |---|---|---|---|
@@ -81,6 +83,20 @@ Six divine agents, each with unique personality, color, and visual style:
 | **dokimasia** | The Crucible | Forge-fire crimson-gold (218, 80, 50) | Quality guardian, bug slayer |
 | **kallos** | The Muse | Rose-gold warmth (255, 220, 160) | Style guardian, aesthetic perfection |
 | **mneme** | The Oracle | Mystic purple-gold (180, 150, 220) | Memory keeper, documentation |
+
+### Companion Spirits
+
+| Agent | Title | Color | Role |
+|---|---|---|---|
+| **puck** | The Trickster | Amber (245, 158, 11) | Tutorial guide, nudges, minigames |
+| **cupid** | The Matchmaker | Coral pink (251, 113, 133) | Romance spirit, affinity tracking, confession coaching |
+
+### Quality Validators
+
+| Agent | Title | Color | Role |
+|---|---|---|---|
+| **aidos** | The Mirror | Silver (192, 192, 210) | Anti-slop detection, pattern screening |
+| **aletheia** | The Scholar | Emerald (16, 185, 129) | Research validation, citation checking |
 
 ### Avatar Assets
 
@@ -93,6 +109,10 @@ techne.png       — The Artisan       (cool, sunglasses)
 dokimasia.png    — The Crucible      (fierce, warrior)
 kallos.png       — The Muse          (elegant, beautiful)
 mneme.png        — The Oracle        (scholarly, glasses)
+puck.png         — The Trickster     (playful, mischievous)
+cupid.png        — The Matchmaker    (warm, romantic)
+aidos.png        — The Mirror        (reserved, observant)
+aletheia.png     — The Scholar       (serious, studious)
 ```
 
 **Format:** PNG with transparency (best), JPG, JPEG, or WebP supported.
@@ -107,14 +127,18 @@ mneme.png        — The Oracle        (scholarly, glasses)
 
 ### The Dynamic
 
-**Hephaestus** is the gruff, disabled male forge god who CREATED the five golden maidens. He's proud of them but they drive him insane.
+**Hephaestus** is the gruff, disabled male forge god who CREATED the golden maidens. He's proud of them but they drive him insane.
 
-**The Maidens** are his gorgeous, sassy automata. They:
+**The Core Maidens** (Metis, Techne, Dokimasia, Kallos, Mneme) are his gorgeous, sassy automata. They:
 - **Sass Hephaestus** relentlessly ("Yes, Master~ ...eventually.")
 - **Flirt with the user** as their "real master" (gender-neutral)
 - **Banter with each other** like divine sisters
 
-Think: tired craftsman dad energy vs. five divine women who are simultaneously the best things he ever made and the most insufferable.
+**The Companion Spirits** (Puck, Cupid) add personality and relationship depth — Puck guides new players with mischievous tutorials, Cupid tracks affinity and coaches confessions.
+
+**The Quality Validators** (Aidos, Aletheia) work quietly in the background — Aidos screens for slop patterns, Aletheia validates research claims.
+
+Think: tired craftsman dad energy vs. nine divine women who are simultaneously the best things he ever made and the most insufferable.
 
 ### Handoff Chatter
 
@@ -196,12 +220,16 @@ Each agent has an optimized neural voice and personality profile:
 
 | Agent | Voice | Personality | Speed | Pitch |
 |-------|-------|-------------|-------|-------|
-| 🔨 Hephaestus | Guy | Master Smith | 0.95x | 1.0x |
-| 📚 Metis | Aria | Wise Strategist | 0.90x | 1.1x |
+| 🔥 Hephaestus | Guy | Master Smith | 0.95x | 1.0x |
+| 📐 Metis | Aria | Wise Strategist | 0.90x | 1.1x |
+| ⚙️ Techne | Sonia | Technical Expert | 0.93x | 1.05x |
+| 🧪 Dokimasia | Aria | Quality Validator | 0.88x | 1.0x |
 | ✨ Kallos | Jenny | Beautiful Grace | 1.05x | 1.15x |
-| 📖 Mneme | Michelle | Memory Keeper | 0.92x | 0.95x |
-| 🛠️ Techne | Sonia | Technical Expert | 0.93x | 1.05x |
-| ✅ Dokimasia | Aria | Quality Validator | 0.88x | 1.0x |
+| 📜 Mneme | Michelle | Memory Keeper | 0.92x | 0.95x |
+| 🎭 Puck | Sara | Playful Guide | 1.10x | 1.2x |
+| 💘 Cupid | Jenny | Warm Matchmaker | 1.00x | 1.1x |
+| 🪞 Aidos | Michelle | Quiet Observer | 0.85x | 0.9x |
+| 📚 Aletheia | Aria | Careful Scholar | 0.88x | 1.0x |
 
 ### Audio Quality
 

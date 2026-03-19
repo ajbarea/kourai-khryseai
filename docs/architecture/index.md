@@ -18,7 +18,7 @@ Kourai Khryseai is built around **transparency** and **interactivity**:
 flowchart TD
     CLI["🖥️ <b>CLI REPL</b><br/><code>make cli</code>"]
     GUI["🎮 <b>Pygame GUI</b><br/><code>make gui</code>"]
-    VN["📖 <b>Ren'Py VN</b><br/>Hades-inspired"]
+    VN["📖 <b>Ren'Py VN</b><br/>Visual Novel"]
     HEP["🔥 <b>HEPHAESTUS</b><br/>Orchestrator · :10000<br/><i>LLM routing · pipeline · context</i>"]
 
     subgraph core ["Core Specialists"]
