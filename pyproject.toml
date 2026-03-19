@@ -34,6 +34,8 @@ exclude = ["**/__pycache__"]
 
 [tool.uv.sources]
 kourai-common = { workspace = true }
+kourai-aidos = { workspace = true }
+kourai-aletheia = { workspace = true }
 
 [tool.ruff]
 line-length = 100

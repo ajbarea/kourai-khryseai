@@ -1,6 +1,6 @@
 [project]
 site_name = "Kourai Khryseai"
-site_description = "Interactive multi-agent development. Collaborate with six specialized AI agents in real-time—you guide each step, they show their work, iterate on feedback."
+site_description = "Ten AI agents, three ways to play. Collaborate with specialized agents in real-time through CLI, Pygame GUI, or a Ren'Py visual novel."
 site_author = "AJ Barea"
 copyright = "AJ Barea &middot; 2026"
 extra_css = ["stylesheets/extra.css"]
@@ -23,8 +23,11 @@ nav = [
       { "Infrastructure" = "architecture/infrastructure.md" },
       { "TTS System" = "architecture/tts.md" },
   ]},
-  { "CLI Reference" = "cli.md" },
-  { "GUI Reference" = "gui.md" },
+  { "Experiences" = [
+      { "CLI Reference" = "cli.md" },
+      { "GUI Reference" = "gui.md" },
+      { "VN Reference" = "vn.md" },
+  ]},
   { "Configuration" = "configuration.md" },
   { "Pricing" = "pricing.md" },
   { "Style Guides" = [

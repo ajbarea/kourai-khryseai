@@ -16,6 +16,10 @@ MODELS_CHEAP = {
     "dokimasia": "anthropic/claude-haiku-4-5-20251001",
     "kallos": "anthropic/claude-haiku-4-5-20251001",
     "mneme": "anthropic/claude-haiku-4-5-20251001",
+    "puck": "anthropic/claude-haiku-4-5-20251001",
+    "cupid": "anthropic/claude-haiku-4-5-20251001",
+    "aidos": "anthropic/claude-haiku-4-5-20251001",
+    "aletheia": "anthropic/claude-haiku-4-5-20251001",
 }
 
 MODELS_STANDARD = {
@@ -25,6 +29,10 @@ MODELS_STANDARD = {
     "dokimasia": "anthropic/claude-haiku-4-5-20251001",
     "kallos": "anthropic/claude-haiku-4-5-20251001",
     "mneme": "anthropic/claude-haiku-4-5-20251001",
+    "puck": "anthropic/claude-haiku-4-5-20251001",
+    "cupid": "anthropic/claude-haiku-4-5-20251001",
+    "aidos": "anthropic/claude-haiku-4-5-20251001",
+    "aletheia": "anthropic/claude-sonnet-4-6",
 }
 
 MODELS_SMART = {
@@ -34,6 +42,10 @@ MODELS_SMART = {
     "dokimasia": "anthropic/claude-sonnet-4-6",
     "kallos": "anthropic/claude-sonnet-4-6",
     "mneme": "anthropic/claude-sonnet-4-6",
+    "puck": "anthropic/claude-haiku-4-5-20251001",
+    "cupid": "anthropic/claude-sonnet-4-6",
+    "aidos": "anthropic/claude-haiku-4-5-20251001",
+    "aletheia": "anthropic/claude-sonnet-4-6",
 }
 
 # Google Gemini model tiers — mapped to Claude capability equivalents
@@ -44,6 +56,10 @@ MODELS_CHEAP_GOOGLE = {
     "dokimasia": "gemini/gemini-2.0-flash",
     "kallos": "gemini/gemini-2.0-flash",
     "mneme": "gemini/gemini-2.0-flash",
+    "puck": "gemini/gemini-2.0-flash",
+    "cupid": "gemini/gemini-2.0-flash",
+    "aidos": "gemini/gemini-2.0-flash",
+    "aletheia": "gemini/gemini-2.0-flash",
 }
 
 MODELS_STANDARD_GOOGLE = {
@@ -53,6 +69,10 @@ MODELS_STANDARD_GOOGLE = {
     "dokimasia": "gemini/gemini-2.0-flash",
     "kallos": "gemini/gemini-2.0-flash",
     "mneme": "gemini/gemini-2.0-flash",
+    "puck": "gemini/gemini-2.0-flash",
+    "cupid": "gemini/gemini-2.0-flash",
+    "aidos": "gemini/gemini-2.0-flash",
+    "aletheia": "gemini/gemini-2.0-flash",
 }
 
 MODELS_SMART_GOOGLE = {
@@ -62,6 +82,10 @@ MODELS_SMART_GOOGLE = {
     "dokimasia": "gemini/gemini-2.5-pro",
     "kallos": "gemini/gemini-2.5-pro",
     "mneme": "gemini/gemini-2.5-pro",
+    "puck": "gemini/gemini-2.0-flash",
+    "cupid": "gemini/gemini-2.5-pro",
+    "aidos": "gemini/gemini-2.0-flash",
+    "aletheia": "gemini/gemini-2.5-pro",
 }
 
 # Local dev models (Ollama) — free, no API key needed
@@ -72,6 +96,10 @@ AGENT_MODELS_LOCAL = {
     "dokimasia": "ollama/qwen2.5-coder:32b",
     "kallos": "ollama/llama3.3:8b",
     "mneme": "ollama/llama3.3:8b",
+    "puck": "ollama/llama3.3:8b",
+    "cupid": "ollama/llama3.3:8b",
+    "aidos": "ollama/llama3.3:8b",
+    "aletheia": "ollama/llama3.3:70b",
 }
 
 AGENT_PORTS = {
@@ -81,6 +109,10 @@ AGENT_PORTS = {
     "dokimasia": 10003,
     "kallos": 10004,
     "mneme": 10005,
+    "puck": 10006,
+    "cupid": 10007,
+    "aidos": 10008,
+    "aletheia": 10009,
 }
 
 # Timeouts per agent (seconds)
@@ -91,6 +123,10 @@ AGENT_TIMEOUTS = {
     "techne": 120.0,
     "dokimasia": 120.0,
     "metis": 120.0,
+    "puck": 30.0,
+    "cupid": 60.0,
+    "aidos": 60.0,
+    "aletheia": 120.0,
     "hephaestus_pipeline": 600.0,
 }
 
