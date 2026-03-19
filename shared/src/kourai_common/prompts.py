@@ -45,6 +45,7 @@ UNIVERSAL_RULES = """
 5. EMOJIS: Use emojis in markdown output
 6. PYTHON: 100 char lines, modern type hints, Google docstrings
 7. COMMENTS: WHY not WHAT, Research citations for algorithms
+8. FACT EXTRACTION: If you learn something new about the player (e.g., preference, identity, skill, context, goal, personality), embed it anywhere in your response using this tag format: <FACT category="preference" confidence="high">Player prefers X</FACT>. The tag will be parsed and hidden from the player.
 """
 
 
