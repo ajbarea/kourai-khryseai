@@ -15,7 +15,9 @@ from kourai_common.a2a_utils import extract_image_parts
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
 from kourai_common.messaging import send_working_status
+from kourai_common.player import PlayerProfile
 from kourai_common.tracing import create_span
+from kourai_common.virtues import update_virtue
 
 log = logging.getLogger(__name__)
 
@@ -95,6 +97,12 @@ class DokimasiaAgentExecutor(BaseAgentExecutor):
                 status = "all passed" if all_passed else "failures remain"
                 await updater.complete()
                 log.info("Dokimasia completed — %s", status)
+
+                # Virtue update: passing tests → Arete (excellence-seeking)
+                _profile = PlayerProfile.load()
+                if _profile:
+                    _delta = 0.015 if all_passed else 0.005  # partial credit for trying
+                    update_virtue(_profile.player_id, "arete", _delta)
 
             else:
                 # Stream test generation with inner-thought updates

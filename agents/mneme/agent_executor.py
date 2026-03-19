@@ -11,11 +11,15 @@ from a2a.server.tasks import TaskUpdater
 from a2a.types import DataPart, Part, Task, TextPart, UnsupportedOperationError
 from a2a.utils.errors import ServerError
 
+from agents.aidos.agent import analyze_slop, flag_slop_words
+from agents.aletheia.agent import find_unsupported_claims, validate_research
 from agents.mneme.agent import generate_commit_messages_stream
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
 from kourai_common.messaging import send_working_status
+from kourai_common.player import PlayerProfile
 from kourai_common.tracing import create_span
+from kourai_common.virtues import update_virtue
 
 log = logging.getLogger(__name__)
 
@@ -126,6 +130,46 @@ class MnemeAgentExecutor(BaseAgentExecutor):
                 )
             ]
 
+            # Aidos: scan commit lines for slop language and append findings to the artifact.
+            # Running on artifact_body (the commit messages) is correct — commit messages
+            # can contain "seamless integration", "robust solution", etc.
+            slop_words = flag_slop_words(artifact_body)
+            if slop_words:
+                await send_working_status(
+                    updater,
+                    task,
+                    f"Aidos: {len(slop_words)} slop word(s) detected — reviewing",
+                    emoji="🚫",
+                )
+                slop_analysis = await analyze_slop(artifact_body, context_id=task.context_id)
+                if slop_analysis != "CLEAN":
+                    # Append to artifact so the player sees concrete replacement suggestions
+                    artifact_body += f"\n\n---\n**Aidos — Language Review**\n{slop_analysis}"
+
+            # Aletheia: validate research claims in the *spoken narrative only*.
+            # Commit subject lines don't cite research — Big-O notation in a perf commit
+            # is description, not an unsupported claim. Only the prose intro might assert
+            # things that need backing (e.g., "This is proven best practice").
+            if spoken_intro:
+                unsupported = find_unsupported_claims(spoken_intro)
+                if unsupported:
+                    await send_working_status(
+                        updater,
+                        task,
+                        f"Aletheia: {len(unsupported)} unsupported claim(s) in narrative",
+                        emoji="🏛️",
+                    )
+                    research_analysis = await validate_research(
+                        spoken_intro, context_id=task.context_id
+                    )
+                    if research_analysis != "VERIFIED":
+                        await send_working_status(
+                            updater,
+                            task,
+                            f"Aletheia: {research_analysis[:120]}",
+                            emoji="🏛️",
+                        )
+
             # Emit both human-readable text and machine-readable structured data
             await updater.add_artifact(
                 [
@@ -144,6 +188,12 @@ class MnemeAgentExecutor(BaseAgentExecutor):
                 name="commit_messages",
             )
             await updater.complete()
+
+            # Virtue update: generating commits → Mneia (memory and continuity)
+            _profile = PlayerProfile.load()
+            if _profile and commit_groups:
+                update_virtue(_profile.player_id, "mneia", 0.01 * len(commit_groups))
+
             log.info(
                 "Mneme completed — generated %d commit groups",
                 len(commit_groups),

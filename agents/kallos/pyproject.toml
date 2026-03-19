@@ -5,6 +5,7 @@ description = "Style agent — linting, formatting, comment cleanup"
 requires-python = ">=3.12"
 dependencies = [
     "kourai-common",
+    "kourai-aidos",
     "ruff>=0.9",
     "mypy>=1.15.0",
 ]

@@ -3,7 +3,7 @@ name = "kourai-mneme"
 version = "0.1.0"
 description = "Scribe agent — generates commit message groups"
 requires-python = ">=3.12"
-dependencies = ["kourai-common"]
+dependencies = ["kourai-common", "kourai-aidos", "kourai-aletheia"]
 
 [build-system]
 requires = ["hatchling"]
