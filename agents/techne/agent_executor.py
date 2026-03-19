@@ -20,9 +20,11 @@ from kourai_common.a2a_utils import extract_image_parts
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
 from kourai_common.messaging import send_working_status
+from kourai_common.player import PlayerProfile
 from kourai_common.stack import looks_like_scaffolding
 from kourai_common.subprocess import parse_and_apply_fixes
 from kourai_common.tracing import create_span
+from kourai_common.virtues import update_virtue
 
 log = logging.getLogger(__name__)
 
@@ -152,6 +154,12 @@ class TechneAgentExecutor(BaseAgentExecutor):
             )
             await updater.complete()
             log.info("Techne completed — applied %d fixes to disk", fixes_applied)
+
+            # Virtue update: applying code fixes → Techne_v (craft precision)
+            if fixes_applied > 0:
+                _profile = PlayerProfile.load()
+                if _profile:
+                    update_virtue(_profile.player_id, "techne_v", 0.01 * min(fixes_applied, 5))
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
         raise ServerError(error=UnsupportedOperationError())

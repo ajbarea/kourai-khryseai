@@ -14,6 +14,7 @@ from typing import Any
 
 from anyio import Path as AnyioPath
 
+from kourai_common.file_ops import PathViolation, validate_file_path
 from kourai_common.llm import chat, chat_stream
 from kourai_common.player import get_enriched_system_prompt
 from kourai_common.prompts import CURRENT_DATE, build_system_prompt
@@ -138,18 +139,29 @@ async def read_files(file_paths: list[str]) -> dict[str, str]:
     }
 
 
-async def write_file(file_path: str, content: str) -> bool:
+async def write_file(file_path: str, content: str, project_root: str | None = None) -> bool:
     """Write content to a file, creating parent directories if needed.
 
     Args:
         file_path: Path to write to.
         content: File content.
+        project_root: If provided, the path is validated to be inside this
+            directory.  Writes that escape the project root are rejected.
 
     Returns:
         True if successful.
     """
     try:
-        path = AnyioPath(file_path)
+        if project_root:
+            try:
+                safe_path = validate_file_path(project_root, file_path)
+            except PathViolation as exc:
+                log.error("Path safety violation — rejecting write: %s", exc)
+                return False
+            path = AnyioPath(str(safe_path))
+        else:
+            path = AnyioPath(file_path)
+
         await path.parent.mkdir(parents=True, exist_ok=True)
         await path.write_text(content, encoding="utf-8")
         log.info("Wrote %d bytes to %s", len(content), file_path)
