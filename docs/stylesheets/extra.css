@@ -166,6 +166,27 @@ body.hero-page .md-content__inner {
   box-shadow: none !important;
 }
 
+/* Hero experience mode strip — CLI | GUI | VN */
+.hero-experiences {
+  margin-top: 1.2rem;
+  margin-bottom: 0.5rem;
+}
+
+.hero-modes {
+  font-size: clamp(0.7rem, 1.2vw, 0.85rem);
+  font-weight: 400;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  opacity: 0.7;
+  margin: 0;
+}
+
+.hero-modes .twemoji,
+.hero-modes .octicon {
+  vertical-align: -0.1em;
+  margin: 0 0.15em;
+}
+
 /* ==========================================================================
    Navigation — seamless with obsidian background
    ========================================================================== */
@@ -252,6 +273,50 @@ body.hero-page .md-header {
   border-bottom: 1px solid var(--glass-border);
 }
 
+/* Tables */
+.md-typeset table:not([class]) {
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.md-typeset table:not([class]) th {
+  background: color-mix(in srgb, var(--gold-mid) 12%, transparent);
+  color: var(--gold-light);
+  font-weight: 700;
+  padding: 0.6rem 0.8rem;
+  border-bottom: 2px solid var(--gold-dark);
+}
+
+.md-typeset table:not([class]) td {
+  padding: 0.5rem 0.8rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--gold-dark) 20%, transparent);
+}
+
+.md-typeset table:not([class]) tr:hover td {
+  background: color-mix(in srgb, var(--gold-mid) 5%, transparent);
+}
+
+/* Code blocks — slightly warmer */
+.md-typeset code {
+  color: var(--gold-light);
+  background: color-mix(in srgb, var(--gold-mid) 8%, transparent);
+  border-radius: 3px;
+  padding: 0.1em 0.3em;
+}
+
+/* Grid cards — gold border on hover */
+.md-typeset .grid.cards > ul > li:hover,
+.md-typeset .grid > .card:hover {
+  border-color: var(--gold-dark);
+  box-shadow: 0 4px 20px color-mix(in srgb, var(--gold-metallic) 15%, transparent);
+}
+
+/* Admonitions — gold-tinted */
+.md-typeset .admonition,
+.md-typeset details {
+  border-color: var(--gold-dark);
+}
+
 /* ==========================================================================
    Scrollbar
    ========================================================================== */
@@ -274,7 +339,7 @@ body.hero-page .md-header {
 }
 
 /* ==========================================================================
-   Mobile Responsive Rules
+   Mobile — Tablet (max-width: 768px)
    ========================================================================== */
 
 @media (max-width: 768px) {
@@ -289,7 +354,6 @@ body.hero-page .md-header {
         var(--obsidian) 95%),
       var(--hero-bg-image) center 48px / contain no-repeat;
     padding: 1rem 1.2rem 2rem;
-    /* Ensure dvh is used on real mobile browsers */
     height: 100vh;
     height: 100dvh;
   }
@@ -303,6 +367,7 @@ body.hero-page .md-header {
   .hero-subtitle {
     font-size: clamp(0.65rem, 2.5vw, 0.85rem);
     margin-bottom: 0.6rem;
+    padding: 0 0.5rem;
   }
 
   .hero-buttons {
@@ -314,12 +379,34 @@ body.hero-page .md-header {
 
   .hero-buttons .md-button {
     min-width: 0;
-    width: 60%;
-    max-width: 240px;
-    padding: 0.55rem 1.2rem !important;
-    font-size: 0.75rem !important;
+    width: 70%;
+    max-width: 260px;
+    padding: 0.6rem 1.2rem !important;
+    font-size: 0.78rem !important;
   }
-  
+
+  .hero-experiences {
+    margin-top: 0.8rem;
+  }
+
+  .hero-modes {
+    font-size: 0.65rem;
+    letter-spacing: 0.12em;
+  }
+
+  /* Tables scroll horizontally on mobile */
+  .md-typeset table:not([class]) {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    font-size: 0.78rem;
+  }
+
+  /* Tighten grid cards */
+  .md-typeset .grid.cards > ul > li {
+    padding: 0.8rem;
+  }
+
   /* Footer adjustments */
   .md-footer-meta__inner {
     display: flex !important;
@@ -337,18 +424,132 @@ body.hero-page .md-header {
     margin-top: 0 !important;
     padding: 0 !important;
   }
+
+  /* Mermaid diagrams scroll on mobile */
+  .mermaid {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 
-/* Extra-small screens (< 400px) */
-@media (max-width: 400px) {
+/* ==========================================================================
+   Mobile — Small phones (max-width: 480px)
+   ========================================================================== */
+
+@media (max-width: 480px) {
   .hero {
-    padding: 0.5rem 1rem 1.5rem;
+    padding: 0.5rem 0.8rem 1.5rem;
+  }
+
+  .md-typeset .hero h1,
+  .hero h1 {
+    font-size: clamp(1.4rem, 9vw, 2rem);
+    letter-spacing: -0.02em;
+  }
+
+  .hero-subtitle {
+    font-size: 0.62rem;
+    margin-bottom: 0.5rem;
   }
 
   .hero-buttons .md-button {
-    width: 60%;
+    width: 80%;
+    max-width: 220px;
     padding: 0.5rem 1rem !important;
-    font-size: 0.7rem !important;
+    font-size: 0.72rem !important;
+  }
+
+  .hero-modes {
+    font-size: 0.58rem;
+  }
+
+  /* Stack content more tightly */
+  .md-typeset h1:not(.hero h1) {
+    font-size: 1.4rem;
+  }
+
+  .md-typeset h2 {
+    font-size: 1.15rem;
+  }
+
+  .md-typeset h3 {
+    font-size: 1rem;
+  }
+
+  /* Code blocks don't overflow */
+  .md-typeset pre > code {
+    font-size: 0.75rem;
+  }
+}
+
+/* ==========================================================================
+   Mobile — Extra small (max-width: 360px)
+   ========================================================================== */
+
+@media (max-width: 360px) {
+  .hero {
+    padding: 0.3rem 0.6rem 1.2rem;
+  }
+
+  .hero-buttons .md-button {
+    width: 90%;
+    font-size: 0.68rem !important;
+    padding: 0.45rem 0.8rem !important;
+  }
+
+  .hero-modes {
+    font-size: 0.52rem;
+    letter-spacing: 0.08em;
+  }
+}
+
+/* ==========================================================================
+   Desktop — Wide screens (min-width: 1440px)
+   ========================================================================== */
+
+@media (min-width: 1440px) {
+  .hero {
+    padding-bottom: 6rem;
+  }
+
+  .md-typeset .hero h1,
+  .hero h1 {
+    font-size: 4rem;
+  }
+
+  .hero-subtitle {
+    font-size: 1.2rem;
+    max-width: 800px;
+  }
+
+  .hero-buttons .md-button {
+    min-width: 240px;
+    padding: 0.85rem 2.2rem !important;
+    font-size: 0.9rem !important;
+  }
+
+  .hero-modes {
+    font-size: 0.9rem;
+  }
+}
+
+/* ==========================================================================
+   Desktop — Ultra-wide (min-width: 1920px)
+   ========================================================================== */
+
+@media (min-width: 1920px) {
+  .hero {
+    padding-bottom: 8rem;
+  }
+
+  .md-typeset .hero h1,
+  .hero h1 {
+    font-size: 4.5rem;
+  }
+
+  .hero-subtitle {
+    font-size: 1.3rem;
   }
 }
 
