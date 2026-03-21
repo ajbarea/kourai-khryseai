@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 from a2a.server.agent_execution import RequestContext
 from a2a.server.events import EventQueue
@@ -10,7 +11,11 @@ from a2a.server.tasks import TaskUpdater
 from a2a.types import DataPart, Part, Task, TextPart, UnsupportedOperationError
 from a2a.utils.errors import ServerError
 
-from agents.dokimasia.agent import generate_tests_stream
+from agents.dokimasia.agent import (
+    generate_playwright_tests,
+    generate_tests_stream,
+    run_playwright,
+)
 from kourai_common.a2a_utils import extract_image_parts
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
@@ -46,8 +51,68 @@ class DokimasiaAgentExecutor(BaseAgentExecutor):
             is_run_request = any(
                 kw in input_lower for kw in ["run test", "make test", "pytest", "run all"]
             )
+            is_e2e_request = any(
+                kw in input_lower
+                for kw in ["e2e", "playwright", "frontend test", "browser test", "ui test"]
+            )
 
-            if is_run_request:
+            if is_e2e_request:
+                # Phase E1: Playwright E2E testing
+                await send_working_status(
+                    updater,
+                    task,
+                    "Generating Playwright E2E tests...",
+                    emoji="🎭",
+                )
+
+                # Generate E2E tests based on user input (feature description)
+                await generate_playwright_tests(
+                    page_source=user_input,
+                    page_name="e2e",
+                    context_id=task.context_id,
+                )
+
+                await send_working_status(
+                    updater,
+                    task,
+                    "Running Playwright tests in headless browser...",
+                    emoji="🎭",
+                )
+
+                # Run the generated tests
+                test_results = await run_playwright(
+                    test_path=user_input
+                    if user_input.endswith(".spec.ts") or user_input.endswith(".test.ts")
+                    else "e2e.spec.ts",
+                    cwd=str(Path.cwd()),
+                    extra_args=["--reporter=json"],
+                )
+
+                final_output = f"🎭 Playwright E2E Test Results\n\n{test_results}"
+                await updater.add_artifact(
+                    [
+                        Part(root=TextPart(text=final_output)),
+                        Part(
+                            root=DataPart(
+                                data={
+                                    "test_type": "e2e",
+                                    "framework": "playwright",
+                                    "output": test_results,
+                                }
+                            )
+                        ),
+                    ],
+                    name="e2e_test_results",
+                )
+                await updater.complete()
+                log.info("Dokimasia completed — ran Playwright E2E tests")
+
+                # Virtue update: E2E test run → arete
+                _profile = PlayerProfile.load()
+                if _profile:
+                    update_virtue(_profile.player_id, "arete", 0.01)
+
+            elif is_run_request:
                 from agents.dokimasia.agent import (
                     fix_test_issues,
                     run_pytest,
@@ -67,13 +132,20 @@ class DokimasiaAgentExecutor(BaseAgentExecutor):
                     result = await run_pytest(status_callback=_pytest_status)
                     return result.success, result.output
 
+                # Validate file paths against the current working directory (project root)
+                project_root = Path.cwd()
+
+                def _apply_fixes_with_validation(llm_output: str) -> int:
+                    """Apply fixes with path safety validation."""
+                    return parse_and_apply_fixes(llm_output, project_root=project_root)
+
                 # Run iterative test-fix loop with personality messages
                 all_passed, test_output, result = await run_fix_loop(
                     tool_name="pytest",
                     run_tool=_run_pytest_wrapper,
                     extract_files=extract_files_from_output,
                     fix_issues=fix_test_issues,
-                    apply_fixes=parse_and_apply_fixes,
+                    apply_fixes=_apply_fixes_with_validation,
                     updater=updater,
                     task=task,
                     emoji="🧪",
@@ -98,10 +170,12 @@ class DokimasiaAgentExecutor(BaseAgentExecutor):
                 await updater.complete()
                 log.info("Dokimasia completed — %s", status)
 
-                # Virtue update: passing tests → Arete (excellence-seeking)
+                # Virtue update: clean test run → arete (excellence-seeking)
                 _profile = PlayerProfile.load()
                 if _profile:
-                    _delta = 0.015 if all_passed else 0.005  # partial credit for trying
+                    _delta = (
+                        0.01 if all_passed else 0.005
+                    )  # full credit for passing, partial for trying
                     update_virtue(_profile.player_id, "arete", _delta)
 
             else:

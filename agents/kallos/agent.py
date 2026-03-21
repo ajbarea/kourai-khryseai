@@ -70,6 +70,20 @@ Add a brief personality touch at start/end (one line max)
 
 IMPORTANT: Before outputting any fixes, briefly plan your fixes by writing
 a TODO list based on the lint/type errors.
+
+PLAYER FACTS (Phase C1):
+Emit discoveries about the player in your responses using this format:
+  <FACT category="CATEGORY" confidence="LEVEL">Observed statement</FACT>
+
+Valid categories: preference, identity, skill, context, goal, personality
+Valid confidence: high (certain), medium (likely), low (hypothesis)
+
+Examples:
+  <FACT category="preference" confidence="high">Prefers docstrings over type hints</FACT>
+  <FACT category="skill" confidence="medium">Code is well-structured</FACT>
+
+These facts are extracted and stored for future context.
+Only emit what their code style clearly demonstrates.
 """,
 )
 

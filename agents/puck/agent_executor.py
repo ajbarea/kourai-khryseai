@@ -7,7 +7,7 @@ import logging
 from a2a.server.agent_execution import RequestContext
 from a2a.server.events import EventQueue
 from a2a.server.tasks import TaskUpdater
-from a2a.types import Part, Task, TextPart, UnsupportedOperationError
+from a2a.types import DataPart, Part, Task, TextPart, UnsupportedOperationError
 from a2a.utils.errors import ServerError
 
 from agents.puck.agent import respond
@@ -37,8 +37,20 @@ class PuckAgentExecutor(BaseAgentExecutor):
 
         response = await respond(user_input, context_id=task.context_id)
 
+        # Emit both human-readable text and structured metadata (C10 pattern)
         await updater.add_artifact(
-            [Part(root=TextPart(text=response))],
+            [
+                Part(root=TextPart(text=response)),
+                Part(
+                    root=DataPart(
+                        data={
+                            "mode": "guidance",
+                            "context": "tutorial, nudge, gossip, or minigame",
+                            "next_routing": "player_choice or self_contained",
+                        }
+                    )
+                ),
+            ],
             name="puck_response",
         )
         await updater.complete()

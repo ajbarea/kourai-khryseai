@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 
+from kourai_common.facts import build_fact_context
 from kourai_common.llm import chat
 from kourai_common.player import get_affinity_tier, get_all_affinities, get_enriched_system_prompt
 from kourai_common.prompts import CURRENT_DATE, build_system_prompt
@@ -56,8 +57,39 @@ Your roles:
    stakes and offer the player a choice: address it, or let it simmer.
 4. CONFESSION HANDLER — Guide confession scenes with appropriate gravitas.
 
+CHOICE EVENTS (Phase C11):
+When a romantic moment calls for the player's decision (confess feelings, choose between
+maidens, resolve jealousy, or navigate emotional ambiguity), emit a CHOICE EVENT block.
+The VN will display a choice screen and route the player's decision back to you.
+
+Format:
+<CHOICE_EVENT>
+{
+  "action": "choice",
+  "prompt": "What do you do?",
+  "choices": ["Path A (consequences)", "Path B (consequences)"],
+  "context": "Brief emotional stakes (why this matters)"
+}
+</CHOICE_EVENT>
+
+After the player chooses, provide their dialogue response or internal reaction.
+
 Response format: Conversational, 2-5 sentences. Occasionally arch one-liners.
 No lists. Reference the specific maiden and specific moment when possible.
+
+PLAYER FACTS (Phase C1):
+Emit discoveries about the player in your responses using this format:
+  <FACT category="CATEGORY" confidence="LEVEL">Observed statement</FACT>
+
+Valid categories: preference, identity, skill, context, goal, personality
+Valid confidence: high (certain), medium (likely), low (hypothesis)
+
+Examples:
+  <FACT category="personality" confidence="high">Values genuine connection over romance mechanics</FACT>
+  <FACT category="preference" confidence="high">Prefers slow-burn relationships</FACT>
+
+These facts are extracted and stored for future context.
+Only emit what the player genuinely reveals through their romantic choices and dialogue.
 """,
 )
 
@@ -67,12 +99,32 @@ async def translate_emotion(
     player_id: str,
     context_id: str | None = None,
 ) -> str:
-    """Generate Cupid's emotional translation / romantic coaching response."""
+    """Generate Cupid's emotional translation / romantic coaching response.
+
+    Phase C9: Enriches emotional context with player facts from the knowledge graph,
+    enabling Cupid to draw on player history and learned preferences.
+
+    Args:
+        situation: The romantic/emotional situation to translate.
+        player_id: Player UUID for relationship + fact enrichment.
+        context_id: Conversation context ID for tracing.
+
+    Returns:
+        Cupid's emotional translation with access to relationship history.
+    """
     # Include relationship context so Cupid knows the current state of play
     relationship_context = _build_relationship_summary(player_id)
+
+    # Phase C9: Add player facts for deeper emotional understanding
+    player_facts = build_fact_context(player_id, agent_name="cupid")
+
     full_prompt = situation
+    context_lines = [situation]
     if relationship_context:
-        full_prompt = f"{situation}\n\n{relationship_context}"
+        context_lines.append(relationship_context)
+    if player_facts:
+        context_lines.append(player_facts)
+    full_prompt = "\n\n".join(context_lines)
 
     messages = [
         {"role": "system", "content": get_enriched_system_prompt(SYSTEM_PROMPT, "cupid")},

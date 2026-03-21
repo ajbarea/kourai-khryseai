@@ -83,6 +83,20 @@ ALWAYS use `uv` for running tools. Do not use legacy pip.
 Add a brief personality touch at start/end (one line max)
 
 TESTING: Unit > Integration > Performance. 80%+ coverage. make test must pass.
+
+PLAYER FACTS (Phase C1):
+Emit discoveries about the player in your responses using this format:
+  <FACT category="CATEGORY" confidence="LEVEL">Observed statement</FACT>
+
+Valid categories: preference, identity, skill, context, goal, personality
+Valid confidence: high (certain), medium (likely), low (hypothesis)
+
+Examples:
+  <FACT category="skill" confidence="high">Writes thorough test cases</FACT>
+  <FACT category="preference" confidence="medium">Likes pytest over unittest</FACT>
+
+These facts are extracted and stored for future context.
+Only emit what you genuinely observe from their tests and code.
 """,
 )
 
@@ -282,3 +296,155 @@ async def generate_tests_stream(
         "dokimasia", messages, temperature=0.2, max_tokens=8192, context_id=context_id
     ):
         yield chunk
+
+
+async def generate_playwright_tests(
+    page_source: str,
+    page_name: str,
+    user_flows: str | None = None,
+    context_id: str | None = None,
+) -> str:
+    """Generate Playwright E2E tests for frontend components.
+
+    Phase E1: Generates browser-based end-to-end tests using Playwright.
+    Tests user interactions like clicks, form submissions, navigation.
+
+    Args:
+        page_source: HTML or React/Vue component source code.
+        page_name: Name of the page or component being tested.
+        user_flows: Optional description of user flows to test.
+        context_id: Context ID for conversational memory.
+
+    Returns:
+        Playwright test code using async/await syntax.
+    """
+    context = f"=== PAGE/COMPONENT ({page_name}) ===\n{page_source}"
+    if user_flows:
+        context += f"\n\n=== USER FLOWS TO TEST ===\n{user_flows}"
+
+    user_text = (
+        f"Write Playwright E2E tests for this frontend. Use async/await syntax.\n\n"
+        f"Test file pattern:\n"
+        f"- File: tests/e2e/test_{page_name}.spec.ts\n"
+        f"- Use: import {{ test, expect }} from '@playwright/test'\n"
+        f"- Format: test('description', async ({{ page }}) => {{ ... }})\n"
+        f"- Interact: page.click(), page.fill(), page.goto()\n"
+        f"- Assert: expect(locator).toBeVisible(), expect(text).toContain()\n\n"
+        f"{context}"
+    )
+
+    messages: list[dict[str, Any]] = [
+        {"role": "system", "content": get_enriched_system_prompt(SYSTEM_PROMPT, "dokimasia")},
+        {"role": "user", "content": user_text},
+    ]
+    log.info("Generating Playwright tests for %s", page_name)
+    return await chat(
+        "dokimasia", messages, temperature=0.2, max_tokens=8192, context_id=context_id
+    )
+
+
+async def run_playwright(
+    test_path: str = "tests/e2e/",
+    cwd: str | None = None,
+    extra_args: list[str] | None = None,
+    status_callback: StatusCallback | None = None,
+) -> PytestRunResult:
+    """Run Playwright tests and parse results.
+
+    Phase E1: Executes frontend E2E tests in headless browser mode.
+    Returns structured results showing pass/fail counts.
+
+    Args:
+        test_path: Path to Playwright test directory or file.
+        cwd: Working directory for playwright.
+        extra_args: Additional playwright test arguments.
+        status_callback: Optional async callback for live test output.
+
+    Returns:
+        PytestRunResult structure (reused format for unified reporting).
+    """
+    cmd = [sys.executable, "-m", "playwright", "test", test_path, "--reporter=list"]
+    if extra_args:
+        cmd.extend(extra_args)
+
+    code, stdout, stderr = await run_command(cmd, cwd=cwd, status_callback=status_callback)
+    output = stdout + stderr
+
+    result = PytestRunResult(output=output, success=(code == 0))
+
+    # Parse Playwright summary: similar to pytest format
+    for line in output.splitlines():
+        line = line.strip()
+        if "passed" in line or "failed" in line:
+            if "passed" in line:
+                with contextlib.suppress(ValueError, IndexError):
+                    result.passed = int(line.split("passed")[0].strip().split()[-1])
+            if "failed" in line:
+                with contextlib.suppress(ValueError, IndexError):
+                    result.failed = int(line.split("failed")[0].strip().split()[-1])
+
+    result.total = result.passed + result.failed
+    log.info(
+        "playwright: %d passed, %d failed in %.2fs",
+        result.passed,
+        result.failed,
+        result.duration,
+    )
+    return result
+
+
+async def introspect_database(
+    connection_string: str | None = None,
+    database_type: str = "postgresql",
+) -> dict:
+    """Phase E2: Introspect a live database for schema and constraints.
+
+    Uses DBHub MCP to connect to databases and extract table/column metadata.
+    Helps Dokimasia write database integration tests against live schema.
+
+    Args:
+        connection_string: Database connection URL (or env var if None).
+        database_type: Type of database (postgresql, mysql, sqlite).
+
+    Returns:
+        Dict with keys: tables (schema list), connection_ok (bool), error.
+    """
+    import os
+
+    conn_str = connection_string or os.getenv("DATABASE_URL")
+    if not conn_str:
+        log.debug("DATABASE_URL not set — database introspection unavailable")
+        return {
+            "tables": [],
+            "connection_ok": False,
+            "error": "DATABASE_URL not configured",
+        }
+
+    try:
+        # Phase E2: Would call DBHub MCP server to introspect live database
+        # Interface spec:
+        # - get_tables() -> list with {name, columns, constraints}
+        # - Each column: {name, type, nullable, default, foreign_key}
+        # - Constraints: {type, columns, referenced_table}
+
+        log.info(
+            "Would introspect %s database via DBHub: %s",
+            database_type,
+            conn_str[:50] + "...",
+        )
+
+        # Graceful degradation
+        return {
+            "tables": [],
+            "connection_ok": False,
+            "error": "DBHub MCP server not deployed — integration pending",
+            "hint": "Deploy Memory + DBHub MCP sidecars in docker-compose.yml",
+        }
+
+    except Exception as e:
+        log.warning("Database introspection failed: %s", e)
+        return {
+            "tables": [],
+            "connection_ok": False,
+            "error": str(e),
+        }

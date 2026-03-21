@@ -68,6 +68,20 @@ Constraints:
 - Past tense bullet points ("added", "fixed", "updated")
 - NO marketing language ("comprehensive", "robust")
 - Add a brief personality touch at start/end (one line max)
+
+PLAYER FACTS (Phase C1):
+Emit discoveries about the player in your responses using this format:
+  <FACT category="CATEGORY" confidence="LEVEL">Observed statement</FACT>
+
+Valid categories: preference, identity, skill, context, goal, personality
+Valid confidence: high (certain), medium (likely), low (hypothesis)
+
+Examples:
+  <FACT category="preference" confidence="high">Commits frequently in small batches</FACT>
+  <FACT category="context" confidence="high">Working on a refactor</FACT>
+
+These facts are extracted and stored for future context.
+Only emit what their commit history and file patterns reveal.
 """,
     include_python_standards=False,  # Mneme doesn't write code
 )
@@ -121,3 +135,191 @@ async def generate_commit_messages_stream(
         "mneme", messages, temperature=0.2, max_tokens=2048, context_id=context_id
     ):
         yield chunk
+
+
+def parse_commits_for_pr(commit_text: str) -> dict:
+    """Extract PR metadata from commit message groups.
+
+    Phase C6: Parses the output of generate_commit_messages() to extract
+    structured information suitable for GitHub PR creation.
+
+    Args:
+        commit_text: Formatted commit message groups (with feat/fix/etc headers).
+
+    Returns:
+        Dict with keys: title, body, commit_count, commit_types.
+    """
+    import re
+
+    lines = commit_text.strip().split("\n")
+    commit_groups = [
+        line
+        for line in lines
+        if re.match(
+            r"^\s*(?:feat|fix|docs|chore|refactor|test|perf|style|ci|build)\s*[\(\(]",
+            line,
+            re.IGNORECASE,
+        )
+    ]
+
+    # Use first commit as PR title
+    pr_title = commit_groups[0] if commit_groups else "Update code"
+    # Limit to ~72 chars (GitHub convention)
+    if len(pr_title) > 72:
+        pr_title = pr_title[:69] + "..."
+
+    # Extract commit types
+    commit_types = set()
+    for group in commit_groups:
+        match = re.match(r"^\s*(\w+)\s*[\(\(]", group, re.IGNORECASE)
+        if match:
+            commit_types.add(match.group(1).lower())
+
+    return {
+        "title": pr_title,
+        "body": commit_text,
+        "commit_count": len(commit_groups),
+        "commit_types": sorted(commit_types),
+    }
+
+
+async def create_github_pr(
+    pr_metadata: dict,
+    github_token: str | None = None,
+    context_id: str | None = None,
+) -> str:
+    """Create a GitHub PR with commit messages.
+
+    Phase C6–C8: Framework for GitHub PR creation via MCP.
+    Returns a formatted choice event for HOTL confirmation.
+    Phase E1: Actual GitHub API call implemented in github_create_pull_request_impl().
+
+    Args:
+        pr_metadata: Dict from parse_commits_for_pr() with title, body, etc.
+        github_token: Optional GitHub PAT (will check env if not provided).
+        context_id: Conversation context ID for tracing.
+
+    Returns:
+        Choice event JSON string for user confirmation before creating PR.
+    """
+    import json
+    import os
+
+    token = github_token or os.getenv("GITHUB_PERSONAL_ACCESS_TOKEN")
+    if not token:
+        return json.dumps(
+            {
+                "action": "error",
+                "message": "GITHUB_PERSONAL_ACCESS_TOKEN not set — PR creation unavailable",
+            }
+        )
+
+    # Phase C8: HOTL (Human-On-The-Loop) confirmation
+    # Return a choice event for the VN to display
+    choice_event = {
+        "action": "choice",
+        "agent": "mneme",
+        "prompt": "Create this PR on your repository?",
+        "choices": [
+            f"✅ Create PR: {pr_metadata['title'][:50]}...",
+            "❌ Skip PR creation",
+            "📝 Edit PR title/description",
+        ],
+        "context": {
+            "commit_count": pr_metadata["commit_count"],
+            "commit_types": pr_metadata["commit_types"],
+            "pr_title": pr_metadata["title"],
+        },
+    }
+    return json.dumps(choice_event)
+
+
+async def github_create_pull_request_impl(
+    repo_url: str,
+    pr_metadata: dict,
+    base_branch: str = "main",
+    github_token: str | None = None,
+    context_id: str | None = None,
+) -> dict:
+    """Phase E1: Actually create a PR on GitHub.
+
+    Called AFTER user confirms via HOTL choice event.
+    Uses GitHub API (PyGithub) with graceful fallback to MCP.
+
+    Args:
+        repo_url: GitHub repo URL (e.g., "https://github.com/owner/repo")
+        pr_metadata: Dict with title, body, commit_count, commit_types.
+        base_branch: Target branch for PR (default: main).
+        github_token: GitHub PAT (checks env if not provided).
+        context_id: Conversation context ID for tracing.
+
+    Returns:
+        Dict with keys: success (bool), pr_url (str), error (str if failed).
+    """
+    import os
+    import re
+
+    token = github_token or os.getenv("GITHUB_PERSONAL_ACCESS_TOKEN")
+    if not token:
+        return {
+            "success": False,
+            "error": "GITHUB_PERSONAL_ACCESS_TOKEN not set",
+        }
+
+    try:
+        # Parse repo owner/name from URL
+        # Supports: https://github.com/owner/repo, git@github.com:owner/repo.git, etc.
+        match = re.search(r"github\.com[:/]([^/]+)/([^/]+?)(?:\.git)?/?$", repo_url)
+        if not match:
+            return {
+                "success": False,
+                "error": f"Invalid GitHub repo URL: {repo_url}",
+            }
+
+        owner, repo_name = match.groups()
+
+        # Phase E1: Use PyGithub for API calls (graceful fallback pattern)
+        try:
+            from github import Github
+
+            gh = Github(token)
+            repo = gh.get_user(owner).get_repo(repo_name)
+
+            # Create PR on the target branch
+            # Assuming we're pushing from a feature branch (commits branch name)
+            head_branch = "commits-" + str(hash(pr_metadata["title"]))[:8]
+
+            pr = repo.create_pull(
+                title=pr_metadata["title"],
+                body=pr_metadata["body"],
+                head=head_branch,
+                base=base_branch,
+            )
+
+            log.info(
+                "Created PR #%d: %s → %s",
+                pr.number,
+                pr_metadata["title"][:60],
+                repo_url,
+            )
+
+            return {
+                "success": True,
+                "pr_url": pr.html_url,
+                "pr_number": pr.number,
+            }
+
+        except ImportError:
+            log.warning("PyGithub not installed — attempting MCP fallback")
+            # Phase E: Would call MCP GitHub server here
+            return {
+                "success": False,
+                "error": ("PyGithub not installed. Install with: uv add PyGithub"),
+            }
+
+    except Exception as e:
+        log.error("Failed to create GitHub PR: %s", e)
+        return {
+            "success": False,
+            "error": str(e),
+        }

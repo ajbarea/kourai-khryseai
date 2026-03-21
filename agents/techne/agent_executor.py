@@ -155,11 +155,11 @@ class TechneAgentExecutor(BaseAgentExecutor):
             await updater.complete()
             log.info("Techne completed — applied %d fixes to disk", fixes_applied)
 
-            # Virtue update: applying code fixes → Techne_v (craft precision)
+            # Virtue update: successful code writes → arete (excellence-seeking)
             if fixes_applied > 0:
                 _profile = PlayerProfile.load()
                 if _profile:
-                    update_virtue(_profile.player_id, "techne_v", 0.01 * min(fixes_applied, 5))
+                    update_virtue(_profile.player_id, "arete", 0.01 * min(fixes_applied, 5))
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
         raise ServerError(error=UnsupportedOperationError())

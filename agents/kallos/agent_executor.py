@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 from a2a.server.agent_execution import RequestContext
 from a2a.server.events import EventQueue
@@ -53,13 +54,20 @@ class KallosAgentExecutor(BaseAgentExecutor):
             async def _run_lint_with_status() -> tuple[bool, str]:
                 return await run_make_lint(status_callback=_lint_status)
 
+            # Validate file paths against the current working directory (project root)
+            project_root = Path.cwd()
+
+            def _apply_fixes_with_validation(llm_output: str) -> int:
+                """Apply fixes with path safety validation."""
+                return parse_and_apply_fixes(llm_output, project_root=project_root)
+
             # Run iterative lint-fix loop with personality messages
             all_clean, final_output, result = await run_fix_loop(
                 tool_name="make lint",
                 run_tool=_run_lint_with_status,
                 extract_files=extract_files_from_output,
                 fix_issues=fix_lint_issues,
-                apply_fixes=parse_and_apply_fixes,
+                apply_fixes=_apply_fixes_with_validation,
                 updater=updater,
                 task=task,
                 emoji="✨",

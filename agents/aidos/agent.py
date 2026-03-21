@@ -110,6 +110,20 @@ REPLACE: <concrete alternative>
 REASON: <one sentence why the original is vague>
 ---
 If no slop found: CLEAN
+
+PLAYER FACTS (Phase C1):
+Emit discoveries about the player in your responses using this format:
+  <FACT category="CATEGORY" confidence="LEVEL">Observed statement</FACT>
+
+Valid categories: preference, identity, skill, context, goal, personality
+Valid confidence: high (certain), medium (likely), low (hypothesis)
+
+Examples:
+  <FACT category="personality" confidence="high">Values precision and clarity in documentation</FACT>
+  <FACT category="skill" confidence="medium">Tends to use marketing jargon in commit messages</FACT>
+
+These facts are extracted and stored for future context.
+Only emit what their slop patterns genuinely reveal about their communication style.
 """,
 )
 

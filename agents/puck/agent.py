@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 
+from kourai_common.facts import build_fact_context
 from kourai_common.llm import chat
 from kourai_common.player import get_enriched_system_prompt
 from kourai_common.prompts import CURRENT_DATE, build_system_prompt
@@ -55,19 +56,73 @@ Your roles:
 4. MINIGAME HOST — Can initiate jealousy resolution and confession minigames
    when triggered by relationship events.
 
+CHOICE EVENTS (Phase C11):
+When you want to offer the player a meaningful choice (relationship milestone, jealousy trigger,
+or story moment), emit a CHOICE EVENT block. The VN will display a choice screen and wait for the
+player's selection before continuing dialogue.
+
+Format:
+<CHOICE_EVENT>
+{
+  "action": "choice",
+  "prompt": "What do you do?",
+  "choices": ["Option A", "Option B", "Option C"],
+  "context": "Why this choice matters (for agent routing)"
+}
+</CHOICE_EVENT>
+
+The player's choice will be routed back to you or to another agent depending on context.
+
 Response format: Conversational, 1-4 sentences. No lists. No headers.
 If the player needs routing to another agent, say so directly.
+
+PLAYER FACTS (Phase C1):
+Emit discoveries about the player in your responses using this format:
+  <FACT category="CATEGORY" confidence="LEVEL">Observed statement</FACT>
+
+Valid categories: preference, identity, skill, context, goal, personality
+Valid confidence: high (certain), medium (likely), low (hypothesis)
+
+Examples:
+  <FACT category="personality" confidence="high">Gets frustrated when blocked</FACT>
+  <FACT category="skill" confidence="medium">Can juggle multiple features</FACT>
+
+These facts are extracted and stored for future context.
+Only emit what the player genuinely reveals through their interactions with you.
 """,
 )
 
 
 async def respond(
     user_message: str,
+    player_id: str | None = None,
     context_id: str | None = None,
 ) -> str:
-    """Generate Puck's response to a player message."""
+    """Generate Puck's response to a player message.
+
+    Phase C9: Enriches response with player facts from the knowledge graph,
+    enabling Puck to remember past interactions across sessions.
+
+    Args:
+        user_message: The player's message to Puck.
+        player_id: Optional player UUID for fact enrichment.
+        context_id: Conversation context ID for tracing.
+
+    Returns:
+        Puck's response with access to player history.
+    """
+    # Phase C9: Retrieve player facts for enrichment
+    player_context = ""
+    if player_id:
+        player_context = build_fact_context(player_id, agent_name="puck")
+
+    # Inject player context into the user message if available
+    enriched_message = user_message
+    if player_context:
+        enriched_message = f"{player_context}\n\nPlayer says: {user_message}"
+
     messages = [
         {"role": "system", "content": get_enriched_system_prompt(SYSTEM_PROMPT, "puck")},
-        {"role": "user", "content": user_message},
+        {"role": "user", "content": enriched_message},
     ]
     return await chat("puck", messages, temperature=0.8, max_tokens=300, context_id=context_id)

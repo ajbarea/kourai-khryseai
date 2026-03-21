@@ -433,6 +433,75 @@ async def execute_pipeline(
             await conn.close()
 
 
+async def github_search_repositories(
+    query: str,
+    language: str | None = None,
+    max_results: int = 5,
+) -> list[dict]:
+    """Phase C7: Search GitHub for repositories.
+
+    Uses GitHub API to find repos matching the query.
+    Helps Hephaestus understand existing solutions and community standards.
+
+    Args:
+        query: Search terms (e.g., "fast api microservices", "react forms").
+        language: Optional language filter (e.g., "python", "javascript").
+        max_results: Max results to return.
+
+    Returns:
+        List of dicts with keys: name, owner, description, url, stars,
+        language, updated_at.
+    """
+    import os
+
+    token = os.getenv("GITHUB_PERSONAL_ACCESS_TOKEN")
+    if not token:
+        log.debug("GITHUB_PERSONAL_ACCESS_TOKEN not set — repo search unavailable")
+        return []
+
+    try:
+        from github import Github
+
+        gh = Github(token)
+
+        # Build search query
+        search_q = query
+        if language:
+            search_q += f" language:{language}"
+        search_q += " sort:stars"
+
+        # Search repos
+        results = gh.search_repositories(search_q)
+
+        output = []
+        for i, result in enumerate(results[:max_results]):
+            try:
+                output.append(
+                    {
+                        "name": result.name,
+                        "owner": result.owner.login,
+                        "description": result.description or "(no description)",
+                        "url": result.html_url,
+                        "stars": result.stargazers_count,
+                        "language": result.language or "unknown",
+                        "updated_at": str(result.updated_at),
+                    }
+                )
+            except Exception as e:
+                log.debug("Could not parse repo %d: %s", i, e)
+                continue
+
+        log.info("GitHub repo search: %d results for '%s'", len(output), query)
+        return output
+
+    except ImportError:
+        log.debug("PyGithub not installed — GitHub repo search unavailable")
+        return []
+    except Exception as e:
+        log.warning("GitHub repo search failed: %s", e)
+        return []
+
+
 async def run_pipeline(
     user_request: str,
     context_id: str | None = None,

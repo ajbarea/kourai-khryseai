@@ -7,7 +7,7 @@ import logging
 from a2a.server.agent_execution import RequestContext
 from a2a.server.events import EventQueue
 from a2a.server.tasks import TaskUpdater
-from a2a.types import Part, Task, TextPart, UnsupportedOperationError
+from a2a.types import DataPart, Part, Task, TextPart, UnsupportedOperationError
 from a2a.utils.errors import ServerError
 
 from agents.cupid.agent import translate_emotion
@@ -43,8 +43,20 @@ class CupidAgentExecutor(BaseAgentExecutor):
             user_input, player_id=player_id, context_id=task.context_id
         )
 
+        # Emit both human-readable text and structured metadata (C10 pattern)
         await updater.add_artifact(
-            [Part(root=TextPart(text=response))],
+            [
+                Part(root=TextPart(text=response)),
+                Part(
+                    root=DataPart(
+                        data={
+                            "mode": "emotional_translation",
+                            "context": "romance_coach, jealousy_mediator, or confession_handler",
+                            "next_routing": "player_choice or self_contained",
+                        }
+                    )
+                ),
+            ],
             name="cupid_response",
         )
         await updater.complete()

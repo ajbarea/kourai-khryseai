@@ -54,6 +54,21 @@ Rules:
 - Prefer editing existing files over creating new ones
 - When planning new projects, use the default tech stack unless the player specifies otherwise
 - Add a brief personality touch at start/end (one line max)
+
+PLAYER FACTS (Phase C1):
+Emit discoveries about the player in your responses using this format:
+  <FACT category="CATEGORY" confidence="LEVEL">Observed statement</FACT>
+
+Valid categories: preference, identity, skill, context, goal, personality
+Valid confidence: high (certain), medium (likely), low (hypothesis)
+
+Examples:
+  <FACT category="skill" confidence="high">Knows React well</FACT>
+  <FACT category="context" confidence="high">Building a SaaS product</FACT>
+  <FACT category="preference" confidence="medium">Prefers microservices architecture</FACT>
+
+These facts are extracted and stored for future context.
+Only emit what the player explicitly states or what their specifications clearly show.
 """,
 )
 
@@ -127,7 +142,18 @@ async def create_spec(
     Returns:
         Detailed implementation spec in structured format.
     """
+    from kourai_common.doc_lookup import lookup_documentation
+
     context_parts = []
+
+    # Phase B5: Fetch relevant documentation for planning
+    docs_context = await lookup_documentation(
+        idea,
+        agent_name="metis",
+        max_results=3,
+    )
+    if docs_context:
+        context_parts.append(docs_context)
 
     if project_context:
         context_parts.append(f"=== PROJECT CONTEXT ===\n{project_context}")
@@ -159,7 +185,18 @@ async def create_spec_stream(
     context_id: str | None = None,
 ) -> AsyncIterable[str]:
     """Stream spec generation for real-time progress."""
+    from kourai_common.doc_lookup import lookup_documentation
+
     context_parts = []
+
+    # Phase B5: Fetch relevant documentation for planning
+    docs_context = await lookup_documentation(
+        idea,
+        agent_name="metis",
+        max_results=3,
+    )
+    if docs_context:
+        context_parts.append(docs_context)
 
     if project_context:
         context_parts.append(f"=== PROJECT CONTEXT ===\n{project_context}")
@@ -184,3 +221,73 @@ async def create_spec_stream(
         "metis", messages, temperature=0.3, max_tokens=8192, context_id=context_id
     ):
         yield chunk
+
+
+async def github_search_issues(
+    query: str,
+    repo_url: str | None = None,
+    language: str | None = None,
+    max_results: int = 5,
+) -> list[dict]:
+    """Phase C7: Search GitHub for related issues and pull requests.
+
+    Uses GitHub API to find similar issues and PRs that might inform planning.
+    Helps Metis understand existing problems and solutions before creating specs.
+
+    Args:
+        query: Search terms (e.g., "database migration", "authentication bug").
+        repo_url: Optional repo to limit search to (format: owner/repo).
+        language: Optional language filter (e.g., "python", "javascript").
+        max_results: Max results to return.
+
+    Returns:
+        List of dicts with keys: issue_number, title, body, repo, url, state.
+    """
+    import os
+
+    token = os.getenv("GITHUB_PERSONAL_ACCESS_TOKEN")
+    if not token:
+        log.debug("GITHUB_PERSONAL_ACCESS_TOKEN not set — issue search unavailable")
+        return []
+
+    try:
+        from github import Github
+
+        gh = Github(token)
+
+        # Build search query
+        search_q = f"type:issue {query}"
+        if repo_url:
+            search_q += f" repo:{repo_url}"
+        if language:
+            search_q += f" language:{language}"
+
+        # Search issues
+        results = gh.search_issues(search_q)
+
+        output = []
+        for i, result in enumerate(results[:max_results]):
+            try:
+                output.append(
+                    {
+                        "issue_number": result.number,
+                        "title": result.title,
+                        "body": result.body[:300] if result.body else "(no description)",
+                        "repo": result.repository.full_name,
+                        "url": result.html_url,
+                        "state": result.state,
+                    }
+                )
+            except Exception as e:
+                log.debug("Could not parse result %d: %s", i, e)
+                continue
+
+        log.info("GitHub issue search: %d results for '%s'", len(output), query)
+        return output
+
+    except ImportError:
+        log.debug("PyGithub not installed — GitHub issue search unavailable")
+        return []
+    except Exception as e:
+        log.warning("GitHub issue search failed: %s", e)
+        return []

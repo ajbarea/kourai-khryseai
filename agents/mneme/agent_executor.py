@@ -13,7 +13,11 @@ from a2a.utils.errors import ServerError
 
 from agents.aidos.agent import analyze_slop, flag_slop_words
 from agents.aletheia.agent import find_unsupported_claims, validate_research
-from agents.mneme.agent import generate_commit_messages_stream
+from agents.mneme.agent import (
+    create_github_pr,
+    generate_commit_messages_stream,
+    parse_commits_for_pr,
+)
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
 from kourai_common.messaging import send_working_status
@@ -170,6 +174,40 @@ class MnemeAgentExecutor(BaseAgentExecutor):
                             emoji="🏛️",
                         )
 
+            # Phase C6–C8: Offer GitHub PR creation (HOTL confirmation)
+            # Check if we should offer PR creation (clean commits, GitHub token available)
+            import os
+
+            github_token = os.getenv("GITHUB_PERSONAL_ACCESS_TOKEN")
+            if github_token and commit_groups and not slop_words:
+                # Parse commits into PR metadata
+                pr_metadata = parse_commits_for_pr(artifact_body)
+
+                await send_working_status(
+                    updater,
+                    task,
+                    f"Ready to create PR: {pr_metadata['title'][:60]}...",
+                    emoji="🔗",
+                )
+
+                # Generate choice event for HOTL confirmation
+                pr_choice_json = await create_github_pr(
+                    pr_metadata,
+                    github_token=github_token,
+                    context_id=task.context_id,
+                )
+
+                # Emit PR metadata as a separate artifact for the VN to handle
+                import json
+
+                json.loads(pr_choice_json)
+                artifact_body += (
+                    f"\n\n---\n**GitHub PR Ready**\n"
+                    f"Title: {pr_metadata['title']}\n"
+                    f"Commits: {pr_metadata['commit_count']} "
+                    f"({', '.join(pr_metadata['commit_types'])})"
+                )
+
             # Emit both human-readable text and machine-readable structured data
             await updater.add_artifact(
                 [
@@ -189,10 +227,10 @@ class MnemeAgentExecutor(BaseAgentExecutor):
             )
             await updater.complete()
 
-            # Virtue update: generating commits → Mneia (memory and continuity)
+            # Virtue update: generating commits → mneia (memory and continuity)
             _profile = PlayerProfile.load()
             if _profile and commit_groups:
-                update_virtue(_profile.player_id, "mneia", 0.01 * len(commit_groups))
+                update_virtue(_profile.player_id, "mneia", 0.005 * len(commit_groups))
 
             log.info(
                 "Mneme completed — generated %d commit groups",
