@@ -118,4 +118,18 @@
   init();
   observer.observe(hero);
   draw();
+
+  // Scroll-reveal for landing sections below the hero
+  const sections = document.querySelectorAll('.landing-section');
+  if (sections.length) {
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.12 });
+    sections.forEach(s => revealObserver.observe(s));
+  }
 })();
