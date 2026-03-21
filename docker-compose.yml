@@ -1,10 +1,12 @@
 # Kourai Khryseai — Multi-Agent A2A System
 # Usage:
-#   docker compose up                    # all services
-#   docker compose up jaeger             # observability only
-#   docker compose --profile agents up   # agents + infra
-#   docker compose up mneme              # single agent + deps
-#   docker compose --profile gui up      # GUI + agents + infra
+#   docker compose up                      # everything (agents + infra)
+#   docker compose up mneme                # single agent + deps
+#
+# Phase E3-E4: Infrastructure
+#   - memory-mcp: Shared Knowledge Graph sidecar for player facts (E3)
+#   - dokimasia: Includes Chromium + Playwright for frontend E2E testing (E4)
+#   All agents can access Memory MCP via MEMORY_MCP_URL environment variable
 
 x-agent-common: &agent-common
   build:
@@ -17,6 +19,7 @@ x-agent-common: &agent-common
     OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
     KOURAI_LOG_LEVEL: ${KOURAI_LOG_LEVEL:-INFO}
     KOURAI_STREAM_ENABLED: ${KOURAI_STREAM_ENABLED:-true}
+    MEMORY_MCP_URL: http://memory-mcp:5000
   volumes:
     - ./shared:/app/shared                    # hot reload shared code
   networks:
@@ -25,6 +28,7 @@ x-agent-common: &agent-common
   depends_on:
     jaeger:
       condition: service_started
+    # memory-mcp removed from deps until Phase 3 wires it in
   logging:
     driver: "json-file"
     options:
@@ -80,6 +84,40 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # ──────────────── MCP Servers (Phase E3-E4) ────────────────
+  memory-mcp:
+    # Phase 3: Shared memory knowledge graph for Puck/Cupid/Mneme
+    # Uses @modelcontextprotocol/server-memory with HTTP health check wrapper
+    image: node:20-slim
+    working_dir: /app
+    volumes:
+      - ./docker/memory-mcp-server.js:/app/memory-mcp-server.js
+      - memory-graph-storage:/data
+    command: node /app/memory-mcp-server.js
+    environment:
+      PORT: "5000"
+      MEMORY_FILE_PATH: /data/memory_graph.json
+    ports:
+      - "5000:5000"
+    networks:
+      - kourai
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:5000/',r=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))\""]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
   # ──────────────── Specialist Agents ────────────────
   mneme:
     <<: *agent-common
@@ -117,7 +155,6 @@ services:
       resources:
         limits:
           memory: 1G
-    profiles: ["agents", "full"]
 
   kallos:
     <<: *agent-common
@@ -155,7 +192,6 @@ services:
       resources:
         limits:
           memory: 1G
-    profiles: ["agents", "full"]
 
   techne:
     <<: *agent-common
@@ -193,7 +229,6 @@ services:
       resources:
         limits:
           memory: 1G
-    profiles: ["agents", "full"]
 
   dokimasia:
     <<: *agent-common
@@ -221,6 +256,9 @@ services:
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
       PORT: 10003
+      # Phase E4: Playwright configuration for headless browser testing
+      PLAYWRIGHT_BROWSERS_PATH: /home/kourai/.cache/ms-playwright
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "0"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:10003/.well-known/agent-card.json"]
       interval: 15s
@@ -231,7 +269,6 @@ services:
       resources:
         limits:
           memory: 1G
-    profiles: ["agents", "full"]
 
   metis:
     <<: *agent-common
@@ -269,7 +306,6 @@ services:
       resources:
         limits:
           memory: 1G
-    profiles: ["agents", "full"]
 
   # ──────────────── Companion Spirits ────────────────
   puck:
@@ -307,7 +343,6 @@ services:
       resources:
         limits:
           memory: 512M
-    profiles: ["agents", "full"]
 
   cupid:
     <<: *agent-common
@@ -344,7 +379,6 @@ services:
       resources:
         limits:
           memory: 512M
-    profiles: ["agents", "full"]
 
   # ──────────────── Quality Spirits ────────────────
   aidos:
@@ -382,7 +416,6 @@ services:
       resources:
         limits:
           memory: 512M
-    profiles: ["agents", "full"]
 
   aletheia:
     <<: *agent-common
@@ -419,7 +452,6 @@ services:
       resources:
         limits:
           memory: 512M
-    profiles: ["agents", "full"]
 
   # ──────────────── Orchestrator ────────────────
   hephaestus:
@@ -447,8 +479,6 @@ services:
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
       PORT: 10000
-      # In Docker, agents talk via service names not localhost
-      KOURAI_AGENT_HOST: "true"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:10000/.well-known/agent-card.json"]
       interval: 15s
@@ -480,94 +510,10 @@ services:
         condition: service_healthy
       aletheia:
         condition: service_healthy
-    profiles: ["full"]
 
-  # ──────────────── Client Interfaces ────────────────
-  cli:
-    build:
-      context: .
-      dockerfile: docker/host.Dockerfile
-      args:
-        HOST_TYPE: cli
-        PACKAGE_NAME: cli
-        PORT: 10100
-    env_file: .env
-    healthcheck:
-      disable: true
-    volumes:
-      - ./hosts/cli:/app/hosts/cli            # hot reload CLI code
-      - ./shared:/app/shared                  # hot reload shared code
-    develop:
-      watch:
-        - action: sync
-          path: ./hosts/cli
-          target: /app/hosts/cli
-        - action: sync
-          path: ./shared
-          target: /app/shared
-    environment:
-      KOURAI_AGENT_HOST: "true"
-      KOURAI_LOG_LEVEL: ${KOURAI_LOG_LEVEL:-INFO}
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
-      PORT: 10100
-    networks:
-      - kourai
-    restart: no
-    depends_on:
-      jaeger:
-        condition: service_started
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    profiles: ["cli"]
-
-  gui:
-    build:
-      context: .
-      dockerfile: docker/host.Dockerfile
-      args:
-        HOST_TYPE: gui
-        PACKAGE_NAME: gui
-    env_file: .env
-    healthcheck:
-      disable: true
-    volumes:
-      - ./hosts/gui:/app/hosts/gui            # hot reload GUI code
-      - ./shared:/app/shared                  # hot reload shared code
-    develop:
-      watch:
-        - action: sync
-          path: ./hosts/gui
-          target: /app/hosts/gui
-        - action: sync
-          path: ./shared
-          target: /app/shared
-    environment:
-      KOURAI_AGENT_HOST: "true"
-      KOURAI_LOG_LEVEL: ${KOURAI_LOG_LEVEL:-INFO}
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
-    networks:
-      - kourai
-    restart: no
-    depends_on:
-      jaeger:
-        condition: service_started
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    profiles: ["gui"]
+volumes:
+  memory-graph-storage:
+    driver: local
 
 networks:
   kourai:
