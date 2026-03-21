@@ -103,30 +103,175 @@ init python:
         if score < 0.8: return 3
         return 4
 
-    def _get_virtue_text():
-        """Load current virtue context for the Forge Journal screen.
+    def _get_virtue_context_dict():
+        """Build virtue data structure for Forge Journal visualization.
 
-        Called once each time the screen opens — not on every render frame.
-        Relies on kourai_common being on sys.path (added in init python hide).
+        Phase C12: Returns dict with virtue scores, session deltas, and discoveries.
+        Queries the python agent subprocess via the bridge to avoid sqlite3 dependency issues.
         """
         try:
-            from kourai_common.virtues import get_virtue_context
-            return get_virtue_context(renpy.persistent.player_id)
-        except Exception as e:
-            return "Error loading virtues: " + str(e)
+            player_id = persistent.player_id
+            if not player_id:
+                raise ValueError("No player ID")
+                
+            bridge.send_message({"action": "get_virtue_context", "player_id": player_id})
+            
+            import time as _time
+            _deadline = _time.time() + 2.0
+            _result = None
+            while _time.time() < _deadline:
+                msg = bridge.get_message(timeout=0.05)
+                if msg and msg.get("action") == "virtue_context_result":
+                    _result = msg
+                    break
+            
+            if not _result:
+                raise TimeoutError("Bridge did not return virtues")
+                
+            virtues = _result.get("virtues", {})
+            deltas = _result.get("deltas", {})
+            facts = _result.get("facts", [])
 
-    def _build_save_json():
+            # Format virtue scores (0.0-1.0 range)
+            virtue_dict = {
+                "arete": max(0.0, min(1.0, virtues.get("arete", 0.0))),
+                "sophia": max(0.0, min(1.0, virtues.get("sophia", 0.0))),
+                "synergy": max(0.0, min(1.0, virtues.get("synergy", 0.0))),
+                "techne_v": max(0.0, min(1.0, virtues.get("techne_v", 0.0))),
+                "mneia": max(0.0, min(1.0, virtues.get("mneia", 0.0))),
+                "eros": max(0.0, min(1.0, virtues.get("eros", 0.0))),
+            }
+
+            # Session summary with deltas
+            delta_lines = []
+            for virtue_name, delta in deltas.items():
+                if delta > 0:
+                    delta_lines.append(f"+{delta:.3f} {virtue_name}")
+                elif delta < 0:
+                    delta_lines.append(f"{delta:.3f} {virtue_name}")
+
+            if delta_lines:
+                summary = "This session: " + ", ".join(delta_lines)
+            else:
+                summary = "No virtue changes this session."
+
+            # Recent discoveries (new facts)
+            recent_facts = [f.get("body", "")[:60] for f in facts if f]
+
+            return {
+                **virtue_dict,
+                "session_summary": summary,
+                "recent_facts": recent_facts,
+            }
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return {
+                "arete": 0.5,
+                "sophia": 0.5,
+                "synergy": 0.5,
+                "techne_v": 0.5,
+                "mneia": 0.5,
+                "eros": 0.5,
+                "session_summary": "The forge is quiet. No session data available.",
+                "recent_facts": [],
+            }
+
+    def _build_save_json(d):
         """Attach per-slot JSON data so save slots show the last active agent's portrait."""
         import store as _store
         agent_id = getattr(_store, "last_agent_id", "hephaestus")
         char_data = AGENT_CHARS.get(agent_id)
         epithet = char_data[1] if char_data else ""
-        return {
-            "agent_portrait": agent_id,
-            "save_note": epithet,
-        }
+        d["agent_portrait"] = agent_id
+        d["active_agent"] = agent_id
+        d["save_note"] = epithet
 
-    config.save_json_callback = _build_save_json
+    config.save_json_callbacks.append(_build_save_json)
+
+    def _validate_and_set_project(project_path):
+        """Validate project directory and add to recent projects.
+
+        Phase C13: Checks if path exists and contains a git repo or valid project marker.
+        """
+        import os
+
+        if not project_path or not os.path.isabs(project_path):
+            renpy.notify("Please enter an absolute project path")
+            return
+
+        if not os.path.isdir(project_path):
+            renpy.notify(f"Path does not exist: {project_path}")
+            return
+
+        # Check for git, pyproject.toml, or package.json as project markers
+        has_git = os.path.isdir(os.path.join(project_path, ".git"))
+        has_pyproject = os.path.isfile(os.path.join(project_path, "pyproject.toml"))
+        has_package_json = os.path.isfile(os.path.join(project_path, "package.json"))
+
+        if not (has_git or has_pyproject or has_package_json):
+            renpy.notify(
+                "Project not found — no .git, pyproject.toml, or package.json"
+            )
+            return
+
+        # Set as current project
+        persistent.project_path = project_path
+
+        # Add to recent projects (avoid duplicates, limit to 10)
+        recent = getattr(persistent, "recent_projects", []) or []
+        if project_path in recent:
+            recent.remove(project_path)
+        recent.insert(0, project_path)
+        persistent.recent_projects = recent[:10]
+
+        renpy.notify(f"✓ Project set: {os.path.basename(project_path)}")
+
+    def _create_new_project_workspace(project_name):
+        """Create a new project workspace under Projects/<PlayerName>/<ProjectName>."""
+        import os
+        import getpass
+
+        if not project_name:
+            renpy.notify("Project name cannot be empty.")
+            return
+
+        # Sanitize the project name
+        safe_name = "".join([c for c in project_name if c.isalpha() or c.isdigit() or c in (' ', '-', '_')]).rstrip()
+        if not safe_name:
+            renpy.notify("Invalid project name.")
+            return
+            
+        try:
+            player_name = getpass.getuser()
+        except:
+            player_name = "Player"
+
+        # Resolve path relative to the user's home directory
+        home_dir = os.path.expanduser("~")
+        
+        # Build the path
+        target_dir = os.path.join(home_dir, "Projects", player_name, safe_name)
+        
+        try:
+            os.makedirs(target_dir, exist_ok=True)
+            
+            # Initialize a basic .git repository (optional, but requested by validation)
+            git_dir = os.path.join(target_dir, ".git")
+            if not os.path.exists(git_dir):
+                 os.makedirs(git_dir)
+                 
+            # Create a basic pyproject.toml to satisfy validation
+            pyproject_path = os.path.join(target_dir, "pyproject.toml")
+            if not os.path.exists(pyproject_path):
+                with open(pyproject_path, "w") as f:
+                    f.write(f'[project]\nname = "{safe_name}"\nversion = "0.1.0"\n')
+
+            # Use the existing validation function to set it
+            _validate_and_set_project(target_dir)
+            renpy.notify(f"✓ Created: {target_dir}")
+        except Exception as e:
+            renpy.notify(f"Error creating project: {e}")
 
     # Pre-authored gossip lines per agent — personality grounded in CHARACTER_DESIGN.md.
     # Each entry: (stage_direction, spoken_line).
@@ -174,7 +319,7 @@ default vn_response = None
 default last_agent_id = "hephaestus"  # tracked for save slot portrait via save_json_callback
 
 # ── Player Identity ───────────────────────────────────────────────────────────
-# player_id persists ACROSS all save files (renpy.persistent) — it is the
+# player_id persists ACROSS all save files (persistent) — it is the
 # player's long-term identity with the agent swarm.
 # context_id is PER SAVE — each save slot gets its own conversation thread.
 # Both are set on first start; context_id is sent on resume so agents can
@@ -202,21 +347,97 @@ label start:
     scene black
     "System" "Initializing the Forge Bridge..."
 
-    # Assign a persistent player_id on first ever launch.
-    # Uses renpy.persistent so it survives across all save files.
-    python:
-        import uuid as _uuid
-        if not renpy.persistent.player_id:
-            renpy.persistent.player_id = _uuid.uuid4().hex
-        player_id = renpy.persistent.player_id
-
-        # New context_id per fresh start (not a load — that path is in after_load)
-        context_id = _uuid.uuid4().hex
-
     # Start the agent subprocess — only verifies uv + process spawn
     if not bridge.start():
         "ERROR" "Could not start the agent process. Is uv installed? Run 'make up' to start the agents."
         return
+
+    # Assign a persistent player_id on first ever launch, integrating with shared DB via the bridge.
+    python:
+        import uuid as _uuid
+        import time as _time
+        
+        _needs_onboarding = False
+        
+        # Check profiles via bridge
+        bridge.send_message({"action": "get_profiles"})
+        _deadline = _time.time() + 5.0
+        _profiles = []
+        while _time.time() < _deadline:
+            msg = bridge.get_message(timeout=0.05)
+            if msg and msg.get("action") == "profiles_result":
+                _profiles = msg.get("profiles", [])
+                break
+
+        if _profiles:
+            # Sync persistent to the active profile if we already have one
+            _active = next((p for p in _profiles if p.get("is_active")), _profiles[0])
+            persistent.player_id = _active["player_id"]
+            bridge.send_message({"action": "set_active_profile", "player_id": persistent.player_id})
+        elif not persistent.player_id:
+            # No profiles exist at all, we must do onboarding
+            _needs_onboarding = True
+
+        # D4: Initialize romance mode (default enabled for new players)
+        if not hasattr(persistent, "romance_mode_enabled"):
+            persistent.romance_mode_enabled = True
+
+        # New context_id per fresh start (not a load — that path is in after_load)
+        context_id = _uuid.uuid4().hex
+
+    if _needs_onboarding:
+        "System" "The Forge requires an identity before you may enter."
+        
+        $ _display_name = ""
+        while not _display_name:
+            $ _display_name = renpy.input("What is your name? (Required):", length=50)
+            $ _display_name = _display_name.strip()
+            
+        $ _pronouns = renpy.input("What are your pronouns? (Optional):", length=50)
+        $ _pronouns = _pronouns.strip()
+        
+        "System" "How should the golden maidens address you?"
+        menu:
+            "As a fellow artisan (Mortal)":
+                $ _role = "mortal"
+                $ _title = "Artisan"
+            "As a God among mortals (Divine)":
+                $ _role = "divine"
+                $ _title = "God"
+            "As a proven champion (Hero)":
+                $ _role = "hero"
+                $ _title = "Champion"
+            "As their beloved master (Devoted)":
+                $ _role = "devoted"
+                $ _title = "Master"
+            "Just by my name":
+                $ _role = "name_only"
+                $ _title = ""
+
+        python:
+            # Send profile creation request to the bridge
+            bridge.send_message({
+                "action": "create_profile",
+                "display_name": _display_name,
+                "tts_name": _display_name,
+                "title": _title,
+                "role": _role,
+                "pronouns": _pronouns
+            })
+            
+            _deadline = _time.time() + 5.0
+            while _time.time() < _deadline:
+                msg = bridge.get_message(timeout=0.05)
+                if msg and msg.get("action") == "create_profile_result":
+                    persistent.player_id = msg.get("player_id")
+                    break
+
+            if not persistent.player_id:
+                # Fallback if bridge failed
+                persistent.player_id = _uuid.uuid4().hex
+
+    python:
+        player_id = persistent.player_id
 
     "System" "Verifying agent connection..."
 
@@ -246,19 +467,19 @@ label main_loop:
     $ user_text = user_text.strip()
 
     if user_text:
-        $ bridge.send_message({"action": "message", "text": user_text, "context_id": context_id or "", "player_id": player_id or "", "project_path": getattr(renpy.persistent, "project_path", "")})
+        $ bridge.send_message({"action": "message", "text": user_text, "context_id": context_id or "", "player_id": player_id or "", "project_path": getattr(persistent, "project_path", "")})
 
         # Show the thinking indicator and poll for responses.
         # Status messages (action="status") update the label live.
         # The first non-status message is the final agent response.
         python:
-            import time
+            import time as _time
             thinking_status = "The forge stirs..."
             vn_response = None
             renpy.show_screen("thinking")
 
-            deadline = time.time() + 60.0
-            while vn_response is None and time.time() < deadline:
+            _deadline = _time.time() + 60.0
+            while vn_response is None and _time.time() < _deadline:
                 msg = bridge.get_message(timeout=0.0)  # non-blocking check
                 if msg is None:
                     # Yield to Ren'Py briefly so the screen redraws
@@ -296,8 +517,8 @@ label main_loop:
                     })
                     # The bridge will respond with a normal message; wait for it
                     vn_response = None
-                    deadline = __import__("time").time() + 60.0
-                    while vn_response is None and __import__("time").time() < deadline:
+                    _deadline = _time.time() + 60.0
+                    while vn_response is None and _time.time() < _deadline:
                         msg = bridge.get_message(timeout=0.0)
                         if msg is None:
                             renpy.pause(0.05, hard=False)
@@ -330,6 +551,8 @@ label main_loop:
             python:
                 # Track which agent gets the affinity bump this turn
                 last_agent_id = beat_queue[-1].get("agent", "hephaestus")
+                # Phase F3: Persist active agent across save/load cycles
+                persistent.active_agent = last_agent_id
 
             # Render each dialogue beat in sequence
             $ _beat_idx = 0
@@ -349,8 +572,8 @@ label main_loop:
                         renpy.hide_screen("agent_portrait")
 
                 if char_info:
-                    $ char_obj, epithet = char_info
-                    char_obj "[message_text]"
+                    $ _char_obj, _epithet = char_info
+                    _char_obj "[message_text]"
                 else:
                     "[agent_id]" "[message_text]"
 
@@ -397,6 +620,17 @@ label after_load:
             "System" "Could not reconnect to agents after loading: [connection_error]"
             return
 
+    # Drain any stale messages in the queue from before the save occurred.
+    # This prevents mid-dialogue saves from replaying buffered responses.
+    python:
+        import time as _time
+        _timeout = 0.5
+        _deadline = _time.time() + _timeout
+        while _time.time() < _deadline:
+            stale = bridge.get_message(timeout=0.05)
+            if stale is None:
+                break
+
     # Send resume action with saved context_id so the bridge restores the
     # correct conversation thread for this save slot.
     python:
@@ -413,7 +647,14 @@ label project_input_label:
     $ new_path = renpy.input("Enter absolute path to project directory:", length=200)
     $ new_path = new_path.strip()
     if new_path:
-        $ renpy.persistent.project_path = new_path
+        $ persistent.project_path = new_path
+    return
+
+label create_project_label:
+    $ new_project_name = renpy.input("Enter new project name:", length=50)
+    $ new_project_name = new_project_name.strip()
+    if new_project_name:
+        $ _create_new_project_workspace(new_project_name)
     return
 
 # ── CLEANUP ──────────────────────────────────────────────────────────────

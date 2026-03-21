@@ -499,8 +499,7 @@ style choice_button_text:
 screen agent_portrait(agent_id="hephaestus", state="neutral"):
     zorder 5
 
-    ## Portrait anchor: lower-left, overlapping the textbox just enough for
-    ## the Jen Zee / Hades style of characters rising from below the frame.
+    ## Portrait anchor: lower-left, overlapping the textbox
     add _portrait_image(agent_id, state):
         xalign 0.0
         yalign 1.0
@@ -875,20 +874,34 @@ screen file_slots(title):
 
                         has vbox
 
+                        # Phase F4: Show active agent for character selection polish
+                        $ active_agent = FileJson(slot, "active_agent", empty=None)
+                        $ agent_color = "#1A1010"  # default dark forge color
+                        if active_agent and active_agent in AGENT_COLORS:
+                            $ agent_color = AGENT_COLORS[active_agent]
+
+                        # Portrait thumbnail in top-left (Phase F4 polish)
+                        frame:
+                            background Solid(agent_color, xysize=(40, 50))
+                            $ save_portrait = FileJson(slot, "agent_portrait", empty=None)
+                            if save_portrait:
+                                # Safely attempt to load portrait
+                                if renpy.loadable("images/portraits/" + save_portrait + ".png"):
+                                    add "images/portraits/" + save_portrait + ".png" zoom 0.3 xalign 0.5 yalign 0.5
+
                         add FileScreenshot(slot) xalign 0.5
 
-                        $ save_portrait = FileJson(slot, "agent_portrait", empty=None)
-                        if save_portrait:
-                            # Safely attempt to load portrait
-                            if renpy.loadable("images/portraits/" + save_portrait + ".png"):
-                                add "images/portraits/" + save_portrait + ".png" zoom 0.25 xalign 0.0 yalign 0.0
+                        # Agent epithet if available (Phase F4 polish)
+                        if active_agent and active_agent in AGENT_CHARS:
+                            $ _, epithet = AGENT_CHARS[active_agent]
+                            text "[active_agent.capitalize()]\n[epithet]" style "slot_name_text" size 18
 
                         text FileTime(slot, format=_("{#file_time}%A, %B %d %Y, %H:%M"), empty=_("empty slot")):
                             style "slot_time_text"
 
                         text FileSaveName(slot):
                             style "slot_name_text"
-                            
+
                         $ save_note = FileJson(slot, "save_note", empty="")
                         if save_note:
                             text save_note style "slot_time_text" italic True
@@ -1053,6 +1066,18 @@ screen preferences():
                         textbutton _("Mute All"):
                             action Preference("all mute", "toggle")
                             style "mute_all_button"
+
+            null height (4 * gui.pref_spacing)
+
+            # D4: Romance mode toggle (Phase D)
+            vbox:
+                style_prefix "check"
+                label _("Experience Settings")
+                textbutton _("Romance Mode"):
+                    action ToggleVariable(
+                        "persistent.romance_mode_enabled", True, False
+                    )
+                text "(Enables romance dialogue, relationship moments, and confession scenes)" size 14 color "#A0A0A0"
 
 
 style pref_label is gui_label
@@ -1868,36 +1893,173 @@ style slider_slider:
 
 screen forge_journal():
     tag menu
-    # _get_virtue_text() is defined in init python in script.rpy.
-    # It runs once when the screen opens (not every render frame).
-    $ virtue_text = _get_virtue_text()
+    # C12: Enhanced Forge Journal with virtue bars, patron agents, and discoveries.
+    # _get_virtue_text() defined in init python in script.rpy.
+    $ virtue_context = _get_virtue_context_dict()
+
     use game_menu(_("Forge Journal"), scroll="viewport"):
         vbox:
-            spacing 20
-            text "The Forge Observes" size 30 color "#D4AF37" bold True
-            text virtue_text size 20 color "#E8E8E8"
+            spacing 30
+
+            # Title
+            text "⚡ The Forge Observes" size 35 color "#D4AF37" bold True
+            text "(Your virtues across sessions)" size 18 color "#A0A0A0"
+
+            null height 10
+
+            # Virtue bars grid
+            grid 2 3:
+                spacing 20
+                # Arete (Hephaestus)
+                vbox:
+                    spacing 5
+                    text "Arete" size 18 color "#D4AF37" bold True
+                    text "Excellence · Hephaestus" size 14 color "#A0A0A0"
+                    bar value virtue_context.get("arete", 0.0) range 1.0 xsize 250 ysize 20
+                    text "%.2f" % virtue_context.get("arete", 0.0) size 14 color "#E8E8E8"
+
+                # Sophia (Metis)
+                vbox:
+                    spacing 5
+                    text "Sophia" size 18 color "#D4AF37" bold True
+                    text "Wisdom · Metis" size 14 color "#A0A0A0"
+                    bar value virtue_context.get("sophia", 0.0) range 1.0 xsize 250 ysize 20
+                    text "%.2f" % virtue_context.get("sophia", 0.0) size 14 color "#E8E8E8"
+
+                # Synergy (Hephaestus/Team)
+                vbox:
+                    spacing 5
+                    text "Synergy" size 18 color "#D4AF37" bold True
+                    text "Collaboration · Teamwork" size 14 color "#A0A0A0"
+                    bar value virtue_context.get("synergy", 0.0) range 1.0 xsize 250 ysize 20
+                    text "%.2f" % virtue_context.get("synergy", 0.0) size 14 color "#E8E8E8"
+
+                # Techne (Techne)
+                vbox:
+                    spacing 5
+                    text "Techne" size 18 color "#D4AF37" bold True
+                    text "Craft · Techne" size 14 color "#A0A0A0"
+                    bar value virtue_context.get("techne_v", 0.0) range 1.0 xsize 250 ysize 20
+                    text "%.2f" % virtue_context.get("techne_v", 0.0) size 14 color "#E8E8E8"
+
+                # Mneia (Memory/Continuity)
+                vbox:
+                    spacing 5
+                    text "Mneia" size 18 color "#D4AF37" bold True
+                    text "Continuity · Mneme" size 14 color "#A0A0A0"
+                    bar value virtue_context.get("mneia", 0.0) range 1.0 xsize 250 ysize 20
+                    text "%.2f" % virtue_context.get("mneia", 0.0) size 14 color "#E8E8E8"
+
+                # Eros (Connection)
+                vbox:
+                    spacing 5
+                    text "Eros" size 18 color "#D4AF37" bold True
+                    text "Connection · Bonds" size 14 color "#A0A0A0"
+                    bar value virtue_context.get("eros", 0.0) range 1.0 xsize 250 ysize 20
+                    text "%.2f" % virtue_context.get("eros", 0.0) size 14 color "#E8E8E8"
+
+            null height 20
+
+            # Session summary
+            frame:
+                xsize 700 ysize 200
+                background Frame(Solid("#1A1010"), 2, 2)
+                padding 15, 15
+                vbox:
+                    spacing 10
+                    text "Session Summary" size 20 color "#D4AF37" bold True
+                    $ summary_text = virtue_context.get("session_summary",
+                        "No virtue changes this session.")
+                    text summary_text size 16 color "#E8E8E8"
+
+            null height 15
+
+            # Discoveries section (new facts from knowledge graph)
+            text "🔮 Discoveries" size 20 color "#D4AF37" bold True
+            $ discoveries = virtue_context.get("recent_facts", [])
+            if discoveries:
+                vbox:
+                    spacing 8
+                    for fact in discoveries:
+                        text "• " + fact size 16 color "#E8D5B7"
+            else:
+                text "(No new discoveries this session)" size 16 color "#A0A0A0"
 
 ## Project Selection screen ####################################################
 
 screen project_selection():
     tag menu
+    # C13: Project selection with validation, recent history, and path input.
+    $ current_path = getattr(persistent, "project_path", None)
+    $ recent_projects = getattr(persistent, "recent_projects", []) or []
+
     use game_menu(_("Project Selection"), scroll="viewport"):
         vbox:
-            spacing 20
-            text "Select Active Project" size 30 color "#D4AF37" bold True
-            
-            text "Current Project Path:" size 20 color "#E8E8E8"
-            $ current_path = getattr(renpy.persistent, "project_path", "None selected")
-            text current_path size 18 color "#A0A0A0"
-            
+            spacing 25
+
+            # Title
+            text "📁 Project Workspace" size 35 color "#D4AF37" bold True
+            text "(where your code lives)" size 16 color "#A0A0A0"
+
+            null height 15
+
+            # Current project display
+            frame:
+                xsize 650 ysize 80
+                background Frame(Solid("#1A1010"), 2, 2)
+                padding 15, 15
+                vbox:
+                    spacing 5
+                    text "Current Project" size 18 color "#D4AF37" bold True
+                    if current_path:
+                        text current_path size 16 color "#E8D5B7"
+                    else:
+                        text "(None selected yet)" size 16 color "#A0A0A0"
+
             null height 20
-            
-            text "Enter new absolute path to project directory:" size 20 color "#E8E8E8"
-            
-            # Simple text input for project path
+
+            # Project path input
+            text "Set Project Path" size 20 color "#D4AF37" bold True
+            text "(Absolute path to project root directory)" size 14 color "#A0A0A0"
+
+            hbox:
+                spacing 15
+                button:
+                    action ui.callsinnewcontext("project_input_label")
+                    background Frame(Solid("#3A2A00"), 2, 2)
+                    xsize 500 ysize 50
+                    text "Enter Path" align (0.5, 0.5) color "#D4AF37" size 18
+                button:
+                    action Function(_validate_and_set_project, current_path)
+                    background Frame(Solid("#2A3A00"), 2, 2)
+                    xsize 120 ysize 50
+                    text "Validate" align (0.5, 0.5) color "#7FFF00" size 16
+
+            null height 10
+
+            # Create new project button
             button:
-                action ui.callsinnewcontext("project_input_label")
-                background Frame(Solid("#3A2A00"), 2, 2)
-                xsize 600 ysize 50
-                text "Click to set path" align (0.5, 0.5) color "#D4AF37"
+                action ui.callsinnewcontext("create_project_label")
+                background Frame(Solid("#17A2B844"), 2, 2)
+                hover_background Frame(Solid("#17A2B888"), 2, 2)
+                xsize 635 ysize 50
+                text "➕ Create New Project Workspace" align (0.5, 0.5) color "#E8E8E8" size 18
+
+            null height 20
+
+            # Recent projects list
+            if recent_projects:
+                text "📌 Recent Projects" size 20 color "#D4AF37" bold True
+                vbox:
+                    spacing 8
+                    for proj_path in recent_projects[:5]:
+                        hbox:
+                            spacing 10
+                            button:
+                                action SetVariable("persistent.project_path", proj_path)
+                                background Frame(Solid("#2A2A1A"), 1, 1)
+                                xsize 600 ysize 40
+                                text (proj_path[:55] + "..." if len(proj_path) > 55 else proj_path) size 14 color "#E8E8E8" align (0.0, 0.5)
+            else:
+                null height 10
 

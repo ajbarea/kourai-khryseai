@@ -51,7 +51,7 @@ define gui.muted_color = '#3A2800'
 define gui.hover_muted_color = '#5A4000'
 
 ## The colors used for dialogue and menu choice text.
-## Warm parchment cream for dialogue (Hades 1 style). Gold for UI chrome.
+## Warm parchment cream for dialogue. Gold for UI chrome.
 define gui.text_color = '#F0E8D0'
 define gui.interface_text_color = '#D4AF37'
 
