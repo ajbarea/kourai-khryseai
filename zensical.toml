@@ -12,6 +12,7 @@ extra_javascript = ["javascripts/particles.js"]
 nav = [
   { "Home" = "index.md" },
   { "Overview" = "overview.md" },
+  { "Art Direction" = "art-direction.md" },
   { "Getting Started" = "getting-started.md" },
   { "Agents" = [
       { "Overview" = "agents/index.md" },
@@ -21,7 +22,6 @@ nav = [
       { "Overview" = "architecture/index.md" },
       { "Internals" = "architecture/internals.md" },
       { "Infrastructure" = "architecture/infrastructure.md" },
-      { "TTS System" = "architecture/tts.md" },
   ]},
   { "Experiences" = [
       { "CLI Reference" = "cli.md" },
@@ -33,7 +33,6 @@ nav = [
   { "Style Guides" = [
       { "Python" = "python-style-guide.md" },
       { "Shell" = "shell-style-guide.md" },
-      { "Frontend" = "frontend-style-guide.md" },
   ]},
 ]
 

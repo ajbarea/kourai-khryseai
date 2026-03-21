@@ -92,9 +92,7 @@ get_agent_url("techne")  # (2)!
 ```
 
 1. Returns model based on `KOURAI_MODEL_TIER` — e.g. `"anthropic/claude-opus-4-6"` on smart, Haiku on cheap (default)
-2. Returns `"http://localhost:10002/"` locally, or Docker service name when `KOURAI_AGENT_HOST=true`
-
-`KOURAI_AGENT_HOST=true` switches URL resolution from `localhost:PORT` to `servicename:PORT` for Docker networking.
+2. Returns `"http://techne:10002/"` — agents resolve each other via Docker service names
 
 ### `llm.py` — Model-Agnostic LLM Interface
 

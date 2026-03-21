@@ -212,4 +212,4 @@ class TestMnemeAgent:
 
 ---
 
-**References:** [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html) · [Shell Guide](shell-style-guide.md) · [Frontend Guide](frontend-style-guide.md)
+**References:** [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html) · [Shell Guide](shell-style-guide.md)

@@ -239,7 +239,7 @@ All three hosts connect to the **same Docker-hosted agent backend.** Your choice
 
     ---
 
-    Docker + Docker Compose with optional Terraform
+    Docker + Docker Compose
 
 -   :material-gamepad-variant:{ .lg .middle } **Visual Novel**
 

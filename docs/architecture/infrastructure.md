@@ -51,17 +51,7 @@ Multi-stage build: builder installs deps with `uv`, runtime copies only the venv
 
 ### Docker Compose
 
-`docker-compose.yml` defines all agents + infrastructure with profiles:
-
-- **No profile** — Jaeger + Prometheus only
-- **`agents`** — All nine specialists (core + companion spirits + quality validators)
-- **`full`** — All specialists + Hephaestus orchestrator (depends on all others)
-
-Environment variable `KOURAI_AGENT_HOST=true` is set automatically in Docker, switching URL resolution to service names.
-
-### Terraform
-
-`infra/terraform/main.tf` uses the `kreuzwerker/docker` provider for local container management. Designed to be swappable — replace the Docker provider with AWS ECS, GCP Cloud Run, or Kubernetes when you're ready for production.
+`docker-compose.yml` defines all ten agents + infrastructure. `docker compose up` brings everything up — agents resolve each other via Docker service names (e.g., `http://hephaestus:10000`).
 
 ---
 

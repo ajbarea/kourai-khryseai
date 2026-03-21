@@ -32,18 +32,29 @@ cp .env.example .env
 
 | Variable | Default | Description |
 |---|---|---|
-| `KOURAI_AGENT_HOST` | `false` | Set to `true` in Docker — switches URL resolution from `localhost:PORT` to Docker service names |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4318` | Jaeger OTLP HTTP endpoint |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://jaeger:4318` | Jaeger OTLP HTTP endpoint (set by Docker Compose) |
 | `ENVIRONMENT` | `development` | Environment tag for traces |
 | `SERVICE_VERSION` | `0.1.0` | Version tag for traces |
 
 ### Optional API Keys
+
+#### LLM Fallbacks
 
 | Variable | Description |
 |---|---|
 | `OPENAI_API_KEY` | OpenAI API key (for GPT models via LiteLLM) |
 | `GOOGLE_API_KEY` | Google API key — alias for `GEMINI_API_KEY` |
 | `OLLAMA_BASE_URL` | Ollama server URL (default: `http://localhost:11434`) |
+
+#### MCP Servers (Phase B+)
+
+Required for agent MCP integrations. **All are free tiers available.**
+
+| Variable | Agent(s) | Description |
+|---|---|---|
+| `GITHUB_PERSONAL_ACCESS_TOKEN` | Mneme, Techne, Metis, Hephaestus | GitHub PAT for PR creation, issue search, code search. Scopes: `repo`, `read:org`, `gist` |
+| `BRAVE_API_KEY` | Aletheia | Brave Search API for web search + claim verification |
+| `CONTEXT7_API_KEY` | Techne, Metis | Context7 API (optional; agents fall back to Context Hub CLI) |
 
 ---
 
@@ -186,14 +197,7 @@ Per-agent timeouts are defined in `shared/src/kourai_common/config.py`:
 
 ## Docker Networking
 
-When running in containers, `KOURAI_AGENT_HOST=true` is set automatically by Docker Compose. This changes how agents find each other:
-
-| Mode | URL format | Example |
-|---|---|---|
-| Local (`false`) | `http://localhost:{port}/` | `http://localhost:10002/` |
-| Docker (`true`) | `http://{service_name}:{port}/` | `http://techne:10002/` |
-
-Agents use Docker's internal DNS to resolve service names within the `kourai` bridge network.
+Agents resolve each other via Docker service names on the `kourai` bridge network (e.g., `http://techne:10002/`). This is handled automatically by Docker Compose — no user configuration needed.
 
 ---
 

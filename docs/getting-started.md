@@ -77,28 +77,25 @@ make up              # Build images + start full stack (waits for healthy servic
 make status          # Show service state/health
 ```
 
-Docker Compose profiles for fine control:
+Start everything:
 
-=== "Full Stack (recommended)"
+```bash
+docker compose up
+```
 
-    ```bash
-    docker compose --profile full up
-    ```
-    All ten agents + Jaeger + Prometheus.
+All ten agents + Jaeger + Prometheus.
 
-=== "Specialists Only"
+To start a single agent (plus its dependencies):
 
-    ```bash
-    docker compose --profile agents up
-    ```
-    Specialist agents without Hephaestus orchestrator.
+```bash
+docker compose up mneme
+```
 
-=== "Observability Only"
+For just Jaeger trace inspection:
 
-    ```bash
-    docker compose up jaeger
-    ```
-    Just Jaeger for trace inspection.
+```bash
+docker compose up jaeger
+```
 
 ---
 

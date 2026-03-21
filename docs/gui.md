@@ -271,12 +271,7 @@ Adjust character-based reading duration
 
 ### For Technical Details
 
-See [Architecture → TTS System](architecture/tts.md) for:
-- Complete API reference
-- Audio processing pipeline
-- Latency and performance metrics
-- Migration guide (v1.0 → v2.0)
-- Advanced audio utilities
+See `designs/TTS_ARCHITECTURE.md` for the complete API reference, audio processing pipeline, and migration guide.
 
 ---
 

@@ -91,4 +91,4 @@ uv sync --all-packages
 
 ---
 
-**References:** [Google Shell Style Guide](https://google.github.io/styleguide/shellguide.html) · [Python Guide](python-style-guide.md) · [Frontend Guide](frontend-style-guide.md)
+**References:** [Google Shell Style Guide](https://google.github.io/styleguide/shellguide.html) · [Python Guide](python-style-guide.md)
