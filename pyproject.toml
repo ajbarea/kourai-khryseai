@@ -99,6 +99,7 @@ module = [
     "a2a.*",
     "litellm.*",
     "uvicorn.*",
+    "github",
 ]
 ignore_errors = true
 
@@ -113,3 +114,8 @@ disallow_incomplete_defs = true
 module = "agents.*"
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
+
+# Allow github module in agents (untyped third-party lib)
+[[tool.mypy.overrides]]
+module = "github"
+ignore_missing_imports = true

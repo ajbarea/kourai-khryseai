@@ -10,7 +10,7 @@
 ##   make down          Stop all services
 ##
 
-.PHONY: help setup upgrade dev dev-vn up down restart status gui cli vn docs lint test test-unit test-integration test-performance clean
+.PHONY: help setup upgrade dev dev-vn up down restart status gui cli vn docs lint test test-unit test-integration test-performance clean prune
 .DEFAULT_GOAL := help
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -33,7 +33,7 @@ else
     export UV_PROJECT_ENVIRONMENT ?= .venv
 endif
 
-COMPOSE_FULL := docker compose --profile full
+COMPOSE_FULL := docker compose
 HOST_UV_RUN := uv run --no-active python scripts/run_in_host_env.py --
 GUI_ARGS ?= --agent http://localhost:10000/
 CLI_ARGS ?=
@@ -136,6 +136,9 @@ clean-cache:               ## Remove cache directories only
 
 clean-tests:               ## Remove test artifacts only
 	uv run --no-active python scripts/clean_build.py --tests-only
+
+prune:                     ## Remove stopped containers, dangling images, and unused build cache
+	docker system prune -f
 
 # ════════════════════════════════════════════════════════════════════════════
 # Help
