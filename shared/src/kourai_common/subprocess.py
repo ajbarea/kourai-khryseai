@@ -186,19 +186,47 @@ _PATCH_PATTERN = re.compile(
 )
 
 
-def parse_and_apply_fixes(llm_output: str) -> int:
+def parse_and_apply_fixes(
+    llm_output: str,
+    project_root: str | Path | None = None,
+) -> int:
     """Parse FILE/ORIGINAL/REPLACEMENT blocks from LLM output and apply them to disk.
+
+    Args:
+        llm_output: LLM response containing FILE/ORIGINAL/REPLACEMENT blocks.
+        project_root: Optional project root for path validation (safety check).
+            If provided, all writes are validated to be inside this root.
+            If not provided, writes proceed with a warning.
 
     Returns:
         Number of fixes successfully applied.
+
+    Raises:
+        PathViolation: If project_root is provided and any path escapes it.
     """
+    from kourai_common.file_ops import PathViolation, validate_file_path
+
     fixes_applied = 0
     for match in _PATCH_PATTERN.finditer(llm_output):
         file_path = match.group(1).strip()
         original = match.group(2)
         replacement = match.group(3)
 
-        path = Path(file_path)
+        # Validate path safety if project_root is provided
+        if project_root:
+            try:
+                validated_path = validate_file_path(project_root, file_path)
+            except PathViolation as e:
+                log.error("Path validation failed: %s", e)
+                continue
+            path = validated_path
+        else:
+            path = Path(file_path)
+            log.warning(
+                "parse_and_apply_fixes called without project_root validation. "
+                "This write may access files outside the intended project."
+            )
+
         if path.exists():
             content = path.read_text(encoding="utf-8")
             if original in content:

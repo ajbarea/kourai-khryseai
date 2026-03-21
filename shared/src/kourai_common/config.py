@@ -140,8 +140,8 @@ OTEL_ENDPOINT = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318"
 # Provider selection: "anthropic" (default), "google", or "local"
 PROVIDER = os.getenv("KOURAI_PROVIDER", "anthropic").lower()
 
-# When running in Docker, agents talk via service names instead of localhost
-DOCKER_MODE = os.getenv("KOURAI_AGENT_HOST", "false").lower() == "true"
+# Agents always resolve each other via Docker service names
+DOCKER_MODE = True
 
 
 _PROVIDER_TIERS: dict[str, dict[str, dict[str, str]]] = {

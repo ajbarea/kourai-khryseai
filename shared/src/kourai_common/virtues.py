@@ -117,6 +117,26 @@ def get_virtue_scores(player_id: str) -> dict[str, float]:
     return scores
 
 
+def get_all_virtues(player_id: str) -> dict[str, float]:
+    """Alias for get_virtue_scores."""
+    return get_virtue_scores(player_id)
+
+
+def get_virtue_deltas(player_id: str) -> dict[str, float]:
+    """Retrieve all virtue session deltas for a player."""
+    conn = _get_virtues_db()
+    rows = conn.execute(
+        "SELECT virtue_key, session_delta FROM player_virtues WHERE player_id = ?",
+        (player_id,),
+    ).fetchall()
+    deltas = {}
+    for virtue_key, delta in rows:
+        if virtue_key in FORGE_VIRTUES and delta != 0.0:
+            deltas[virtue_key] = delta
+    conn.close()
+    return deltas
+
+
 def update_virtue(player_id: str, virtue_key: str, delta: float) -> float:
     """Adjust a virtue score by delta. Returns new score.
 
