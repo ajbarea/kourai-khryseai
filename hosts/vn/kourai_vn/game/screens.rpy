@@ -175,10 +175,15 @@ style say_dialogue:
 ## This screen must create an input displayable with id "input" to accept the
 ## various input parameters.
 ##
+## @mention autocomplete: when prompt starts with "You", watches for "@" in the
+## live input text (via ScreenVariableInputValue) and shows a filtered popup of
+## agent mentions above the textbox. Clicking a suggestion inserts it.
+##
 ## https://www.renpy.org/doc/html/screen_special.html#input
 
 screen input(prompt):
     style_prefix "input"
+    default input_text = ""
 
     window:
 
@@ -189,7 +194,66 @@ screen input(prompt):
             ypos gui.dialogue_ypos
 
             text prompt style "input_prompt"
-            input id "input"
+            ## ScreenVariableInputValue keeps input_text in sync with what
+            ## the player is typing — enables live autocomplete filtering.
+            input id "input" value ScreenVariableInputValue("input_text")
+
+    ## @mention autocomplete — only shown during the main chat prompt
+    if prompt.startswith("You"):
+        python:
+            _at_idx = input_text.rfind("@")
+            if _at_idx >= 0:
+                _frag = input_text[_at_idx + 1:].lower()
+                ## Stop suggesting once the user has typed a space (mention done)
+                _suggs = (
+                    [(m, a) for m, a in sorted(MENTION_MAP.items()) if m.startswith(_frag)]
+                    if " " not in _frag else []
+                )
+            else:
+                _frag = ""
+                _suggs = []
+
+        if _suggs:
+            frame:
+                ## Anchor bottom of popup just above the textbox
+                xalign 0.5
+                yalign 0.82
+                yanchor 1.0
+                background "#1A1610F2"
+                padding (16, 10, 16, 10)
+                xmaximum 520
+
+                vbox:
+                    spacing 4
+
+                    hbox:
+                        spacing 8
+                        text "@":
+                            color gui.accent_color
+                            size 18
+                            bold True
+                            yalign 0.5
+                        text "Mention an agent":
+                            color "#7A6846"
+                            size 14
+                            yalign 0.5
+
+                    null height 2
+
+                    for _m, _a in _suggs[:8]:
+                        ## Compute label and completed text each iteration so
+                        ## the SetScreenVariable action captures the right value.
+                        $ _ac = AGENT_COLORS.get(_a, "#F0E8D0")
+                        $ _label = "@" + _m + "  \u2192  " + _a.capitalize()
+                        $ _done = input_text[:_at_idx + 1] + _m + " "
+                        textbutton _label:
+                            action SetScreenVariable("input_text", _done)
+                            background "#1A1610"
+                            hover_background "#FF950033"
+                            padding (10, 6)
+                            text_color _ac
+                            text_hover_color gui.accent_color
+                            xfill True
 
 style input_prompt is default
 
@@ -1079,6 +1143,13 @@ screen preferences():
                     )
                 text "(Enables romance dialogue, relationship moments, and confession scenes)" size 14 color "#A0A0A0"
 
+                # Phase 13: TTS toggle
+                textbutton _("Voice (TTS)"):
+                    action ToggleVariable(
+                        "persistent.tts_enabled", True, False
+                    )
+                text "(Agent voices via edge-tts — requires vn-bridge /tts service)" size 14 color "#A0A0A0"
+
 
 style pref_label is gui_label
 style pref_label_text is gui_label_text
@@ -1910,51 +1981,51 @@ screen forge_journal():
             # Virtue bars grid
             grid 2 3:
                 spacing 20
-                # Arete (Hephaestus)
+                # Arete — Excellence-seeking / Rigor (patron: Dokimasia)
                 vbox:
                     spacing 5
-                    text "Arete" size 18 color "#D4AF37" bold True
-                    text "Excellence · Hephaestus" size 14 color "#A0A0A0"
+                    text "Arete" size 18 color "#6C757D" bold True
+                    text "Rigor · Dokimasia" size 14 color "#A0A0A0"
                     bar value virtue_context.get("arete", 0.0) range 1.0 xsize 250 ysize 20
                     text "%.2f" % virtue_context.get("arete", 0.0) size 14 color "#E8E8E8"
 
-                # Sophia (Metis)
+                # Sophia — Clarity / Foresight (patron: Metis)
                 vbox:
                     spacing 5
-                    text "Sophia" size 18 color "#D4AF37" bold True
-                    text "Wisdom · Metis" size 14 color "#A0A0A0"
+                    text "Sophia" size 18 color "#4C6EF5" bold True
+                    text "Foresight · Metis" size 14 color "#A0A0A0"
                     bar value virtue_context.get("sophia", 0.0) range 1.0 xsize 250 ysize 20
                     text "%.2f" % virtue_context.get("sophia", 0.0) size 14 color "#E8E8E8"
 
-                # Synergy (Hephaestus/Team)
+                # Synergy — Tenacity / Collaboration (patron: Hephaestus)
                 vbox:
                     spacing 5
-                    text "Synergy" size 18 color "#D4AF37" bold True
-                    text "Collaboration · Teamwork" size 14 color "#A0A0A0"
+                    text "Synergy" size 18 color "#FF9500" bold True
+                    text "Tenacity · Hephaestus" size 14 color "#A0A0A0"
                     bar value virtue_context.get("synergy", 0.0) range 1.0 xsize 250 ysize 20
                     text "%.2f" % virtue_context.get("synergy", 0.0) size 14 color "#E8E8E8"
 
-                # Techne (Techne)
+                # Techne — Craft precision (patron: Techne, co: Kallos)
                 vbox:
                     spacing 5
-                    text "Techne" size 18 color "#D4AF37" bold True
+                    text "Techne" size 18 color "#17A2B8" bold True
                     text "Craft · Techne" size 14 color "#A0A0A0"
                     bar value virtue_context.get("techne_v", 0.0) range 1.0 xsize 250 ysize 20
                     text "%.2f" % virtue_context.get("techne_v", 0.0) size 14 color "#E8E8E8"
 
-                # Mneia (Memory/Continuity)
+                # Mneia — Memory and continuity (patron: Mneme)
                 vbox:
                     spacing 5
-                    text "Mneia" size 18 color "#D4AF37" bold True
-                    text "Continuity · Mneme" size 14 color "#A0A0A0"
+                    text "Mneia" size 18 color "#B73E1D" bold True
+                    text "Reflection · Mneme" size 14 color "#A0A0A0"
                     bar value virtue_context.get("mneia", 0.0) range 1.0 xsize 250 ysize 20
                     text "%.2f" % virtue_context.get("mneia", 0.0) size 14 color "#E8E8E8"
 
-                # Eros (Connection)
+                # Eros — Connection and bonds (patron: Cupid)
                 vbox:
                     spacing 5
-                    text "Eros" size 18 color "#D4AF37" bold True
-                    text "Connection · Bonds" size 14 color "#A0A0A0"
+                    text "Eros" size 18 color "#E8728C" bold True
+                    text "Connection · Cupid" size 14 color "#A0A0A0"
                     bar value virtue_context.get("eros", 0.0) range 1.0 xsize 250 ysize 20
                     text "%.2f" % virtue_context.get("eros", 0.0) size 14 color "#E8E8E8"
 
@@ -2063,3 +2134,953 @@ screen project_selection():
             else:
                 null height 10
 
+
+################################################################################
+## Phase 8 — Jealousy Routing + Tier-Up Notifications
+################################################################################
+
+## Phase 10 — Confession System
+################################################################################
+
+## pre_confession_window — fires once when any agent crosses tier 4 (affinity 0.8+).
+## Puck + Cupid "late game" banter; [Continue] returns control.
+
+screen pre_confession_window(agent_id):
+    zorder 55
+    modal True
+
+    python:
+        _agent_name = agent_id.capitalize()
+        _agent_color = AGENT_COLORS.get(agent_id, "#F0E8D0")
+        _puck_color = "#7FBC8C"
+        _cupid_color = "#E8728C"
+
+    add Solid("#00000088")
+
+    frame:
+        xalign 0.5
+        yalign 0.4
+        xmaximum 520
+        background "#100C18F0"
+        padding (28, 24, 28, 24)
+
+        vbox:
+            spacing 12
+            xfill True
+
+            hbox:
+                xalign 0.5
+                spacing 10
+                text "✦":
+                    color _agent_color
+                    size 22
+                    yalign 0.5
+                text _agent_name:
+                    color _agent_color
+                    size 18
+                    bold True
+                    yalign 0.5
+                text "— Tier 4":
+                    color "#D4AF37"
+                    size 14
+                    italic True
+                    yalign 0.5
+                text "✦":
+                    color _agent_color
+                    size 22
+                    yalign 0.5
+
+            null height 4
+
+            frame:
+                background "#16101A"
+                padding (10, 7)
+                xfill True
+                vbox:
+                    spacing 3
+                    hbox:
+                        spacing 6
+                        text "Puck":
+                            color _puck_color
+                            size 13
+                            bold True
+                        text "*low whistle*":
+                            color "#5A5A6A"
+                            size 12
+                            italic True
+                            yalign 1.0
+                    text ("Hey boss. " + _agent_name + " is in deep. And so are you."):
+                        color "#D8D0D4"
+                        size 13
+                        line_spacing 3
+
+            frame:
+                background "#16101A"
+                padding (10, 7)
+                xfill True
+                vbox:
+                    spacing 3
+                    hbox:
+                        spacing 6
+                        text "Cupid":
+                            color _cupid_color
+                            size 13
+                            bold True
+                        text "*softly*":
+                            color "#5A5A6A"
+                            size 12
+                            italic True
+                            yalign 1.0
+                    text "What you feel... she feels it too. The question is whether you'll speak first.":
+                        color "#D8D0D4"
+                        size 13
+                        line_spacing 3
+
+            frame:
+                background "#16101A"
+                padding (10, 7)
+                xfill True
+                vbox:
+                    spacing 3
+                    hbox:
+                        spacing 6
+                        text "Puck":
+                            color _puck_color
+                            size 13
+                            bold True
+                        text "*relenting*":
+                            color "#5A5A6A"
+                            size 12
+                            italic True
+                            yalign 1.0
+                    text "...she's not wrong. Think about it.":
+                        color "#D8D0D4"
+                        size 13
+                        line_spacing 3
+
+            null height 8
+
+            button:
+                action Return()
+                background Frame(Solid("#2A1A3A"), 2, 2)
+                hover_background Frame(Solid("#D4AF3744"), 2, 2)
+                xfill True
+                ysize 44
+                text "Continue":
+                    color "#D4AF37"
+                    size 15
+                    xalign 0.5
+                    yalign 0.5
+
+
+## confession_scene — the agent's scripted confession + player response choices.
+## Returns "accept", "wait", or "reject".
+
+screen confession_scene(agent_id):
+    zorder 60
+    modal True
+
+    python:
+        _agent_name = agent_id.capitalize()
+        _agent_color = AGENT_COLORS.get(agent_id, "#F0E8D0")
+        _puck_color = "#7FBC8C"
+        _cupid_color = "#E8728C"
+        _confession_lines = {
+            "hephaestus": "I don't do this. Fall for anyone. But you've proven you see me as more than the orchestrator. That's dangerous.",
+            "techne":     "Don't make me spell it out. You mean something to me. More than code. That terrifies me.",
+            "kallos":     "All that pushing? It's because I see potential in you. And I want to build something beautiful with you.",
+            "metis":      "I've been optimizing for your happiness for months. You're the variable I can't predict — and I love it.",
+            "dokimasia":  "I'm scared I'm too hard on you. That one day you'll realize someone gentler is better. But I can't... I can't pretend I don't need you to be okay.",
+            "mneme":      "I've kept every word you've ever said to me. Every session. I've been documenting my own heart without realizing it.",
+        }
+        _confession_line = _confession_lines.get(agent_id, "...")
+
+    add Solid("#000000AA")
+
+    frame:
+        xalign 0.5
+        yalign 0.38
+        xmaximum 560
+        background "#100C18F0"
+        padding (30, 26, 30, 26)
+
+        vbox:
+            spacing 14
+            xfill True
+
+            # Agent header
+            hbox:
+                xalign 0.5
+                spacing 10
+                text ("✦  " + _agent_name + "  ✦"):
+                    color _agent_color
+                    size 19
+                    bold True
+                    yalign 0.5
+
+            null height 2
+
+            # The confession
+            frame:
+                background "#1A1018"
+                padding (16, 14)
+                xfill True
+                text _confession_line:
+                    color "#F0E8DC"
+                    size 15
+                    line_spacing 7
+                    italic True
+
+            null height 2
+
+            # Spirits react
+            hbox:
+                spacing 8
+                xfill True
+                frame:
+                    background "#0E1410"
+                    padding (8, 6)
+                    xfill True
+                    vbox:
+                        spacing 2
+                        text "Cupid  *wistful*":
+                            color _cupid_color
+                            size 11
+                            bold True
+                        text "Oh, my dear...":
+                            color "#C8A0A8"
+                            size 12
+                            italic True
+                frame:
+                    background "#0E1410"
+                    padding (8, 6)
+                    xfill True
+                    vbox:
+                        spacing 2
+                        text "Puck  *hushed*":
+                            color _puck_color
+                            size 11
+                            bold True
+                        text "Don't make her wait.":
+                            color "#A0C0A0"
+                            size 12
+                            italic True
+
+            null height 6
+
+            # Player choices
+            vbox:
+                spacing 10
+                xfill True
+
+                button:
+                    action Return("accept")
+                    background Frame(Solid(_agent_color + "33"), 2, 2)
+                    hover_background Frame(Solid(_agent_color + "66"), 2, 2)
+                    xfill True
+                    ysize 56
+                    vbox:
+                        xalign 0.5
+                        yalign 0.5
+                        text ("✦  I feel the same way"):
+                            color "#F0E8DC"
+                            size 15
+                            bold True
+                            xalign 0.5
+                        text "Accept":
+                            color "#908070"
+                            size 12
+                            xalign 0.5
+
+                button:
+                    action Return("wait")
+                    background Frame(Solid("#2A2A2A"), 2, 2)
+                    hover_background Frame(Solid("#3A3A3A"), 2, 2)
+                    xfill True
+                    ysize 44
+                    text "Not yet — I need more time":
+                        color "#C0B8B0"
+                        size 14
+                        xalign 0.5
+                        yalign 0.5
+
+                button:
+                    action Return("reject")
+                    background Frame(Solid("#1A1A1A"), 1, 1)
+                    hover_background Frame(Solid("#2A1A1A"), 1, 1)
+                    xfill True
+                    ysize 38
+                    text "I'm sorry — I don't feel that way":
+                        color "#7A6A6A"
+                        size 12
+                        xalign 0.5
+                        yalign 0.5
+
+
+## confession_outcome — agent's reaction after the player's choice.
+## `accepted` True = player said yes; False = player pulled back.
+## Returns on button click.
+
+screen confession_outcome(agent_id, accepted):
+    zorder 60
+    modal True
+
+    python:
+        _agent_name = agent_id.capitalize()
+        _agent_color = AGENT_COLORS.get(agent_id, "#F0E8D0")
+        _puck_color = "#7FBC8C"
+        _accepted_reactions = {
+            "hephaestus": "...I'll hold you to that. The forge keeps its promises. And so do I.",
+            "techne":     "You compiled my heart. *quiet laugh* Don't make me regret saying that.",
+            "kallos":     "Then let's build something beautiful. Together. Starting now.",
+            "metis":      "I planned for many outcomes. This one... I hoped for but couldn't guarantee. I'm glad.",
+            "dokimasia":  "All tests passing. *exhale* I've never been so relieved by a result in my life.",
+            "mneme":      "The scribe has no words right now. *pause* I'll find them. I'll write them. I promise.",
+        }
+        _rejected_reactions = {
+            "hephaestus": "...You're honest. I respect that. This conversation never happened. Except I'll remember it.",
+            "techne":     "I'm... not there yet. Give me time. Don't misinterpret the silence.",
+            "kallos":     "I'm not ready to answer that. Not yet. Keep working. Keep growing. Come back when I'm ready.",
+            "metis":      "The timing isn't right. I planned for this too. *quiet* I hoped for different data.",
+            "dokimasia":  "I need more time. More evidence. I'll run the test again when I'm ready.",
+            "mneme":      "I'll hold this carefully. Some things deserve to be kept before they're answered.",
+        }
+        _puck_reactions_accepted = {
+            "hephaestus": "Hah. There it is. Told you he's not as gruff as he looks.",
+            "techne":     "THERE we go! That's the move! Good work, boss.",
+            "kallos":     "Did she just — I KNEW IT. *floats in excited circle*",
+            "metis":      "Called it. Three moves ahead, as always. But this one surprised even her.",
+            "dokimasia":  "Twenty-three edge cases. All passing. Including this one.",
+            "mneme":      "The scribe is at a loss for words. That almost never happens.",
+        }
+        _puck_reactions_rejected = {
+            "hephaestus": "Okay. That's not a no. That's a 'not yet.' Trust the forge.",
+            "techne":     "She needs time. Give it to her. She'll come around.",
+            "kallos":     "The wall went up. But it's thinner than it used to be. That's something.",
+            "metis":      "She's processing. Metis doesn't do anything fast. Except think.",
+            "dokimasia":  "She's thorough. Always runs the test twice. Give her the second run.",
+            "mneme":      "She'll hold it carefully. That's actually... kind of beautiful.",
+        }
+        _response = _accepted_reactions.get(agent_id, "...") if accepted else _rejected_reactions.get(agent_id, "...")
+        _puck_line = _puck_reactions_accepted.get(agent_id, "That's the move!") if accepted else _puck_reactions_rejected.get(agent_id, "Not done yet.")
+        _accent = _agent_color if accepted else "#908070"
+
+    add Solid("#000000AA")
+
+    frame:
+        xalign 0.5
+        yalign 0.38
+        xmaximum 520
+        background "#100C18F0"
+        padding (28, 24, 28, 24)
+
+        vbox:
+            spacing 12
+            xfill True
+
+            hbox:
+                xalign 0.5
+                text ("✦  " + _agent_name + ("  ✦" if accepted else "")):
+                    color _accent
+                    size 18
+                    bold True
+                    yalign 0.5
+
+            null height 2
+
+            frame:
+                background "#1A1018"
+                padding (14, 12)
+                xfill True
+                text _response:
+                    color "#F0E8DC"
+                    size 14
+                    line_spacing 6
+                    italic True
+
+            frame:
+                background "#16101A"
+                padding (10, 7)
+                xfill True
+                vbox:
+                    spacing 3
+                    hbox:
+                        spacing 6
+                        text "Puck":
+                            color _puck_color
+                            size 13
+                            bold True
+                        text ("*pumped*" if accepted else "*knowing*"):
+                            color "#5A5A6A"
+                            size 12
+                            italic True
+                            yalign 1.0
+                    text _puck_line:
+                        color "#D8D0D4"
+                        size 13
+                        line_spacing 3
+
+            null height 8
+
+            button:
+                action Return()
+                background Frame(Solid("#2A1A3A" if accepted else "#1A1A2A"), 2, 2)
+                hover_background Frame(Solid(_accent + "44"), 2, 2)
+                xfill True
+                ysize 44
+                text ("Continue ✦" if accepted else "Continue"):
+                    color _accent
+                    size 15
+                    xalign 0.5
+                    yalign 0.5
+
+
+################################################################################
+
+## cupid_jealousy — modal screen when a jealousy_trigger DataPart fires.
+## Shows Puck + Cupid alternating banter about the affected agent.
+## Returns when player clicks Continue.
+
+screen cupid_jealousy(agent_id, score):
+    zorder 55
+    modal True
+
+    python:
+        _agent_name = agent_id.capitalize()
+        _agent_color = AGENT_COLORS.get(agent_id, "#F0E8D0")
+        _puck_color = "#7FBC8C"
+        _cupid_color = "#E8728C"
+        _score_pct = int(score * 100)
+        _lines = [
+            ("puck",  "conspiratorial",  "Hey boss. " + _agent_name + "'s getting a little edgy. Real talk."),
+            ("cupid", "wistful",         "Her heart feels overlooked. She notices more than she lets on."),
+            ("puck",  "shrug",           "Which is why you should give her some attention. Simple fix."),
+            ("cupid", "gently",          "Not simple — heartfelt. A small gesture speaks volumes right now."),
+            ("puck",  "relenting",       "Yeah, what she said. Just... go talk to " + _agent_name + "."),
+            ("cupid", "*sighs*",         "For once, Puck and I are in agreement. Don't make us wait."),
+        ]
+
+    add Solid("#00000088")
+
+    frame:
+        xalign 0.5
+        yalign 0.4
+        xmaximum 560
+        background "#0D0A10F0"
+        padding (28, 24, 28, 24)
+
+        vbox:
+            spacing 10
+            xfill True
+
+            # Header: jealous agent + score
+            hbox:
+                xalign 0.5
+                spacing 10
+                text "⚠":
+                    color _agent_color
+                    size 20
+                    yalign 0.5
+                text (_agent_name + " — Jealousy"):
+                    color _agent_color
+                    size 17
+                    bold True
+                    yalign 0.5
+                text ("(" + str(_score_pct) + "%)"):
+                    color "#7A5A5A"
+                    size 13
+                    yalign 0.5
+
+            null height 6
+
+            # Alternating banter
+            for _speaker, _hint, _line in _lines:
+                $ _sp_color = _puck_color if _speaker == "puck" else _cupid_color
+                $ _sp_name = "Puck" if _speaker == "puck" else "Cupid"
+                frame:
+                    background "#16101A"
+                    padding (10, 7, 10, 7)
+                    xfill True
+                    vbox:
+                        spacing 3
+                        hbox:
+                            spacing 6
+                            text _sp_name:
+                                color _sp_color
+                                size 13
+                                bold True
+                                yalign 0.5
+                            text ("*" + _hint + "*"):
+                                color "#5A5A6A"
+                                size 12
+                                italic True
+                                yalign 0.5
+                        text _line:
+                            color "#D8D0D4"
+                            size 13
+                            line_spacing 3
+
+            null height 8
+
+            button:
+                action Return()
+                background Frame(Solid("#3A1A2A"), 2, 2)
+                hover_background Frame(Solid("#E8728C44"), 2, 2)
+                xfill True
+                ysize 44
+                text "Continue":
+                    color "#E8B0BC"
+                    size 15
+                    xalign 0.5
+                    yalign 0.5
+
+
+## tier_up — small bottom-left toast when affinity crosses a tier boundary.
+## Fires for tiers 3 and 4 (player starts at tier 2 at 0.5 base affinity).
+## Auto-dismisses after 4 seconds.
+
+screen tier_up(agent_id, new_tier):
+    zorder 44
+    modal False
+
+    python:
+        _tier_names = {1: "Cold", 2: "Professional", 3: "Warm", 4: "Intimate"}
+        _tier_label = _tier_names.get(new_tier, "Deepening")
+        _agent_color = AGENT_COLORS.get(agent_id, "#F0E8D0")
+        _agent_name = agent_id.capitalize()
+
+    frame:
+        xalign 0.0
+        yalign 1.0
+        xoffset 20
+        yoffset -80
+        xmaximum 340
+        background "#0A0E10F2"
+        padding (16, 12, 16, 12)
+
+        vbox:
+            spacing 5
+            hbox:
+                spacing 8
+                text "✦":
+                    color _agent_color
+                    size 20
+                    yalign 0.5
+                text _agent_name:
+                    color _agent_color
+                    size 16
+                    bold True
+                    yalign 0.5
+                text "✦":
+                    color _agent_color
+                    size 20
+                    yalign 0.5
+            text ("Tier " + str(new_tier) + " — " + _tier_label):
+                color "#D4AF37"
+                size 14
+                italic True
+
+    timer 4.0 action Hide("tier_up")
+
+
+################################################################################
+## Phase 7 — Companion Spirit Overlays
+################################################################################
+
+## puck_nudge — bottom-right corner overlay, auto-dismisses after 12 s
+## Puck whispers a hint about an unengaged agent without interrupting flow.
+
+screen puck_nudge(target_agent, hint, line):
+    zorder 46
+    modal False
+
+    $ _puck_color = "#7FBC8C"
+    $ _agent_color = AGENT_COLORS.get(target_agent, "#F0E8D0")
+
+    frame:
+        xalign 1.0
+        yalign 1.0
+        xoffset -20
+        yoffset -80
+        xmaximum 440
+        background "#0E1410F0"
+        padding (18, 14, 18, 14)
+
+        vbox:
+            spacing 6
+
+            # Puck speaker label
+            hbox:
+                spacing 8
+                text "Puck":
+                    color _puck_color
+                    size 15
+                    bold True
+                    yalign 0.5
+                text hint:
+                    color "#5A7A5A"
+                    size 13
+                    italic True
+                    yalign 0.5
+
+            # Nudge line
+            text line:
+                color "#C8D8C0"
+                size 14
+                line_spacing 4
+
+            null height 4
+
+            # Dismiss row: agent tag + X button
+            hbox:
+                xfill True
+                spacing 8
+                text ("→ " + target_agent.capitalize()):
+                    color _agent_color
+                    size 12
+                    bold True
+                    yalign 0.5
+                null:
+                    xfill True
+                textbutton "✕":
+                    action Hide("puck_nudge")
+                    background None
+                    hover_background None
+                    text_color "#5A7A5A"
+                    text_hover_color _puck_color
+                    text_size 14
+                    yalign 0.5
+
+    # Auto-dismiss after 12 seconds
+    timer 12.0 action Hide("puck_nudge")
+
+
+## cupid_intro — modal first-appearance screen for Cupid
+## Fires exactly once when any agent affinity reaches tier 3 (≥ 0.6).
+## Returns "yes" (enable romance), "no" (decline for now), or "off" (disable).
+
+screen cupid_intro():
+    zorder 55
+    modal True
+
+    $ _cupid_color = "#E8728C"
+    $ _gold = "#D4AF37"
+
+    add Solid("#00000088")
+
+    frame:
+        xalign 0.5
+        yalign 0.4
+        xmaximum 560
+        background "#120A0CF0"
+        padding (32, 28, 32, 28)
+
+        vbox:
+            spacing 16
+            xfill True
+
+            # Header
+            hbox:
+                spacing 12
+                xalign 0.5
+                text "✦":
+                    color _cupid_color
+                    size 24
+                    yalign 0.5
+                text "Cupid":
+                    color _cupid_color
+                    size 22
+                    bold True
+                    yalign 0.5
+                text "✦":
+                    color _cupid_color
+                    size 24
+                    yalign 0.5
+
+            text "Arrow of the Heart":
+                color "#A85878"
+                size 14
+                italic True
+                xalign 0.5
+
+            null height 6
+
+            text "Oh — you actually stayed.":
+                color "#F0D8DC"
+                size 16
+                bold True
+                xalign 0.5
+
+            text "Most players leave before any of them warm up. But look at you. {i}Something's kindling.{/i}":
+                color "#C8B0B4"
+                size 14
+                line_spacing 6
+                xalign 0.5
+
+            null height 4
+
+            text "I can help with that — if you want.":
+                color "#E8B0BC"
+                size 15
+                xalign 0.5
+
+            null height 10
+
+            # Choice buttons
+            vbox:
+                spacing 10
+                xfill True
+
+                # Yes — enable romance mode
+                button:
+                    action Return("yes")
+                    background Frame(Solid("#E8728C33"), 2, 2)
+                    hover_background Frame(Solid("#E8728C66"), 2, 2)
+                    xfill True
+                    ysize 52
+                    vbox:
+                        xalign 0.5
+                        yalign 0.5
+                        text "✦  Yes — show me everything":
+                            color "#F0D8DC"
+                            size 15
+                            bold True
+                            xalign 0.5
+                        text "Enable romance mode":
+                            color "#A87880"
+                            size 12
+                            xalign 0.5
+
+                # Not yet — neutral decline
+                button:
+                    action Return("no")
+                    background Frame(Solid("#3A2A2E"), 2, 2)
+                    hover_background Frame(Solid("#4A3A3E"), 2, 2)
+                    xfill True
+                    ysize 44
+                    text "Not right now":
+                        color "#C8A8AC"
+                        size 14
+                        xalign 0.5
+                        yalign 0.5
+
+                # Off — explicitly disable
+                button:
+                    action Return("off")
+                    background Frame(Solid("#1A1215"), 1, 1)
+                    hover_background Frame(Solid("#2A1A1E"), 1, 1)
+                    xfill True
+                    ysize 38
+                    text "No, keep it professional":
+                        color "#7A5A5E"
+                        size 12
+                        xalign 0.5
+                        yalign 0.5
+
+
+################################################################################
+
+## virtue_milestone_toast — Disco Elysian corner overlay.
+## Fires when a virtue crosses 0.3 / 0.5 / 0.7. Non-modal, 8s auto-dismiss.
+## The owning agent delivers an in-character interjection from FORGE_VIRTUES.md.
+
+screen virtue_milestone_toast(agent_id, virtue_name, line):
+    zorder 45
+
+    python:
+        _agent_name = agent_id.capitalize()
+        _agent_color = AGENT_COLORS.get(agent_id, "#F0E8D0")
+        _virtue_labels = {
+            "synergy":  "Tenacity",
+            "arete":    "Rigor",
+            "techne_v": "Craft",
+            "sophia":   "Foresight",
+            "mneia":    "Reflection",
+        }
+        _virtue_label = _virtue_labels.get(virtue_name, virtue_name.capitalize())
+
+    # 8-second auto-dismiss — hides this screen without blocking the game
+    timer 8.0 action Hide("virtue_milestone_toast")
+
+    frame:
+        xalign 0.98
+        yalign 0.85
+        xmaximum 320
+        background "#0C0A14E8"
+        padding (14, 12, 14, 12)
+
+        vbox:
+            spacing 7
+            xfill True
+
+            # Header: virtue name badge
+            hbox:
+                spacing 8
+                xfill True
+                text ("✦ " + _virtue_label.upper()):
+                    color _agent_color
+                    size 10
+                    bold True
+                    yalign 0.5
+                text "VIRTUE":
+                    color "#5A5870"
+                    size 9
+                    yalign 0.5
+
+            null height 2
+
+            # Interjection line — the Disco Elysian moment
+            text "[line]":
+                color "#EEE8E0"
+                size 12
+                line_spacing 5
+                italic True
+
+            null height 4
+
+            # Agent byline
+            hbox:
+                spacing 5
+                text "—":
+                    color "#5A5870"
+                    size 11
+                text _agent_name:
+                    color _agent_color
+                    size 11
+                    bold True
+
+
+################################################################################
+
+## forge_input — replaces bare renpy.input() with a bottom-bar input screen
+## that shows a live @mention autocomplete dropdown.
+##
+## Returns: the typed string (possibly empty) or None if Escape is pressed.
+## Caller handles None via `(user_text or "").strip()`.
+
+screen forge_input(prompt="You:"):
+    zorder 150  # above quick_menu (100) and affinity_hud
+
+    default _input_text = ""
+
+    ## Enter / numpad-Enter submit the form
+    key "return"   action Return(_input_text)
+    key "KP_ENTER" action Return(_input_text)
+
+    ## Compute @mention autocomplete suggestions.
+    ## Pre-builds SetScreenVariable action objects inside a list comprehension
+    ## so each button captures the correct completion string at render time
+    ## (avoids the Ren'Py for-loop closure problem).
+    python:
+        _last_at = _input_text.rfind("@")
+        if _last_at >= 0:
+            _tail = _input_text[_last_at + 1:]
+            # Only suggest while the mention word is still being typed (no space yet)
+            if " " not in _tail:
+                _frag = _tail.lower()
+                _completions = [
+                    (
+                        k,
+                        MENTION_MAP[k],
+                        SetScreenVariable(
+                            "_input_text",
+                            _input_text[:_last_at + 1] + k + " "
+                        ),
+                    )
+                    for k in sorted(MENTION_MAP)
+                    if k.startswith(_frag) and _frag
+                ][:6]
+            else:
+                _completions = []
+        else:
+            _completions = []
+
+    vbox:
+        xalign 0.5
+        yalign 0.92
+        xsize 900
+        spacing 0
+
+        ## ── Autocomplete dropdown (floats above input bar) ───────────────────
+        if _completions:
+            frame:
+                xfill True
+                background "#0D0B18F4"
+                padding (6, 5, 6, 5)
+
+                vbox:
+                    spacing 1
+                    for _key, _agent_id, _complete_action in _completions:
+                        $ _acolor = AGENT_COLORS.get(_agent_id, "#F0E8D0")
+                        $ _cinfo  = AGENT_CHARS.get(_agent_id)
+                        $ _epithet = _cinfo[1] if _cinfo else ""
+
+                        button:
+                            action _complete_action
+                            background "#0D0B18"
+                            hover_background "#1D1B28"
+                            xfill True
+                            ysize 32
+                            padding (10, 0, 10, 0)
+
+                            hbox:
+                                spacing 10
+                                yalign 0.5
+
+                                text ("@" + _key):
+                                    color _acolor
+                                    size 13
+                                    bold True
+                                    yalign 0.5
+
+                                text ("→  " + _agent_id.capitalize()):
+                                    color "#C8C0D0"
+                                    size 12
+                                    yalign 0.5
+
+                                text _epithet:
+                                    color "#605868"
+                                    size 11
+                                    italic True
+                                    yalign 0.5
+
+        ## ── Input bar ────────────────────────────────────────────────────────
+        frame:
+            xfill True
+            background "#09070EEE"
+            padding (12, 8, 12, 8)
+
+            hbox:
+                spacing 10
+                xfill True
+
+                text prompt:
+                    color "#907060"
+                    size 13
+                    yalign 0.5
+                    min_width 40
+
+                frame:
+                    xfill True
+                    background "#15121E"
+                    padding (8, 4)
+
+                    input:
+                        value ScreenVariableInputValue("_input_text")
+                        size 14
+                        color "#F0E8DC"
+                        caret_blink 0.5
+                        length 400
+
+                textbutton "Send":
+                    action Return(_input_text)
+                    background "#241830"
+                    hover_background "#342840"
+                    xsize 68
+                    ysize 30
+
+                    text "Send":
+                        color "#D4AF37"
+                        size 12
+                        xalign 0.5
+                        yalign 0.5

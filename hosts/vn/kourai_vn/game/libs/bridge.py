@@ -54,10 +54,10 @@ class RenPyBridge:
     def _log(self, message: str) -> None:
         try:
             ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            with open(self.log_file, "a", encoding="utf-8") as f:
+            with Path(self.log_file).open("a", encoding="utf-8") as f:
                 f.write(f"[{ts}] {message}\n")
                 f.flush()
-        except Exception:  # noqa: BLE001, S110
+        except Exception:  # noqa: S110
             pass
 
     # ── Lifecycle ─────────────────────────────────────────────────────────
@@ -161,6 +161,78 @@ class RenPyBridge:
         try:
             return self.errors.get(timeout=timeout)
         except queue.Empty:
+            return None
+
+    # ── TTS ────────────────────────────────────────────────────────────────
+
+    def request_tts(self, text: str, agent: str) -> str | None:
+        """Request TTS audio from the bridge and save to game/audio/tts/.
+
+        Returns a Ren'Py-relative path (e.g. "audio/tts/tts_techne.mp3")
+        suitable for renpy.voice(), or None on failure.
+        """
+        url = f"{BRIDGE_URL}/tts"
+        body = json.dumps({"text": text, "agent": agent}).encode("utf-8")
+        try:
+            req = urllib.request.Request(  # noqa: S310
+                url, data=body, headers={"Content-Type": "application/json"}
+            )
+            with urllib.request.urlopen(req, timeout=_ACTION_TIMEOUT) as resp:  # noqa: S310
+                if resp.status != 200:
+                    self._log(f"TTS request failed: HTTP {resp.status}")
+                    return None
+                audio_data = resp.read()
+                if not audio_data:
+                    self._log("TTS returned empty audio")
+                    return None
+                # game/audio/tts/ — Ren'Py resolves audio relative to game/
+                game_dir = Path(__file__).resolve().parent.parent
+                audio_dir = game_dir / "audio" / "tts"
+                audio_dir.mkdir(parents=True, exist_ok=True)
+                filename = f"tts_{agent}.mp3"
+                (audio_dir / filename).write_bytes(audio_data)
+                self._log(f"TTS saved: {filename} ({len(audio_data)} bytes)")
+                return f"audio/tts/{filename}"
+        except Exception as e:
+            self._log(f"TTS request error: {e}")
+            return None
+
+    # ── Gossip ──────────────────────────────────────────────────────────────
+
+    _GOSSIP_TIMEOUT = 5.0
+
+    def request_gossip(self, agent: str, player_id: str, affinity: dict) -> tuple[str, str] | None:
+        """Request a live gossip line from an idle agent.
+
+        Returns (hint, line) tuple on success, None on failure.
+        Callers should fall back to pre-authored GOSSIP_LINES on None.
+        """
+        url = f"{BRIDGE_URL}/gossip"
+        body = json.dumps(
+            {
+                "agent": agent,
+                "player_id": player_id,
+                "affinity": affinity,
+            }
+        ).encode("utf-8")
+        try:
+            req = urllib.request.Request(  # noqa: S310
+                url, data=body, headers={"Content-Type": "application/json"}
+            )
+            with urllib.request.urlopen(req, timeout=self._GOSSIP_TIMEOUT) as resp:  # noqa: S310
+                if resp.status != 200:
+                    self._log(f"Gossip request failed: HTTP {resp.status}")
+                    return None
+                data = json.loads(resp.read())
+                hint = data.get("hint", "*observing*")
+                line = data.get("line", "")
+                if not line:
+                    self._log("Gossip returned empty line")
+                    return None
+                self._log(f"Live gossip ({agent}): {hint} {line[:60]}")
+                return (hint, line)
+        except Exception as e:
+            self._log(f"Gossip request error: {e}")
             return None
 
     # ── Ren'Py save/load pickle support ───────────────────────────────────

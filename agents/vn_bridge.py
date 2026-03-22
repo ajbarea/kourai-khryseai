@@ -1,12 +1,15 @@
 """VN Bridge HTTP Server - runs in Docker, proxies Ren'Py to A2A agents.
 
-Exposes three endpoints:
+Exposes five endpoints:
   GET  /health  - liveness + agent connectivity check
   POST /action  - synchronous actions (profiles, virtues, resume)
   POST /message - streaming NDJSON: user message or choice to agent stream
+  POST /tts     - text-to-speech: {text, agent} → MP3 audio bytes
+  POST /gossip  - live agent gossip: {agent, player_id, affinity} → {hint, line}
 """
 
 import contextlib
+import io
 import json
 import logging
 import re
@@ -15,6 +18,7 @@ from collections.abc import AsyncGenerator
 from typing import cast
 from uuid import uuid4
 
+import edge_tts
 import httpx
 import uvicorn
 from a2a.client import A2ACardResolver, ClientConfig, ClientFactory
@@ -58,6 +62,36 @@ AGENT_NAMES = {
 
 # Status keywords promoted to dialogue beats vs. silent HUD updates
 DIALOGUE_KEYWORDS = ["pipeline:", "dispatching", "complete", "failed", "error"]
+
+# Agent → edge-tts voice config. Source of truth: designs/TTS_ARCHITECTURE.md
+VOICE_MAP: dict[str, dict] = {
+    "hephaestus": {"voice": "en-US-GuyNeural", "rate": "-5%", "pitch": "+0Hz"},
+    "metis": {"voice": "en-US-AriaNeural", "rate": "-10%", "pitch": "+10%"},
+    "kallos": {"voice": "en-US-JennyNeural", "rate": "+5%", "pitch": "+15%"},
+    "mneme": {"voice": "en-US-MichelleNeural", "rate": "-8%", "pitch": "-5%"},
+    "techne": {"voice": "en-GB-SoniaNeural", "rate": "-7%", "pitch": "+5%"},
+    "dokimasia": {"voice": "en-US-AriaNeural", "rate": "-12%", "pitch": "+0Hz"},
+    "puck": {"voice": "en-US-AndrewNeural", "rate": "+5%", "pitch": "+0Hz"},
+    "cupid": {"voice": "en-US-AmberNeural", "rate": "-5%", "pitch": "+10%"},
+    "aidos": {"voice": "en-US-JaneNeural", "rate": "-10%", "pitch": "-5%"},
+    "aletheia": {"voice": "en-US-NancyNeural", "rate": "-7%", "pitch": "+0Hz"},
+}
+_DEFAULT_VOICE = {"voice": "en-US-AriaNeural", "rate": "+0%", "pitch": "+0Hz"}
+
+# Short personality hints for gossip generation — keeps prompts small and fast.
+# Source of truth: designs/CHARACTER_DESIGN.md
+GOSSIP_HINTS: dict[str, str] = {
+    "hephaestus": "Gruff forge-master. Laconic. Shows approval through craft metaphors.",
+    "techne": "Precise British coder. Dry wit. Notices technical habits. Tsundere about caring.",
+    "kallos": "Elegant stylist. Opinionated about aesthetics. Notices effort in presentation.",
+    "metis": "Strategic architect. Speaks in systems. Sees patterns others miss.",
+    "dokimasia": "Stern tester. Counts everything. Quietly satisfied by thoroughness.",
+    "mneme": "Gentle scribe. Poetic. Remembers everything. Finds meaning in repetition.",
+    "puck": "Sarcastic companion spirit. Conspiratorial. Calls the player 'boss'.",
+    "cupid": "Romantic idealist. Reads emotional subtext. Warm and perceptive.",
+    "aidos": "Spirit of shame. Terse. Notices when people are being vague or dishonest.",
+    "aletheia": "Truth-seeker. Factual. Values evidence over opinion.",
+}
 
 
 def _infer_portrait_state(agent: str, text: str) -> str:
@@ -120,7 +154,7 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
     httpx_client = httpx.AsyncClient(timeout=600)
     config = ClientConfig(streaming=True, httpx_client=httpx_client)
     try:
-        resolver = A2ACardResolver(cast(httpx.AsyncClient, config.httpx_client), agent_url)
+        resolver = A2ACardResolver(cast("httpx.AsyncClient", config.httpx_client), agent_url)
         card = await resolver.get_agent_card()
         card.url = agent_url
         client = await ClientFactory.connect(card, client_config=config)
@@ -132,6 +166,96 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
     app.state.context_id = uuid4().hex
     yield
     await httpx_client.aclose()
+
+
+async def handle_tts(request: Request) -> StreamingResponse | JSONResponse:
+    """Generate MP3 audio from text using edge-tts with per-agent voice settings."""
+    data: dict = await request.json()
+    text = data.get("text", "").strip()
+    agent = data.get("agent", "").lower().strip()
+    if not text:
+        return JSONResponse({"error": "Missing 'text' field"}, status_code=400)
+
+    voice_cfg = VOICE_MAP.get(agent, _DEFAULT_VOICE)
+    log.info(f"TTS ({agent}): {text[:60]}... → {voice_cfg['voice']}")
+    try:
+        communicate = edge_tts.Communicate(
+            text,
+            voice=voice_cfg["voice"],
+            rate=voice_cfg["rate"],
+            pitch=voice_cfg["pitch"],
+        )
+        buf = io.BytesIO()
+        async for chunk in communicate.stream():
+            if chunk["type"] == "audio":
+                buf.write(chunk["data"])
+        buf.seek(0)
+        return StreamingResponse(buf, media_type="audio/mpeg")
+    except Exception as e:
+        log.error(f"TTS generation failed: {e}", exc_info=True)
+        return JSONResponse({"error": f"TTS failed: {e}"}, status_code=500)
+
+
+async def handle_gossip(request: Request) -> JSONResponse:
+    """Generate a live gossip line from an idle agent about the player.
+
+    Uses kourai_common.llm.chat() directly (not A2A) for speed — gossip
+    is flavor text that shouldn't go through the full orchestrator pipeline.
+    """
+    from kourai_common.facts import get_relevant_facts_for_enrichment
+    from kourai_common.llm import chat
+
+    data: dict = await request.json()
+    agent = data.get("agent", "").lower().strip()
+    player_id = data.get("player_id", "").strip()
+    affinity_data: dict = data.get("affinity") or {}
+
+    if agent not in AGENT_NAMES:
+        return JSONResponse({"error": f"Unknown agent: {agent}"}, status_code=400)
+
+    hint_text = GOSSIP_HINTS.get(agent, "An AI agent.")
+    agent_affinity = affinity_data.get(agent, 0.5)
+
+    # Gather player facts for personalization
+    fact_lines = ""
+    if player_id:
+        facts = get_relevant_facts_for_enrichment(player_id, agent_name=agent, limit=3)
+        if facts:
+            fact_lines = "\n".join(f"- {f.get('content', '')}" for f in facts)
+            fact_lines = f"\nWhat you know about the player:\n{fact_lines}"
+
+    prompt = (
+        f"You are {agent.capitalize()}, observing the player from the sidelines.\n"
+        f"Personality: {hint_text}\n"
+        f"Your affinity with the player: {agent_affinity:.2f} (0=cold, 1=intimate).{fact_lines}\n\n"
+        f"Generate exactly ONE idle observation about the player. Stay in character.\n"
+        f'Respond with ONLY valid JSON: {{"hint": "*stage direction*", "line": "Your observation."}}'
+    )
+
+    try:
+        result = await chat(
+            agent,
+            [{"role": "user", "content": prompt}],
+            temperature=0.9,
+            max_tokens=100,
+        )
+        # Parse the JSON response — strip markdown fences if the LLM wraps it
+        cleaned = result.strip()
+        if cleaned.startswith("```"):
+            cleaned = cleaned.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+        parsed = json.loads(cleaned)
+        hint = parsed.get("hint", "*observing*")
+        line = parsed.get("line", "")
+        if not line:
+            return JSONResponse({"error": "Empty gossip"}, status_code=500)
+        log.info(f"Gossip ({agent}): {hint} {line[:60]}")
+        return JSONResponse({"hint": hint, "line": line})
+    except (json.JSONDecodeError, KeyError) as e:
+        log.warning(f"Gossip parse error ({agent}): {e} — raw: {result[:100]}")
+        return JSONResponse({"error": "Gossip generation failed"}, status_code=500)
+    except Exception as e:
+        log.error(f"Gossip LLM error ({agent}): {e}", exc_info=True)
+        return JSONResponse({"error": f"Gossip failed: {e}"}, status_code=500)
 
 
 async def health(request: Request) -> JSONResponse:
@@ -216,9 +340,28 @@ async def handle_message(request: Request) -> StreamingResponse:
         request.app.state.context_id = req_context
     context_id = request.app.state.context_id
     current_player_id = data.get("player_id", "").strip()
+    project_path = data.get("project_path", "").strip()
 
     # Both "message" and "choice" resolve to a user text turn
     user_text = data.get("choice", "") if action == "choice" else data.get("text", "")
+
+    # Inject project context so Hephaestus can pass it to specialist agents.
+    # WHY: vn_bridge previously dropped project_path on the floor; agents always
+    # operated on the Kourai codebase regardless of the player's selected project.
+    if project_path:
+        user_text = f"[project_root: {project_path}]\n{user_text}"
+
+    # Inject affinity snapshot so Hephaestus can calibrate relationship tier context.
+    # WHY: ROUTING_PROMPT says "use your current relationship context" but no context
+    # was ever provided. This closes the loop — agents adapt tone by tier without
+    # SYSTEM_PROMPT changes; tier context flows via accumulated_context only.
+    affinity_data: dict = data.get("affinity") or {}
+    if affinity_data:
+        tiers_str = ",".join(
+            f"{k}={v:.2f}" for k, v in affinity_data.items() if isinstance(v, int | float)
+        )
+        if tiers_str:
+            user_text = f"[relationship_tiers: {tiers_str}]\n{user_text}"
     if not user_text:
 
         async def empty() -> AsyncGenerator[str, None]:
@@ -291,6 +434,24 @@ async def handle_message(request: Request) -> StreamingResponse:
                             )
                     elif isinstance(update, TaskArtifactUpdateEvent):
                         if update.artifact and update.artifact.parts:
+                            # Extract jealousy_trigger from DataPart before processing text.
+                            # WHY: Phase 5.2 embeds this signal in DataPart; bridge previously
+                            # iterated only TextPart so the signal was silently dropped.
+                            for p in update.artifact.parts:
+                                part_data = getattr(p.root, "data", None)
+                                if isinstance(part_data, dict):
+                                    jealousy = part_data.get("jealousy_trigger")
+                                    if jealousy and isinstance(jealousy, dict):
+                                        yield (
+                                            json.dumps(
+                                                {
+                                                    "action": "jealousy",
+                                                    "agent": jealousy.get("agent", ""),
+                                                    "score": jealousy.get("score", 0.0),
+                                                }
+                                            )
+                                            + "\n"
+                                        )
                             text = "\n".join(
                                 p.root.text
                                 for p in update.artifact.parts
@@ -338,6 +499,8 @@ app = Starlette(
         Route("/health", health),
         Route("/action", handle_action, methods=["POST"]),
         Route("/message", handle_message, methods=["POST"]),
+        Route("/tts", handle_tts, methods=["POST"]),
+        Route("/gossip", handle_gossip, methods=["POST"]),
     ],
     lifespan=lifespan,
 )
