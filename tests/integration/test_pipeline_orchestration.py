@@ -62,10 +62,10 @@ class TestFullPipelineOrchestration:
         pipeline = ["metis", "techne", "dokimasia", "kallos", "mneme"]
 
         with patch(
-            "agents.hephaestus.routing_agent.RemoteAgentConnection",
+            "agents.hephaestus.agent.RemoteAgentConnection",
             side_effect=make_conn,
         ):
-            from agents.hephaestus.routing_agent import execute_pipeline
+            from agents.hephaestus.agent import execute_pipeline
 
             statuses: list[tuple[str, str]] = []
             async for agent, status, _output in execute_pipeline(pipeline, "implement CSV export"):
@@ -99,10 +99,10 @@ class TestFullPipelineOrchestration:
         pipeline = ["metis", "techne", "dokimasia", "kallos", "mneme"]
 
         with patch(
-            "agents.hephaestus.routing_agent.RemoteAgentConnection",
+            "agents.hephaestus.agent.RemoteAgentConnection",
             side_effect=make_conn,
         ):
-            from agents.hephaestus.routing_agent import execute_pipeline
+            from agents.hephaestus.agent import execute_pipeline
 
             statuses: list[tuple[str, str]] = []
             async for agent, status, _output in execute_pipeline(pipeline, "implement feature"):
@@ -163,12 +163,12 @@ class TestIterativeLoopConvergence:
 
         with (
             patch(
-                "agents.hephaestus.routing_agent.RemoteAgentConnection",
+                "agents.hephaestus.agent.RemoteAgentConnection",
                 side_effect=make_conn,
             ),
-            patch("agents.hephaestus.routing_agent.MAX_ITERATIONS", 3),
+            patch("agents.hephaestus.agent.MAX_ITERATIONS", 3),
         ):
-            from agents.hephaestus.routing_agent import execute_pipeline
+            from agents.hephaestus.agent import execute_pipeline
 
             statuses: list[tuple[str, str]] = []
             async for agent, status, _output in execute_pipeline(
@@ -226,10 +226,10 @@ class TestMidPipelineDegradation:
         pipeline = ["metis", "techne", "dokimasia", "kallos", "mneme"]
 
         with patch(
-            "agents.hephaestus.routing_agent.RemoteAgentConnection",
+            "agents.hephaestus.agent.RemoteAgentConnection",
             side_effect=make_conn,
         ):
-            from agents.hephaestus.routing_agent import execute_pipeline
+            from agents.hephaestus.agent import execute_pipeline
 
             statuses: list[tuple[str, str]] = []
             async for agent, status, _output in execute_pipeline(pipeline, "implement feature"):
@@ -272,10 +272,10 @@ class TestMidPipelineDegradation:
             return conn
 
         with patch(
-            "agents.hephaestus.routing_agent.RemoteAgentConnection",
+            "agents.hephaestus.agent.RemoteAgentConnection",
             side_effect=make_conn,
         ):
-            from agents.hephaestus.routing_agent import execute_pipeline
+            from agents.hephaestus.agent import execute_pipeline
 
             statuses: list[tuple[str, str]] = []
             async for agent, status, _output in execute_pipeline(
