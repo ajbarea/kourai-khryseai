@@ -20,6 +20,7 @@ from agents.mneme.agent import (
 )
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
+from kourai_common.facts import extract_facts, store_facts, strip_facts
 from kourai_common.messaging import send_working_status
 from kourai_common.player import PlayerProfile
 from kourai_common.tracing import create_span
@@ -115,6 +116,14 @@ class MnemeAgentExecutor(BaseAgentExecutor):
                         await send_working_status(
                             updater, task, f"Drafting: {latest_line}", emoji="📜"
                         )
+
+            # Extract + store player facts from the full response before splitting
+            _profile_early = PlayerProfile.load()
+            _player_id_early = _profile_early.player_id if _profile_early else ""
+            _facts = extract_facts(full_response, source_agent="mneme")
+            if _facts and _player_id_early:
+                store_facts(_player_id_early, _facts)
+            full_response = strip_facts(full_response)
 
             # Separate spoken personality lines from the artifact
             spoken_intro, artifact_body, _spoken_outro = _split_response(full_response)
@@ -226,6 +235,23 @@ class MnemeAgentExecutor(BaseAgentExecutor):
                 name="commit_messages",
             )
             await updater.complete()
+
+            # Optional: persist commit context to Memory MCP (graceful degradation)
+            if commit_groups and _player_id_early:
+                try:
+                    from kourai_common.mcp_client import create_memory_entities  # noqa: PLC0415
+
+                    await create_memory_entities(
+                        [
+                            {
+                                "name": f"{_player_id_early}_commits",
+                                "entityType": "PlayerCommitHistory",
+                                "observations": commit_groups[:5],
+                            }
+                        ]
+                    )
+                except Exception:  # noqa: BLE001, S110
+                    pass
 
             # Virtue update: generating commits → mneia (memory and continuity)
             _profile = PlayerProfile.load()

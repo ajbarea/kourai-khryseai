@@ -26,36 +26,46 @@ async def query_context7(
     query: str,
     max_results: int = 3,
 ) -> list[dict[str, Any]]:
-    """Query Context7 API for documentation.
+    """Query Context7 MCP sidecar for documentation.
 
-    Context7 is a documentation-aware LLM that provides current API docs,
-    standards references, and framework guides.
+    Connects to the context7-mcp Docker service via mcp_client.query_context7().
+    The sidecar exposes the @upstash/context7-mcp server over SSE (port 3001).
 
     Args:
-        query: Documentation search (e.g., "async/await Python 3.12")
-        max_results: Max doc snippets to return.
+        query: Documentation search (e.g., "async/await Python 3.12").
+        max_results: Max doc snippets to return (currently returns 1 rich result).
 
     Returns:
-        List of dicts with keys: title, snippet, source_url, confidence.
-        Empty list if unavailable.
-
-    Note:
-        Requires Context7 API key in environment (CONTEXT7_API_KEY).
-        Stub implementation; actual MCP integration in Phase E.
+        List of dicts with keys: title, snippet, source_url.
+        Empty list if context7-mcp sidecar is unavailable.
     """
-    import os
+    from kourai_common.mcp_client import (  # noqa: PLC0415
+        MCPUnavailable,
+        query_context7 as mcp_query_context7,
+    )
 
-    api_key = os.getenv("CONTEXT7_API_KEY")
-    if not api_key:
-        log.debug("CONTEXT7_API_KEY not set — falling back to Context Hub")
+    # Use the first word as the library name; rest of query becomes the topic
+    parts = query.split(None, 1)
+    library = parts[0] if parts else ""
+    topic = parts[1] if len(parts) > 1 else query
+
+    if not library:
         return []
 
     try:
-        # MCP Integration Point: In Phase E, this becomes an MCP call
-        # For now, return empty to trigger chub fallback
-        log.debug("Context7 stub: query=%s", query)
+        docs_text = await mcp_query_context7(library, topic)
+        if not docs_text:
+            return []
+        return [
+            {
+                "title": f"{library} — Context7 docs",
+                "snippet": docs_text[:500],
+                "source_url": f"https://context7.com/{library}",
+            }
+        ]
+    except MCPUnavailable:
+        log.debug("context7-mcp sidecar unavailable — falling back to Context Hub")
         return []
-
     except Exception as e:
         log.warning("Context7 lookup failed: %s", e)
         return []

@@ -1,21 +1,22 @@
 """MCPToolkit — shared infrastructure for agent MCP server integration.
 
-Centralizes MCP client lifecycle, server registry, and per-agent tool assignments.
-Provides graceful degradation (MCPUnavailable) when servers are not available.
+Centralizes MCP client lifecycle, server registry, per-agent tool assignments,
+and the real async MCP client functions for Context7 and Memory sidecars.
 
 MCP Servers in Kourai Khryseai:
-- Context7: Documentation lookup (code awareness)
-- Context Hub: Fallback documentation (cli: chub get)
-- GitHub: Issue/PR/repo operations (code search, PRs, commits)
-- Memory: Player facts, relationship persistence (JSON graph)
-- Shell: pytest, ruff, npx, node (command execution)
-- Playwright: Frontend E2E testing (Phase E)
-- Brave Search: Web search for claim verification
+- Context7: Documentation lookup via context7-mcp sidecar (SSE on port 3001)
+- Memory: Player facts, relationship persistence via memory-mcp sidecar (SSE on port 5001)
+- GitHub: Issue/PR/repo operations (direct PyGithub)
+- Shell: pytest, ruff, npx, node (direct subprocess)
+- Playwright: Frontend E2E testing (direct subprocess)
+- Brave Search: Web search (direct curl subprocess)
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import os
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -284,3 +285,121 @@ def _initialize_default_registry(toolkit: MCPToolkit) -> None:
     toolkit.assign_servers("aletheia", ["brave_search"], fallback_mode="none")
 
     log.info("Initialized default MCP registry with %d servers", len(toolkit.server_registry))
+
+
+# ── Real async MCP client functions ──────────────────────────────────────────
+#
+# Context7 and Memory sidecars expose SSE endpoints via supergateway.
+# Agents import these directly; all failures raise MCPUnavailable.
+# Callers should catch MCPUnavailable and fall back gracefully.
+
+_MCP_CALL_TIMEOUT = 15.0  # seconds
+
+
+async def query_context7(library: str, topic: str, tokens: int = 5000) -> str:
+    """Query the Context7 MCP sidecar for live documentation.
+
+    Connects to the context7-mcp Docker service (SSE transport, port 3001).
+    Resolves the library ID then fetches documentation for the given topic.
+
+    Args:
+        library: Library name to look up (e.g., "asyncio", "react", "fastapi").
+        topic: Specific topic within the library (e.g., "async context managers").
+        tokens: Max token budget for the documentation response.
+
+    Returns:
+        Documentation text suitable for prompt injection.
+
+    Raises:
+        MCPUnavailable: If the context7-mcp sidecar is unreachable or the call fails.
+    """
+    from mcp import ClientSession  # noqa: PLC0415
+    from mcp.client.sse import sse_client  # noqa: PLC0415
+
+    url = os.getenv("CONTEXT7_MCP_URL", "http://context7-mcp:3001/sse")
+    try:
+        async with asyncio.timeout(_MCP_CALL_TIMEOUT):
+            async with sse_client(url) as (read, write):
+                async with ClientSession(read, write) as session:
+                    await session.initialize()
+                    lib_result = await session.call_tool(
+                        "resolve-library-id", {"libraryName": library}
+                    )
+                    library_id = lib_result.content[0].text.strip() if lib_result.content else ""
+                    if not library_id:
+                        raise MCPUnavailable(f"Context7 could not resolve library: {library}")
+                    docs_result = await session.call_tool(
+                        "get-library-docs",
+                        {
+                            "context7CompatibleLibraryID": library_id,
+                            "topic": topic,
+                            "tokens": tokens,
+                        },
+                    )
+                    return docs_result.content[0].text if docs_result.content else ""
+    except MCPUnavailable:
+        raise
+    except Exception as e:
+        log.warning("Context7 MCP unavailable: %s", e)
+        raise MCPUnavailable(f"Context7: {e}") from e
+
+
+async def create_memory_entities(entities: list[dict]) -> None:
+    """Store entities in the shared Memory MCP knowledge graph.
+
+    Connects to the memory-mcp Docker service (SSE transport, port 5001).
+    Entity format: {"name": str, "entityType": str, "observations": list[str]}.
+
+    Args:
+        entities: List of entity dicts to create/update in the graph.
+
+    Raises:
+        MCPUnavailable: If the memory-mcp sidecar is unreachable or the call fails.
+    """
+    from mcp import ClientSession  # noqa: PLC0415
+    from mcp.client.sse import sse_client  # noqa: PLC0415
+
+    url = os.getenv("MEMORY_MCP_SSE_URL", "http://memory-mcp:5001/sse")
+    try:
+        async with asyncio.timeout(_MCP_CALL_TIMEOUT):
+            async with sse_client(url) as (read, write):
+                async with ClientSession(read, write) as session:
+                    await session.initialize()
+                    await session.call_tool("create_entities", {"entities": entities})
+    except MCPUnavailable:
+        raise
+    except Exception as e:
+        log.warning("Memory MCP unavailable (create_entities): %s", e)
+        raise MCPUnavailable(f"Memory MCP: {e}") from e
+
+
+async def search_memory_nodes(query: str) -> str:
+    """Search the Memory MCP knowledge graph for relevant nodes.
+
+    Connects to the memory-mcp Docker service (SSE transport, port 5001).
+
+    Args:
+        query: Search string to find relevant entities/observations.
+
+    Returns:
+        Search results as text, or empty string if no matches.
+
+    Raises:
+        MCPUnavailable: If the memory-mcp sidecar is unreachable or the call fails.
+    """
+    from mcp import ClientSession  # noqa: PLC0415
+    from mcp.client.sse import sse_client  # noqa: PLC0415
+
+    url = os.getenv("MEMORY_MCP_SSE_URL", "http://memory-mcp:5001/sse")
+    try:
+        async with asyncio.timeout(_MCP_CALL_TIMEOUT):
+            async with sse_client(url) as (read, write):
+                async with ClientSession(read, write) as session:
+                    await session.initialize()
+                    result = await session.call_tool("search_nodes", {"query": query})
+                    return result.content[0].text if result.content else ""
+    except MCPUnavailable:
+        raise
+    except Exception as e:
+        log.warning("Memory MCP unavailable (search_nodes): %s", e)
+        raise MCPUnavailable(f"Memory MCP: {e}") from e

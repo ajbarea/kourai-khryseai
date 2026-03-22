@@ -1,60 +1,92 @@
 #!/usr/bin/env node
+/**
+ * Memory MCP server wrapper.
+ *
+ * - Port 5000: HTTP health check (used by Docker healthcheck + agents)
+ * - Port 5001: MCP SSE endpoint via supergateway → @modelcontextprotocol/server-memory
+ *
+ * Health is determined by probing port 5001 rather than a fixed timer,
+ * so the /health endpoint reflects actual readiness.
+ */
+
+'use strict';
+
 const http = require('http');
+const net = require('net');
 const { spawn } = require('child_process');
 
-const PORT = process.env.PORT || 5000;
-let mcpHealthy = false;
+const HEALTH_PORT = parseInt(process.env.PORT || '5000', 10);
+const MCP_PORT = parseInt(process.env.MCP_PORT || '5001', 10);
+const MEMORY_FILE = process.env.MEMORY_FILE_PATH || '/data/memory_graph.json';
 
-// Create a simple HTTP server that responds with OK for health checks
+let mcpReady = false;
+
+// Launch supergateway to expose memory-mcp-server as SSE on MCP_PORT.
+// supergateway bridges the stdio MCP server to SSE so Python agents can
+// connect via mcp.client.sse without Node.js in their containers.
+const gatewayArgs = [
+  '--stdio', 'memory-mcp-server',
+  '--port', String(MCP_PORT),
+  '--host', '0.0.0.0',
+];
+
+const gatewayProcess = spawn('supergateway', gatewayArgs, {
+  stdio: 'inherit',
+  env: { ...process.env, MEMORY_FILE_PATH: MEMORY_FILE },
+});
+
+gatewayProcess.on('error', (err) => {
+  console.error('supergateway error:', err);
+  process.exit(1);
+});
+
+gatewayProcess.on('exit', (code) => {
+  console.log(`supergateway exited with code ${code}`);
+  process.exit(code || 1);
+});
+
+// Poll MCP_PORT until supergateway is accepting TCP connections.
+// This is a real readiness check, not a fixed sleep.
+function pollMcpPort() {
+  const sock = new net.Socket();
+  sock.setTimeout(1000);
+  sock.connect(MCP_PORT, '127.0.0.1', () => {
+    sock.destroy();
+    mcpReady = true;
+    console.log(`Memory MCP SSE ready on port ${MCP_PORT}`);
+  });
+  sock.on('error', () => {
+    sock.destroy();
+    setTimeout(pollMcpPort, 500);
+  });
+  sock.on('timeout', () => {
+    sock.destroy();
+    setTimeout(pollMcpPort, 500);
+  });
+}
+pollMcpPort();
+
+// Minimal HTTP health check server for Docker healthcheck + agent startup probing.
 const server = http.createServer((req, res) => {
   if (req.url === '/' || req.url === '/health') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: mcpHealthy ? 'healthy' : 'initializing' }));
+    const status = mcpReady ? 'healthy' : 'initializing';
+    res.writeHead(mcpReady ? 200 : 503, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status, mcp_port: MCP_PORT }));
   } else {
     res.writeHead(404);
     res.end();
   }
 });
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Memory MCP health check server listening on 0.0.0.0:${PORT}`);
-});
-
-// Start the actual MCP server in the background
-console.log('Starting MCP server...');
-const mcpProcess = spawn('npx', ['-y', '@modelcontextprotocol/server-memory@2026.1.26'], {
-  stdio: ['pipe', 'inherit', 'inherit'],
-});
-
-// Mark as healthy after 5 seconds
-setTimeout(() => {
-  mcpHealthy = true;
-  console.log('MCP server marked as healthy');
-}, 5000);
-
-mcpProcess.on('error', (err) => {
-  console.error('MCP process error:', err);
-  process.exit(1);
-});
-
-mcpProcess.on('exit', (code) => {
-  console.log(`MCP process exited with code ${code}`);
-  process.exit(code || 1);
+server.listen(HEALTH_PORT, '0.0.0.0', () => {
+  console.log(`Memory MCP health server on ${HEALTH_PORT}, MCP SSE on ${MCP_PORT}`);
 });
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down...');
-  mcpProcess.kill('SIGTERM');
-  server.close(() => {
-    process.exit(0);
-  });
-});
-
-process.on('SIGINT', () => {
-  console.log('SIGINT received, shutting down...');
-  mcpProcess.kill('SIGINT');
-  server.close(() => {
-    process.exit(0);
-  });
-});
+function shutdown(signal) {
+  console.log(`${signal} received — shutting down`);
+  gatewayProcess.kill(signal);
+  server.close(() => process.exit(0));
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));

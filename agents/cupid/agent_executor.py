@@ -13,8 +13,9 @@ from a2a.utils.errors import ServerError
 from agents.cupid.agent import translate_emotion
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
+from kourai_common.facts import extract_facts, store_facts, strip_facts
 from kourai_common.messaging import send_working_status
-from kourai_common.player import PlayerProfile
+from kourai_common.player import PlayerProfile, get_all_affinities
 
 log = logging.getLogger(__name__)
 
@@ -43,10 +44,39 @@ class CupidAgentExecutor(BaseAgentExecutor):
             user_input, player_id=player_id, context_id=task.context_id
         )
 
+        # Extract + store player facts; strip tags before sending to player
+        facts = extract_facts(response, source_agent="cupid")
+        if facts and player_id:
+            store_facts(player_id, facts)
+        clean_response = strip_facts(response)
+
+        # Optional: persist relationship state to Memory MCP (graceful degradation)
+        if player_id:
+            try:
+                from kourai_common.mcp_client import create_memory_entities  # noqa: PLC0415
+
+                affinities = get_all_affinities(player_id) or {}
+                observations = [
+                    f"Affinity with {agent}: {data.get('affinity_score', 0):.2f}"
+                    for agent, data in affinities.items()
+                ]
+                if observations:
+                    await create_memory_entities(
+                        [
+                            {
+                                "name": f"{player_id}_relationships",
+                                "entityType": "PlayerRelationships",
+                                "observations": observations,
+                            }
+                        ]
+                    )
+            except Exception:  # noqa: BLE001, S110
+                pass
+
         # Emit both human-readable text and structured metadata (C10 pattern)
         await updater.add_artifact(
             [
-                Part(root=TextPart(text=response)),
+                Part(root=TextPart(text=clean_response)),
                 Part(
                     root=DataPart(
                         data={
