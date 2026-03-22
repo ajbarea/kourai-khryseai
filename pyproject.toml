@@ -3,9 +3,7 @@ name = "kourai-khryseai"
 version = "0.1.0"
 description = "Multi-agent A2A development system — Golden Maidens of Hephaestus"
 requires-python = ">=3.12"
-dependencies = [
-    "psutil>=7.2.2",
-]
+dependencies = []
 
 [dependency-groups]
 dev = [
@@ -50,18 +48,37 @@ exclude = [
 ]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "W", "C4", "S", "ASYNC", "T20"]
+select = [
+    "E", "F", "I", "UP", "B", "SIM", "W", "C4", "S", "ASYNC", "T20",
+    "PERF",  # Performance anti-patterns
+    "RUF",   # Ruff-specific rules
+    "PTH",   # pathlib over os.path
+    "N",     # PEP 8 naming conventions
+    "PIE",   # Misc lints (flake8-pie)
+    "FURB",  # Modernization (refurb)
+    "LOG",   # Logging best practices
+    "TCH",   # TYPE_CHECKING imports (runtime perf)
+    "FLY",   # f-string conversion (flynt)
+]
 fixable = ["ALL"]
 unfixable = ["T20"]  # Don't auto-remove print statements
 ignore = [
-    "E501",   # Handled by formatter
-    "B008",   # Function calls in defaults
-    "SIM102", # Nested if statements
-    "SIM108", # Use ternary operator
+    "E501",    # Handled by formatter
+    "B008",    # Function calls in defaults (FastAPI/Click patterns)
+    "SIM102",  # Nested if statements
+    "SIM108",  # Use ternary operator
+    "N806",    # Uppercase variables in functions — our convention for constants-in-scope
+    "N818",    # Exception name suffix — too noisy for existing code
+    "RUF001",  # Ambiguous unicode in strings (em-dashes, arrows)
+    "RUF002",  # Ambiguous unicode in docstrings
+    "RUF003",  # Ambiguous unicode in comments
+    "RUF012",  # Mutable class variables — conflicts with dataclass patterns
+    "RUF059",  # Unused unpacked variables — 3-tuple destructuring pattern
+    "PERF203", # try-except in loop — sometimes unavoidable
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101"]  # Assert is appropriate in test code
+"tests/**" = ["S101", "E402"]  # Assert + importorskip-before-import pattern
 
 [tool.ruff.lint.isort]
 known-first-party = ["kourai_common", "agents", "hosts"]
