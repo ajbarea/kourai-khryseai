@@ -19,18 +19,19 @@ ENV UV_COMPILE_BYTECODE=1 \
 
 WORKDIR /app
 
-COPY pyproject.toml uv.lock ./
-COPY shared/ shared/
-COPY scripts/ scripts/
+COPY --link pyproject.toml uv.lock ./
+COPY --link shared/ shared/
+COPY --link scripts/ scripts/
 
 ARG HOST_TYPE
 ARG PACKAGE_NAME
 
 # Copies all agent/host source but only installs the target package via --package.
-COPY agents/ agents/
-COPY hosts/ hosts/
+COPY --link agents/ agents/
+COPY --link hosts/ hosts/
 
-RUN uv sync --package kourai-${PACKAGE_NAME} --no-dev --frozen
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --package kourai-${PACKAGE_NAME} --no-dev --frozen
 
 # --- Runtime ---
 FROM python:${PYTHON_VERSION}-slim AS runtime
@@ -109,14 +110,14 @@ RUN if [ "${HOST_TYPE}" = "gui" ]; then \
     rm -rf /var/lib/apt/lists/*; \
     fi
 
-COPY --from=builder /app/.venv /app/.venv
-COPY agents/ agents/
-COPY hosts/ hosts/
-COPY shared/ shared/
-COPY scripts/ scripts/
-COPY assets/ assets/
-COPY templates/ templates/
-COPY docker/entrypoint.sh /app/entrypoint.sh
+COPY --link --from=builder /app/.venv /app/.venv
+COPY --link agents/ agents/
+COPY --link hosts/ hosts/
+COPY --link shared/ shared/
+COPY --link scripts/ scripts/
+COPY --link assets/ assets/
+COPY --link templates/ templates/
+COPY --link docker/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
 ENV PATH="/app/.venv/bin:$PATH"
