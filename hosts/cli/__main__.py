@@ -20,13 +20,12 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 import asyncclick as click
 import httpx
 from a2a.client import A2ACardResolver, ClientConfig, ClientFactory
-from a2a.client.client import Client
 from a2a.types import (
     FilePart,
     FileWithBytes,
@@ -45,6 +44,9 @@ from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.patch_stdout import patch_stdout
 
 from kourai_common.config import get_agent_url
+
+if TYPE_CHECKING:
+    from a2a.client.client import Client
 
 logger = logging.getLogger(__name__)
 
@@ -613,7 +615,7 @@ def _maidenify_status(text: str) -> str:
     Detects agent transitions and plays handoff chatter — like watching
     mecha pilots banter as they tag in and out of combat.
     """
-    global _last_seen_agent  # noqa: PLW0603
+    global _last_seen_agent
 
     for emoji, (agent_name, _face) in _EMOJI_TO_MAIDEN.items():
         if text.lstrip().startswith(emoji):
@@ -855,8 +857,8 @@ async def send_and_stream(
     Returns:
         (continue_loop, context_id, task_id) tuple.
     """
-    global _last_result  # noqa: PLW0603
-    global _last_seen_agent  # noqa: PLW0603
+    global _last_result
+    global _last_seen_agent
     t0 = time.monotonic()
     _last_seen_agent = ""  # Reset pipeline tracking for this run
 

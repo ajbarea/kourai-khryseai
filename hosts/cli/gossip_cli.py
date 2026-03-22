@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from kourai_common.gossip import (
     GossipResponseOption,
@@ -27,7 +27,9 @@ from kourai_common.gossip import (
     start_gossip_session,
     summarize_gossip_session,
 )
-from kourai_common.player import PlayerProfile
+
+if TYPE_CHECKING:
+    from kourai_common.player import PlayerProfile
 
 log = logging.getLogger(__name__)
 
