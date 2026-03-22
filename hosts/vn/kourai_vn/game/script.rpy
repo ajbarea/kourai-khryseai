@@ -347,9 +347,9 @@ label start:
     scene black
     "System" "Initializing the Forge Bridge..."
 
-    # Start the agent subprocess — only verifies uv + process spawn
+    # Polls until vn-bridge is healthy and connected to agents (status=ok)
     if not bridge.start():
-        "ERROR" "Could not start the agent process. Is uv installed? Run 'make up' to start the agents."
+        "ERROR" "Could not reach the agents. Run 'docker compose up' first, then relaunch."
         return
 
     # Assign a persistent player_id on first ever launch, integrating with shared DB via the bridge.
@@ -438,15 +438,6 @@ label start:
 
     python:
         player_id = persistent.player_id
-
-    "System" "Verifying agent connection..."
-
-    # Actually ping Hephaestus before claiming connected
-    $ connection_error = bridge.check_connection(timeout=15.0)
-    if connection_error:
-        "ERROR" "Could not reach the agents: [connection_error]"
-        "System" "Run 'make up' before launching the VN, then try again."
-        return
 
     "System" "Connection to Kourai Khryseai established."
     "System" "The Master of the Forge is listening."
@@ -615,11 +606,6 @@ label after_load:
         if not bridge_ok:
             "System" "Could not restart the agent process after loading. Run 'make up' and relaunch."
             return
-        $ connection_error = bridge.check_connection(timeout=15.0)
-        if connection_error:
-            "System" "Could not reconnect to agents after loading: [connection_error]"
-            return
-
     # Drain any stale messages in the queue from before the save occurred.
     # This prevents mid-dialogue saves from replaying buffered responses.
     python:

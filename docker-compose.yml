@@ -3,10 +3,11 @@
 #   docker compose up                      # everything (agents + infra)
 #   docker compose up mneme                # single agent + deps
 #
-# Phase E3-E4: Infrastructure
-#   - memory-mcp: Shared Knowledge Graph sidecar for player facts (E3)
-#   - dokimasia: Includes Chromium + Playwright for frontend E2E testing (E4)
-#   All agents can access Memory MCP via MEMORY_MCP_URL environment variable
+# Phase 3 MCP Sidecars:
+#   - memory-mcp:   Shared knowledge graph (Puck/Cupid/Mneme) — port 5000 health, 5001 SSE
+#   - context7-mcp: Live docs for Techne/Metis — port 3001 SSE
+# Phase E4:
+#   - dokimasia: Includes Chromium + Playwright for frontend E2E testing
 
 x-agent-common: &agent-common
   build:
@@ -19,7 +20,9 @@ x-agent-common: &agent-common
     OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
     KOURAI_LOG_LEVEL: ${KOURAI_LOG_LEVEL:-INFO}
     KOURAI_STREAM_ENABLED: ${KOURAI_STREAM_ENABLED:-true}
-    MEMORY_MCP_URL: http://memory-mcp:5000
+    MEMORY_MCP_URL: http://memory-mcp:5000          # health check endpoint
+    MEMORY_MCP_SSE_URL: http://memory-mcp:5001/sse  # MCP SSE endpoint (Phase 3)
+    CONTEXT7_MCP_URL: http://context7-mcp:3001/sse  # Context7 MCP SSE endpoint (Phase 3)
   volumes:
     - ./shared:/app/shared                    # hot reload shared code
   networks:
@@ -28,7 +31,7 @@ x-agent-common: &agent-common
   depends_on:
     jaeger:
       condition: service_started
-    # memory-mcp removed from deps until Phase 3 wires it in
+    # memory-mcp and context7-mcp not in depends_on: agents degrade gracefully if sidecars are slow
   logging:
     driver: "json-file"
     options:
@@ -84,21 +87,24 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # ──────────────── MCP Servers (Phase E3-E4) ────────────────
+  # ──────────────── MCP Servers (Phase 3) ────────────────
   memory-mcp:
     # Phase 3: Shared memory knowledge graph for Puck/Cupid/Mneme
-    # Uses @modelcontextprotocol/server-memory with HTTP health check wrapper
-    image: node:20-slim
-    working_dir: /app
+    # Port 5000: HTTP health check
+    # Port 5001: MCP SSE endpoint (supergateway → @modelcontextprotocol/server-memory)
+    build:
+      context: .
+      dockerfile: docker/memory-mcp.Dockerfile
     volumes:
-      - ./docker/memory-mcp-server.js:/app/memory-mcp-server.js
+      - ./docker/memory-mcp-server.js:/app/memory-mcp-server.js  # hot reload
       - memory-graph-storage:/data
-    command: node /app/memory-mcp-server.js
     environment:
       PORT: "5000"
+      MCP_PORT: "5001"
       MEMORY_FILE_PATH: /data/memory_graph.json
     ports:
-      - "5000:5000"
+      - "5000:5000"   # health check
+      - "5001:5001"   # MCP SSE endpoint
     networks:
       - kourai
     restart: unless-stopped
@@ -112,11 +118,40 @@ services:
         max-size: "10m"
         max-file: "3"
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:5000/',r=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))\""]
+      # Real readiness check: /health returns 200 only after supergateway port is open
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:5000/health',r=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))\""]
       interval: 15s
       timeout: 5s
-      start_period: 30s
-      retries: 3
+      start_period: 60s
+      retries: 5
+
+  context7-mcp:
+    # Phase 3: Live documentation for Techne/Metis
+    # Port 3001: MCP SSE endpoint (supergateway → @upstash/context7-mcp)
+    # Free tier: 1,000 req/month — no API key required
+    build:
+      context: .
+      dockerfile: docker/context7-mcp.Dockerfile
+    ports:
+      - "3001:3001"   # MCP SSE endpoint
+    networks:
+      - kourai
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:3001/',r=>{process.exit(r.statusCode<500?0:1)}).on('error',()=>process.exit(1))\""]
+      interval: 15s
+      timeout: 5s
+      start_period: 60s
+      retries: 5
 
   # ──────────────── Specialist Agents ────────────────
   mneme:
@@ -452,6 +487,49 @@ services:
       resources:
         limits:
           memory: 512M
+
+  # ──────────────── VN Bridge ────────────────
+  vn-bridge:
+    build:
+      context: .
+      dockerfile: docker/host.Dockerfile
+      args:
+        HOST_TYPE: vn_bridge
+        PACKAGE_NAME: hephaestus   # install hephaestus deps (a2a-sdk, starlette, httpx, uvicorn)
+        PORT: 10010
+    env_file: .env
+    environment:
+      HOST_TYPE: vn_bridge
+      PORT: "10010"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      KOURAI_LOG_LEVEL: ${KOURAI_LOG_LEVEL:-INFO}
+    ports:
+      - "10010:10010"
+    volumes:
+      - ./agents/vn_bridge.py:/app/agents/vn_bridge.py   # hot reload
+      - ./shared:/app/shared
+      - ~/.kourai_khryseai:/home/kourai/.kourai_khryseai  # player data persistence
+    networks:
+      - kourai
+    restart: unless-stopped
+    depends_on:
+      hephaestus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:10010/health')\""]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # ──────────────── Orchestrator ────────────────
   hephaestus:
