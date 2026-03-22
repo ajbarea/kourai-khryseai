@@ -43,42 +43,66 @@ hide:
   <div class="section-inner">
     <h2 class="section-title">The Forge</h2>
     <div class="agent-grid">
-      <div class="agent-card" style="--agent-accent: #FF9500">
+      <a href="agents/#hephaestus-orchestrator" class="agent-card" style="--agent-accent: #FF9500">
         <div class="agent-emoji">🔥</div>
         <div class="agent-name">Hephaestus</div>
         <div class="agent-epithet">Master of the Forge</div>
         <p>Routes requests, manages pipelines, asks clarifying questions</p>
-      </div>
-      <div class="agent-card" style="--agent-accent: #4C6EF5">
+      </a>
+      <a href="agents/specialists/#metis-planner" class="agent-card" style="--agent-accent: #4C6EF5">
         <div class="agent-emoji">📐</div>
         <div class="agent-name">Metis</div>
         <div class="agent-epithet">Architect of Intent</div>
         <p>Plans specs, identifies edge cases, asks architecture decisions</p>
-      </div>
-      <div class="agent-card" style="--agent-accent: #17A2B8">
+      </a>
+      <a href="agents/specialists/#techne-coder" class="agent-card" style="--agent-accent: #17A2B8">
         <div class="agent-emoji">⚙️</div>
         <div class="agent-name">Techne</div>
         <div class="agent-epithet">Artisan of Code</div>
         <p>Writes code, explains patterns, ships implementations</p>
-      </div>
-      <div class="agent-card" style="--agent-accent: #6C757D">
+      </a>
+      <a href="agents/specialists/#dokimasia-tester" class="agent-card" style="--agent-accent: #6C757D">
         <div class="agent-emoji">🧪</div>
         <div class="agent-name">Dokimasia</div>
         <div class="agent-epithet">Guardian of Standards</div>
         <p>Creates test suites, runs coverage, catches regressions</p>
-      </div>
-      <div class="agent-card" style="--agent-accent: #D946EF">
+      </a>
+      <a href="agents/specialists/#kallos-stylist" class="agent-card" style="--agent-accent: #D946EF">
         <div class="agent-emoji">✨</div>
         <div class="agent-name">Kallos</div>
         <div class="agent-epithet">Eye of Elegance</div>
         <p>Reviews style, enforces standards, refines quality</p>
-      </div>
-      <div class="agent-card" style="--agent-accent: #B73E1D">
+      </a>
+      <a href="agents/specialists/#mneme-scribe" class="agent-card" style="--agent-accent: #B73E1D">
         <div class="agent-emoji">📜</div>
         <div class="agent-name">Mneme</div>
         <div class="agent-epithet">Keeper of Memory</div>
         <p>Organizes diffs into clean conventional commits</p>
-      </div>
+      </a>
+      <a href="agents/specialists/#puck-companion-spirit" class="agent-card" style="--agent-accent: #7FBC8C">
+        <div class="agent-emoji">🎭</div>
+        <div class="agent-name">Puck</div>
+        <div class="agent-epithet">Spirit of Mischief</div>
+        <p>Keeps the mood alive with wit, quips, and mischievous observations</p>
+      </a>
+      <a href="agents/specialists/#cupid-romance-spirit" class="agent-card" style="--agent-accent: #E8728C">
+        <div class="agent-emoji">💘</div>
+        <div class="agent-name">Cupid</div>
+        <div class="agent-epithet">Arrow of the Heart</div>
+        <p>Tracks affinity, unlocks romance routes, tends companion bonds</p>
+      </a>
+      <a href="agents/specialists/#aidos-anti-slop-validator" class="agent-card" style="--agent-accent: #A0A0B0">
+        <div class="agent-emoji">🪞</div>
+        <div class="agent-name">Aidos</div>
+        <div class="agent-epithet">Mirror of Truth</div>
+        <p>Detects hollow prose, forces specificity, kills the slop</p>
+      </a>
+      <a href="agents/specialists/#aletheia-research-validator" class="agent-card" style="--agent-accent: #64B5F6">
+        <div class="agent-emoji">📚</div>
+        <div class="agent-name">Aletheia</div>
+        <div class="agent-epithet">Keeper of Truth</div>
+        <p>Validates citations, cross-checks facts, grounds agents in reality</p>
+      </a>
     </div>
   </div>
 </section>
@@ -102,21 +126,21 @@ hide:
   <div class="section-inner">
     <h2 class="section-title">Three Ways to Play</h2>
     <div class="experience-grid">
-      <div class="experience-card">
+      <a href="cli/" class="experience-card">
         <div class="experience-icon">⌨️</div>
         <h3>CLI</h3>
         <p>Fast. Scriptable. Works anywhere &mdash; even over SSH. Real-time agent streaming with emoji progress indicators.</p>
-      </div>
-      <div class="experience-card">
+      </a>
+      <a href="gui/" class="experience-card">
         <div class="experience-icon">🖥️</div>
         <h3>Pygame GUI</h3>
         <p>Agent portraits with glow effects. Personality-matched neural voices. Golden particles and typewriter dialogue.</p>
-      </div>
-      <div class="experience-card">
+      </a>
+      <a href="vn/" class="experience-card">
         <div class="experience-icon">📖</div>
         <h3>Ren'Py VN</h3>
         <p>Romance routes, affinity tiers, confession scenes, and companion spirits. A visual novel forged in gold.</p>
-      </div>
+      </a>
     </div>
     <p class="experience-note">All three connect to the same Docker-hosted agent backend. Your choice doesn't change what the agents can do.</p>
   </div>
