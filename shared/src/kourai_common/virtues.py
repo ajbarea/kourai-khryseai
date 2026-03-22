@@ -129,10 +129,11 @@ def get_virtue_deltas(player_id: str) -> dict[str, float]:
         "SELECT virtue_key, session_delta FROM player_virtues WHERE player_id = ?",
         (player_id,),
     ).fetchall()
-    deltas = {}
-    for virtue_key, delta in rows:
-        if virtue_key in FORGE_VIRTUES and delta != 0.0:
-            deltas[virtue_key] = delta
+    deltas = {
+        virtue_key: delta
+        for virtue_key, delta in rows
+        if virtue_key in FORGE_VIRTUES and delta != 0.0
+    }
     conn.close()
     return deltas
 

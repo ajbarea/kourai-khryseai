@@ -39,7 +39,7 @@ async def query_context7(
         List of dicts with keys: title, snippet, source_url.
         Empty list if context7-mcp sidecar is unavailable.
     """
-    from kourai_common.mcp_client import (  # noqa: PLC0415
+    from kourai_common.mcp_client import (
         MCPUnavailable,
         query_context7 as mcp_query_context7,
     )

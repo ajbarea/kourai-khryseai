@@ -17,13 +17,15 @@ from __future__ import annotations
 import json
 import logging
 import math
-import sqlite3
 import time
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
+
+if TYPE_CHECKING:
+    import sqlite3
 
 log = logging.getLogger(__name__)
 
@@ -395,7 +397,7 @@ def get_active_profile_id() -> str | None:
         return None
     try:
         pid = ACTIVE_PROFILE_FILE.read_text(encoding="utf-8").strip()
-        return pid if pid else None
+        return pid or None
     except OSError:
         return None
 

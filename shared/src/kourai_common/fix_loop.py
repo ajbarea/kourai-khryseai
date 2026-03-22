@@ -9,11 +9,14 @@ This module provides a reusable loop abstraction that works for any tool.
 from __future__ import annotations
 
 import logging
-from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
-from a2a.server.tasks import TaskUpdater
-from a2a.types import Task
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
+    from a2a.server.tasks import TaskUpdater
+    from a2a.types import Task
 
 log = logging.getLogger(__name__)
 

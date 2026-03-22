@@ -11,10 +11,35 @@ Centralizes common A2A message handling patterns used across multiple agents.
 
 from __future__ import annotations
 
-from typing import Any
+import re
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
-from a2a.server.agent_execution import RequestContext
 from a2a.types import FileWithBytes
+
+if TYPE_CHECKING:
+    from a2a.server.agent_execution import RequestContext
+
+# ── Project root extraction ───────────────────────────────────────────
+
+
+def parse_project_root(text: str) -> Path:
+    """Parse the 'Project root: /path' line injected by Hephaestus into accumulated context.
+
+    Specialist agents (Kallos, Dokimasia, Techne) call this to get the player's
+    project directory so they can run subprocesses and write files there instead
+    of defaulting to the Kourai codebase working directory.
+
+    Falls back to Path.cwd() when no project root is present (e.g., internal tasks)
+    or when the parsed path no longer exists on disk.
+    """
+    match = re.search(r"^Project root:\s*(.+)$", text, re.MULTILINE)
+    if match:
+        path = Path(match.group(1).strip())
+        if path.is_dir():
+            return path
+    return Path.cwd()
+
 
 # ── Part inspection helpers (v1.0 migration firewall) ────────────────
 

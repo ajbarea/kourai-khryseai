@@ -8,7 +8,6 @@ access to the launching process only (no network exposure).
 from __future__ import annotations
 
 import asyncio
-import os
 import sys
 from pathlib import Path
 
@@ -73,7 +72,7 @@ async def run_command(
     """
     _check_allowed(cmd)
 
-    effective_cwd = cwd or os.getcwd()
+    effective_cwd = cwd or str(Path.cwd())
     try:
         proc = await asyncio.create_subprocess_exec(
             *cmd,
@@ -89,7 +88,7 @@ async def run_command(
             await proc.communicate()
             raise TimeoutError(
                 f"Command timed out after {timeout_seconds}s: {' '.join(cmd)}"
-            ) from None  # noqa: TRY301
+            ) from None
 
         rc = proc.returncode or 0
         out = stdout.decode("utf-8", errors="replace")
@@ -130,4 +129,4 @@ async def which(name: str) -> str:
     )
     stdout, _ = await proc.communicate()
     result = stdout.decode("utf-8", errors="replace").strip()
-    return result if result else f"not found: {name}"
+    return result or f"not found: {name}"

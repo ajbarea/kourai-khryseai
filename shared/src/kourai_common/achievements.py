@@ -381,7 +381,7 @@ def check_achievements(
     from kourai_common.player import get_affinity_tier
 
     tier_counts = {0: 0, 1: 0, 2: 0, 3: 0}
-    for _agent, aff in all_aff.items():
+    for aff in all_aff.values():
         tier = get_affinity_tier(aff["affinity_score"])
         tier_counts[tier] = tier_counts.get(tier, 0) + 1
 

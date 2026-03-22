@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
-from a2a.server.tasks import TaskUpdater
+from typing import TYPE_CHECKING
+
 from a2a.types import Task, TaskState
 from a2a.utils import new_agent_text_message
+
+if TYPE_CHECKING:
+    from a2a.server.tasks import TaskUpdater
 
 
 async def send_working_status(

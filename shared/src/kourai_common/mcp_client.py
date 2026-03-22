@@ -313,8 +313,8 @@ async def query_context7(library: str, topic: str, tokens: int = 5000) -> str:
     Raises:
         MCPUnavailable: If the context7-mcp sidecar is unreachable or the call fails.
     """
-    from mcp import ClientSession  # noqa: PLC0415
-    from mcp.client.sse import sse_client  # noqa: PLC0415
+    from mcp import ClientSession
+    from mcp.client.sse import sse_client
 
     url = os.getenv("CONTEXT7_MCP_URL", "http://context7-mcp:3001/sse")
     try:
@@ -325,7 +325,10 @@ async def query_context7(library: str, topic: str, tokens: int = 5000) -> str:
                     lib_result = await session.call_tool(
                         "resolve-library-id", {"libraryName": library}
                     )
-                    library_id = lib_result.content[0].text.strip() if lib_result.content else ""
+                    from mcp.types import TextContent
+
+                    text_items = [c for c in lib_result.content if isinstance(c, TextContent)]
+                    library_id = text_items[0].text.strip() if text_items else ""
                     if not library_id:
                         raise MCPUnavailable(f"Context7 could not resolve library: {library}")
                     docs_result = await session.call_tool(
@@ -336,7 +339,8 @@ async def query_context7(library: str, topic: str, tokens: int = 5000) -> str:
                             "tokens": tokens,
                         },
                     )
-                    return docs_result.content[0].text if docs_result.content else ""
+                    text_items = [c for c in docs_result.content if isinstance(c, TextContent)]
+                    return text_items[0].text if text_items else ""
     except MCPUnavailable:
         raise
     except Exception as e:
@@ -356,8 +360,8 @@ async def create_memory_entities(entities: list[dict]) -> None:
     Raises:
         MCPUnavailable: If the memory-mcp sidecar is unreachable or the call fails.
     """
-    from mcp import ClientSession  # noqa: PLC0415
-    from mcp.client.sse import sse_client  # noqa: PLC0415
+    from mcp import ClientSession
+    from mcp.client.sse import sse_client
 
     url = os.getenv("MEMORY_MCP_SSE_URL", "http://memory-mcp:5001/sse")
     try:
@@ -387,8 +391,8 @@ async def search_memory_nodes(query: str) -> str:
     Raises:
         MCPUnavailable: If the memory-mcp sidecar is unreachable or the call fails.
     """
-    from mcp import ClientSession  # noqa: PLC0415
-    from mcp.client.sse import sse_client  # noqa: PLC0415
+    from mcp import ClientSession
+    from mcp.client.sse import sse_client
 
     url = os.getenv("MEMORY_MCP_SSE_URL", "http://memory-mcp:5001/sse")
     try:
@@ -397,7 +401,10 @@ async def search_memory_nodes(query: str) -> str:
                 async with ClientSession(read, write) as session:
                     await session.initialize()
                     result = await session.call_tool("search_nodes", {"query": query})
-                    return result.content[0].text if result.content else ""
+                    from mcp.types import TextContent
+
+                    text_items = [c for c in result.content if isinstance(c, TextContent)]
+                    return text_items[0].text if text_items else ""
     except MCPUnavailable:
         raise
     except Exception as e:

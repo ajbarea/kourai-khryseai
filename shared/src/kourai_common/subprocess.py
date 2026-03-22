@@ -264,14 +264,14 @@ def extract_files_from_output(output: str) -> set[str]:
                 path = path[2:].strip()
             if path.startswith("--> "):
                 path = path[4:].strip()
-            if path.startswith("./") or path.startswith(".\\"):
+            if path.startswith(("./", ".\\")):
                 path = path[2:]
             files.add(path)
         elif " " in line:
             first_word = line.split(" ")[0].strip()
             if first_word.endswith(".py"):
                 path = first_word
-                if path.startswith("./") or path.startswith(".\\"):
+                if path.startswith(("./", ".\\")):
                     path = path[2:]
                 files.add(path)
     return files

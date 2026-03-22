@@ -3,16 +3,20 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Generator
 from contextlib import contextmanager
+from typing import TYPE_CHECKING
 
 from opentelemetry import trace
-from opentelemetry.context import Context
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.propagate import extract, inject
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from opentelemetry.context import Context
 
 _tracer: trace.Tracer | None = None
 

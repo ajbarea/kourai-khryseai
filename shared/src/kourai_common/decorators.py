@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
 from functools import wraps
 from typing import TYPE_CHECKING, Any
 
@@ -11,6 +10,8 @@ from a2a.types import InternalError
 from a2a.utils.errors import ServerError
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from a2a.server.agent_execution import RequestContext
     from a2a.server.events import EventQueue
 
