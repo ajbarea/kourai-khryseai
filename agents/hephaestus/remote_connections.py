@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncGenerator
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
 import httpx
 from a2a.client import A2ACardResolver, ClientConfig, ClientFactory
-from a2a.client.client import Client
 from a2a.types import (
     AgentCard,
     FilePart,
@@ -24,6 +23,11 @@ from a2a.types import (
 )
 
 from kourai_common.tracing import create_span, get_trace_context
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
+    from a2a.client.client import Client
 
 log = logging.getLogger(__name__)
 

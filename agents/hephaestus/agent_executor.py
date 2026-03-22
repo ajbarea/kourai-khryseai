@@ -3,14 +3,12 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
-from a2a.server.agent_execution import RequestContext
-from a2a.server.events import EventQueue
-from a2a.server.tasks import TaskUpdater
 from a2a.types import DataPart, Part, Task, TextPart, UnsupportedOperationError
 from a2a.utils.errors import ServerError
 
-from agents.hephaestus.routing_agent import determine_pipeline, execute_pipeline
+from agents.hephaestus.agent import determine_pipeline, execute_pipeline
 from kourai_common.a2a_utils import extract_file_attachments
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
@@ -23,6 +21,11 @@ from kourai_common.player import (
 )
 from kourai_common.tracing import create_span
 from kourai_common.virtues import update_virtue
+
+if TYPE_CHECKING:
+    from a2a.server.agent_execution import RequestContext
+    from a2a.server.events import EventQueue
+    from a2a.server.tasks import TaskUpdater
 
 log = logging.getLogger(__name__)
 
@@ -197,33 +200,12 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
             if input_required:
                 return
 
-            # Step 4: Emit both human-readable and structured pipeline result
-            await updater.add_artifact(
-                [
-                    Part(root=TextPart(text=last_agent_output or "Pipeline complete")),
-                    Part(
-                        root=DataPart(
-                            data={
-                                "mode": "pipeline",
-                                "agents": pipeline,
-                                "agent_count": len(pipeline),
-                            }
-                        )
-                    ),
-                ],
-                name="pipeline_result",
-            )
-            await updater.complete()
-            log.info("Hephaestus pipeline completed: %s", pipeline_display)
-
-            # Virtue update: completed pipeline → Sophia (quality of intent)
+            # Step 4: Virtue + affinity updates, jealousy check — all before complete()
             _profile = PlayerProfile.load()
             if _profile:
                 update_virtue(_profile.player_id, "sophia", 0.005)
                 update_virtue(_profile.player_id, "synergy", 0.005)
 
-            # Update affinity for each agent that participated in the pipeline
-            if _profile:
                 for _agent_name in pipeline:
                     _new_score = update_affinity(_profile.player_id, _agent_name, delta=0.01)
                     log.debug(
@@ -233,24 +215,40 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
                         get_affinity_tier(_new_score),
                     )
 
-                # Task 4: Jealousy Trigger Check (>0.3 delta)
+            # Jealousy check: flag in DataPart when one agent is far ahead (>0.3 spread).
+            # Hosts read jealousy_trigger from the artifact DataPart and route to Cupid.
+            jealousy_trigger: dict | None = None
+            if _profile:
                 all_aff = get_all_affinities(_profile.player_id)
                 if len(all_aff) > 1:
-                    scores = [a["affinity_score"] for a in all_aff.values()]
+                    scores = [v["affinity_score"] for v in all_aff.values()]
                     if max(scores) - min(scores) > 0.3:
-                        # Find top and bottom agents for the message
                         sorted_agents = sorted(
                             all_aff.items(), key=lambda x: x[1]["affinity_score"], reverse=True
                         )
                         top_agent = sorted_agents[0][0]
                         bottom_agent = sorted_agents[-1][0]
+                        jealousy_trigger = {"top": top_agent, "bottom": bottom_agent}
+                        log.info("Jealousy triggered: %s far ahead of %s", top_agent, bottom_agent)
 
-                        await send_working_status(
-                            updater,
-                            task,
-                            f"CHAT:cupid: Jealousy triggered — {top_agent} is far ahead of {bottom_agent}.",
-                            emoji="💘",
-                        )
+            # Step 5: Emit artifact then complete
+            pipeline_data: dict = {
+                "mode": "pipeline",
+                "agents": pipeline,
+                "agent_count": len(pipeline),
+            }
+            if jealousy_trigger:
+                pipeline_data["jealousy_trigger"] = jealousy_trigger
+
+            await updater.add_artifact(
+                [
+                    Part(root=TextPart(text=last_agent_output or "Pipeline complete")),
+                    Part(root=DataPart(data=pipeline_data)),
+                ],
+                name="pipeline_result",
+            )
+            await updater.complete()
+            log.info("Hephaestus pipeline completed: %s", pipeline_display)
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
         raise ServerError(error=UnsupportedOperationError())

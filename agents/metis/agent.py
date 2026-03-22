@@ -7,14 +7,16 @@ structured specifications with file lists, steps, and acceptance criteria.
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncIterable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from kourai_common.llm import chat, chat_stream
 from kourai_common.player import get_enriched_system_prompt
 from kourai_common.prompts import CURRENT_DATE, build_system_prompt
 from kourai_common.subprocess import StatusCallback, run_command
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterable
 
 log = logging.getLogger(__name__)
 
@@ -109,7 +111,7 @@ async def get_project_context(
         parts.append(f"Recent commits:\n{stdout.strip()}")
 
     # Project structure (top-level only)
-    root = Path(project_root) if project_root else Path(".")
+    root = Path(project_root) if project_root else Path()
     if root.exists():
         entries = sorted(
             [

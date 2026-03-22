@@ -30,7 +30,7 @@ CITATION_PATTERN = re.compile(
 # Pattern to find claims that should have citations but don't
 # Looks for algorithmic keywords without nearby citations
 ALGORITHMIC_KEYWORDS = [
-    r"\bO\([^)]+\)\b",  # Big-O notation
+    r"\bO\([^)]+\)",  # Big-O notation — no trailing \b (closing ) is non-word, kills match in prose)
     r"\balgorithm\b",
     r"\bheuristic\b",
     r"\bapproximation\b",
@@ -194,15 +194,14 @@ async def brave_web_search(
         data = json.loads(response_json)
 
         # Parse results
-        results = []
-        for result in data.get("web", [])[:max_results]:
-            results.append(
-                {
-                    "title": result.get("title", ""),
-                    "description": result.get("description", ""),
-                    "url": result.get("url", ""),
-                }
-            )
+        results = [
+            {
+                "title": result.get("title", ""),
+                "description": result.get("description", ""),
+                "url": result.get("url", ""),
+            }
+            for result in data.get("web", [])[:max_results]
+        ]
 
         log.debug("Brave Search: found %d results for '%s'", len(results), query)
         return results

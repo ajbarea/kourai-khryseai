@@ -1,11 +1,12 @@
-"""Hephaestus routing logic — decides which specialist to call and in what order.
+"""Hephaestus agent logic — routing, pipeline execution, and GitHub search.
 
-Uses the LLM to analyze user requests and determine the pipeline,
-then executes the pipeline by calling specialists sequentially.
+Decides which specialist agents to call and in what order, then
+executes the pipeline by calling them sequentially.
 """
 
 from __future__ import annotations
 
+import contextlib
 import datetime
 import inspect
 import logging
@@ -98,6 +99,75 @@ _MENTION_ALIASES: list[tuple[re.Pattern, str]] = [
 ]
 
 
+def extract_project_root(text: str) -> tuple[str, str | None]:
+    """Strip the [project_root: /path] metadata tag injected by vn_bridge.
+
+    Returns (clean_text, project_root_or_None) so callers can:
+    - Send clean_text to the routing LLM (no metadata noise)
+    - Inject "Project root: /path" into accumulated_context for specialist agents
+
+    WHY: vn_bridge injects the tag as a text prefix because A2A message metadata
+    fields aren't guaranteed to be forwarded by all transports. Text is universal.
+    """
+    match = re.search(r"\[project_root:\s*([^\]]+)\]", text, re.IGNORECASE)
+    if match:
+        root = match.group(1).strip()
+        clean = re.sub(r"\[project_root:\s*[^\]]+\]\n?", "", text).strip()
+        return clean, root
+    return text, None
+
+
+def extract_relationship_tiers(text: str) -> tuple[str, dict[str, float]]:
+    """Strip the [relationship_tiers: name=score,...] tag injected by vn_bridge.
+
+    Returns (clean_text, affinity_dict) where affinity_dict maps agent names
+    to their current 0.0–1.0 affinity score from the VN's client-side state.
+
+    WHY: Same tag pattern as [project_root:] — text injection is universal
+    across all A2A transports. The dict is used to build a relationship context
+    block injected into accumulated_context so specialist agents can adapt
+    their personality tone by tier without SYSTEM_PROMPT changes.
+    """
+    match = re.search(r"\[relationship_tiers:\s*([^\]]+)\]", text, re.IGNORECASE)
+    if not match:
+        return text, {}
+    affinities: dict[str, float] = {}
+    for pair in match.group(1).split(","):
+        if "=" in pair:
+            name, val = pair.strip().split("=", 1)
+            with contextlib.suppress(ValueError):
+                affinities[name.strip()] = float(val.strip())
+    clean = re.sub(r"\[relationship_tiers:\s*[^\]]+\]\n?", "", text).strip()
+    return clean, affinities
+
+
+def _tier_label(score: float) -> str:
+    """Map affinity score to a human-readable tier label."""
+    if score < 0.3:
+        return "Tier 1 — Cold"
+    if score < 0.6:
+        return "Tier 2 — Professional"
+    if score < 0.8:
+        return "Tier 3 — Warm"
+    return "Tier 4 — Intimate"
+
+
+def build_relationship_context(affinities: dict[str, float]) -> str:
+    """Build a relationship tier block for injection into accumulated_context.
+
+    Each specialist agent receives this so they can tailor tone without
+    individual SYSTEM_PROMPT changes — the LLM infers appropriate personality
+    from the tier description per CHARACTER_DESIGN.md.
+    """
+    if not affinities:
+        return ""
+    lines = ["Relationship tiers:"]
+    for agent_name in sorted(affinities):
+        score = affinities[agent_name]
+        lines.append(f"  {agent_name}: {_tier_label(score)} (affinity {score:.2f})")
+    return "\n".join(lines)
+
+
 def expand_mentions(text: str) -> str:
     """Expand @shorthand aliases to canonical agent names.
 
@@ -140,7 +210,10 @@ async def determine_pipeline(user_request: str, context_id: str | None = None) -
         List of agent names in execution order, or a string starting
         with "ASK_USER:" or "CHAT:" if not a dev task.
     """
-    # Expand @mention shorthands before sending to LLM for reliable detection
+    # Strip project metadata tag, extract affinity tiers, then expand @mention shorthands.
+    # The routing LLM only needs the human-readable request, not the tag prefixes.
+    user_request, _ = extract_project_root(user_request)
+    user_request, affinities = extract_relationship_tiers(user_request)
     user_request = expand_mentions(user_request)
 
     with create_span("hephaestus.route", {"request_length": str(len(user_request))}):
@@ -151,6 +224,17 @@ async def determine_pipeline(user_request: str, context_id: str | None = None) -
             player_ctx = build_player_context(profile, "hephaestus", top_k_memories=4)
             if player_ctx:
                 system_prompt += f"\n\n{player_ctx}"
+
+        # Inject Hephaestus's own relationship tier so he flavors CHAT responses correctly.
+        # WHY: ROUTING_PROMPT says "use your current relationship context" but the context
+        # was never provided — this is the fix.
+        heph_score = affinities.get("hephaestus")
+        if heph_score is not None:
+            system_prompt += (
+                f"\n\nYour current relationship with the player: "
+                f"{_tier_label(heph_score)} (affinity {heph_score:.2f}). "
+                f"Adjust your tone accordingly."
+            )
 
         messages = [
             {"role": "system", "content": system_prompt},
@@ -250,7 +334,24 @@ async def execute_pipeline(
         context_id = str(uuid.uuid4())
 
     connections: dict[str, RemoteAgentConnection] = {}
-    accumulated_context = f"Original request: {user_request}"
+
+    # Extract project_root from the [project_root: /path] tag injected by vn_bridge,
+    # then build accumulated_context with clean request + explicit "Project root:" line.
+    # WHY: specialist agents (Kallos/Dokimasia/Techne) parse "Project root:" from their
+    # context string to set subprocess cwd and file-write root. Text is universal across
+    # all A2A transports; no metadata fields required.
+    clean_request, project_root = extract_project_root(user_request)
+    clean_request, affinities = extract_relationship_tiers(clean_request)
+    accumulated_context = f"Original request: {clean_request}"
+    if project_root:
+        accumulated_context += f"\nProject root: {project_root}"
+
+    # Inject relationship tiers so every specialist agent can adapt their tone.
+    # Each agent receives "Relationship tiers: techne: Tier 3 — Warm (affinity 0.72)"
+    # in their context and naturally inflects personality per CHARACTER_DESIGN.md tier tables.
+    rel_ctx = build_relationship_context(affinities)
+    if rel_ctx:
+        accumulated_context += f"\n\n{rel_ctx}"
 
     # Append player context so every specialist agent receives it
     profile = PlayerProfile.load()

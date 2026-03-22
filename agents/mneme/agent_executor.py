@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import logging
 import re
+from typing import TYPE_CHECKING
 
-from a2a.server.agent_execution import RequestContext
-from a2a.server.events import EventQueue
-from a2a.server.tasks import TaskUpdater
 from a2a.types import DataPart, Part, Task, TextPart, UnsupportedOperationError
 from a2a.utils.errors import ServerError
 
@@ -25,6 +23,11 @@ from kourai_common.messaging import send_working_status
 from kourai_common.player import PlayerProfile
 from kourai_common.tracing import create_span
 from kourai_common.virtues import update_virtue
+
+if TYPE_CHECKING:
+    from a2a.server.agent_execution import RequestContext
+    from a2a.server.events import EventQueue
+    from a2a.server.tasks import TaskUpdater
 
 log = logging.getLogger(__name__)
 
@@ -239,7 +242,7 @@ class MnemeAgentExecutor(BaseAgentExecutor):
             # Optional: persist commit context to Memory MCP (graceful degradation)
             if commit_groups and _player_id_early:
                 try:
-                    from kourai_common.mcp_client import create_memory_entities  # noqa: PLC0415
+                    from kourai_common.mcp_client import create_memory_entities
 
                     await create_memory_entities(
                         [
@@ -250,7 +253,7 @@ class MnemeAgentExecutor(BaseAgentExecutor):
                             }
                         ]
                     )
-                except Exception:  # noqa: BLE001, S110
+                except Exception:  # noqa: S110
                     pass
 
             # Virtue update: generating commits → mneia (memory and continuity)

@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
-from a2a.server.agent_execution import RequestContext
-from a2a.server.events import EventQueue
-from a2a.server.tasks import TaskUpdater
 from a2a.types import DataPart, Part, Task, TextPart, UnsupportedOperationError
 from a2a.utils.errors import ServerError
 
@@ -16,7 +14,7 @@ from agents.techne.agent import (
     parse_file_paths,
     read_files,
 )
-from kourai_common.a2a_utils import extract_image_parts
+from kourai_common.a2a_utils import extract_image_parts, parse_project_root
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
 from kourai_common.messaging import send_working_status
@@ -25,6 +23,11 @@ from kourai_common.stack import looks_like_scaffolding
 from kourai_common.subprocess import parse_and_apply_fixes
 from kourai_common.tracing import create_span
 from kourai_common.virtues import update_virtue
+
+if TYPE_CHECKING:
+    from a2a.server.agent_execution import RequestContext
+    from a2a.server.events import EventQueue
+    from a2a.server.tasks import TaskUpdater
 
 log = logging.getLogger(__name__)
 
@@ -49,6 +52,7 @@ class TechneAgentExecutor(BaseAgentExecutor):
         """Techne-specific: generate code changes from task description."""
         with create_span("techne.execute", {"a2a.method": "execute"}):
             user_input = context.get_user_input()
+            project_root = parse_project_root(user_input)
 
             # Step 1: Parse file paths from the request
             file_paths = parse_file_paths(user_input)
@@ -124,11 +128,13 @@ class TechneAgentExecutor(BaseAgentExecutor):
                         if latest.strip():
                             await send_working_status(updater, task, f"Coding: {latest}")
 
-            # Step 5: Apply code changes to disk
+            # Step 5: Apply code changes to disk using the player's project root.
             # WHY: Without this, cross-agent fix loops are broken — Kallos/Dokimasia
             # would re-check unchanged files every iteration.
+            # project_root ensures file writes stay within the player's project
+            # (validated by validate_file_path inside parse_and_apply_fixes).
             with create_span("techne.apply_fixes"):
-                fixes_applied = parse_and_apply_fixes(result)
+                fixes_applied = parse_and_apply_fixes(result, project_root=project_root)
 
             await send_working_status(
                 updater,

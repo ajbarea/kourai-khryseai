@@ -7,11 +7,14 @@ returns structured commit messages following AJ's exact format.
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncIterable
+from typing import TYPE_CHECKING
 
 from kourai_common.llm import chat, chat_stream
 from kourai_common.player import get_enriched_system_prompt
 from kourai_common.prompts import CURRENT_DATE, build_system_prompt
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterable
 
 log = logging.getLogger(__name__)
 

@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
-from a2a.server.agent_execution import RequestContext
-from a2a.server.events import EventQueue
-from a2a.server.tasks import TaskUpdater
 from a2a.types import DataPart, Part, Task, TextPart, UnsupportedOperationError
 from a2a.utils.errors import ServerError
 
@@ -16,6 +14,11 @@ from kourai_common.decorators import executor_error_handler
 from kourai_common.facts import extract_facts, store_facts, strip_facts
 from kourai_common.messaging import send_working_status
 from kourai_common.player import PlayerProfile, get_all_affinities
+
+if TYPE_CHECKING:
+    from a2a.server.agent_execution import RequestContext
+    from a2a.server.events import EventQueue
+    from a2a.server.tasks import TaskUpdater
 
 log = logging.getLogger(__name__)
 
@@ -53,7 +56,7 @@ class CupidAgentExecutor(BaseAgentExecutor):
         # Optional: persist relationship state to Memory MCP (graceful degradation)
         if player_id:
             try:
-                from kourai_common.mcp_client import create_memory_entities  # noqa: PLC0415
+                from kourai_common.mcp_client import create_memory_entities
 
                 affinities = get_all_affinities(player_id) or {}
                 observations = [
@@ -70,7 +73,7 @@ class CupidAgentExecutor(BaseAgentExecutor):
                             }
                         ]
                     )
-            except Exception:  # noqa: BLE001, S110
+            except Exception:  # noqa: S110
                 pass
 
         # Emit both human-readable text and structured metadata (C10 pattern)

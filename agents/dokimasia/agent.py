@@ -9,9 +9,8 @@ from __future__ import annotations
 import contextlib
 import logging
 import sys
-from collections.abc import AsyncIterable
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from anyio import Path as AnyioPath
 
@@ -19,6 +18,9 @@ from kourai_common.llm import chat, chat_stream
 from kourai_common.player import get_enriched_system_prompt
 from kourai_common.prompts import CURRENT_DATE, build_system_prompt
 from kourai_common.subprocess import StatusCallback, run_command
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterable
 
 log = logging.getLogger(__name__)
 

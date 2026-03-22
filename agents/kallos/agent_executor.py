@@ -3,21 +3,24 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
+from typing import TYPE_CHECKING
 
-from a2a.server.agent_execution import RequestContext
-from a2a.server.events import EventQueue
-from a2a.server.tasks import TaskUpdater
 from a2a.types import DataPart, Part, Task, TextPart, UnsupportedOperationError
 from a2a.utils.errors import ServerError
 
 from agents.aidos.agent import analyze_slop, flag_slop_words
+from kourai_common.a2a_utils import parse_project_root
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
 from kourai_common.messaging import send_working_status
 from kourai_common.player import PlayerProfile
 from kourai_common.tracing import create_span
 from kourai_common.virtues import update_virtue
+
+if TYPE_CHECKING:
+    from a2a.server.agent_execution import RequestContext
+    from a2a.server.events import EventQueue
+    from a2a.server.tasks import TaskUpdater
 
 log = logging.getLogger(__name__)
 
@@ -51,11 +54,11 @@ class KallosAgentExecutor(BaseAgentExecutor):
             async def _lint_status(line: str) -> None:
                 await send_working_status(updater, task, line, emoji="💻")
 
-            async def _run_lint_with_status() -> tuple[bool, str]:
-                return await run_make_lint(status_callback=_lint_status)
+            # Resolve player's project root (falls back to CWD for internal Kourai tasks)
+            project_root = parse_project_root(context.get_user_input())
 
-            # Validate file paths against the current working directory (project root)
-            project_root = Path.cwd()
+            async def _run_lint_with_status() -> tuple[bool, str]:
+                return await run_make_lint(cwd=str(project_root), status_callback=_lint_status)
 
             def _apply_fixes_with_validation(llm_output: str) -> int:
                 """Apply fixes with path safety validation."""

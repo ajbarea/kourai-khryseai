@@ -3,11 +3,8 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
+from typing import TYPE_CHECKING
 
-from a2a.server.agent_execution import RequestContext
-from a2a.server.events import EventQueue
-from a2a.server.tasks import TaskUpdater
 from a2a.types import DataPart, Part, Task, TextPart, UnsupportedOperationError
 from a2a.utils.errors import ServerError
 
@@ -16,13 +13,18 @@ from agents.dokimasia.agent import (
     generate_tests_stream,
     run_playwright,
 )
-from kourai_common.a2a_utils import extract_image_parts
+from kourai_common.a2a_utils import extract_image_parts, parse_project_root
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
 from kourai_common.messaging import send_working_status
 from kourai_common.player import PlayerProfile
 from kourai_common.tracing import create_span
 from kourai_common.virtues import update_virtue
+
+if TYPE_CHECKING:
+    from a2a.server.agent_execution import RequestContext
+    from a2a.server.events import EventQueue
+    from a2a.server.tasks import TaskUpdater
 
 log = logging.getLogger(__name__)
 
@@ -46,6 +48,8 @@ class DokimasiaAgentExecutor(BaseAgentExecutor):
         """Dokimasia-specific: run tests or generate new tests."""
         with create_span("dokimasia.execute", {"a2a.method": "execute"}):
             user_input = context.get_user_input()
+            # Resolve player's project root once; used by both test and e2e branches
+            project_root = parse_project_root(user_input)
 
             input_lower = user_input.lower()
             is_run_request = any(
@@ -82,9 +86,9 @@ class DokimasiaAgentExecutor(BaseAgentExecutor):
                 # Run the generated tests
                 test_results = await run_playwright(
                     test_path=user_input
-                    if user_input.endswith(".spec.ts") or user_input.endswith(".test.ts")
+                    if user_input.endswith((".spec.ts", ".test.ts"))
                     else "e2e.spec.ts",
-                    cwd=str(Path.cwd()),
+                    cwd=str(project_root),
                     extra_args=["--reporter=json"],
                 )
 
@@ -129,11 +133,8 @@ class DokimasiaAgentExecutor(BaseAgentExecutor):
 
                 # Wrapper to adapt run_pytest to fix_loop interface
                 async def _run_pytest_wrapper() -> tuple[bool, str]:
-                    result = await run_pytest(status_callback=_pytest_status)
+                    result = await run_pytest(cwd=str(project_root), status_callback=_pytest_status)
                     return result.success, result.output
-
-                # Validate file paths against the current working directory (project root)
-                project_root = Path.cwd()
 
                 def _apply_fixes_with_validation(llm_output: str) -> int:
                     """Apply fixes with path safety validation."""

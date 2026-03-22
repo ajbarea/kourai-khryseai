@@ -3,17 +3,20 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
-from a2a.server.agent_execution import RequestContext
-from a2a.server.events import EventQueue
-from a2a.server.tasks import TaskUpdater
 from a2a.types import DataPart, Part, Task, TextPart, UnsupportedOperationError
 from a2a.utils.errors import ServerError
 
-from agents.aidos.agent import analyze_slop, flag_slop_words
+from agents.aidos.agent import analyze_slop, flag_slop_words, flag_vacuous_docstrings
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
 from kourai_common.messaging import send_working_status
+
+if TYPE_CHECKING:
+    from a2a.server.agent_execution import RequestContext
+    from a2a.server.events import EventQueue
+    from a2a.server.tasks import TaskUpdater
 
 log = logging.getLogger(__name__)
 
@@ -35,13 +38,16 @@ class AidosAgentExecutor(BaseAgentExecutor):
 
         # Fast pre-screen
         slop_words = flag_slop_words(user_input)
+        vacuous = flag_vacuous_docstrings(user_input)
+        issues: list[str] = []
         if slop_words:
-            await send_working_status(
-                updater,
-                task,
-                f"Found {len(slop_words)} slop word(s): {', '.join(slop_words[:5])}",
-                emoji="🚫",
-            )
+            issues.append(f"{len(slop_words)} slop word(s): {', '.join(slop_words[:5])}")
+        if vacuous:
+            names = ", ".join(f"`{v['name']}`" for v in vacuous[:5])
+            issues.append(f"{len(vacuous)} vacuous docstring(s): {names}")
+
+        if issues:
+            await send_working_status(updater, task, "Found " + "; ".join(issues), emoji="🚫")
         else:
             await send_working_status(updater, task, "Scanning for slop...", emoji="🔍")
 
@@ -51,7 +57,13 @@ class AidosAgentExecutor(BaseAgentExecutor):
             [
                 Part(root=TextPart(text=result)),
                 Part(
-                    root=DataPart(data={"slop_words_found": slop_words, "clean": result == "CLEAN"})
+                    root=DataPart(
+                        data={
+                            "slop_words_found": slop_words,
+                            "vacuous_docstrings": [v["name"] for v in vacuous],
+                            "clean": result == "CLEAN",
+                        }
+                    )
                 ),
             ],
             name="aidos_analysis",
