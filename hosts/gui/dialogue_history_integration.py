@@ -146,7 +146,6 @@ class DialogueHistoryWithAutoScroll:
         """Draw a single dialogue entry."""
         # This is a placeholder - in real implementation, this would be
         # the same as the original DialogueHistory._draw_entry method
-        pass
 
     def draw(
         self, surf: pygame.Surface, dest_rect: pygame.Rect, show_distance: bool = True

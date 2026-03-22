@@ -10,19 +10,20 @@ Implements March 2026 UI/UX best practices:
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 import pygame
 import pygame.freetype
 
 from hosts.gui.display_modes import DISPLAY_MODE_OPTIONS, normalize_display_mode
-from hosts.gui.gui_components_integration import GUIComponentsIntegration
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from hosts.gui.audio_manager import AudioManager as _AM
+    from collections.abc import Callable
+
+    from hosts.gui.audio_manager import AudioManager as _AudioManager
+    from hosts.gui.gui_components_integration import GUIComponentsIntegration
 
 
 def _ensure_freetype_ready() -> None:
@@ -300,7 +301,7 @@ class SettingsOverlay:
         width: int,
         height: int,
         gui_integration: GUIComponentsIntegration,
-        audio_manager: _AM | None = None,
+        audio_manager: _AudioManager | None = None,
     ):
         self.screen_w = width
         self.screen_h = height

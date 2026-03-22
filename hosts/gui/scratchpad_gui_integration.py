@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-import pygame
+from typing import TYPE_CHECKING
 
 from .scratchpad import Scratchpad
+
+if TYPE_CHECKING:
+    import pygame
 
 
 class ScratchpadGUIIntegration:

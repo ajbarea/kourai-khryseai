@@ -7,10 +7,12 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .dialogue_pacing import PacingMode
-from .tts_gui_integration import TTSGUIManager
+
+if TYPE_CHECKING:
+    from .tts_gui_integration import TTSGUIManager
 
 
 class TTSSettingsConfig:
@@ -38,7 +40,7 @@ class TTSSettingsConfig:
         """Load settings from file or use defaults."""
         if self.config_path.exists():
             try:
-                with open(self.config_path) as f:
+                with self.config_path.open() as f:
                     return json.load(f)
             except (OSError, json.JSONDecodeError):
                 pass
@@ -46,7 +48,7 @@ class TTSSettingsConfig:
 
     def save(self) -> None:
         """Save current settings to file."""
-        with open(self.config_path, "w") as f:
+        with self.config_path.open("w") as f:
             json.dump(self.settings, f, indent=2)
 
     def get(self, key: str, default: Any = None) -> Any:

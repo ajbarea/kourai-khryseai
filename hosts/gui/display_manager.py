@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+from typing import TYPE_CHECKING
 
 import pygame
 
@@ -21,7 +22,9 @@ from .display_modes import (
     normalize_display_mode,
     save_windowed_size,
 )
-from .settings import SettingsManager
+
+if TYPE_CHECKING:
+    from .settings import SettingsManager
 
 logger = logging.getLogger(__name__)
 

@@ -77,10 +77,8 @@ class HighContrastGUIIntegration:
         """Apply high contrast colors to GUI elements."""
         # This would be called by the GUI to update all elements
         # Implementation depends on GUI architecture
-        pass
 
     def _apply_standard_contrast(self) -> None:
         """Apply standard colors to GUI elements."""
         # This would be called by the GUI to update all elements
         # Implementation depends on GUI architecture
-        pass

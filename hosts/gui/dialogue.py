@@ -20,18 +20,18 @@ _EMOTE_RE = re.compile(r"\*([^*]+)\*")
 # ---------------------------------------------------------------------------
 class DialogueEntry:
     __slots__ = (
-        "agent",
-        "text",
-        "is_user",
-        "is_result",
-        "is_error",
-        "is_system",
         "_timestamp",
         "_timestamp_source",
         "_wall_timestamp",
-        "processing_time",
+        "agent",
         "agent_count",
+        "is_error",
+        "is_result",
+        "is_system",
+        "is_user",
         "metadata_visible",
+        "processing_time",
+        "text",
     )
 
     def __init__(

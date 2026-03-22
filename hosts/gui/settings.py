@@ -82,7 +82,7 @@ class SettingsManager:
         """
         try:
             self.config_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(self.config_path, "w", encoding="utf-8") as f:
+            with self.config_path.open("w", encoding="utf-8") as f:
                 json.dump(self.settings, f, indent=2, ensure_ascii=False)
         except OSError as e:
             # Gracefully handle file I/O errors
@@ -103,7 +103,7 @@ class SettingsManager:
             return
 
         try:
-            with open(self.config_path, encoding="utf-8") as f:
+            with self.config_path.open(encoding="utf-8") as f:
                 loaded = json.load(f)
                 if "display_mode" not in loaded and loaded.get("fullscreen") is True:
                     loaded["display_mode"] = "Fullscreen"

@@ -134,7 +134,7 @@ class Scratchpad:
 
             # Simple markdown highlighting for bullet points and headers
             color = theme.white
-            if line.startswith("- ") or line.startswith("* ") or line.lstrip().startswith("1. "):
+            if line.startswith(("- ", "* ")) or line.lstrip().startswith("1. "):
                 color = theme.dim_white
             elif "[x]" in line or "TODO" in line:
                 color = theme.gold

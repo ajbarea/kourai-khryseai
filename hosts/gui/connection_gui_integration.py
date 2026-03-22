@@ -5,10 +5,13 @@ Provides connection status display in the title bar and reconnect button functio
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pygame
 import pygame.freetype
 
-from .connection_manager import ConnectionManager
+if TYPE_CHECKING:
+    from .connection_manager import ConnectionManager
 
 
 class ConnectionStatusDisplay:

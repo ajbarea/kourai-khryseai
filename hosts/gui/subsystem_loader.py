@@ -11,12 +11,10 @@ import logging
 import queue
 import secrets
 import threading
-from collections.abc import Generator
 from dataclasses import dataclass
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .alignment_gauges import AlignmentGaugePanel
-from .audio_manager import AudioManager
 from .client import GuiClient
 from .debug_log import DebugLog
 from .dialogue import DialogueHistory
@@ -34,6 +32,12 @@ from .quick_actions import QuickActionBar
 from .settings_ui import SettingsOverlay
 from .tts_gui_integration import TTSGUIManager
 from .typewriter import TypewriterManager
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+    from pathlib import Path
+
+    from .audio_manager import AudioManager
 
 logger = logging.getLogger(__name__)
 

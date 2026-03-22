@@ -6,7 +6,10 @@ status display and reconnection functionality.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 class ConnectionManager:

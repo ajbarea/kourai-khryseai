@@ -8,7 +8,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
-import threading
 from typing import TYPE_CHECKING
 
 from .dialogue_pacing import DialoguePacer, PacingConfig, PacingMode
@@ -18,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     import queue as _queue
+    import threading
 
 # ---------------------------------------------------------------------------
 # Speech filtering — skip artifacts, commit messages, code, etc.

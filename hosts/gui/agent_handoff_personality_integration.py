@@ -87,4 +87,3 @@ class AgentHandoffPersonalityIntegration:
         """Update personality display in GUI."""
         # This would be called to update the GUI with new personality
         # Implementation depends on GUI architecture
-        pass

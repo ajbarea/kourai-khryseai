@@ -9,7 +9,6 @@ from __future__ import annotations
 import io
 import logging
 import math
-import os
 import random
 import struct
 import threading
@@ -281,9 +280,7 @@ class AudioManager:
             logger.info("Skipping playlist loading; audio is disabled.")
             return
         try:
-            self._playlist = [
-                os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".ogg")
-            ]
+            self._playlist = [str(p) for p in Path(directory).iterdir() if p.suffix == ".ogg"]
             random.shuffle(self._playlist)
             self._current_track_index = 0
             logger.info(f"Loaded playlist with {len(self._playlist)} tracks from {directory}.")

@@ -17,41 +17,31 @@ from __future__ import annotations
 
 import contextlib
 import logging
-import random
 import signal
 import sys
-import threading
 from pathlib import Path
 from typing import Any
 
 import pygame
 from PIL import Image as PILImage
 
-from .alignment_theme import compute_alignment_palette
 from .audio_manager import AudioManager
 from .constants import (
     DIALOGUE_X,
     INPUT_H,
-    PORTRAIT_W,
     theme,
 )
-from .dialogue import DialogueEntry, draw_banner
 from .display_manager import DisplayManager
-from .emote_sfx import play_emote_sfx
+from .gui_state import GUIState
 from .loading_screen import run_loading_screen
-from .maidens import (
-    AGENTS,
-    HANDOFF_GENERIC,
-    HANDOFF_LINES,
-    VICTORY_LINES,
-    detect_agent,
-    get_avatar_path,
-)
-from .message_classifier import is_scratchpad_content, is_system_status
+from .maidens import get_avatar_path
 from .profile_select import run_profile_select
+from .pygame_event_handler import PygameEventDispatcher
+from .queue_event_handler import QueueEventHandler
+from .render import RenderPipeline
 from .settings import SettingsManager
 from .subsystem_loader import Subsystems, load_subsystems
-from .tts_gui_integration import extract_speakable
+from .theme_manager import ThemeManager
 
 logger = logging.getLogger(__name__)
 
@@ -240,10 +230,8 @@ def main(agent_url: str | None = None) -> None:
         memory_viewer.update_layout(screen_w, screen_h)
 
     def apply_display_mode(mode: str) -> None:
-        nonlocal screen
         display.apply_mode(mode, gui_integration.settings)
-        screen = display.screen
-        sync_layout(*screen.get_size())
+        sync_layout(*display.screen.get_size())
 
     settings_overlay.set_display_mode_callback(apply_display_mode)
 
@@ -255,41 +243,72 @@ def main(agent_url: str | None = None) -> None:
     sync_layout(*screen.get_size())
 
     # --- State ---
-    connected = False
-    current_agent = "hephaestus"
-    last_agent = "hephaestus"
+    state = GUIState()
     resize_events = {pygame.VIDEORESIZE}
     for event_name in ("WINDOWRESIZED", "WINDOWSIZECHANGED"):
         resize_event = getattr(pygame, event_name, None)
         if resize_event is not None:
             resize_events.add(resize_event)
-    result_agent = "hephaestus"  # tracks which specialist produced the result
-    _typewriter_full_text = ""  # full text for the active typewriter entry
-    _alignment_refresh_timer = 0.0  # Refresh alignment from profile every 10s
+
+    queue_handler = QueueEventHandler(
+        state=state,
+        history=history,
+        portrait=portrait,
+        input_bar=input_bar,
+        typewriter=typewriter,
+        flash=flash,
+        tts_manager=tts_manager,
+        gui_integration=gui_integration,
+        audio_manager=audio_manager,
+        debug_log=debug_log,
+    )
+
+    event_dispatcher = PygameEventDispatcher(
+        state,
+        onboarding=onboarding,
+        settings_overlay=settings_overlay,
+        memory_viewer=memory_viewer,
+        alignment_panel=alignment_panel,
+        gossip_panel=gossip_panel,
+        gui_integration=gui_integration,
+        input_bar=input_bar,
+        typewriter=typewriter,
+        history=history,
+        portrait=portrait,
+        quick_actions=quick_actions,
+        debug_log=debug_log,
+        display=display,
+        audio_manager=audio_manager,
+        send_q=send_q,
+        dialogue_rect=dialogue_rect,
+        resize_events=resize_events,
+        on_quit=on_quit,
+        sync_layout=sync_layout,
+    )
+
+    theme_mgr = ThemeManager(alignment_panel, gui_integration, theme)
+
+    renderer = RenderPipeline(
+        gui_integration=gui_integration,
+        particles=particles,
+        portrait=portrait,
+        flash=flash,
+        history=history,
+        input_bar=input_bar,
+        quick_actions=quick_actions,
+        debug_log=debug_log,
+        settings_overlay=settings_overlay,
+        alignment_panel=alignment_panel,
+        gossip_panel=gossip_panel,
+        memory_viewer=memory_viewer,
+        onboarding=onboarding,
+        theme=theme,
+        agent_url=agent_url or "",
+    )
 
     # --- Trigger onboarding if needed (New Game or first run) ---
     if _run_onboarding:
         onboarding.start()
-
-    def _add_with_typewriter(entry: DialogueEntry) -> None:
-        """Add a dialogue entry, animating it with the typewriter effect."""
-        nonlocal _typewriter_full_text
-        try:
-            logger.debug(f"Adding dialogue: {entry.agent} | {entry.text[:50]}...")
-            # Finalize any in-progress typewriter entry before starting a new one
-            if typewriter.active or _typewriter_full_text:
-                history.update_last_text(_typewriter_full_text)
-                typewriter.reset()
-            _typewriter_full_text = entry.text
-            if not entry.is_system and not entry.is_user:
-                entry.text = ""  # start empty; typewriter fills it in
-                history.add(entry)
-                typewriter.start(_typewriter_full_text)
-            else:
-                history.add(entry)
-                _typewriter_full_text = ""
-        except Exception as e:
-            logger.exception(f"Error adding dialogue entry: {e}")
 
     while _shutdown_flag["running"]:
         dt = clock.tick(60) / 1000.0
@@ -297,188 +316,7 @@ def main(agent_url: str | None = None) -> None:
         # --- Process recv_q events ---
         try:
             while not recv_q.empty():
-                q_event = recv_q.get_nowait()
-                logger.debug(f"recv_q event: {q_event.get('type')}")
-                etype = q_event.get("type")
-
-                # Tier 3: every A2A event goes to the debug log
-                debug_log.record(q_event)
-
-                if etype == "connected":
-                    connected = True
-                    # System toast for connection status
-                    gui_integration.status_bubbles.add_status_message(
-                        f"[system] Connected to {q_event.get('name', 'Hephaestus')}"
-                    )
-                    # Character greeting as dialogue
-                    greeting = "The forge is hot. What are we building?"
-                    history.add(
-                        DialogueEntry(
-                            "hephaestus",
-                            greeting,
-                        )
-                    )
-                    history.scroll_to_bottom()
-
-                    # Speak the greeting
-                    if tts_manager.enable_tts and tts_manager.tts_engine is not None:
-                        threading.Thread(
-                            target=tts_manager.tts_engine.speak_sync,
-                            args=(greeting,),
-                            kwargs={"agent_name": "hephaestus"},
-                            daemon=True,
-                        ).start()
-
-                elif etype == "disconnected":
-                    connected = False
-
-                elif etype == "status":
-                    raw = q_event["text"]
-                    agent, text = detect_agent(raw)
-                    if not text:
-                        continue
-
-                    if "INPUT_REQUIRED:" in text:
-                        parts = text.split("INPUT_REQUIRED:", 1)
-                        question = parts[1].strip()
-                        input_bar.waiting_for_agent = agent or current_agent
-                        input_bar.processing = False
-                        _add_with_typewriter(DialogueEntry(agent or current_agent, question))
-                        history.scroll_to_bottom()
-                        # Speak the question aloud
-                        speaking_agent = agent or current_agent
-                        if tts_manager.tts_engine is not None:
-                            threading.Thread(
-                                target=tts_manager.tts_engine.speak_sync,
-                                args=(question,),
-                                kwargs={"agent_name": speaking_agent},
-                                daemon=True,
-                            ).start()
-                        continue
-
-                    if agent:
-                        # Detect agent switch
-                        if agent != current_agent:
-                            # Handoff chatter from outgoing agent
-                            key = (current_agent, agent)
-                            lines = HANDOFF_LINES.get(key) or HANDOFF_GENERIC.get(current_agent)
-                            if lines:
-                                handoff_line = random.choice(lines)  # noqa: S311
-                                _add_with_typewriter(DialogueEntry(current_agent, handoff_line))
-                                play_emote_sfx(handoff_line, current_agent, audio_manager)
-
-                            portrait.switch_to(agent)
-                            flash.trigger()
-                            # Update quote for new agent
-                            agent_quotes = AGENTS.get(agent, {}).get("quotes", [])
-                            portrait.current_quote = (
-                                random.choice(agent_quotes) if agent_quotes else ""  # noqa: S311
-                            )
-                            current_agent = agent
-                            last_agent = agent
-                            tts_manager.set_current_agent(agent)
-                            gui_integration.get_scratchpad().set_active_agent(agent)
-
-                        # Track which specialist produced the result
-                        if agent != "hephaestus":
-                            result_agent = agent
-
-                        # Classify: pipeline chatter → system, dialogue → normal
-                        is_sys = is_system_status(text)
-                        is_scratchpad = is_scratchpad_content(text)
-
-                        if is_sys:
-                            gui_integration.status_bubbles.add_status_message(f"[{agent}] {text}")
-                        elif is_scratchpad:
-                            gui_integration.get_scratchpad().add_plan(text, agent)
-                        else:
-                            _add_with_typewriter(DialogueEntry(agent, text))
-                            play_emote_sfx(text, agent, audio_manager)
-                            speakable = extract_speakable(text)
-                            if (
-                                speakable
-                                and tts_manager.enable_tts
-                                and tts_manager.tts_engine is not None
-                            ):
-                                threading.Thread(
-                                    target=tts_manager.tts_engine.speak_sync,
-                                    args=(speakable,),
-                                    kwargs={"agent_name": agent},
-                                    daemon=True,
-                                ).start()
-                    else:
-                        is_sys = is_system_status(text)
-                        is_scratchpad = is_scratchpad_content(text)
-
-                        if is_sys:
-                            gui_integration.status_bubbles.add_status_message(
-                                f"[{current_agent}] {text}"
-                            )
-                        elif is_scratchpad:
-                            gui_integration.get_scratchpad().add_plan(text, current_agent)
-                        else:
-                            _add_with_typewriter(DialogueEntry(current_agent, text))
-                            play_emote_sfx(text, current_agent, audio_manager)
-                            speakable = extract_speakable(text)
-                            if (
-                                speakable
-                                and tts_manager.enable_tts
-                                and tts_manager.tts_engine is not None
-                            ):
-                                threading.Thread(
-                                    target=tts_manager.tts_engine.speak_sync,
-                                    args=(speakable,),
-                                    kwargs={"agent_name": current_agent},
-                                    daemon=True,
-                                ).start()
-
-                    history.scroll_to_bottom()
-
-                elif etype == "result":
-                    text = q_event["text"]
-                    _add_with_typewriter(DialogueEntry(result_agent, text, is_result=True))
-                    history.scroll_to_bottom()
-                    # Speak only the conversational portions (skip commit groups, code, etc.)
-                    speakable = extract_speakable(text)
-                    if speakable and tts_manager.enable_tts and tts_manager.tts_engine is not None:
-                        threading.Thread(
-                            target=tts_manager.tts_engine.speak_sync,
-                            args=(speakable,),
-                            kwargs={"agent_name": result_agent},
-                            daemon=True,
-                        ).start()
-
-                elif etype == "complete":
-                    elapsed = q_event.get("elapsed", 0.0)
-                    input_bar.processing = False
-
-                    # Victory line as dialogue
-                    vlines = VICTORY_LINES.get(last_agent, [])
-                    if vlines:
-                        victory_text = random.choice(vlines)  # noqa: S311
-                        _add_with_typewriter(DialogueEntry(last_agent, victory_text))
-                        play_emote_sfx(victory_text, last_agent, audio_manager)
-                        # Speak just the personality line
-                        if tts_manager.enable_tts and tts_manager.tts_engine is not None:
-                            threading.Thread(
-                                target=tts_manager.tts_engine.speak_sync,
-                                args=(victory_text,),
-                                kwargs={"agent_name": last_agent},
-                                daemon=True,
-                            ).start()
-
-                    # Elapsed time as system toast
-                    gui_integration.status_bubbles.add_status_message(
-                        f"[system] * Completed in {elapsed:.1f}s"
-                    )
-
-                    history.scroll_to_bottom()
-
-                elif etype == "error":
-                    logger.error(f"Pipeline error: {q_event.get('text', 'unknown')}")
-                    history.add(DialogueEntry("hephaestus", q_event["text"], is_error=True))
-                    input_bar.processing = False
-                    history.scroll_to_bottom()
+                queue_handler.process_event(recv_q.get_nowait())
         except Exception as e:
             logger.exception(f"Exception processing recv_q event: {e}")
 
@@ -491,163 +329,12 @@ def main(agent_url: str | None = None) -> None:
 
         for event in events:
             try:
-                # Onboarding overlay consumes ALL events while active
-                if onboarding.active:
-                    onboarding.handle_event(event)
-                    result = onboarding.get_result()
-                    if result:
-                        try:
-                            from kourai_common.player import PlayerProfile, set_active_profile
-
-                            profile = PlayerProfile()
-                            profile.display_name = result["display_name"]
-                            profile.tts_name = result["tts_name"]
-                            profile.title = result["title"]
-                            profile.role = result["role"]
-                            profile.pronouns = result["pronouns"]
-                            profile.save()
-                            set_active_profile(profile.player_id)
-                            alignment_panel.update_values(
-                                profile.sovereignty, profile.devotion, profile.role
-                            )
-                        except Exception:
-                            logger.debug("Onboarding profile save/set failed")
-                    continue
-
-                if settings_overlay.handle_event(event):
-                    continue
-                if memory_viewer.handle_event(event):
-                    continue
-                if alignment_panel.handle_event(event):
-                    continue
-                if gossip_panel.handle_event(event):
-                    continue
-                if gui_integration.get_scratchpad().handle_event(event):
-                    continue
-
-                if event.type == pygame.QUIT:
-                    _shutdown_flag["running"] = False
-                    send_q.put(None)  # shutdown client
-
-                elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_ESCAPE:
-                        settings_overlay.toggle()
-                    elif event.key == pygame.K_TAB:
-                        gui_integration.get_scratchpad().toggle()
-                    elif event.key == pygame.K_F2:
-                        alignment_panel.toggle()
-                    elif event.key == pygame.K_F3:
-                        if gossip_panel.active:
-                            gossip_panel.dismiss()
-                        else:
-                            gossip_panel.active = True
-                    elif event.key == pygame.K_F4:
-                        memory_viewer.toggle()
-                    elif typewriter.active and not typewriter.is_complete():
-                        # Any key skips the typewriter to show full text
-                        typewriter.skip()
-                        history.update_last_text(typewriter.get_displayed_text())
-                    else:
-                        submitted = input_bar.handle_key(event)
-                        if submitted:
-                            # Show user bubble
-                            history.add(DialogueEntry("user", submitted, is_user=True))
-                            history.scroll_to_bottom()
-                            # Send to pipeline
-                            target = input_bar.waiting_for_agent or current_agent
-                            send_q.put((target, submitted))
-                            debug_log.record_user(target, submitted)
-                            input_bar.processing = True
-
-                            # Reset to Hephaestus for the incoming pipeline
-                            portrait.switch_to(input_bar.waiting_for_agent or "hephaestus")
-                            current_agent = input_bar.waiting_for_agent or "hephaestus"
-                            result_agent = current_agent
-                            input_bar.waiting_for_agent = None
-
-                            agent_quotes = AGENTS[current_agent].get("user_quotes", [])
-                            portrait.current_quote = (
-                                random.choice(agent_quotes) if agent_quotes else ""  # noqa: S311
-                            )
-
-                elif event.type == pygame.TEXTINPUT:
-                    if not input_bar.processing:
-                        input_bar.handle_textinput(event)
-
-                elif event.type == pygame.MOUSEMOTION:
-                    quick_actions.update(event.pos)
-
-                elif event.type == pygame.MOUSEWHEEL:
-                    # Route scroll to debug log if it's visible and mouse is near it
-                    if gui_integration.settings.get("show_debug_logs", False):
-                        mx, my = pygame.mouse.get_pos()
-                        panel_w = min(520, dialogue_rect.width - 20)
-                        debug_area = pygame.Rect(
-                            dialogue_rect.right - panel_w - 8,
-                            dialogue_rect.top + 8,
-                            panel_w,
-                            int(dialogue_rect.height * 0.45),
-                        )
-                        if debug_area.collidepoint(mx, my):
-                            debug_log.scroll(-event.y * 40)
-                            continue
-                    history.scroll(-event.y * 40)
-
-                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    if not input_bar.processing:
-                        action = quick_actions.handle_click(event.pos)
-                        if action:
-                            history.add(DialogueEntry("user", action.display_text, is_user=True))
-                            history.scroll_to_bottom()
-
-                            payload = f"{action.display_text}\n\n{action.hidden_prompt}"
-                            send_q.put((action.agent, payload))
-                            debug_log.record_user(action.agent, action.display_text)
-                            input_bar.processing = True
-
-                            portrait.switch_to(action.agent)
-                            current_agent = action.agent
-                            result_agent = current_agent
-
-                            agent_quotes = AGENTS.get(current_agent, {}).get("user_quotes", [])
-                            portrait.current_quote = (
-                                random.choice(agent_quotes) if agent_quotes else ""  # noqa: S311
-                            )
-                            continue
-
-                    clicked_agent = history.handle_click(event.pos, dialogue_rect)
-                    if clicked_agent and clicked_agent in AGENTS:
-                        portrait.switch_to(clicked_agent)
-                        # Update quote for new agent
-                        agent_quotes = AGENTS.get(clicked_agent, {}).get("quotes", [])
-                        portrait.current_quote = (
-                            random.choice(agent_quotes) if agent_quotes else ""  # noqa: S311
-                        )
-
-                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
-                    clicked_text = history.handle_right_click(event.pos, dialogue_rect)
-                    if clicked_text:
-                        try:
-                            pygame.scrap.put_text(clicked_text)
-                            audio_manager.play_sfx()
-                            history.add(
-                                DialogueEntry(
-                                    agent="system",
-                                    text="Copied to clipboard.",
-                                    is_system=True,
-                                )
-                            )
-                        except Exception as e:
-                            logger.warning(f"Clipboard error: {e}")
-
-                elif event.type in resize_events:
-                    screen_w, screen_h = display.handle_resize(
-                        event, settings=gui_integration.settings
-                    )
-                    screen = display.screen
-                    sync_layout(screen_w, screen_h)
+                event_dispatcher.dispatch(event)
             except Exception as e:
                 logger.exception(f"Exception handling pygame event: {e}")
+
+        # Refresh screen reference after possible resize or display mode change
+        screen = display.screen
 
         # --- Updates ---
         try:
@@ -667,31 +354,8 @@ def main(agent_url: str | None = None) -> None:
         except Exception as e:
             logger.exception(f"Error syncing history settings: {e}")
 
-        # Apply alignment-based visual theming (blended with high-contrast)
-        # WHY: alignment shifts the palette dynamically; high-contrast overrides it
-        try:
-            if not gui_integration.settings.get("high_contrast", False):
-                _alignment_refresh_timer += dt
-                if _alignment_refresh_timer >= 10.0:
-                    _alignment_refresh_timer = 0.0
-                    try:
-                        from kourai_common.player import PlayerProfile as _PP
-
-                        _prof = _PP.load()
-                        if _prof:
-                            alignment_panel.update_values(
-                                _prof.sovereignty, _prof.devotion, _prof.role
-                            )
-                    except Exception:
-                        logger.debug("Periodic alignment sync failed")
-                alignment_palette = compute_alignment_palette(
-                    alignment_panel.sovereignty, alignment_panel.devotion
-                )
-                theme.apply_palette(alignment_palette)
-            else:
-                theme.apply_palette(gui_integration.high_contrast.get_color_palette())
-        except Exception as e:
-            logger.exception(f"Error updating theme: {e}")
+        # Alignment-based visual theming (or high-contrast override)
+        theme_mgr.update(dt)
 
         # Sync reduce_motion to typewriter
         try:
@@ -725,53 +389,7 @@ def main(agent_url: str | None = None) -> None:
             logger.exception(f"Error in particle/portrait/input updates: {e}")
 
         # --- Draw ---
-        try:
-            screen.fill(theme.dark_bg)
-
-            # Background particles (full canvas)
-            if not gui_integration.settings.get("reduce_motion", False):
-                particles.draw(screen)
-
-            # Left: portrait panel (with handoff flash)
-            portrait.draw(screen)
-            _, flash_alpha = flash.update(0.0)  # peek alpha without advancing time
-            if flash_alpha > 0:
-                flash_surf = pygame.Surface((PORTRAIT_W, screen_h), pygame.SRCALPHA)
-                flash_surf.fill((255, 255, 255, flash_alpha))
-                screen.blit(flash_surf, (0, 0))
-
-            # Right: banner + dialogue history
-            draw_banner(screen, connected, agent_url or "")
-            history.draw(screen, dialogue_rect)
-
-            # Right panel border
-            pygame.draw.line(
-                screen, theme.gold_dim, (DIALOGUE_X, 0), (DIALOGUE_X, screen_h - INPUT_H), 1
-            )
-
-            if not input_bar.processing:
-                quick_actions.draw(screen, disabled=False)
-
-            # Bottom: input
-            input_bar.draw(screen)
-
-            # Tier 3: debug log panel (toggle in Settings > Gameplay)
-            if gui_integration.settings.get("show_debug_logs", False):
-                debug_log.draw(screen, dialogue_rect)
-
-            # Draw Scratchpad
-            gui_integration.get_scratchpad().draw(screen, dialogue_rect)
-
-            # Overlays
-            settings_overlay.draw(screen)
-            alignment_panel.draw(screen)
-            gossip_panel.draw(screen)
-            memory_viewer.draw(screen)
-            onboarding.draw(screen)
-
-            pygame.display.flip()
-        except Exception as e:
-            logger.exception(f"Exception during draw: {e}")
+        renderer.render(screen, state, dialogue_rect)
 
     # Cleanup (graceful shutdown on Ctrl+C)
     with contextlib.suppress(Exception):

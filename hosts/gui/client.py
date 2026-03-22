@@ -9,8 +9,8 @@ Communicates with the pygame main thread via two queues:
 from __future__ import annotations
 
 import asyncio
-import queue as _queue
 import re
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
 import httpx
@@ -26,6 +26,9 @@ from a2a.types import (
 )
 
 from kourai_common.config import get_agent_url
+
+if TYPE_CHECKING:
+    import queue as _queue
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
 

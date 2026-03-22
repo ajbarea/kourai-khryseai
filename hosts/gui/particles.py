@@ -12,7 +12,7 @@ from .constants import H, W
 class Ember:
     """Single golden ember particle drifting upward."""
 
-    __slots__ = ("x", "y", "vx", "vy", "radius", "alpha", "decay", "color")
+    __slots__ = ("alpha", "color", "decay", "radius", "vx", "vy", "x", "y")
 
     x: float
     y: float

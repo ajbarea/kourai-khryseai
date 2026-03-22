@@ -6,8 +6,11 @@ when flash starts and resumes when flash completes.
 
 from __future__ import annotations
 
-from .flash_effect import FlashEffect
-from .typewriter import TypewriterManager
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .flash_effect import FlashEffect
+    from .typewriter import TypewriterManager
 
 
 class TypewriterFlashIntegration:
