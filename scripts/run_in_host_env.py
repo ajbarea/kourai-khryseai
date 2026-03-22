@@ -42,7 +42,7 @@ def _host_env() -> dict[str, str]:
     path_parts = [str(_bin_dir(HOST_ENV_DIR))]
     if os.name == "nt":
         path_parts.insert(0, str(HOST_ENV_DIR))
-    env["PATH"] = os.pathsep.join(path_parts + [env.get("PATH", "")])
+    env["PATH"] = os.pathsep.join([*path_parts, env.get("PATH", "")])
     return env
 
 

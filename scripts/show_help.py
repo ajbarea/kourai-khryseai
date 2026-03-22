@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import re
 import sys
 from pathlib import Path
@@ -12,7 +11,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
-SCRIPT_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
+SCRIPT_DIR = Path(__file__).resolve().parent
 MAKEFILE = SCRIPT_DIR.parent / "Makefile"
 
 

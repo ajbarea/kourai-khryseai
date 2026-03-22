@@ -9,11 +9,11 @@ Usage:
 
 from __future__ import annotations
 
-import glob
 import logging
 import os
 import shutil
 import sys
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -27,7 +27,7 @@ def clean_pycache() -> None:
 
         for dirname in dirs:
             if dirname in {"__pycache__", ".egg-info"}:
-                path = os.path.join(root, dirname)
+                path = Path(root) / dirname
                 logger.info(f"Removing {path}")
                 shutil.rmtree(path, ignore_errors=True)
 
@@ -36,50 +36,55 @@ def clean_pytest() -> None:
     """Remove pytest and coverage artifacts."""
     patterns = [".pytest_cache", "logs", ".coverage", "coverage.xml", "htmlcov"]
     for pattern in patterns:
-        if os.path.exists(pattern):
-            if os.path.isdir(pattern):
+        p = Path(pattern)
+        if p.exists():
+            if p.is_dir():
                 logger.info(f"Removing directory {pattern}")
-                shutil.rmtree(pattern, ignore_errors=True)
+                shutil.rmtree(p, ignore_errors=True)
             else:
                 logger.info(f"Removing file {pattern}")
-                os.remove(pattern)
+                p.unlink()
 
 
 def clean_mypy() -> None:
     """Remove mypy cache."""
-    if os.path.exists(".mypy_cache"):
+    p = Path(".mypy_cache")
+    if p.exists():
         logger.info("Removing .mypy_cache")
-        shutil.rmtree(".mypy_cache", ignore_errors=True)
+        shutil.rmtree(p, ignore_errors=True)
 
 
 def clean_ruff() -> None:
     """Remove ruff cache."""
-    if os.path.exists(".ruff_cache"):
+    p = Path(".ruff_cache")
+    if p.exists():
         logger.info("Removing .ruff_cache")
-        shutil.rmtree(".ruff_cache", ignore_errors=True)
+        shutil.rmtree(p, ignore_errors=True)
 
 
 def clean_build() -> None:
     """Remove build artifacts."""
     patterns = [".playwright-mcp", "site", "dist", "build"]
     for pattern in patterns:
-        if os.path.exists(pattern):
+        p = Path(pattern)
+        if p.exists():
             logger.info(f"Removing {pattern}")
-            shutil.rmtree(pattern, ignore_errors=True)
+            shutil.rmtree(p, ignore_errors=True)
 
 
 def clean_hypothesis() -> None:
     """Remove hypothesis cache."""
-    if os.path.exists(".hypothesis"):
+    p = Path(".hypothesis")
+    if p.exists():
         logger.info("Removing .hypothesis")
-        shutil.rmtree(".hypothesis", ignore_errors=True)
+        shutil.rmtree(p, ignore_errors=True)
 
 
 def clean_uv_backups() -> None:
     """Remove uv.lock backup files."""
-    for backup_file in glob.glob("uv.lock.backup.*"):
+    for backup_file in Path().glob("uv.lock.backup.*"):
         logger.info(f"Removing {backup_file}")
-        os.remove(backup_file)
+        backup_file.unlink()
 
 
 def main() -> int:
