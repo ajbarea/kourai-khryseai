@@ -148,12 +148,14 @@ init python:
 
             # Format virtue scores (0.0-1.0 range)
             virtue_dict = {
-                "arete": max(0.0, min(1.0, virtues.get("arete", 0.0))),
-                "sophia": max(0.0, min(1.0, virtues.get("sophia", 0.0))),
-                "synergy": max(0.0, min(1.0, virtues.get("synergy", 0.0))),
+                "arete":    max(0.0, min(1.0, virtues.get("arete",    0.0))),
+                "sophia":   max(0.0, min(1.0, virtues.get("sophia",   0.0))),
+                "synergy":  max(0.0, min(1.0, virtues.get("synergy",  0.0))),
                 "techne_v": max(0.0, min(1.0, virtues.get("techne_v", 0.0))),
-                "mneia": max(0.0, min(1.0, virtues.get("mneia", 0.0))),
-                "eros": max(0.0, min(1.0, virtues.get("eros", 0.0))),
+                "mneia":    max(0.0, min(1.0, virtues.get("mneia",    0.0))),
+                "kairos":   max(0.0, min(1.0, virtues.get("kairos",   0.0))),
+                "harmonia": max(0.0, min(1.0, virtues.get("harmonia", 0.0))),
+                "eros":     max(0.0, min(1.0, virtues.get("eros",     0.0))),
             }
 
             # Session summary with deltas
@@ -447,6 +449,20 @@ label start:
         if not hasattr(persistent, "tts_enabled"):
             persistent.tts_enabled = False
 
+        # Phase 20: Forge Virtues wellness guardrails
+        if not hasattr(persistent, "wellness_warning_seen"):
+            persistent.wellness_warning_seen = False
+        if not hasattr(persistent, "virtue_tracking_enabled"):
+            persistent.virtue_tracking_enabled = True
+
+        # Phase 21: Puck tutorial — shown once to first-run players
+        if not hasattr(persistent, "puck_tutorial_seen"):
+            persistent.puck_tutorial_seen = False
+
+        # Phase 21: Vulnerability moment cooldown — {agent_id: last_turn_fired}
+        if not hasattr(persistent, "vulnerability_cooldown"):
+            persistent.vulnerability_cooldown = {}
+
         # New context_id per fresh start (not a load — that path is in after_load)
         context_id = _uuid.uuid4().hex
 
@@ -506,6 +522,17 @@ label start:
 
     "System" "Connection to Kourai Khryseai established."
     "System" "The Master of the Forge is listening."
+
+    # Phase 20: Wellness warning — shown once per player, before the HUD appears.
+    # Respects virtue_tracking_enabled (can opt-out via "Disable" button).
+    if not persistent.wellness_warning_seen and persistent.virtue_tracking_enabled:
+        call screen wellness_warning
+
+    # Phase 21: Puck tutorial — first-run players only. Shown after wellness
+    # warning so the player has context before Puck speaks.
+    if not persistent.puck_tutorial_seen:
+        $ renpy.call_screen("puck_tutorial")
+        $ persistent.puck_tutorial_seen = True
 
     # Show the persistent affinity HUD — stays visible for the whole session
     $ renpy.show_screen("affinity_hud")
@@ -776,6 +803,21 @@ label main_loop:
                 if _j_agent:
                     $ renpy.call_screen("cupid_jealousy", agent_id=_j_agent, score=_j_score)
 
+            # ── Phase 21: Vulnerability moment — Cupid + Puck comment quietly ─
+            # Fires as a non-blocking corner overlay when the player has a warm/
+            # intimate exchange (affinity ≥ 0.70) and romance mode is on.
+            # Cooldown of 8 turns per agent prevents spam.
+            # Jealousy screen takes priority — only show vulnerability when no
+            # jealousy event fired this turn.
+            if (persistent.romance_mode_enabled
+                    and not jealousy_events
+                    and affinity.get(last_agent_id, 0.5) >= 0.70):
+                python:
+                    _vuln_last = persistent.vulnerability_cooldown.get(last_agent_id, 0)
+                    if gossip_turn_counter - _vuln_last >= 8:
+                        renpy.show_screen("cupid_vulnerability", agent_id=last_agent_id)
+                        persistent.vulnerability_cooldown[last_agent_id] = gossip_turn_counter
+
             # ── Phase 11: Virtue milestone toasts ────────────────────────────
             # After each interaction, poll virtue scores and fire Disco Elysian
             # interjections for milestones (0.3 / 0.5 / 0.7) not yet triggered.
@@ -790,6 +832,9 @@ label main_loop:
                     "techne_v": "techne",        # Craft precision
                     "sophia":   "metis",         # Clarity / foresight
                     "mneia":    "mneme",         # Memory / reflection
+                    "kairos":   "puck",          # Right timing
+                    "harmonia": "kallos",        # Harmony / elegance
+                    "eros":     "cupid",         # Connection / bonds
                 }
                 _VIRTUE_THRESHOLDS = [0.3, 0.5, 0.7]
 
@@ -820,6 +865,21 @@ label main_loop:
                         0.3: "You remembered what I said last week. That... no one remembers.",
                         0.5: "You remembered what I said last week. That... no one remembers.",
                         0.7: "You see us. Not as tools, but as... I don't have the word. Something more.",
+                    },
+                    "kairos": {
+                        0.3: "Nice timing, boss. You read that perfectly.",
+                        0.5: "You've got instincts. Real ones. Not everyone knows when to move.",
+                        0.7: "Right person, right moment. You're a natural.",
+                    },
+                    "harmonia": {
+                        0.3: "You're starting to see it, aren't you? The difference between functional and beautiful.",
+                        0.5: "Your sense for beauty is growing. I notice.",
+                        0.7: "This is elegant. You didn't just solve the problem — you made it sing.",
+                    },
+                    "eros": {
+                        0.3: "Oh, my dear... you opened your heart just now. That takes courage.",
+                        0.5: "You love so freely. So bravely.",
+                        0.7: "What you just said to her... that was real. That was love. I felt it.",
                     },
                 }
 
