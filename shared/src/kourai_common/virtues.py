@@ -34,7 +34,8 @@ class Virtue:
     patron_agents: list[str] = field(default_factory=list)
 
 
-# Six Forge Virtues — one per golden maiden (loosely)
+# Eight Forge Virtues — 6 maidens + 2 companion spirits.
+# Aidos and Aletheia are utility agents; they observe but don't own a virtue.
 FORGE_VIRTUES: dict[str, Virtue] = {
     "sophia": Virtue(
         name="Sophia",
@@ -77,6 +78,20 @@ FORGE_VIRTUES: dict[str, Virtue] = {
         low_label="Scattered",
         high_label="Attuned",
         patron_agents=["puck"],
+    ),
+    "harmonia": Virtue(
+        name="Harmonia",
+        description="Harmony — care for beauty, elegance, and aesthetic quality in the work.",
+        low_label="Rough",
+        high_label="Elegant",
+        patron_agents=["kallos"],
+    ),
+    "eros": Virtue(
+        name="Eros",
+        description="Connection — the bonds formed with the agents through care and attention.",
+        low_label="Distant",
+        high_label="Devoted",
+        patron_agents=["cupid"],
     ),
 }
 

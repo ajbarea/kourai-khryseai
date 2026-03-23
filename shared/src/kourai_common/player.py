@@ -1096,6 +1096,16 @@ def get_enriched_system_prompt(base_prompt: str, agent_name: str) -> str:
     except Exception:
         log.debug("Failed to generate memory moment (non-critical)", exc_info=True)
 
+    # Forge virtue context — psychological state for interjection awareness
+    try:
+        from kourai_common.virtues import get_virtue_context
+
+        virtue_ctx = get_virtue_context(_profile_cache.player_id)
+        if virtue_ctx:
+            parts.append(virtue_ctx)
+    except Exception:
+        log.debug("Failed to get virtue context (non-critical)", exc_info=True)
+
     return "\n\n".join(parts)
 
 
