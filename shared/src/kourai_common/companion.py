@@ -8,6 +8,112 @@ Spec: designs/COMPANION_SPIRITS.md
 
 from __future__ import annotations
 
+# ── Portrait state constants ───────────────────────────────────────────────
+#
+# Canonical per-agent portrait states.  State names must stay in sync with:
+#   - designs/PORTRAIT_GENERATION_GUIDE.md  (art direction / filenames)
+#   - hosts/vn/kourai_vn/game/script.rpy    (Ren'Py allowlist)
+#   - agents/vn_bridge.py                   (inference → NDJSON "portrait" field)
+#
+PORTRAIT_STATES: dict[str, frozenset[str]] = {
+    "hephaestus": frozenset({"neutral", "vulnerable", "fierce"}),
+    "techne": frozenset({"neutral", "vulnerable", "fired_up"}),
+    "kallos": frozenset({"neutral", "vulnerable", "passionate"}),
+    "metis": frozenset({"neutral", "vulnerable", "calculating"}),
+    "dokimasia": frozenset({"neutral", "vulnerable", "fierce"}),
+    "mneme": frozenset({"neutral", "vulnerable", "remembering"}),
+    "puck": frozenset({"neutral", "vulnerable", "scheming"}),
+    "cupid": frozenset({"neutral", "vulnerable", "determined"}),
+    "aidos": frozenset({"neutral", "vulnerable", "cutting"}),
+    "aletheia": frozenset({"neutral", "vulnerable", "inspired"}),
+}
+
+_VULNERABLE_SIGNALS: tuple[str, ...] = (
+    "i'm glad",
+    "i care",
+    "i appreciate",
+    "thank you",
+    "means a lot",
+    "i worry",
+    "proud of you",
+    "you did well",
+    "nicely done",
+    "well done",
+    "good work",
+    "i noticed",
+    "honest with you",
+    "vulnerable",
+)
+
+# Maps agent ID → (trigger phrases, tertiary state name).
+# Priority: vulnerable > tertiary > neutral.
+_TERTIARY_SIGNALS: dict[str, tuple[tuple[str, ...], str]] = {
+    "hephaestus": (
+        ("approved", "well done", "as expected", "good", "forged", "masterwork"),
+        "fierce",
+    ),
+    "techne": (
+        ("analyzing", "let me check", "running", "executing", "compiling", "building"),
+        "fired_up",
+    ),
+    "kallos": (
+        ("style violation", "messy", "inconsistent", "beautiful", "elegant", "clean"),
+        "passionate",
+    ),
+    "metis": (
+        ("consider", "the architecture", "planning", "structure", "design"),
+        "calculating",
+    ),
+    "dokimasia": (
+        ("test", "assertion", "coverage", "failure", "passing", "green"),
+        "fierce",
+    ),
+    "mneme": (
+        ("remember", "recorded", "stored", "history", "last time", "recall"),
+        "remembering",
+    ),
+    "puck": (
+        ("have a plan", "trust me", "here's the thing", "listen up", "got an idea"),
+        "scheming",
+    ),
+    "cupid": (
+        ("you must", "be brave", "love requires", "the heart", "i promise", "don't give up"),
+        "determined",
+    ),
+    "aidos": (
+        ("vague", "hollow", "no substance", "unclear", "that lacks", "slop"),
+        "cutting",
+    ),
+    "aletheia": (
+        ("i found", "confirmed", "verified", "the evidence", "research shows", "discovered"),
+        "inspired",
+    ),
+}
+
+
+def infer_portrait_state(agent: str, text: str) -> str:
+    """Infer portrait emotional state from agent ID and response text.
+
+    Priority order: vulnerable > agent-specific tertiary > neutral.
+    The returned string is always present in ``PORTRAIT_STATES[agent]``
+    (or "neutral" for unknown agents).
+
+    Args:
+        agent: Agent ID (e.g. ``"techne"``, ``"kallos"``).
+        text: The agent's response text.
+
+    Returns:
+        Portrait state string — one of ``"neutral"``, ``"vulnerable"``,
+        or the agent's unique tertiary state (e.g. ``"fired_up"``).
+    """
+    lower = text.lower()
+    if any(sig in lower for sig in _VULNERABLE_SIGNALS):
+        return "vulnerable"
+    signals, state = _TERTIARY_SIGNALS.get(agent, ((), "neutral"))
+    if any(sig in lower for sig in signals):
+        return state
+    return "neutral"
+
 
 def minigame_affinity_gain(base_gain: float, minigames_won: int) -> float:
     """Exponential decay on minigame affinity gains to prevent power-leveling.

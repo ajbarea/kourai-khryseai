@@ -35,6 +35,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, StreamingResponse
 from starlette.routing import Route
 
+from kourai_common.companion import infer_portrait_state
 from kourai_common.config import get_agent_url
 from kourai_common.facts import process_agent_output
 
@@ -92,53 +93,6 @@ GOSSIP_HINTS: dict[str, str] = {
     "aidos": "Spirit of shame. Terse. Notices when people are being vague or dishonest.",
     "aletheia": "Truth-seeker. Factual. Values evidence over opinion.",
 }
-
-
-def _infer_portrait_state(agent: str, text: str) -> str:
-    """Infer portrait emotional state from text content."""
-    lower = text.lower()
-    vulnerable_signals = [
-        "i'm glad",
-        "i care",
-        "i appreciate",
-        "thank you",
-        "means a lot",
-        "i worry",
-        "proud of you",
-        "you did well",
-        "nicely done",
-        "well done",
-        "good work",
-        "i noticed",
-        "honest with you",
-        "vulnerable",
-    ]
-    if any(sig in lower for sig in vulnerable_signals):
-        return "vulnerable"
-    tertiary: dict[str, tuple[list[str], str]] = {
-        "hephaestus": (["approved", "well done", "as expected", "good"], "approving"),
-        "techne": (["analyzing", "let me check", "running", "executing", "compiling"], "focused"),
-        "kallos": (
-            ["style violation", "messy", "inconsistent", "beautiful", "elegant", "clean"],
-            "appraising",
-        ),
-        "metis": (
-            ["consider", "the architecture", "planning", "structure", "design"],
-            "contemplating",
-        ),
-        "dokimasia": (
-            ["test", "assertion", "coverage", "failure", "passing", "green"],
-            "scrutinizing",
-        ),
-        "mneme": (
-            ["remember", "recorded", "stored", "history", "last time", "recall"],
-            "remembering",
-        ),
-    }
-    signals, state = tertiary.get(agent, ([], "neutral"))
-    if any(sig in lower for sig in signals):
-        return state
-    return "neutral"
 
 
 def _paginate(text: str) -> list[str]:
@@ -385,7 +339,7 @@ async def handle_message(request: Request) -> StreamingResponse:
                 if isinstance(event, Message):
                     text = "\n".join(p.root.text for p in event.parts if hasattr(p.root, "text"))
                     if text:
-                        portrait_state = _infer_portrait_state(current_agent, text)
+                        portrait_state = infer_portrait_state(current_agent, text)
                         for beat in _paginate(text):
                             yield (
                                 json.dumps(
@@ -462,7 +416,7 @@ async def handle_message(request: Request) -> StreamingResponse:
                                 text = process_agent_output(
                                     text, current_player_id, source_agent=current_agent
                                 )
-                                portrait_state = _infer_portrait_state(current_agent, text)
+                                portrait_state = infer_portrait_state(current_agent, text)
                                 for beat in _paginate(text):
                                     yield (
                                         json.dumps(
