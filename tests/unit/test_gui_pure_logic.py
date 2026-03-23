@@ -10,8 +10,11 @@ import math
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-import numpy as np
 import pytest
+
+pytest.importorskip("numpy")
+
+import numpy as np
 
 # ---------------------------------------------------------------------------
 # Module 3: audio_utils

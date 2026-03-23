@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import os
 import tempfile
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -87,7 +87,7 @@ class TestFileOperations:
     @pytest.mark.asyncio
     async def test_read_existing_file(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            path = os.path.join(tmpdir, "test_read.py")
+            path = str(Path(tmpdir) / "test_read.py")
             await AnyioPath(path).write_text("x = 1\n")
             content = await read_file(path)
             assert content == "x = 1\n"
@@ -100,7 +100,7 @@ class TestFileOperations:
     @pytest.mark.asyncio
     async def test_write_file(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            path = os.path.join(tmpdir, "test.py")
+            path = str(Path(tmpdir) / "test.py")
             success = await write_file(path, "x = 42\n")
             assert success
             assert await AnyioPath(path).exists()
@@ -109,7 +109,7 @@ class TestFileOperations:
     @pytest.mark.asyncio
     async def test_write_creates_parent_dirs(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            path = os.path.join(tmpdir, "sub", "dir", "test.py")
+            path = str(Path(tmpdir) / "sub" / "dir" / "test.py")
             success = await write_file(path, "y = 1\n")
             assert success
             assert await AnyioPath(path).exists()
@@ -117,8 +117,8 @@ class TestFileOperations:
     @pytest.mark.asyncio
     async def test_read_files_multiple(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            p1 = os.path.join(tmpdir, "a.py")
-            p2 = os.path.join(tmpdir, "b.py")
+            p1 = str(Path(tmpdir) / "a.py")
+            p2 = str(Path(tmpdir) / "b.py")
             await AnyioPath(p1).write_text("a = 1")
             await AnyioPath(p2).write_text("b = 2")
 
@@ -203,9 +203,7 @@ class TestGenerateCodeStream:
         with patch("agents.techne.agent.chat_stream", side_effect=mock_stream):
             from agents.techne.agent import generate_code_stream
 
-            chunks = []
-            async for chunk in generate_code_stream("fix bug"):
-                chunks.append(chunk)
+            chunks = [chunk async for chunk in generate_code_stream("fix bug")]
 
             assert len(chunks) == 3
             assert "".join(chunks) == "ACTION: EDIT\nFILE:"

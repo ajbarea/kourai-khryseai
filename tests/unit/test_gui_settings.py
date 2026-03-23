@@ -8,6 +8,8 @@ from pathlib import Path
 import pytest
 from hypothesis import given, settings, strategies as st
 
+pytest.importorskip("pygame")
+
 from hosts.gui.font_scaler import FontScaler
 from hosts.gui.settings import SettingsManager
 from hosts.gui.typewriter import TypewriterManager

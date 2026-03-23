@@ -1,5 +1,9 @@
 """Tests for KeyboardShortcuts class."""
 
+import pytest
+
+pytest.importorskip("pygame")
+
 import pygame
 
 from hosts.gui.keyboard_shortcuts import KeyboardShortcuts

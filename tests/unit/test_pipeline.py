@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from agents.hephaestus.agent import _kallos_found_issues
 from agents.hephaestus.remote_connections import AgentInputRequired
-from agents.hephaestus.routing_agent import _kallos_found_issues
 
 
 class TestKallosFoundIssues:
@@ -90,12 +90,12 @@ class TestExecutePipelineIterativeLoop:
 
         with (
             patch(
-                "agents.hephaestus.routing_agent.RemoteAgentConnection",
+                "agents.hephaestus.agent.RemoteAgentConnection",
                 side_effect=make_conn,
             ),
-            patch("agents.hephaestus.routing_agent.MAX_ITERATIONS", 3),
+            patch("agents.hephaestus.agent.MAX_ITERATIONS", 3),
         ):
-            from agents.hephaestus.routing_agent import execute_pipeline
+            from agents.hephaestus.agent import execute_pipeline
 
             statuses = []
             async for agent, status, _output in execute_pipeline(
@@ -134,12 +134,12 @@ class TestExecutePipelineIterativeLoop:
 
         with (
             patch(
-                "agents.hephaestus.routing_agent.RemoteAgentConnection",
+                "agents.hephaestus.agent.RemoteAgentConnection",
                 side_effect=make_conn,
             ),
-            patch("agents.hephaestus.routing_agent.MAX_ITERATIONS", 2),
+            patch("agents.hephaestus.agent.MAX_ITERATIONS", 2),
         ):
-            from agents.hephaestus.routing_agent import execute_pipeline
+            from agents.hephaestus.agent import execute_pipeline
 
             statuses = []
             async for agent, status, _output in execute_pipeline(
@@ -165,10 +165,10 @@ class TestExecutePipelineIterativeLoop:
             return conn
 
         with patch(
-            "agents.hephaestus.routing_agent.RemoteAgentConnection",
+            "agents.hephaestus.agent.RemoteAgentConnection",
             side_effect=make_conn,
         ):
-            from agents.hephaestus.routing_agent import execute_pipeline
+            from agents.hephaestus.agent import execute_pipeline
 
             statuses = []
             async for agent, status, _output in execute_pipeline(
@@ -203,10 +203,10 @@ class TestExecutePipelineInputRequired:
             return conn
 
         with patch(
-            "agents.hephaestus.routing_agent.RemoteAgentConnection",
+            "agents.hephaestus.agent.RemoteAgentConnection",
             side_effect=make_conn,
         ):
-            from agents.hephaestus.routing_agent import execute_pipeline
+            from agents.hephaestus.agent import execute_pipeline
 
             statuses = []
             async for agent, status, _output in execute_pipeline(
@@ -223,9 +223,14 @@ class TestExecutePipelineInputRequired:
 
 
 class TestCLIHelpers:
-    """Test CLI output formatting helpers."""
+    """Test CLI output formatting helpers.
+
+    These tests skip gracefully when asyncclick is not installed (e.g., running
+    outside Docker). asyncclick is a Docker-only host dependency.
+    """
 
     def test_extract_status_text(self):
+        pytest.importorskip("asyncclick")
         from hosts.cli.__main__ import _extract_status_text
 
         event = MagicMock()
@@ -235,6 +240,7 @@ class TestCLIHelpers:
         assert _extract_status_text(event) == "Working on it..."
 
     def test_extract_status_text_no_message(self):
+        pytest.importorskip("asyncclick")
         from hosts.cli.__main__ import _extract_status_text
 
         event = MagicMock()
@@ -242,6 +248,7 @@ class TestCLIHelpers:
         assert _extract_status_text(event) == ""
 
     def test_extract_artifact_text(self):
+        pytest.importorskip("asyncclick")
         from hosts.cli.__main__ import _extract_artifact_text
 
         event = MagicMock()
@@ -251,6 +258,7 @@ class TestCLIHelpers:
         assert _extract_artifact_text(event) == "Final result"
 
     def test_extract_artifact_text_empty(self):
+        pytest.importorskip("asyncclick")
         from hosts.cli.__main__ import _extract_artifact_text
 
         event = MagicMock()

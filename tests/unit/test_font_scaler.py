@@ -6,9 +6,12 @@ adjustment calculations.
 
 from __future__ import annotations
 
+import pytest
+
+pytest.importorskip("pygame")
+
 import pygame
 import pygame.freetype
-import pytest
 
 from hosts.gui.font_scaler import FontScaler
 

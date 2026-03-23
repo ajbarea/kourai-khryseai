@@ -1,6 +1,9 @@
 """Property-based tests for Timestamp Display using Hypothesis."""
 
+import pytest
 from hypothesis import given, settings, strategies as st
+
+pytest.importorskip("pygame")
 
 from hosts.gui.dialogue import DialogueEntry, DialogueHistory
 

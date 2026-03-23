@@ -6,9 +6,12 @@ Validates: Requirements 9.1, 9.2, 9.3, 12.1, 12.5
 
 from __future__ import annotations
 
+import pytest
+
+pytest.importorskip("pygame")
+
 import pygame
 import pygame.freetype
-import pytest
 from hypothesis import given, settings, strategies as st
 
 from hosts.gui.font_scaler import FontScaler

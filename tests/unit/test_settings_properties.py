@@ -113,7 +113,7 @@ class TestSettingsPersistenceProperty:
             manager.save()
 
             # Verify file is valid JSON
-            with open(config_path) as f:
+            with config_path.open() as f:
                 data = json.load(f)
 
             # Verify the setting is in the file

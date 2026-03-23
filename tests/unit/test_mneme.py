@@ -57,9 +57,7 @@ class TestMnemeGenerate:
         with patch("agents.mneme.agent.chat_stream", side_effect=mock_stream):
             from agents.mneme.agent import generate_commit_messages_stream
 
-            chunks = []
-            async for chunk in generate_commit_messages_stream("M auth.py"):
-                chunks.append(chunk)
+            chunks = [chunk async for chunk in generate_commit_messages_stream("M auth.py")]
             assert "".join(chunks) == "feat(auth): add login endpoint\n"
 
 

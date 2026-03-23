@@ -1,4 +1,3 @@
-# ruff: noqa: E402
 """Tests for TTSEngine, AudioManager, and remaining coverage gaps.
 
 Covers:
@@ -18,6 +17,9 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
+
+pytest.importorskip("pygame")
+
 from anyio import Path as AnyioPath
 
 # ===================================================================

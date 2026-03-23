@@ -4,6 +4,8 @@ import time
 
 import pytest
 
+pytest.importorskip("pygame")
+
 from hosts.gui.dialogue import DialogueEntry
 
 

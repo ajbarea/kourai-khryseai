@@ -8,6 +8,8 @@ import httpx
 import pytest
 from a2a.types import Message, Task, TaskState, TaskStatusUpdateEvent
 
+pytest.importorskip("asyncclick")
+
 from hosts.cli.__main__ import (
     _extract_artifact_text,
     _extract_status_text,
@@ -113,7 +115,7 @@ class TestSendAndStream:
     async def test_handles_connect_error(self):
         async def mock_send(message, **kwargs):
             raise httpx.ConnectError("refused")
-            yield  # noqa: E501
+            yield
 
         client = MagicMock()
         client.send_message = mock_send
@@ -125,7 +127,7 @@ class TestSendAndStream:
     async def test_handles_timeout(self):
         async def mock_send(message, **kwargs):
             raise httpx.TimeoutException("timed out")
-            yield  # noqa: E501
+            yield
 
         client = MagicMock()
         client.send_message = mock_send
@@ -154,7 +156,7 @@ class TestSendAndStream:
     async def test_verbose_mode(self):
         async def mock_send(message, **kwargs):
             return
-            yield  # noqa: E501
+            yield
 
         client = MagicMock()
         client.send_message = mock_send

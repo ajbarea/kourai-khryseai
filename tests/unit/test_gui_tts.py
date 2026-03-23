@@ -18,6 +18,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+pytest.importorskip("pygame")
+
 # ---------------------------------------------------------------------------
 # Module-level mock for TTSEngine so we never import pygame/edge_tts
 # ---------------------------------------------------------------------------
@@ -821,7 +823,7 @@ class TestTTSSettingsConfig:
             config = TTSSettingsConfig(config_path=path)
             config.save()
             assert path.exists()
-            with open(path) as f:
+            with path.open() as f:
                 data = json.load(f)
             assert data == config.settings
 
@@ -874,7 +876,7 @@ class TestTTSSettingsConfig:
                 "thinking_pause_duration": 2.0,
                 "min_chars_per_second": 100.0,
             }
-            with open(path, "w") as f:
+            with path.open("w") as f:
                 json.dump(custom_settings, f)
 
             config = TTSSettingsConfig(config_path=path)
@@ -889,7 +891,7 @@ class TestTTSSettingsConfig:
         TTSSettingsConfig = _import_config()
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "tts_settings.json"
-            with open(path, "w") as f:
+            with path.open("w") as f:
                 f.write("{invalid json!!!")
 
             config = TTSSettingsConfig(config_path=path)
@@ -966,7 +968,7 @@ class TestTTSSettingsConfig:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "tts_settings.json"
             # Write a file with only one key
-            with open(path, "w") as f:
+            with path.open("w") as f:
                 json.dump({"min_chars_per_second": 99.0}, f)
 
             config = TTSSettingsConfig(config_path=path)
@@ -1038,7 +1040,7 @@ class TestTTSSettingsConfig:
             assert "custom_extra" not in config.settings
 
             # File should also be updated
-            with open(path) as f:
+            with path.open() as f:
                 saved = json.load(f)
             assert saved == TTSSettingsConfig.DEFAULT_CONFIG
 

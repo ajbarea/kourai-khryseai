@@ -1,5 +1,9 @@
 """Tests for DialogueHistory timestamp and metadata display."""
 
+import pytest
+
+pytest.importorskip("pygame")
+
 from hosts.gui.dialogue import DialogueEntry, DialogueHistory
 
 

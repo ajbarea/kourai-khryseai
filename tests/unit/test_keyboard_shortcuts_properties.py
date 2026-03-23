@@ -1,5 +1,9 @@
 """Property-based tests for KeyboardShortcuts using Hypothesis."""
 
+import pytest
+
+pytest.importorskip("pygame")
+
 import pygame
 from hypothesis import given, settings, strategies as st
 

@@ -6,6 +6,8 @@ import json
 
 import pytest
 
+pytest.importorskip("pygame")
+
 
 class TestMultiProfileBackend:
     """Test multi-profile CRUD, switching, listing, migration."""

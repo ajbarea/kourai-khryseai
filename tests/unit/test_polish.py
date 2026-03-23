@@ -102,10 +102,10 @@ class TestGracefulDegradation:
             return conn
 
         with patch(
-            "agents.hephaestus.routing_agent.RemoteAgentConnection",
+            "agents.hephaestus.agent.RemoteAgentConnection",
             side_effect=make_conn,
         ):
-            from agents.hephaestus.routing_agent import execute_pipeline
+            from agents.hephaestus.agent import execute_pipeline
 
             statuses = []
             async for agent, status, _output in execute_pipeline(
@@ -138,10 +138,10 @@ class TestGracefulDegradation:
             return conn
 
         with patch(
-            "agents.hephaestus.routing_agent.RemoteAgentConnection",
+            "agents.hephaestus.agent.RemoteAgentConnection",
             side_effect=make_conn,
         ):
-            from agents.hephaestus.routing_agent import execute_pipeline
+            from agents.hephaestus.agent import execute_pipeline
 
             statuses = []
             async for agent, status, _output in execute_pipeline(
@@ -158,6 +158,7 @@ class TestCLIVerboseFlag:
 
     def test_main_accepts_verbose(self):
         """CLI main command accepts --verbose flag."""
+        pytest.importorskip("asyncclick")
         from hosts.cli.__main__ import main
 
         # Verify the click command has the verbose parameter
@@ -166,6 +167,7 @@ class TestCLIVerboseFlag:
 
     def test_main_accepts_v_shorthand(self):
         """CLI main command accepts -v shorthand."""
+        pytest.importorskip("asyncclick")
         from hosts.cli.__main__ import main
 
         for p in main.params:

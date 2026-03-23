@@ -1,7 +1,10 @@
-# ruff: noqa: E402
 from __future__ import annotations
 
 import time
+
+import pytest
+
+pytest.importorskip("pygame")
 
 import pygame
 

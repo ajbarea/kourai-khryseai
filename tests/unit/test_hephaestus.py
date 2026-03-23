@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from agents.hephaestus.routing_agent import (
+from agents.hephaestus.agent import (
     AVAILABLE_AGENTS,
     ROUTING_PROMPT,
     PipelineResult,
@@ -37,28 +37,28 @@ class TestDeterminePipeline:
 
     @pytest.mark.asyncio
     async def test_implement_routes_full_pipeline(self):
-        with patch("agents.hephaestus.routing_agent.chat", new_callable=AsyncMock) as mock:
+        with patch("agents.hephaestus.agent.chat", new_callable=AsyncMock) as mock:
             mock.return_value = "metis, techne, dokimasia, kallos, mneme"
             result = await determine_pipeline("implement a CSV export feature")
             assert result == ["metis", "techne", "dokimasia", "kallos", "mneme"]
 
     @pytest.mark.asyncio
     async def test_commit_prep_routes_to_mneme_only(self):
-        with patch("agents.hephaestus.routing_agent.chat", new_callable=AsyncMock) as mock:
+        with patch("agents.hephaestus.agent.chat", new_callable=AsyncMock) as mock:
             mock.return_value = "mneme"
             result = await determine_pipeline("commit prep")
             assert result == ["mneme"]
 
     @pytest.mark.asyncio
     async def test_cleanup_routes_to_kallos_mneme(self):
-        with patch("agents.hephaestus.routing_agent.chat", new_callable=AsyncMock) as mock:
+        with patch("agents.hephaestus.agent.chat", new_callable=AsyncMock) as mock:
             mock.return_value = "kallos, mneme"
             result = await determine_pipeline("clean up comments in src/")
             assert result == ["kallos", "mneme"]
 
     @pytest.mark.asyncio
     async def test_ask_user_returns_string(self):
-        with patch("agents.hephaestus.routing_agent.chat", new_callable=AsyncMock) as mock:
+        with patch("agents.hephaestus.agent.chat", new_callable=AsyncMock) as mock:
             mock.return_value = "ASK_USER: What file do you want to fix?"
             result = await determine_pipeline("fix it")
             assert isinstance(result, str)
@@ -66,21 +66,21 @@ class TestDeterminePipeline:
 
     @pytest.mark.asyncio
     async def test_invalid_agents_filtered_out(self):
-        with patch("agents.hephaestus.routing_agent.chat", new_callable=AsyncMock) as mock:
+        with patch("agents.hephaestus.agent.chat", new_callable=AsyncMock) as mock:
             mock.return_value = "metis, nonexistent_agent, techne"
             result = await determine_pipeline("implement X")
             assert result == ["metis", "techne"]
 
     @pytest.mark.asyncio
     async def test_empty_response_defaults_to_mneme(self):
-        with patch("agents.hephaestus.routing_agent.chat", new_callable=AsyncMock) as mock:
+        with patch("agents.hephaestus.agent.chat", new_callable=AsyncMock) as mock:
             mock.return_value = "  "
             result = await determine_pipeline("do something")
             assert result == ["mneme"]
 
     @pytest.mark.asyncio
     async def test_uses_hephaestus_model(self):
-        with patch("agents.hephaestus.routing_agent.chat", new_callable=AsyncMock) as mock:
+        with patch("agents.hephaestus.agent.chat", new_callable=AsyncMock) as mock:
             mock.return_value = "mneme"
             await determine_pipeline("test")
             assert mock.call_args[0][0] == "hephaestus"
@@ -90,9 +90,9 @@ class TestDeterminePipeline:
         """Player context is appended to system prompt when a profile exists."""
         profile = PlayerProfile(display_name="AJ", title="The Architect", role="divine")
         with (
-            patch("agents.hephaestus.routing_agent.chat", new_callable=AsyncMock) as mock,
-            patch("agents.hephaestus.routing_agent.PlayerProfile") as mock_cls,
-            patch("agents.hephaestus.routing_agent.build_player_context") as mock_ctx,
+            patch("agents.hephaestus.agent.chat", new_callable=AsyncMock) as mock,
+            patch("agents.hephaestus.agent.PlayerProfile") as mock_cls,
+            patch("agents.hephaestus.agent.build_player_context") as mock_ctx,
         ):
             mock.return_value = "mneme"
             mock_cls.load.return_value = profile

@@ -24,7 +24,7 @@ def test_validate_file_path_invalid_extension(tmp_path):
     project_root = tmp_path
     invalid_ext = "main.exe"
 
-    with pytest.raises(PathViolation, match="Extension.*is not in the allowed write list"):
+    with pytest.raises(PathViolation, match=r"Extension.*is not in the allowed write list"):
         validate_file_path(project_root, invalid_ext)
 
 

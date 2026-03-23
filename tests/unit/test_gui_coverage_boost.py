@@ -12,6 +12,10 @@ import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+import pytest
+
+pytest.importorskip("pygame")
+
 import pygame
 import pygame.freetype
 

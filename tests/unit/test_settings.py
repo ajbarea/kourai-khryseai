@@ -71,7 +71,7 @@ class TestSettingsManagerPersistence:
 
             manager.save()
 
-            with open(config_path) as f:
+            with config_path.open() as f:
                 data = json.load(f)
 
             assert data["typewriter_speed_ms"] == 75
@@ -107,7 +107,7 @@ class TestSettingsManagerPersistence:
             config_path = Path(tmpdir) / "settings.json"
 
             # Save only some settings
-            with open(config_path, "w") as f:
+            with config_path.open("w") as f:
                 json.dump({"typewriter_speed_ms": 80}, f)
 
             # Load should merge with defaults
@@ -135,7 +135,7 @@ class TestSettingsManagerErrorHandling:
             config_path = Path(tmpdir) / "settings.json"
 
             # Write invalid JSON
-            with open(config_path, "w") as f:
+            with config_path.open("w") as f:
                 f.write("{ invalid json }")
 
             # Should not raise, should use defaults
@@ -158,16 +158,15 @@ class TestSettingsManagerErrorHandling:
             manager = SettingsManager(config_path)
 
             # Make directory read-only (Unix-like systems)
-            import os
             import stat
 
             try:
-                os.chmod(tmpdir, stat.S_IRUSR | stat.S_IXUSR)
+                Path(tmpdir).chmod(stat.S_IRUSR | stat.S_IXUSR)
                 # Should not raise
                 manager.save()
             finally:
                 # Restore permissions for cleanup
-                os.chmod(tmpdir, stat.S_IRWXU)
+                Path(tmpdir).chmod(stat.S_IRWXU)
 
 
 class TestSettingsManagerAllSettings:

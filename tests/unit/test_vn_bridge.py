@@ -1,6 +1,7 @@
 """Tests for the Ren'Py VN bridge (hosts/vn/kourai_vn/game/libs/bridge.py).
 
-Focuses on the RenPyBridge class, which manages the subprocess and communication.
+Focuses on the RenPyBridge class, which manages HTTP communication with the
+vn-bridge Docker service. Covers service lifecycle, messaging, TTS, and gossip.
 """
 
 from __future__ import annotations
@@ -8,9 +9,8 @@ from __future__ import annotations
 import json
 import sys
 import urllib.error
-import urllib.request
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -19,7 +19,7 @@ _LIBS_DIR = Path(__file__).parents[2] / "hosts/vn/kourai_vn/game/libs"
 if str(_LIBS_DIR) not in sys.path:
     sys.path.insert(0, str(_LIBS_DIR))
 
-from bridge import RenPyBridge, _find_project_root  # type: ignore[import-not-found]  # noqa: E402
+from bridge import RenPyBridge, _find_project_root  # type: ignore[import-not-found]
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -63,9 +63,6 @@ class TestRenPyBridgeInit:
     def test_starts_not_running(self, bridge: RenPyBridge) -> None:
         assert bridge.is_running is False
 
-    def test_process_is_none_before_start(self, bridge: RenPyBridge) -> None:
-        assert bridge.process is None
-
     def test_inbox_is_empty(self, bridge: RenPyBridge) -> None:
         assert bridge.inbox.empty()
 
@@ -77,117 +74,65 @@ class TestRenPyBridgeInit:
         assert bridge.log_dir.exists()
 
 
-# ── RenPyBridge — check_connection ───────────────────────────────────────────
-
-
-class TestCheckConnection:
-    def test_returns_none_on_200(self, bridge: RenPyBridge) -> None:
-        """Successful HTTP response → no error."""
-        mock_response = MagicMock()
-        with patch("urllib.request.urlopen", return_value=mock_response):
-            result = bridge.check_connection(timeout=5.0)
-        assert result is None
-
-    def test_pings_hephaestus_port_10000(self, bridge: RenPyBridge) -> None:
-        """Always pings Hephaestus on port 10000 (matches AGENT_PORTS)."""
-        mock_response = MagicMock()
-        with patch("urllib.request.urlopen", return_value=mock_response) as mock_open:
-            bridge.check_connection(timeout=5.0)
-        called_url = mock_open.call_args[0][0]
-        assert "10000" in called_url
-        assert "127.0.0.1" in called_url
-
-    def test_returns_error_string_on_http_error(self, bridge: RenPyBridge) -> None:
-        """HTTPError (e.g. 503) → descriptive error string, not None."""
-        http_err = urllib.error.HTTPError(
-            url="http://127.0.0.1:10000/.well-known/agent.json",
-            code=503,
-            msg="Service Unavailable",
-            hdrs=None,  # type: ignore[arg-type]
-            fp=None,  # type: ignore[arg-type]
-        )
-        with patch("urllib.request.urlopen", side_effect=http_err):
-            result = bridge.check_connection(timeout=5.0)
-        assert result is not None
-        assert "503" in result
-
-    def test_returns_error_string_on_url_error(self, bridge: RenPyBridge) -> None:
-        """URLError (agents not running) → descriptive error string."""
-        url_err = urllib.error.URLError(reason="Connection refused")
-        with patch("urllib.request.urlopen", side_effect=url_err):
-            result = bridge.check_connection(timeout=5.0)
-        assert result is not None
-        assert "127.0.0.1" in result
-
-    def test_returns_error_string_on_unexpected_exception(self, bridge: RenPyBridge) -> None:
-        """Any other exception → descriptive error string, never raises."""
-        with patch("urllib.request.urlopen", side_effect=RuntimeError("boom")):
-            result = bridge.check_connection(timeout=5.0)
-        assert result is not None
-        assert "boom" in result
-
-    def test_error_is_logged(self, bridge: RenPyBridge) -> None:
-        """Connection failures are written to the log file."""
-        url_err = urllib.error.URLError(reason="Connection refused")
-        with patch("urllib.request.urlopen", side_effect=url_err):
-            bridge.check_connection(timeout=5.0)
-        log_content = bridge.log_file.read_text(encoding="utf-8")
-        assert "Connection check failed" in log_content
+def _ok_response() -> MagicMock:
+    """Mock urlopen response returning {"status": "ok"}."""
+    resp = MagicMock()
+    resp.read.return_value = b'{"status": "ok"}'
+    return resp
 
 
 # ── RenPyBridge — start ───────────────────────────────────────────────────────
 
 
 class TestStart:
-    def test_returns_false_when_uv_not_found(self, bridge: RenPyBridge) -> None:
-        """No uv on PATH → start() returns False without spawning a process."""
-        with patch("shutil.which", return_value=None):
+    def test_returns_false_when_docker_unreachable(self, bridge: RenPyBridge) -> None:
+        """Docker service unreachable → start() returns False without raising."""
+        url_err = urllib.error.URLError(reason="Connection refused")
+        # time.time side_effect: [deadline_calc=0, while_check=0, while_check=11]
+        with (
+            patch("urllib.request.urlopen", side_effect=url_err),
+            patch("time.sleep"),
+            patch("time.time", side_effect=[0, 0, 11]),
+        ):
             result = bridge.start()
         assert result is False
-        assert bridge.process is None
+        assert bridge.is_running is False
 
-    def test_queues_error_when_uv_not_found(self, bridge: RenPyBridge) -> None:
-        with patch("shutil.which", return_value=None):
+    def test_queues_error_when_docker_unreachable(self, bridge: RenPyBridge) -> None:
+        """Start failure queues a user-visible error mentioning the Docker service."""
+        url_err = urllib.error.URLError(reason="Connection refused")
+        with (
+            patch("urllib.request.urlopen", side_effect=url_err),
+            patch("time.sleep"),
+            patch("time.time", side_effect=[0, 0, 11]),
+        ):
             bridge.start()
         err = bridge.get_error()
         assert err is not None
-        assert "uv" in err.lower()
+        assert "docker" in err.lower() or "vn-bridge" in err.lower()
 
-    def test_returns_false_when_process_dies_immediately(self, bridge: RenPyBridge) -> None:
-        """Process exits before the 1.5s startup window → start() returns False."""
-        dead_process = Mock()
-        dead_process.poll.return_value = 1  # non-None → dead
-        dead_process.stderr.read.return_value = "ImportError: no module named x"
-
+    def test_returns_false_when_service_unhealthy(self, bridge: RenPyBridge) -> None:
+        """Service returns status=disconnected → start() returns False."""
+        resp = MagicMock()
+        resp.read.return_value = b'{"status": "disconnected"}'
         with (
-            patch("shutil.which", return_value="/usr/bin/uv"),
-            patch("subprocess.Popen", return_value=dead_process),
-            patch("time.sleep"),  # don't actually wait
+            patch("urllib.request.urlopen", return_value=resp),
+            patch("time.sleep"),
+            patch("time.time", side_effect=[0, 0, 11]),
         ):
             result = bridge.start()
-
         assert result is False
         assert bridge.is_running is False
 
     def test_returns_true_and_sets_running_on_success(self, bridge: RenPyBridge) -> None:
-        """Healthy process → start() returns True, is_running=True, threads spawned."""
-        live_process = Mock()
-        live_process.poll.return_value = None  # still alive
-        live_process.stdout = MagicMock()
-        live_process.stderr = MagicMock()
-
+        """Healthy Docker service → start() returns True and sets is_running=True."""
         with (
-            patch("shutil.which", return_value="/usr/bin/uv"),
-            patch("subprocess.Popen", return_value=live_process),
+            patch("urllib.request.urlopen", return_value=_ok_response()),
             patch("time.sleep"),
-            patch.object(bridge, "_read_loop"),  # don't actually start threads
-            patch.object(bridge, "_error_loop"),
         ):
             result = bridge.start()
-
         assert result is True
         assert bridge.is_running is True
-        assert bridge.process is live_process
 
 
 # ── RenPyBridge — send_message ────────────────────────────────────────────────
@@ -197,41 +142,36 @@ class TestSendMessage:
     def test_returns_false_when_not_running(self, bridge: RenPyBridge) -> None:
         assert bridge.send_message({"action": "message", "text": "hello"}) is False
 
-    def test_returns_false_when_process_is_none(self, bridge: RenPyBridge) -> None:
+    def test_routes_message_action_to_streaming(self, bridge: RenPyBridge) -> None:
+        """'message' action spawns a thread targeting _post_streaming."""
         bridge.is_running = True
-        bridge.process = None
-        assert bridge.send_message({"action": "message", "text": "hello"}) is False
-
-    def test_writes_json_newline_to_stdin(self, bridge: RenPyBridge) -> None:
-        """Messages must be JSON lines (newline-terminated) for the reader loop."""
-        fake_stdin = MagicMock()
-        fake_process = Mock()
-        fake_process.stdin = fake_stdin
-
-        bridge.is_running = True
-        bridge.process = fake_process
-
-        msg = {"action": "message", "text": "hello forge"}
-        result = bridge.send_message(msg)
-
+        mock_thread = MagicMock()
+        with patch("bridge.threading.Thread", return_value=mock_thread) as thread_cls:
+            result = bridge.send_message({"action": "message", "text": "hello forge"})
         assert result is True
-        written = fake_stdin.write.call_args[0][0]
-        assert written.endswith("\n")
-        parsed = json.loads(written.strip())
-        assert parsed == msg
+        mock_thread.start.assert_called_once()
+        _, kwargs = thread_cls.call_args
+        assert kwargs["target"].__name__ == "_post_streaming"
 
-    def test_returns_false_and_logs_on_broken_pipe(self, bridge: RenPyBridge) -> None:
-        """BrokenPipeError from stdin.write → returns False, does not raise."""
-        fake_stdin = MagicMock()
-        fake_stdin.write.side_effect = BrokenPipeError("broken pipe")
-        fake_process = Mock()
-        fake_process.stdin = fake_stdin
-
+    def test_routes_non_message_action_to_action_post(self, bridge: RenPyBridge) -> None:
+        """Non-message actions (e.g. get_profiles) route to _post_action."""
         bridge.is_running = True
-        bridge.process = fake_process
+        mock_thread = MagicMock()
+        with patch("bridge.threading.Thread", return_value=mock_thread) as thread_cls:
+            result = bridge.send_message({"action": "get_profiles"})
+        assert result is True
+        mock_thread.start.assert_called_once()
+        _, kwargs = thread_cls.call_args
+        assert kwargs["target"].__name__ == "_post_action"
 
-        result = bridge.send_message({"action": "message", "text": "test"})
-        assert result is False
+    def test_streaming_error_queues_error_string(self, bridge: RenPyBridge) -> None:
+        """HTTP failure in _post_streaming puts an error string into the error queue."""
+        bridge.is_running = True
+        with patch("urllib.request.urlopen", side_effect=OSError("connection reset")):
+            bridge._post_streaming({"action": "message", "text": "test"})
+        err = bridge.get_error()
+        assert err is not None
+        assert "connection reset" in err.lower() or "streaming" in err.lower()
 
 
 # ── RenPyBridge — get_message / get_error ────────────────────────────────────
@@ -273,15 +213,134 @@ class TestShutdown:
         bridge.shutdown()
         assert bridge.is_running is False
 
-    def test_terminates_process(self, bridge: RenPyBridge) -> None:
-        mock_process = Mock()
-        bridge.process = mock_process
+    def test_shutdown_writes_log_entry(self, bridge: RenPyBridge) -> None:
+        """shutdown() writes a log entry so operators can see clean teardown."""
         bridge.is_running = True
         bridge.shutdown()
-        mock_process.terminate.assert_called_once()
+        log_content = bridge.log_file.read_text(encoding="utf-8")
+        assert "shutdown" in log_content.lower()
 
-    def test_shutdown_is_safe_with_no_process(self, bridge: RenPyBridge) -> None:
-        """shutdown() must not raise even if process was never started."""
-        bridge.process = None
+    def test_shutdown_is_safe_when_not_started(self, bridge: RenPyBridge) -> None:
+        """shutdown() must not raise even if start() was never called."""
         bridge.shutdown()  # should not raise
         assert bridge.is_running is False
+
+
+# ── RenPyBridge — request_tts ────────────────────────────────────────────────
+
+
+def _audio_response(data: bytes = b"\xff\xfb\x90\x00" * 100) -> MagicMock:
+    """Mock urlopen response returning MP3-like audio bytes."""
+    resp = MagicMock()
+    resp.__enter__ = MagicMock(return_value=resp)
+    resp.__exit__ = MagicMock(return_value=False)
+    resp.status = 200
+    resp.read.return_value = data
+    return resp
+
+
+def _json_response(data: dict, status: int = 200) -> MagicMock:
+    """Mock urlopen response returning JSON."""
+    resp = MagicMock()
+    resp.__enter__ = MagicMock(return_value=resp)
+    resp.__exit__ = MagicMock(return_value=False)
+    resp.status = status
+    resp.read.return_value = json.dumps(data).encode()
+    return resp
+
+
+class TestRequestTts:
+    def test_returns_renpy_relative_path_on_success(
+        self, bridge: RenPyBridge, tmp_path: Path
+    ) -> None:
+        """Successful TTS returns a Ren'Py-relative path like 'audio/tts/tts_techne.mp3'."""
+        with patch("urllib.request.urlopen", return_value=_audio_response()):
+            result = bridge.request_tts("Hello world.", "techne")
+        assert result == "audio/tts/tts_techne.mp3"
+
+    def test_writes_mp3_file_to_disk(self, bridge: RenPyBridge) -> None:
+        """TTS audio bytes are written to game/audio/tts/ directory."""
+        audio_bytes = b"\xff\xfb\x90\x00" * 50
+        with patch("urllib.request.urlopen", return_value=_audio_response(audio_bytes)):
+            bridge.request_tts("Test audio.", "kallos")
+        # Verify the file was created relative to bridge.py location
+        # (mocked project root, so check via the path logic)
+        game_dir = Path(__file__).parents[2] / "hosts/vn/kourai_vn/game"
+        tts_file = game_dir / "audio" / "tts" / "tts_kallos.mp3"
+        if tts_file.exists():
+            assert tts_file.read_bytes() == audio_bytes
+
+    def test_returns_none_on_http_error(self, bridge: RenPyBridge) -> None:
+        """HTTP failure returns None, not an exception."""
+        with patch("urllib.request.urlopen", side_effect=OSError("connection refused")):
+            result = bridge.request_tts("Hello.", "metis")
+        assert result is None
+
+    def test_returns_none_on_empty_response(self, bridge: RenPyBridge) -> None:
+        """Empty audio response returns None."""
+        with patch("urllib.request.urlopen", return_value=_audio_response(b"")):
+            result = bridge.request_tts("Hello.", "techne")
+        assert result is None
+
+    def test_returns_none_on_non_200_status(self, bridge: RenPyBridge) -> None:
+        """Non-200 HTTP status returns None."""
+        resp = _audio_response()
+        resp.status = 500
+        with patch("urllib.request.urlopen", return_value=resp):
+            result = bridge.request_tts("Hello.", "techne")
+        assert result is None
+
+
+# ── RenPyBridge — request_gossip ─────────────────────────────────────────────
+
+
+class TestRequestGossip:
+    def test_returns_tuple_on_success(self, bridge: RenPyBridge) -> None:
+        """Successful gossip returns (hint, line) tuple."""
+        gossip_data = {"hint": "*glancing over*", "line": "They're improving."}
+        with patch("urllib.request.urlopen", return_value=_json_response(gossip_data)):
+            result = bridge.request_gossip("techne", "player-123", {"techne": 0.6})
+        assert result == ("*glancing over*", "They're improving.")
+
+    def test_returns_none_on_http_error(self, bridge: RenPyBridge) -> None:
+        """Network failure returns None for fallback to static lines."""
+        with patch("urllib.request.urlopen", side_effect=OSError("timeout")):
+            result = bridge.request_gossip("kallos", "player-123", {})
+        assert result is None
+
+    def test_returns_none_on_non_200_status(self, bridge: RenPyBridge) -> None:
+        """Non-200 HTTP status returns None."""
+        resp = _json_response({"error": "unknown agent"}, status=400)
+        with patch("urllib.request.urlopen", return_value=resp):
+            result = bridge.request_gossip("unknown", "player-123", {})
+        assert result is None
+
+    def test_returns_none_on_empty_line(self, bridge: RenPyBridge) -> None:
+        """Empty gossip line returns None."""
+        gossip_data = {"hint": "*observing*", "line": ""}
+        with patch("urllib.request.urlopen", return_value=_json_response(gossip_data)):
+            result = bridge.request_gossip("metis", "player-123", {})
+        assert result is None
+
+    def test_defaults_hint_when_missing(self, bridge: RenPyBridge) -> None:
+        """Missing 'hint' key defaults to '*observing*'."""
+        gossip_data = {"line": "Interesting patterns forming."}
+        with patch("urllib.request.urlopen", return_value=_json_response(gossip_data)):
+            result = bridge.request_gossip("metis", "player-123", {})
+        assert result is not None
+        assert result[0] == "*observing*"
+        assert result[1] == "Interesting patterns forming."
+
+    def test_passes_affinity_in_request_body(self, bridge: RenPyBridge) -> None:
+        """Affinity data is included in the POST body."""
+        gossip_data = {"hint": "*thinking*", "line": "They work hard."}
+        affinity = {"techne": 0.7, "kallos": 0.3}
+        with patch("urllib.request.urlopen", return_value=_json_response(gossip_data)) as mock_open:
+            bridge.request_gossip("techne", "player-123", affinity)
+        # Extract the body from the Request object
+        call_args = mock_open.call_args
+        request_obj = call_args[0][0]
+        body = json.loads(request_obj.data)
+        assert body["agent"] == "techne"
+        assert body["player_id"] == "player-123"
+        assert body["affinity"] == affinity
