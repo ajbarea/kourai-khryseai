@@ -134,6 +134,17 @@ label start:
     python:
         player_id = persistent.player_id
 
+    # ═══════════════════════════════════════════════════════════════
+    # CODEX: Unlock starter entries on first launch
+    # ═══════════════════════════════════════════════════════════════
+    python:
+        # Always-available entries on game start
+        unlock_codex_entry("char_player", silent=True)
+        unlock_codex_entry("lore_forge", silent=True)
+        unlock_codex_entry("tech_a2a", silent=True)
+        unlock_codex_entry("tech_bridge", silent=True)
+        unlock_codex_entry("tutorial_first_launch", silent=True)
+
     "System" "Connection to Kourai Khryseai established."
     "System" "The Master of the Forge is listening."
 
@@ -141,12 +152,17 @@ label start:
     # Respects virtue_tracking_enabled (can opt-out via "Disable" button).
     if not persistent.wellness_warning_seen and persistent.virtue_tracking_enabled:
         call screen wellness_warning
+        # CODEX: Unlock wellness entry after warning shown
+        $ unlock_codex_entry("virtue_wellness", silent=False)
 
     # Phase 21: Puck tutorial — first-run players only. Shown after wellness
     # warning so the player has context before Puck speaks.
     if not persistent.puck_tutorial_seen:
         $ renpy.call_screen("puck_tutorial")
         $ persistent.puck_tutorial_seen = True
+        # CODEX: Unlock Puck and tutorial entries
+        $ unlock_codex_entry("char_puck", silent=False)
+        $ unlock_codex_entry("tutorial_puck", silent=False)
 
     # Show the persistent affinity HUD — stays visible for the whole session
     $ renpy.show_screen("affinity_hud")

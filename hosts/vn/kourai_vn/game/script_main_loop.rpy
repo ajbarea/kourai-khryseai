@@ -114,6 +114,11 @@ label main_loop:
                 $ message_text = _beat.get("message", "The forge is silent...")
                 $ portrait_state = _beat.get("portrait", "neutral")
                 $ char_info = AGENT_CHARS.get(agent_id)
+                
+                # ═══════════════════════════════════════════════════════
+                # CODEX: Unlock character entry on first encounter
+                # ═══════════════════════════════════════════════════════
+                $ unlock_codex_entry(f"char_{agent_id}", silent=False)
 
                 # Show/update portrait for speaking agent
                 python:
@@ -219,6 +224,9 @@ label main_loop:
                     elif _cupid_choice == "off":
                         persistent.romance_mode_enabled = False
                     persistent.cupid_appeared = True
+                    # CODEX: Unlock Cupid character entry
+                    unlock_codex_entry("char_cupid", silent=False)
+                    unlock_codex_entry("tutorial_romance", silent=False)
 
             # ── Confession trigger — agent confesses when affinity ≥ 0.95 ──────
             # Hephaestus is gated: only triggers after player reaches tier 3+ with ≥3 others.
@@ -367,6 +375,9 @@ label main_loop:
                                 _mkey = f"{_vname}@{_thresh}"
                                 if _vscore >= _thresh and _mkey not in persistent.virtue_milestones:
                                     persistent.virtue_milestones.add(_mkey)
+                                    # CODEX: Unlock virtue entries on first milestone
+                                    if _thresh == _VIRTUE_THRESHOLDS[0]:  # First threshold only
+                                        unlock_codex_entry(f"virtue_{_vname}", silent=False)
                                     if _virtue_toast is None:
                                         _vline = _VIRTUE_LINES.get(_vname, {}).get(_thresh, "")
                                         if _vline:

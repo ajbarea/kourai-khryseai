@@ -31,7 +31,7 @@ init python:
     # Character definitions — colors from FORGE_AESTHETIC.md agent personality colors
     h   = Character("Hephaestus", color="#FF9500", what_prefix='"', what_suffix='"')
     t   = Character("Techne",     color="#17A2B8", what_prefix='"', what_suffix='"')
-    k   = Character("Kallos",     color="#D946EF", what_prefix='"', what_suffix='"')
+    k   = Character("Kallos",     color="#C8A2C8", what_prefix='"', what_suffix='"')
     m   = Character("Metis",      color="#4C6EF5", what_prefix='"', what_suffix='"')
     d   = Character("Dokimasia",  color="#6C757D", what_prefix='"', what_suffix='"')
     mn  = Character("Mneme",      color="#B73E1D", what_prefix='"', what_suffix='"')
@@ -71,7 +71,7 @@ init python:
     AGENT_COLORS = {
         "hephaestus": "#FF9500",
         "techne":     "#17A2B8",
-        "kallos":     "#D946EF",
+        "kallos":     "#C8A2C8",
         "metis":      "#4C6EF5",
         "dokimasia":  "#6C757D",
         "mneme":      "#B73E1D",
@@ -233,6 +233,153 @@ init python:
 
     config.save_json_callbacks.append(_build_save_json)
 
+    # ═══════════════════════════════════════════════════════════════
+    # CODEX SYSTEM — Persistence & Unlock Logic
+    # ═══════════════════════════════════════════════════════════════
+
+    def unlock_codex_entry(entry_id, silent=False):
+        """Unlock a Codex entry and optionally queue a notification.
+        
+        Args:
+            entry_id: Unique entry identifier from CODEX_ENTRIES
+            silent: If True, skip notification toast (for bulk unlocks)
+        
+        Returns:
+            True if newly unlocked, False if already unlocked
+        """
+        if not hasattr(persistent, 'codex_unlocked'):
+            persistent.codex_unlocked = set()
+        
+        if entry_id in persistent.codex_unlocked:
+            return False  # Already unlocked
+        
+        # Find the entry to get its title
+        entry_data = None
+        for category in CODEX_ENTRIES.values():
+            for entry in category:
+                if entry["id"] == entry_id:
+                    entry_data = entry
+                    break
+            if entry_data:
+                break
+        
+        if not entry_data:
+            return False  # Entry doesn't exist
+        
+        persistent.codex_unlocked.add(entry_id)
+        
+        if not silent:
+            # Queue notification for display
+            if not hasattr(persistent, 'codex_new_notifications'):
+                persistent.codex_new_notifications = []
+            persistent.codex_new_notifications.append({
+                "id": entry_id,
+                "title": entry_data["title"],
+                "subtitle": entry_data.get("subtitle", ""),
+                "category": _get_entry_category(entry_id)
+            })
+        
+        return True
+    
+    def _get_entry_category(entry_id):
+        """Find which category an entry belongs to."""
+        for category_name, entries in CODEX_ENTRIES.items():
+            for entry in entries:
+                if entry["id"] == entry_id:
+                    return category_name
+        return "Unknown"
+    
+    def mark_codex_entry_read(entry_id):
+        """Mark a Codex entry as read (removes NEW badge)."""
+        if not hasattr(persistent, 'codex_read'):
+            persistent.codex_read = set()
+        persistent.codex_read.add(entry_id)
+    
+    def is_codex_entry_unlocked(entry_id):
+        """Check if a Codex entry is unlocked."""
+        if not hasattr(persistent, 'codex_unlocked'):
+            return False
+        return entry_id in persistent.codex_unlocked
+    
+    def is_codex_entry_new(entry_id):
+        """Check if a Codex entry has a NEW badge (unlocked but not read)."""
+        if not hasattr(persistent, 'codex_read'):
+            persistent.codex_read = set()
+        return is_codex_entry_unlocked(entry_id) and entry_id not in persistent.codex_read
+    
+    def get_codex_new_count(category=None):
+        """Get count of NEW (unread) entries in a category or total.
+        
+        Args:
+            category: Category name (e.g., "Characters"), or None for total
+        
+        Returns:
+            Count of unread entries
+        """
+        if not hasattr(persistent, 'codex_unlocked'):
+            return 0
+        if not hasattr(persistent, 'codex_read'):
+            persistent.codex_read = set()
+        
+        count = 0
+        entries_to_check = []
+        
+        if category:
+            entries_to_check = CODEX_ENTRIES.get(category, [])
+        else:
+            for cat_entries in CODEX_ENTRIES.values():
+                entries_to_check.extend(cat_entries)
+        
+        for entry in entries_to_check:
+            if is_codex_entry_new(entry["id"]):
+                count += 1
+        
+        return count
+    
+    def get_unlocked_entries(category):
+        """Get list of unlocked entries for a category.
+        
+        Returns:
+            List of entry dicts that are unlocked
+        """
+        if not hasattr(persistent, 'codex_unlocked'):
+            return []
+        
+        unlocked = []
+        for entry in CODEX_ENTRIES.get(category, []):
+            if entry["id"] in persistent.codex_unlocked:
+                unlocked.append(entry)
+        
+        return unlocked
+    
+    def pop_codex_notification():
+        """Get and remove the next pending Codex notification.
+        
+        Returns:
+            Notification dict or None if queue is empty
+        """
+        if not hasattr(persistent, 'codex_new_notifications'):
+            persistent.codex_new_notifications = []
+        
+        if persistent.codex_new_notifications:
+            return persistent.codex_new_notifications.pop(0)
+        
+        return None
+
+# ── CODEX HOTKEY BINDING ─────────────────────────────────────────────
+
+init python:
+    # Add 'c' key binding to toggle Codex
+    config.keymap['codex_toggle'] = ['c', 'C']
+    config.underlay.append(
+        renpy.Keymap(
+            codex_toggle=ShowMenu("codex")
+        )
+    )
+
+# ─────────────────────────────────────────────────────────────────────
+
+init python:
     def _validate_and_set_project(project_path):
         """Validate project directory and add to recent projects.
 
