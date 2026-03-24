@@ -47,6 +47,22 @@ init python:
         "cupid":      (cpd, "Arrow of the Heart"),
     }
 
+    # Name → epithet lookup for the say screen subtitle display.
+    # Matches Hades dialogue UI: "ATHENA / Goddess of Wisdom".
+    # Canonical epithets from designs/FORGE_AESTHETIC.md § Ten Agents.
+    AGENT_EPITHETS = {
+        "Hephaestus": "Master of the Forge",
+        "Techne":     "Artisan of Code",
+        "Kallos":     "Eye of Elegance",
+        "Metis":      "Architect of Intent",
+        "Dokimasia":  "Guardian of Standards",
+        "Mneme":      "Keeper of Memory",
+        "Puck":       "Voice of Reason",
+        "Cupid":      "Aspect of Love",
+        "Aidos":      "The Honest Mirror",
+        "Aletheia":   "Seeker of Truth",
+    }
+
     # Agent accent colors (mirrors AGENT_CHARS, used by HUD, gossip bubble, portrait frame)
     AGENT_COLORS = {
         "hephaestus": "#FF9500",
@@ -984,7 +1000,8 @@ label create_project_label:
 # a quick intro line so you can preview all character art in one pass.
 
 label portrait_debug:
-    scene black
+    ## Warm forge-dark instead of pure black — matches the forge atmosphere.
+    scene expression "#0D0A07"
 
     python:
         # Build the full agent list — AGENT_CHARS covers the 8 main agents;
