@@ -146,7 +146,7 @@ screen tier_up(agent_id, new_tier):
                     size 20
                     yalign 0.5
             text ("Tier " + str(new_tier) + " — " + _tier_label):
-                color "#D4AF37"
+                color "#F1D2A1"
                 size 14
                 italic True
 
@@ -234,7 +234,7 @@ screen cupid_intro():
     modal True
 
     $ _cupid_color = "#E8728C"
-    $ _gold = "#D4AF37"
+    $ _gold = "#F1D2A1"
 
     add Solid("#00000088")
 
@@ -373,7 +373,7 @@ screen wellness_warning():
 
             # Title
             text "⚒  THE FORGE OBSERVES":
-                color "#D4AF37"
+                color "#F1D2A1"
                 size 20
                 bold True
                 xalign 0.5

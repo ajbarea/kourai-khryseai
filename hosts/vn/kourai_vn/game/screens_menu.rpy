@@ -36,6 +36,8 @@ screen navigation():
 
         textbutton _("Load") action ShowMenu("load")
 
+        textbutton _("Codex") action ShowMenu("codex")
+
         textbutton _("Preferences") action ShowMenu("preferences")
 
         if _in_replay:
@@ -69,6 +71,7 @@ style navigation_button:
 
 style navigation_button_text:
     properties gui.text_properties("navigation_button")
+    size 26
 
 
 ## Main Menu screen ############################################################
@@ -82,12 +85,25 @@ screen main_menu():
     ## This ensures that any other menu screen is replaced.
     tag menu
 
-    ## Deep forge-dark background (replaces the plain brown main_menu.png)
-    add Solid("#0D0A07")
+    ## All black background with the blended image and particles
+    add Solid("#000000")
+    
+    ## Anchor the statues to the far right of the screen
+    add gui.main_menu_background:
+        xalign 1.0
+        yalign 0.5
+    
+    add "ember_particles"
 
     ## Left navigation panel overlay
     frame:
         style "main_menu_frame"
+        background None
+
+    ## Sleek new golden separator line to replace the default orange overlay!
+    add Solid("#C9944A", xysize=(2, 1080)):
+        xpos 320
+        alpha 0.8
 
     ## The use statement includes another screen inside this one. The actual
     ## contents of the main menu are in the navigation screen.
@@ -95,35 +111,42 @@ screen main_menu():
 
     if gui.show_name:
 
-        ## Forge title block — centered in the right two-thirds
+        ## Forge title block — Sleek modern 2026 UI composition
+        ## Positioned exactly right of the navigation menu, flowing outwards
         vbox:
-            xalign 0.68
+            xpos 350
             yalign 0.42
-            spacing 12
+            spacing 18
 
             text "[config.name!t]":
                 style "main_menu_title"
-                xalign 0.5
-                kerning 3.0
+                xalign 0.0
+                text_align 0.0
+                size 92
+                kerning 4.0
+                color "#F1D2A1"
+                outlines [ (1, "#00000050", 2, 2) ]
 
-            ## Gold divider line
-            add Solid("#D4AF3770", xysize=(480, 2)):
-                xalign 0.5
-
-            null height 4
+            ## Sleek delicate line
+            add Solid("#F1D2A1", xysize=(600, 1)):
+                xalign 0.0
+                alpha 0.5
 
             ## Tagline
-            text "Golden Maidens of the Forge":
-                color "#C8B88A"
-                size 26
-                italic True
-                xalign 0.5
+            text "GOLDEN MAIDENS OF THE FORGE":
+                color "#C8B88AD8"
+                size 20
+                kerning 7.0
+                xalign 0.0
+                text_align 0.0
 
-        ## Version number — bottom right area
+        ## Version number — elegant placement bottom right edge
         text "[config.version]":
             style "main_menu_version"
-            xalign 0.68
-            yalign 0.96
+            xalign 0.98
+            yalign 0.95
+            size 16
+            kerning 2.0
 
 
 style main_menu_frame is empty
@@ -133,10 +156,10 @@ style main_menu_title is main_menu_text
 style main_menu_version is main_menu_text
 
 style main_menu_frame:
-    xsize 420
+    xsize 320
     yfill True
 
-    background "gui/overlay/main_menu.png"
+    background None
 
 style main_menu_vbox:
     xalign 1.0
@@ -414,7 +437,7 @@ screen file_slots(title):
 
                         # Agent epithet if available (Phase F4 polish)
                         if active_agent and active_agent in AGENT_CHARS:
-                            $ _, epithet = AGENT_CHARS[active_agent]
+                            $ _char, epithet = AGENT_CHARS[active_agent]
                             text "[active_agent.capitalize()]\n[epithet]" style "slot_name_text" size 18
 
                         text FileTime(slot, format=_("{#file_time}%A, %B %d %Y, %H:%M"), empty=_("empty slot")):

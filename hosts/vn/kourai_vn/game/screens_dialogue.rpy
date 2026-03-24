@@ -358,4 +358,5 @@ screen agent_portrait(agent_id="hephaestus", state="neutral"):
     add _portrait_image(agent_id, state) at portrait_enter:
         xalign 0.0
         yalign 1.0
+        yoffset 160
         size (760, 760)

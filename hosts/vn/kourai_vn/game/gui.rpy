@@ -1,4 +1,4 @@
-﻿################################################################################
+################################################################################
 ## Initialization
 ################################################################################
 
@@ -26,7 +26,7 @@ define config.check_conflicting_properties = True
 
 ## An accent color used throughout the interface to label and highlight text.
 ## Forge palette: Primary Gold from FORGE_AESTHETIC.md
-define gui.accent_color = '#D4AF37'
+define gui.accent_color = '#F1D2A1'
 
 ## The color used for a text button when it is neither selected nor hovered.
 define gui.idle_color = '#9A8866'
@@ -53,7 +53,7 @@ define gui.hover_muted_color = '#5A4000'
 ## The colors used for dialogue and menu choice text.
 ## Warm parchment cream for dialogue. Gold for UI chrome.
 define gui.text_color = '#F0E8D0'
-define gui.interface_text_color = '#D4AF37'
+define gui.interface_text_color = '#F1D2A1'
 
 
 ## Fonts and Font Sizes ########################################################
@@ -89,7 +89,7 @@ define gui.title_text_size = 75
 ## Main and Game Menus #########################################################
 
 ## The images used for the main and game menus.
-define gui.main_menu_background = "gui/main_menu.png"
+define gui.main_menu_background = "images/main_menu_bg.png"
 define gui.game_menu_background = "gui/game_menu.png"
 
 

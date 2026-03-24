@@ -503,7 +503,7 @@ screen forge_input(prompt="You:"):
                     hover_background "#342840"
                     xsize 68
                     ysize 30
-                    text_color "#D4AF37"
+                    text_color "#F1D2A1"
                     text_size 12
                     text_xalign 0.5
                     text_yalign 0.5

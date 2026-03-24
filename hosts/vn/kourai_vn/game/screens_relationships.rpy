@@ -65,7 +65,7 @@ screen forge_journal():
             spacing 30
 
             # Title
-            text "⚡ The Forge Observes" size 35 color "#D4AF37" bold True
+            text "⚡ The Forge Observes" size 35 color "#F1D2A1" bold True
             text "(Your virtues across sessions)" size 18 color "#A0A0A0"
 
             null height 10
@@ -146,7 +146,7 @@ screen forge_journal():
                 padding 15, 15
                 vbox:
                     spacing 10
-                    text "Session Summary" size 20 color "#D4AF37" bold True
+                    text "Session Summary" size 20 color "#F1D2A1" bold True
                     $ summary_text = virtue_context.get("session_summary",
                         "No virtue changes this session.")
                     text summary_text size 16 color "#E8E8E8"
@@ -154,7 +154,7 @@ screen forge_journal():
             null height 15
 
             # Discoveries section (new facts from knowledge graph)
-            text "🔮 Discoveries" size 20 color "#D4AF37" bold True
+            text "🔮 Discoveries" size 20 color "#F1D2A1" bold True
             $ discoveries = virtue_context.get("recent_facts", [])
             if discoveries:
                 vbox:
@@ -177,7 +177,7 @@ screen project_selection():
             spacing 25
 
             # Title
-            text "📁 Project Workspace" size 35 color "#D4AF37" bold True
+            text "📁 Project Workspace" size 35 color "#F1D2A1" bold True
             text "(where your code lives)" size 16 color "#A0A0A0"
 
             null height 15
@@ -189,7 +189,7 @@ screen project_selection():
                 padding 15, 15
                 vbox:
                     spacing 5
-                    text "Current Project" size 18 color "#D4AF37" bold True
+                    text "Current Project" size 18 color "#F1D2A1" bold True
                     if current_path:
                         text current_path size 16 color "#E8D5B7"
                     else:
@@ -198,7 +198,7 @@ screen project_selection():
             null height 20
 
             # Project path input
-            text "Set Project Path" size 20 color "#D4AF37" bold True
+            text "Set Project Path" size 20 color "#F1D2A1" bold True
             text "(Absolute path to project root directory)" size 14 color "#A0A0A0"
 
             hbox:
@@ -207,7 +207,7 @@ screen project_selection():
                     action ui.callsinnewcontext("project_input_label")
                     background Frame(Solid("#3A2A00"), 2, 2)
                     xsize 500 ysize 50
-                    text "Enter Path" align (0.5, 0.5) color "#D4AF37" size 18
+                    text "Enter Path" align (0.5, 0.5) color "#F1D2A1" size 18
                 button:
                     action Function(_validate_and_set_project, current_path)
                     background Frame(Solid("#2A3A00"), 2, 2)
@@ -228,7 +228,7 @@ screen project_selection():
 
             # Recent projects list
             if recent_projects:
-                text "📌 Recent Projects" size 20 color "#D4AF37" bold True
+                text "📌 Recent Projects" size 20 color "#F1D2A1" bold True
                 vbox:
                     spacing 8
                     for proj_path in recent_projects[:5]:
@@ -289,7 +289,7 @@ screen pre_confession_window(agent_id):
                     bold True
                     yalign 0.5
                 text "— Tier 4":
-                    color "#D4AF37"
+                    color "#F1D2A1"
                     size 14
                     italic True
                     yalign 0.5
@@ -371,11 +371,11 @@ screen pre_confession_window(agent_id):
             button:
                 action Return()
                 background Frame(Solid("#2A1A3A"), 2, 2)
-                hover_background Frame(Solid("#D4AF3744"), 2, 2)
+                hover_background Frame(Solid("#F1D2A144"), 2, 2)
                 xfill True
                 ysize 44
                 text "Continue":
-                    color "#D4AF37"
+                    color "#F1D2A1"
                     size 15
                     xalign 0.5
                     yalign 0.5
