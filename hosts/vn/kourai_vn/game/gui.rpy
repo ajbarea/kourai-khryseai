@@ -99,7 +99,8 @@ define gui.game_menu_background = "gui/game_menu.png"
 ## time.
 
 ## The height of the textbox containing dialogue.
-define gui.textbox_height = 278
+## Taller than default to accommodate epithet subtitle below character name.
+define gui.textbox_height = 310
 
 ## The placement of the textbox vertically on the screen. 0.0 is the top, 0.5 is
 ## center, and 1.0 is the bottom.
@@ -108,8 +109,9 @@ define gui.textbox_yalign = 1.0
 
 ## The placement of the speaking character's name, relative to the textbox.
 ## These can be a whole number of pixels from the left or top, or 0.5 to center.
-define gui.name_xpos = 360
-define gui.name_ypos = 0
+## Offset past the 760px portrait sprite so name plate never clips behind it.
+define gui.name_xpos = 730
+define gui.name_ypos = 8
 
 ## The horizontal alignment of the character's name. This can be 0.0 for left-
 ## aligned, 0.5 for centered, and 1.0 for right-aligned.
@@ -132,11 +134,14 @@ define gui.namebox_tile = False
 ## The placement of dialogue relative to the textbox. These can be a whole
 ## number of pixels relative to the left or top side of the textbox, or 0.5 to
 ## center.
-define gui.dialogue_xpos = 402
-define gui.dialogue_ypos = 75
+## Matches name_xpos so dialogue text aligns with the name plate.
+define gui.dialogue_xpos = 730
+## Below name + epithet subtitle (name ~54px + epithet ~26px + padding).
+define gui.dialogue_ypos = 110
 
 ## The maximum width of dialogue text, in pixels.
-define gui.dialogue_width = 1116
+## Fills the space right of the 760px portrait (1920 - 780 - 80 margin ≈ 1060).
+define gui.dialogue_width = 1060
 
 ## The horizontal alignment of the dialogue text. This can be 0.0 for left-
 ## aligned, 0.5 for centered, and 1.0 for right-aligned.
@@ -190,8 +195,8 @@ define gui.confirm_button_text_xalign = 0.5
 
 define gui.page_button_borders = Borders(15, 6, 15, 6)
 
-define gui.quick_button_borders = Borders(15, 6, 15, 0)
-define gui.quick_button_text_size = 21
+define gui.quick_button_borders = Borders(12, 4, 12, 0)
+define gui.quick_button_text_size = 18
 define gui.quick_button_text_idle_color = gui.idle_small_color
 define gui.quick_button_text_selected_color = gui.accent_color
 
