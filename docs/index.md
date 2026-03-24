@@ -44,61 +44,61 @@ hide:
     <h2 class="section-title">The Forge</h2>
     <div class="agent-grid">
       <a href="agents/#hephaestus-orchestrator" class="agent-card" style="--agent-accent: #FF9500">
-        <div class="agent-emoji">🔥</div>
+        <img src="assets/avatars/hephaestus_neutral.png" class="agent-avatar" alt="Hephaestus" loading="lazy">
         <div class="agent-name">Hephaestus</div>
         <div class="agent-epithet">Master of the Forge</div>
         <p>Routes requests, manages pipelines, asks clarifying questions</p>
       </a>
       <a href="agents/specialists/#metis-planner" class="agent-card" style="--agent-accent: #4C6EF5">
-        <div class="agent-emoji">📐</div>
+        <img src="assets/avatars/metis_neutral.png" class="agent-avatar" alt="Metis" loading="lazy">
         <div class="agent-name">Metis</div>
         <div class="agent-epithet">Architect of Intent</div>
         <p>Plans specs, identifies edge cases, asks architecture decisions</p>
       </a>
       <a href="agents/specialists/#techne-coder" class="agent-card" style="--agent-accent: #17A2B8">
-        <div class="agent-emoji">⚙️</div>
+        <img src="assets/avatars/techne_neutral.png" class="agent-avatar" alt="Techne" loading="lazy">
         <div class="agent-name">Techne</div>
         <div class="agent-epithet">Artisan of Code</div>
         <p>Writes code, explains patterns, ships implementations</p>
       </a>
       <a href="agents/specialists/#dokimasia-tester" class="agent-card" style="--agent-accent: #6C757D">
-        <div class="agent-emoji">🧪</div>
+        <img src="assets/avatars/dokimasia_neutral.png" class="agent-avatar" alt="Dokimasia" loading="lazy">
         <div class="agent-name">Dokimasia</div>
         <div class="agent-epithet">Guardian of Standards</div>
         <p>Creates test suites, runs coverage, catches regressions</p>
       </a>
       <a href="agents/specialists/#kallos-stylist" class="agent-card" style="--agent-accent: #D946EF">
-        <div class="agent-emoji">✨</div>
+        <img src="assets/avatars/kallos_neutral.png" class="agent-avatar" alt="Kallos" loading="lazy">
         <div class="agent-name">Kallos</div>
         <div class="agent-epithet">Eye of Elegance</div>
         <p>Reviews style, enforces standards, refines quality</p>
       </a>
       <a href="agents/specialists/#mneme-scribe" class="agent-card" style="--agent-accent: #B73E1D">
-        <div class="agent-emoji">📜</div>
+        <img src="assets/avatars/mneme_neutral.png" class="agent-avatar" alt="Mneme" loading="lazy">
         <div class="agent-name">Mneme</div>
         <div class="agent-epithet">Keeper of Memory</div>
         <p>Organizes diffs into clean conventional commits</p>
       </a>
       <a href="agents/specialists/#puck-companion-spirit" class="agent-card" style="--agent-accent: #7FBC8C">
-        <div class="agent-emoji">🎭</div>
+        <img src="assets/avatars/puck_neutral.png" class="agent-avatar" alt="Puck" loading="lazy">
         <div class="agent-name">Puck</div>
         <div class="agent-epithet">Spirit of Mischief</div>
         <p>Keeps the mood alive with wit, quips, and mischievous observations</p>
       </a>
       <a href="agents/specialists/#cupid-romance-spirit" class="agent-card" style="--agent-accent: #E8728C">
-        <div class="agent-emoji">💘</div>
+        <img src="assets/avatars/cupid_neutral.png" class="agent-avatar" alt="Cupid" loading="lazy">
         <div class="agent-name">Cupid</div>
         <div class="agent-epithet">Arrow of the Heart</div>
         <p>Tracks affinity, unlocks romance routes, tends companion bonds</p>
       </a>
       <a href="agents/specialists/#aidos-anti-slop-validator" class="agent-card" style="--agent-accent: #A0A0B0">
-        <div class="agent-emoji">🪞</div>
+        <img src="assets/avatars/aidos_neutral.png" class="agent-avatar" alt="Aidos" loading="lazy">
         <div class="agent-name">Aidos</div>
         <div class="agent-epithet">Mirror of Truth</div>
         <p>Detects hollow prose, forces specificity, kills the slop</p>
       </a>
       <a href="agents/specialists/#aletheia-research-validator" class="agent-card" style="--agent-accent: #64B5F6">
-        <div class="agent-emoji">📚</div>
+        <img src="assets/avatars/aletheia_neutral.png" class="agent-avatar" alt="Aletheia" loading="lazy">
         <div class="agent-name">Aletheia</div>
         <div class="agent-epithet">Keeper of Truth</div>
         <p>Validates citations, cross-checks facts, grounds agents in reality</p>
@@ -111,12 +111,12 @@ hide:
   <div class="section-inner">
     <h2 class="section-title">One Request, Full Pipeline</h2>
     <div class="pipeline-flow">
-      <div class="pipeline-step"><span class="step-emoji">🔥</span><span class="step-label" style="color:#FF9500">Route</span></div>
-      <div class="pipeline-step"><span class="step-emoji">📐</span><span class="step-label" style="color:#4C6EF5">Plan</span></div>
-      <div class="pipeline-step"><span class="step-emoji">⚙️</span><span class="step-label" style="color:#17A2B8">Code</span></div>
-      <div class="pipeline-step"><span class="step-emoji">🧪</span><span class="step-label" style="color:#6C757D">Test</span></div>
-      <div class="pipeline-step"><span class="step-emoji">✨</span><span class="step-label" style="color:#D946EF">Review</span></div>
-      <div class="pipeline-step"><span class="step-emoji">📜</span><span class="step-label" style="color:#B73E1D">Commit</span></div>
+      <div class="pipeline-step"><img src="assets/avatars/hephaestus_neutral.png" class="avatar-mini" alt="Hephaestus"><span class="step-label" style="color:#FF9500">Route</span></div>
+      <div class="pipeline-step"><img src="assets/avatars/metis_neutral.png" class="avatar-mini" alt="Metis"><span class="step-label" style="color:#4C6EF5">Plan</span></div>
+      <div class="pipeline-step"><img src="assets/avatars/techne_neutral.png" class="avatar-mini" alt="Techne"><span class="step-label" style="color:#17A2B8">Code</span></div>
+      <div class="pipeline-step"><img src="assets/avatars/dokimasia_neutral.png" class="avatar-mini" alt="Dokimasia"><span class="step-label" style="color:#6C757D">Test</span></div>
+      <div class="pipeline-step"><img src="assets/avatars/kallos_neutral.png" class="avatar-mini" alt="Kallos"><span class="step-label" style="color:#D946EF">Review</span></div>
+      <div class="pipeline-step"><img src="assets/avatars/mneme_neutral.png" class="avatar-mini" alt="Mneme"><span class="step-label" style="color:#B73E1D">Commit</span></div>
     </div>
     <p class="pipeline-caption">"Add authentication to /api/users" &mdash; planned, coded, tested, reviewed, committed</p>
   </div>
