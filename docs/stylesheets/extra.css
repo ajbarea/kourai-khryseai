@@ -777,6 +777,44 @@ body.hero-page .md-header {
   margin-bottom: 0.5rem;
 }
 
+/* Avatar portraits — circular crop with agent-accent glow */
+.agent-avatar {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--agent-accent, var(--gold-dark));
+  margin-bottom: 0.6rem;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.agent-card:hover .agent-avatar {
+  transform: scale(1.08);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--agent-accent, var(--gold-dark)) 40%, transparent);
+}
+
+/* Mini avatars — pipeline flow, inline references */
+.avatar-mini {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1.5px solid var(--gold-dark);
+  vertical-align: middle;
+}
+
+/* Specialist profile header avatars */
+.specialist-avatar {
+  width: 128px;
+  height: 128px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid var(--gold-dark);
+  float: right;
+  margin: 0 0 1rem 1.5rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
 .agent-name {
   font-size: 1rem;
   font-weight: 700;
