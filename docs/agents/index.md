@@ -16,6 +16,8 @@ Hephaestus discovers specialists by fetching their cards at connection time, ena
 
 ## 🔥 Hephaestus — Orchestrator
 
+<img src="../assets/avatars/hephaestus_neutral.png" class="specialist-avatar" alt="Hephaestus — Master of the Forge">
+
 **Port `10000`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/hephaestus/`](https://github.com/ajbarea/kourai_khryseai/tree/main/agents/hephaestus)
 
 The brain of the system. Receives user requests, uses its LLM to decide which specialists to invoke and in what order, then executes the pipeline sequentially while streaming progress back to the host.
