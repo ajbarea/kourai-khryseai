@@ -60,7 +60,8 @@ def db(monkeypatch):
     mock_conn = MagicMock(wraps=conn)
     mock_conn.close = MagicMock()  # no-op — keeps in-memory DB alive
     monkeypatch.setattr("kourai_common.virtues._get_virtues_db", lambda: mock_conn)
-    return mock_conn
+    yield mock_conn
+    conn.close()  # explicitly close the real connection to suppress ResourceWarning
 
 
 PLAYER = "test-player-abc123"
