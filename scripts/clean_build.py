@@ -87,6 +87,14 @@ def clean_uv_backups() -> None:
         backup_file.unlink()
 
 
+def clean_docker_logs() -> None:
+    """Remove docker logs."""
+    p = Path("docker-debug.log")
+    if p.exists():
+        logger.info("Removing docker-debug.log")
+        p.unlink()
+
+
 def main() -> int:
     """Clean all artifacts."""
     args = sys.argv[1:]
@@ -108,6 +116,7 @@ def main() -> int:
         clean_build()
         clean_hypothesis()
         clean_uv_backups()
+        clean_docker_logs()
 
     logger.info("Done. Workspace cleaned.")
     return 0

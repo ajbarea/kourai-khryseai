@@ -67,11 +67,13 @@ dev-vn:                    ## Start services + Ren'Py VN (full development stack
 	@$(MAKE) --no-print-directory vn
 
 up:                        ## Start all agents + infrastructure (background, waits for health)
-	$(COMPOSE_FULL) up -d --build --pull always --wait --wait-timeout 180
-	@echo All services running and healthy
+	@echo Building and starting services...
+	@$(COMPOSE_FULL) up -d --build --pull always --wait 2>&1 | tee docker-debug.log && echo "✅ All services running and healthy" || (echo "❌ Build or startup failed - see docker-debug.log"; exit 1)
+	@echo
 	@echo Dashboards:
 	@echo   Jaeger traces:      http://localhost:16686
 	@echo   Prometheus metrics: http://localhost:9090
+	@echo
 	@$(COMPOSE_FULL) ps
 
 down:                      ## Stop all services and remove containers
