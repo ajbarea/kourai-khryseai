@@ -1,6 +1,6 @@
 # Visual Novel Reference
 
-The Kourai Khryseai Visual Novel is a Ren'Py experience where the Golden Maidens aren't just tools — they're characters with personality, affinity, and romance routes. Built on Ren'Py 8.5.2 with a subprocess JSON IPC bridge to the agent backend.
+The Kourai Khryseai Visual Novel is a Ren'Py experience where the Golden Maidens aren't just tools — they're characters with personality, affinity, and romance routes. Built on Ren'Py 8.5.2, connecting to the agent backend through a dedicated `vn-bridge` Docker service (`:10010`).
 
 **Location:** `hosts/vn/kourai_vn/`
 
@@ -15,43 +15,56 @@ cd hosts/vn/renpy-8.5.2-sdk
 renpy.exe ..\kourai_vn     # Windows
 ```
 
-The VN launches, spawns the agent bridge subprocess, connects to Hephaestus, and drops you into the forge.
+The VN launches, connects to the `vn-bridge` service at `:10010`, and drops you into the forge. The bridge must be running via `docker compose up`.
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────────┐       JSON IPC        ┌──────────────────────┐
-│     Ren'Py VN       │◄─── subprocess ────►  │   agents/vn_bridge   │
-│  script.rpy (426L)  │     stdin/stdout       │      (343 LOC)       │
-│  screens.rpy (1903L)│                        │  ┌─ Hephaestus (:10000)
-│  bridge.py (240L)   │                        │  ├─ Metis      (:10001)
-│                     │                        │  ├─ Techne     (:10002)
-│  game/images/       │                        │  ├─ ...
-│    portraits/       │                        │  └─ Aletheia   (:10009)
-└─────────────────────┘                        └──────────────────────┘
+┌─────────────────────┐    HTTP (urllib)     ┌──────────────────────┐
+│     Ren'Py VN       │ ──── :10010 ──────►  │  vn-bridge (Docker)  │
+│  script.rpy         │                       │  agents/vn_bridge.py │
+│  screens.rpy        │  ◄── NDJSON ────────  │                      │
+│  libs/bridge.py     │                       │  ┌─ A2A client       │
+│                     │                       │  └─► Hephaestus      │
+│  game/images/       │                       │      (:10000)        │
+│    portraits/       │                       │      ├─ Metis  …     │
+└─────────────────────┘                       └──────────────────────┘
 ```
 
-### Bridge IPC Protocol
+The `vn-bridge` is a standalone Docker service (`docker/host.Dockerfile` with `HOST_TYPE=vn_bridge`) that translates between Ren'Py's synchronous `urllib` calls and Hephaestus's async A2A streaming.
 
-**Player → Agent:**
+### Bridge HTTP Endpoints
+
+| Endpoint | Method | Purpose | Response |
+|----------|--------|---------|----------|
+| `/health` | GET | Liveness check | `{"status": "ok"}` |
+| `/message` | POST | Send message or choice | NDJSON stream |
+| `/action` | POST | Profiles, virtues, context resume | Single JSON |
+| `/tts` | POST | Text-to-speech (edge-tts) | MP3 bytes |
+| `/gossip` | POST | Idle agent flavor text | `{"hint": "...", "line": "..."}` |
+
+### Bridge Protocol
+
+**Player → Bridge (POST /message):**
 ```json
 {"action": "message", "text": "...", "context_id": "uuid", "player_id": "uuid", "project_path": "/abs/path"}
 {"action": "choice",  "choice": "selected text", "context_id": "uuid", "player_id": "uuid"}
-{"action": "resume",  "context_id": "uuid"}
 ```
 
-**Agent → Player:**
+**Bridge → Player (NDJSON stream, one JSON object per line):**
 ```json
 {"action": "status",  "message": "Reading files..."}
 {"action": "message", "agent": "techne", "message": "Here's what I found.", "portrait": "neutral", "affinity_delta": 0.02}
 {"action": "choice",  "agent": "puck", "prompt": "How do you respond?", "choices": ["Support her", "Change the subject"]}
 ```
 
+The Ren'Py client (`libs/bridge.py`) spawns daemon threads that stream NDJSON lines into an inbox queue. The main Ren'Py loop polls via `get_message(timeout=0.05)`.
+
 ### Pickle Safety
 
-Ren'Py saves game state via Python pickle. The bridge uses `python hide` blocks and `__getstate__`/`__setstate__` to avoid pickling subprocess/thread objects:
+Ren'Py saves game state via Python pickle. The bridge uses `python hide` blocks and `__getstate__`/`__setstate__` to avoid pickling thread/connection objects:
 
 ```python
 # CORRECT — hidden namespace, not saved
@@ -173,19 +186,19 @@ Save slots display:
 - Timestamp
 - Custom save note (agent's epithet)
 
-The bridge reconstructs fresh on load — only `agent_script` path is pickled. A `resume` action re-sends `context_id` to restore conversation state.
+The bridge reconnects to `:10010` on load — only the bridge URL and context state are pickled. A `resume` action via `/action` re-sends `context_id` to restore conversation state.
 
 ---
 
 ## Troubleshooting
 
-### Bridge won't start
-- Verify `uv` is on PATH: `which uv`
-- Check that Docker agents are running: `make status`
-- Look at `logs/bridge_renpy.log` and `logs/bridge_stderr.log`
+### Bridge won't connect
+- Ensure Docker is running: `docker compose up`
+- Check that `vn-bridge` is healthy: `curl http://localhost:10010/health`
+- Check that Hephaestus is up: `docker compose logs vn-bridge`
 
 ### Save crashes
-- Never store subprocess/thread objects in Ren'Py store variables
+- Never store thread/connection objects in Ren'Py store variables
 - Always use `python hide` blocks for non-picklable objects
 - Delete `game/cache/` if bytecode is stale
 
