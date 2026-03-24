@@ -47,7 +47,7 @@ init python:
         "cupid":      (cpd, "Arrow of the Heart"),
     }
 
-    # Agent accent colors (mirrors AGENT_CHARS, used by HUD and gossip bubble)
+    # Agent accent colors (mirrors AGENT_CHARS, used by HUD, gossip bubble, portrait frame)
     AGENT_COLORS = {
         "hephaestus": "#FF9500",
         "techne":     "#17A2B8",
@@ -55,8 +55,10 @@ init python:
         "metis":      "#4C6EF5",
         "dokimasia":  "#6C757D",
         "mneme":      "#B73E1D",
-        "puck":       "#7FBC8C",
-        "cupid":      "#E8728C",
+        "puck":       "#007FFF",
+        "cupid":      "#FF85A2",
+        "aidos":      "#B8D4E3",
+        "aletheia":   "#2E8B57",
     }
 
     # Canonical display order for the affinity HUD (6 maidens only — spirits are sidebar)
@@ -76,17 +78,20 @@ init python:
         "ale":  "aletheia",
     }
 
-    # Valid portrait states per agent — the "other" key maps agent-specific
-    # states defined in PORTRAIT_GENERATION_GUIDE.md.
+    # Valid portrait states per agent — canonical names from
+    # designs/PORTRAIT_GENERATION_GUIDE.md.  Must stay in sync with
+    # kourai_common.companion.PORTRAIT_STATES (the inference source).
     PORTRAIT_STATES = {
-        "hephaestus": {"neutral", "vulnerable", "approving"},
-        "techne":     {"neutral", "vulnerable", "focused"},
-        "kallos":     {"neutral", "vulnerable", "appraising"},
-        "metis":      {"neutral", "vulnerable", "contemplating"},
-        "dokimasia":  {"neutral", "vulnerable", "scrutinizing"},
+        "hephaestus": {"neutral", "vulnerable", "fierce"},
+        "techne":     {"neutral", "vulnerable", "fired_up"},
+        "kallos":     {"neutral", "vulnerable", "passionate"},
+        "metis":      {"neutral", "vulnerable", "calculating"},
+        "dokimasia":  {"neutral", "vulnerable", "fierce"},
         "mneme":      {"neutral", "vulnerable", "remembering"},
-        "puck":       {"neutral", "mischievous", "smug"},
-        "cupid":      {"neutral", "hopeful", "knowing"},
+        "puck":       {"neutral", "vulnerable", "scheming"},
+        "cupid":      {"neutral", "vulnerable", "determined"},
+        "aidos":      {"neutral", "vulnerable", "cutting"},
+        "aletheia":   {"neutral", "vulnerable", "inspired"},
     }
 
     def validate_portrait_state(agent_id, state):
@@ -100,11 +105,14 @@ init python:
         return None  # Asset missing entirely — caller should skip portrait
 
     def _portrait_image(agent_id, state):
-        """Return an Image displayable for the given agent/state, or None."""
+        """Return an Image displayable for the given agent/state, or None.
+
+        All portrait assets are transparent PNGs named {agent}_{state}.png.
+        Falls back to neutral if the requested state asset isn't ready yet.
+        """
         path = "images/portraits/{}_{}.png".format(agent_id, state)
         if renpy.loadable(path):
             return Image(path)
-        # Try neutral fallback
         neutral_path = "images/portraits/{}_neutral.png".format(agent_id)
         if renpy.loadable(neutral_path):
             return Image(neutral_path)
@@ -969,6 +977,40 @@ label create_project_label:
     if new_project_name:
         $ _create_new_project_workspace(new_project_name)
     return
+
+# ── PORTRAIT DEBUG ───────────────────────────────────────────────────────
+# Accessible from the main menu without Docker running.
+# Loops through every agent, shows their neutral portrait, and has them say
+# a quick intro line so you can preview all character art in one pass.
+
+label portrait_debug:
+    scene black
+
+    python:
+        # Build the full agent list — AGENT_CHARS covers the 8 main agents;
+        # aidos and aletheia have portraits but no game Character objects, so
+        # we define temporary ones here just for the debug preview.
+        _dbg_agents = list(AGENT_CHARS.items()) + [
+            ("aidos",    (Character("Aidos",    color="#B8D4E3", what_prefix='"', what_suffix='"'), "Keeper of Shame")),
+            ("aletheia", (Character("Aletheia", color="#2E8B57", what_prefix='"', what_suffix='"'), "Seeker of Truth")),
+        ]
+
+    "Entering portrait debug mode. No Docker required — press to step through each character."
+
+    python:
+        for agent_id, (char, _epithet) in _dbg_agents:
+            resolved = validate_portrait_state(agent_id, "neutral")
+            if resolved is not None:
+                renpy.show_screen("agent_portrait", agent_id=agent_id, state=resolved)
+            else:
+                renpy.hide_screen("agent_portrait")
+            renpy.say(char, "Hi! My name is {}!".format(char.name))
+        renpy.hide_screen("agent_portrait")
+
+    "All portraits reviewed."
+
+    return
+
 
 # ── CLEANUP ──────────────────────────────────────────────────────────────
 

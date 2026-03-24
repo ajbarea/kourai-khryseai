@@ -217,7 +217,7 @@ screen input(prompt):
             frame:
                 ## Anchor bottom of popup just above the textbox
                 xalign 0.5
-                yalign 0.82
+                ypos 0.82
                 yanchor 1.0
                 background "#1A1610F2"
                 padding (16, 10, 16, 10)
@@ -554,21 +554,21 @@ style choice_button_text:
 
 ## Agent Portrait screen ########################################################
 ##
-## Displays the current speaking agent's portrait on the left side of the screen.
-## Portrait assets live at game/images/portraits/{agent_id}_{state}.png.
-## Falls back to neutral state if the requested state image is missing.
+## Transparent PNG sprite, lower-left, sits directly on the scene.
+## All portrait assets are transparent — naming: {agent_id}_{state}.png
+## Falls back to {agent_id}_neutral.png if a state asset isn't ready yet.
+##
 ## Call: renpy.show_screen("agent_portrait", agent_id="techne", state="neutral")
 ## Hide: renpy.hide_screen("agent_portrait")
 
 screen agent_portrait(agent_id="hephaestus", state="neutral"):
     zorder 5
 
-    ## Portrait anchor: lower-left, overlapping the textbox
+    ## 520×520 @ 1280×720 ≈ 41% screen width.
     add _portrait_image(agent_id, state):
         xalign 0.0
         yalign 1.0
-        xoffset 40
-        yoffset -160
+        size (520, 520)
 
 
 ################################################################################
@@ -593,6 +593,8 @@ screen navigation():
         if main_menu:
 
             textbutton _("Start") action Start()
+
+            textbutton _("Portrait Debug") action Start("portrait_debug")
 
         else:
 
@@ -3518,9 +3520,7 @@ screen forge_input(prompt="You:"):
                     hover_background "#342840"
                     xsize 68
                     ysize 30
-
-                    text "Send":
-                        color "#D4AF37"
-                        size 12
-                        xalign 0.5
-                        yalign 0.5
+                    text_color "#D4AF37"
+                    text_size 12
+                    text_xalign 0.5
+                    text_yalign 0.5
