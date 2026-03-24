@@ -245,7 +245,7 @@ All three hosts connect to the **same Docker-hosted agent backend.** Your choice
 
     ---
 
-    [Ren'Py 8.5](https://www.renpy.org/) — subprocess IPC bridge, JSON protocol
+    [Ren'Py 8.5](https://www.renpy.org/) — HTTP bridge via `vn-bridge` Docker service (`:10010`)
 
 -   :material-tools:{ .lg .middle } **Tools**
 
