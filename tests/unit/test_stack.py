@@ -18,7 +18,7 @@ class TestStackLayer:
     def test_frozen(self) -> None:
         layer = StackLayer("framework", "FastAPI", "0.115+")
         with pytest.raises(AttributeError):
-            layer.name = "Django"  # type: ignore[misc]
+            layer.name = "Django"  # type: ignore[misc]  # ty: ignore[invalid-assignment]
 
     def test_default_notes(self) -> None:
         layer = StackLayer("orm", "SQLAlchemy", "2.0+")
@@ -32,7 +32,7 @@ class TestStackLayer:
 class TestProjectStack:
     def test_frozen(self) -> None:
         with pytest.raises(AttributeError):
-            DEFAULT_BACKEND.name = "changed"  # type: ignore[misc]
+            DEFAULT_BACKEND.name = "changed"  # type: ignore[misc]  # ty: ignore[invalid-assignment]
 
     def test_to_prompt_context_contains_name(self) -> None:
         ctx = DEFAULT_BACKEND.to_prompt_context()

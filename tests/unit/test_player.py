@@ -216,7 +216,7 @@ class TestPlayerMemory:
             _ensure_player_tables(first)
 
             # Simulate later work on a different connection after prior init.
-            player_mod._tables_initialized = True
+            player_mod._tables_initialized = True  # ty: ignore[invalid-assignment]
             _ensure_player_tables(second)
 
             second.execute("DELETE FROM player_memories WHERE player_id = ?", ("test123",))
@@ -569,8 +569,8 @@ class TestEnrichedSystemPrompt:
         import kourai_common.player as player_mod
         from kourai_common.player import get_enriched_system_prompt
 
-        player_mod._profile_cache = None
-        player_mod._profile_cache_ts = 0.0
+        player_mod._profile_cache = None  # ty: ignore[unresolved-attribute]
+        player_mod._profile_cache_ts = 0.0  # ty: ignore[unresolved-attribute]
         monkeypatch.setattr(PlayerProfile, "load", staticmethod(lambda: None))
 
         result = get_enriched_system_prompt("base prompt", "metis")
@@ -580,8 +580,8 @@ class TestEnrichedSystemPrompt:
         import kourai_common.player as player_mod
         from kourai_common.player import get_enriched_system_prompt
 
-        player_mod._profile_cache = None
-        player_mod._profile_cache_ts = 0.0
+        player_mod._profile_cache = None  # ty: ignore[unresolved-attribute]
+        player_mod._profile_cache_ts = 0.0  # ty: ignore[unresolved-attribute]
         monkeypatch.setattr(PlayerProfile, "load", staticmethod(lambda: profile))
 
         result = get_enriched_system_prompt("base prompt", "metis")

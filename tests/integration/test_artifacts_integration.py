@@ -296,4 +296,4 @@ class TestArtifactWorkflow:
 
             # Load and verify first trace
             first_trace = storage.load_artifact("debug_traces", "trace_000")
-            assert "Starting code analysis" in first_trace
+            assert "Starting code analysis" in first_trace  # ty: ignore[unsupported-operator]

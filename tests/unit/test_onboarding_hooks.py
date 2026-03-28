@@ -49,8 +49,8 @@ def _isolate_db(tmp_path, monkeypatch):
     monkeypatch.setattr(player_mod, "_LEGACY_PLAYER_FILE", tmp_path / "player.json")
 
     # Reset profile cache
-    player_mod._profile_cache = None
-    player_mod._profile_cache_ts = 0.0
+    player_mod._profile_cache = None  # ty: ignore[unresolved-attribute]
+    player_mod._profile_cache_ts = 0.0  # ty: ignore[unresolved-attribute]
 
     yield conn
     conn.close()

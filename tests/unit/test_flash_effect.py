@@ -95,8 +95,8 @@ class TestFlashEffectAlphaFade:
         # Update multiple times to complete the effect
         for _ in range(10):
             active, alpha = effect.update(0.020)  # 20ms per update
-        assert alpha == 0
-        assert active is False
+        assert alpha == 0  # ty: ignore[possibly-unresolved-reference]
+        assert active is False  # ty: ignore[possibly-unresolved-reference]
 
     def test_update_alpha_decreases_over_time(self) -> None:
         """Test alpha decreases over time."""
@@ -129,8 +129,8 @@ class TestFlashEffectAlphaFade:
         # Update multiple times beyond completion
         for _ in range(20):
             active, alpha = effect.update(0.050)
-        assert alpha == 0
-        assert alpha >= 0
+        assert alpha == 0  # ty: ignore[possibly-unresolved-reference]
+        assert alpha >= 0  # ty: ignore[possibly-unresolved-reference]
 
     def test_update_does_not_exceed_start_alpha(self) -> None:
         """Test alpha does not exceed start_alpha."""

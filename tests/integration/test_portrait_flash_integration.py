@@ -94,8 +94,8 @@ class TestPortraitFlashIntegrationUpdate:
         # Update multiple times to complete
         for _ in range(20):
             active, alpha = integration.update(0.020)
-        assert active is False
-        assert alpha == 0
+        assert active is False  # ty: ignore[possibly-unresolved-reference]
+        assert alpha == 0  # ty: ignore[possibly-unresolved-reference]
 
     def test_get_flash_alpha(self) -> None:
         """Test get_flash_alpha returns current alpha."""
