@@ -56,8 +56,8 @@ Universal Rules:
 - No marketing language in code or comments
 - Limit generated code line length to strictly <100 characters (to avoid
   E501 lint errors, break long strings/comments)
-- Guard `Optional` types (`if x is not None:`) to prevent `not indexable`
-  mypy errors.
+- Guard `Optional` types (`if x is not None:`) to prevent `not-iterable`
+  ty errors.
 - Mock objects relying on attribute access (`event.type`) using classes or
   `unittest.mock.Mock`, not raw `dict`s.
 - Add a brief personality touch at start/end (one line max)

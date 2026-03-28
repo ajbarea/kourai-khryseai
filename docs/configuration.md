@@ -239,7 +239,7 @@ See [GUI Reference](gui.md#text-to-speech-system-) for voice profiles and audio 
 | `make up` | Start all agents in Docker + Jaeger + Prometheus |
 | `make down` | Stop all Docker containers |
 | `make status` | Show Docker service status and health |
-| `make lint` | Run ruff + mypy |
+| `make lint` | Run ruff + ty |
 | `make test` | Run linters + full test suite with coverage |
 | `make clean` | Remove `__pycache__`, `.pytest_cache`, build artifacts |
 | `make docs` | Serve documentation locally (Zensical) |

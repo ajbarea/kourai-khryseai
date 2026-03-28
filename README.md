@@ -253,7 +253,7 @@ See [Configuration](docs/configuration.md) for full environment variable referen
 
 ```bash
 make test       # Run unit and integration tests (80%+ coverage)
-make lint       # Run ruff, mypy, formatters
+make lint       # Run ruff, ty, formatters
 make docs       # Serve docs locally at http://localhost:8000
 make help       # Show all available commands
 ```
@@ -263,7 +263,7 @@ make help       # Show all available commands
 - **Language** — Python 3.12+ with modern type hints
 - **LLM** — [LiteLLM](https://docs.litellm.ai/) (pluggable: Claude, Gemini, Ollama, etc.)
 - **Tools** — [MCP](https://modelcontextprotocol.io/) (filesystem, git, shell)
-- **Linting** — [Ruff](https://docs.astral.sh/ruff/) + [Mypy](https://mypy-lang.org/) (Python)
+- **Linting** — [Ruff](https://docs.astral.sh/ruff/) + [ty](https://docs.astral.sh/ty/) (Python)
 - **Packaging** — [uv](https://docs.astral.sh/uv/) workspaces
 - **Observability** — [OpenTelemetry](https://opentelemetry.io/) → [Jaeger](https://www.jaegertracing.io/) + [Prometheus](https://prometheus.io/)
 - **Containers** — Docker + Docker Compose

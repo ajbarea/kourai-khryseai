@@ -48,7 +48,7 @@ DEFAULT_BACKEND = ProjectStack(
         StackLayer("validation", "Pydantic", "2.10+", "BaseSettings for config"),
         StackLayer("testing", "pytest", "8.0+", "xdist, parametrize, hypothesis, asyncio"),
         StackLayer("linting", "ruff", "0.9+", "format + check + isort"),
-        StackLayer("type checking", "mypy", "1.15+", "strict on src/"),
+        StackLayer("type checking", "ty", "0.0.25+", "strict on src/, 10x faster than mypy"),
         StackLayer("packaging", "uv", "0.10+", "pyproject.toml + uv.lock"),
         StackLayer("containerization", "Docker", "", "multi-stage with uv"),
     ),
@@ -66,7 +66,6 @@ DEFAULT_FRONTEND = ProjectStack(
     ),
 )
 
-# Keywords that indicate a player wants to scaffold a new project
 SCAFFOLD_KEYWORDS = frozenset(
     {
         "build",

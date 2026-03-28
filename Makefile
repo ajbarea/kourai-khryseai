@@ -10,7 +10,7 @@
 ##   make down          Stop all services
 ##
 
-.PHONY: help setup upgrade dev dev-vn up down restart status gui cli vn docs lint test test-unit test-integration test-performance clean prune
+.PHONY: help setup setup-artifacts upgrade dev dev-vn up down restart status gui cli vn docs lint test test-unit test-integration test-performance clean prune
 .DEFAULT_GOAL := help
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -34,7 +34,6 @@ else
 endif
 
 COMPOSE_FULL := docker compose
-HOST_UV_RUN := uv run --no-active python scripts/run_in_host_env.py --
 GUI_ARGS ?= --agent http://localhost:10000/
 CLI_ARGS ?=
 
@@ -42,8 +41,14 @@ CLI_ARGS ?=
 # Setup & Maintenance (run first time, or when dependencies change)
 # ════════════════════════════════════════════════════════════════════════════
 
-setup:                     ## Install all Python dependencies (workspace + all packages)
-	uv sync --all-packages --no-active
+setup:                     ## Install all Python dependencies + optional HF-Mount if token set
+	uv run --no-active python scripts/setup.py
+
+setup-artifacts:            ## Configure HF-Mount for agent artifacts (Phase 1)
+	uv run --no-active python scripts/setup_hf_mount.py
+
+setup-artifacts-force:      ## Force re-configure HF-Mount artifacts (skips marker check)
+	uv run --no-active python scripts/setup.py --force-artifacts
 
 upgrade:                   ## Update all dependencies to latest versions
 	uv run --no-active python scripts/upgrade.py
@@ -68,7 +73,7 @@ dev-vn:                    ## Start services + Ren'Py VN (full development stack
 
 up:                        ## Start all agents + infrastructure (background, waits for health)
 	@echo Building and starting services...
-	@$(COMPOSE_FULL) up -d --build --pull always --wait 2>&1 | tee docker-debug.log && echo "✅ All services running and healthy" || (echo "❌ Build or startup failed - see docker-debug.log"; exit 1)
+	@$(COMPOSE_FULL) up -d --build --pull missing --wait 2>&1 | tee docker-debug.log && echo "✅ All services running and healthy" || (echo "❌ Build or startup failed - see docker-debug.log"; exit 1)
 	@echo
 	@echo Dashboards:
 	@echo   Jaeger traces:      http://localhost:16686
@@ -91,10 +96,10 @@ status:                    ## Show current service status and health
 # ════════════════════════════════════════════════════════════════════════════
 
 gui:                       ## Launch Pygame GUI (runs on host machine)
-	$(HOST_UV_RUN) python -m hosts.gui $(GUI_ARGS)
+	uv run --python managed python -m hosts.gui $(GUI_ARGS)
 
 cli:                       ## Launch terminal CLI client (runs on host machine)
-	$(HOST_UV_RUN) python -m hosts.cli $(CLI_ARGS)
+	uv run --python managed python -m hosts.cli $(CLI_ARGS)
 
 vn:                        ## Launch Ren'Py Visual Novel GUI (runs on host machine)
 	./hosts/vn/renpy-8.5.2-sdk/renpy.exe ./hosts/vn/kourai_vn/
@@ -110,10 +115,10 @@ docs:                      ## Serve project documentation (Zensical on http://lo
 # Quality Gates (run before commit; cross-platform via Python scripts)
 # ════════════════════════════════════════════════════════════════════════════
 
-lint:                      ## Run code quality checks (ruff format, ruff check, mypy)
+lint:                      ## Run code quality checks (ruff format, ruff check, ty)
 	uv run --no-active ruff format .
 	uv run --no-active ruff check --fix --unsafe-fixes --show-fixes .
-	uv run --no-active mypy --config-file=pyproject.toml .
+	uv run --no-active ty check agents hosts/cli hosts/gui mcp_servers shared/src tests
 
 test:                      ## Run full test suite with quality checks (unit + integration + performance)
 	@$(MAKE) --no-print-directory lint

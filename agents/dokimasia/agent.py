@@ -63,9 +63,9 @@ Docstring Style (same as production code):
 Mocking & Typing Rules:
 - When mocking objects requiring attribute access (e.g. `event.type`),
   use classes, `dataclass`, or `Mock()`. Do NOT use raw dicts to avoid
-  `dict has no attribute` mypy errors.
+  `not-subscriptable` ty errors.
 - Always guard Optional types (`if x is not None:`) before indexing or
-  accessing attributes to prevent mypy errors.
+  accessing attributes to prevent ty errors.
 
 After writing tests, output them in this format:
 

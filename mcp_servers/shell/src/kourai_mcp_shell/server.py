@@ -20,7 +20,7 @@ mcp = FastMCP("kourai-shell")
 _ALLOWED_COMMANDS: frozenset[str] = frozenset(
     {
         "ruff",
-        "mypy",
+        "ty",
         "pytest",
         "git",
         "python",

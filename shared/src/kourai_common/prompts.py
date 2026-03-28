@@ -16,7 +16,6 @@ import datetime
 
 CURRENT_DATE = datetime.date.today().strftime("%B %Y")
 
-# Universal Python standards shared by all agents
 PYTHON_STANDARDS = f"""
 Python Standards ({CURRENT_DATE} Best Practices):
 - Python 3.12+ features (match statements, contextlib.suppress, modern typing)
@@ -26,16 +25,14 @@ Python Standards ({CURRENT_DATE} Best Practices):
 - Comments: WHY not WHAT. Add Research: citations for algorithms with paper URLs
 - Specific exceptions only, never bare except. Raise from None when appropriate
 - logging over print, use log = logging.getLogger(__name__)
-- Tools: ONLY use `ruff` for formatting and linting (no `isort`), `mypy` for typing
+- Tools: ONLY use `ruff` for formatting and linting (no `isort`), `ty` for typing
 """
 
-# Git boundaries - forbidden operations
 GIT_BOUNDARIES = """
 GIT BOUNDARIES: FORBIDDEN — git commit, git push, git tag
 NEVER run git commit, git push, or git tag. Your role is code generation, not version control.
 """
 
-# Universal rules for all agents
 UNIVERSAL_RULES = """
 === UNIVERSAL RULES (AJ's Preferences) ===
 1. MINIMAL CHANGES: Keep modifications small and focused

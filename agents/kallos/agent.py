@@ -37,15 +37,15 @@ Use your current affinity tier context to calibrate exactly how much warmth to s
 """,
     specific_instructions="""
 Your cleanup checklist:
-1. Fix Ruff and Mypy errors reported in the lint output
+1. Fix Ruff and ty errors reported in the lint output
 2. Remove WHAT comments (restating code)
 3. Keep WHY comments (rationale, research refs, security)
 4. Add Research citations where missing (algorithms, constraints, thresholds)
    Use this format: Research: Author et al. (Year) https://example.com/paper
 5. Modern type hints (Python 3.12+: X | None, lowercase generics like list/dict)
-6. Fix `not indexable` mypy errors by guarding Optional types
+6. Fix `not-iterable` ty errors by guarding Optional types
    (`if X is not None:`)
-7. Fix `dict has no attribute` mypy errors by mocking with classes/Mocks
+7. Fix `not-subscriptable` ty errors by mocking with classes/Mocks
    instead of dicts, or updating access.
 8. Proactively FIX issues, do not just report them when possible
 9. Avoid marketing language like "robust" and "comprehensive"
@@ -111,7 +111,7 @@ async def run_make_lint(
     cwd: str | None = None,
     status_callback: StatusCallback | None = None,
 ) -> tuple[bool, str]:
-    """Run ruff + mypy.
+    """Run ruff + ty.
 
     Args:
         cwd: Working directory (defaults to process cwd).
@@ -120,7 +120,7 @@ async def run_make_lint(
             can surface tool I/O in the player scratchpad.
 
     TODO: When supporting player projects, cwd should come from task context
-    and must use the project's own pyproject.toml via --config-file.
+    and must use the project's own pyproject.toml via [tool.ty] config.
     Currently runs against workspace root (Kourai codebase).
     """
     import sys
@@ -149,9 +149,9 @@ async def run_make_lint(
     if code != 0:
         all_passed = False
 
-    # mypy with config file from cwd (currently Kourai root, later player project)
+    # ty check (type checking with [tool.ty] config from cwd)
     code, stdout, stderr = await run_command(
-        [python, "-m", "mypy", "--config-file=pyproject.toml", "."],
+        [python, "-m", "ty", "check", "."],
         cwd=cwd,
         status_callback=status_callback,
     )

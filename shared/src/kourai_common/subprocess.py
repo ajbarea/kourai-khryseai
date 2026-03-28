@@ -15,10 +15,8 @@ from pathlib import Path
 
 log = logging.getLogger(__name__)
 
-# Context lines above/below each diagnostic when windowing file content
 _CONTEXT_LINES = 10
 
-# Type alias for the streaming callback passed to run_command
 StatusCallback = Callable[[str], Awaitable[None]]
 
 
@@ -47,7 +45,6 @@ async def run_command(
     )
 
     if status_callback is None:
-        # Fast path: no streaming needed — communicate() handles deadlocks safely.
         stdout, stderr = await proc.communicate()
         return (
             proc.returncode or 0,
@@ -55,8 +52,6 @@ async def run_command(
             stderr.decode("utf-8", errors="replace"),
         )
 
-    # Streaming path: emit command invocation, then stream stdout line by line
-    # while draining stderr concurrently to prevent pipe buffer deadlocks.
     await status_callback(f"$ {cmd_str}")
 
     stdout_lines: list[str] = []
@@ -66,14 +61,13 @@ async def run_command(
         async for raw in proc.stdout:
             line = raw.decode("utf-8", errors="replace").rstrip()
             stdout_lines.append(line)
-            if line.strip():  # skip blank lines
+            if line.strip():
                 await status_callback(line)
 
     async def _drain_stderr() -> bytes:
         assert proc.stderr is not None  # noqa: S101
         return await proc.stderr.read()
 
-    # Run both drains concurrently so neither pipe buffers up and deadlocks
     stderr_bytes, _ = await asyncio.gather(_drain_stderr(), _drain_stdout())
     await proc.wait()
 
@@ -82,9 +76,6 @@ async def run_command(
         await status_callback(f"exit {rc}")
 
     return rc, "\n".join(stdout_lines), stderr_bytes.decode("utf-8", errors="replace")
-
-
-# ── Ruff JSON output parsing ────────────────────────────────────────
 
 
 def parse_ruff_json(output: str) -> list[dict]:
@@ -131,9 +122,6 @@ def get_diagnostic_line_ranges(output: str) -> dict[str, set[int]]:
     return ranges
 
 
-# ── Smart context windowing ──────────────────────────────────────────
-
-
 def read_file_with_context(
     file_path: str,
     diagnostic_lines: set[int] | None = None,
@@ -154,18 +142,15 @@ def read_file_with_context(
 
     all_lines = path.read_text(encoding="utf-8").splitlines()
 
-    # Small files: just return everything
     if not diagnostic_lines or len(all_lines) <= 200:
         return "\n".join(f"{i + 1}: {line}" for i, line in enumerate(all_lines))
 
-    # Build set of line indices to include (0-based)
     included: set[int] = set()
     for diag_line in diagnostic_lines:
         start = max(0, diag_line - 1 - context_lines)
         end = min(len(all_lines), diag_line + context_lines)
         included.update(range(start, end))
 
-    # Format with line numbers, adding "..." separators for gaps
     result_lines: list[str] = []
     prev_idx = -2
     for idx in sorted(included):
@@ -177,9 +162,6 @@ def read_file_with_context(
     return "\n".join(result_lines)
 
 
-# ── Patch parsing and application ────────────────────────────────────
-
-# Regex for FILE/ORIGINAL/REPLACEMENT patch blocks emitted by agents
 _PATCH_PATTERN = re.compile(
     r"FILE:\s*(.*?)\n.*?ORIGINAL:\n```(?:python)?\n(.*?)\n```.*?REPLACEMENT:\n```(?:python)?\n(.*?)\n```",
     re.DOTALL,
@@ -212,7 +194,6 @@ def parse_and_apply_fixes(
         original = match.group(2)
         replacement = match.group(3)
 
-        # Validate path safety if project_root is provided
         if project_root:
             try:
                 validated_path = validate_file_path(project_root, file_path)
@@ -239,21 +220,16 @@ def parse_and_apply_fixes(
     return fixes_applied
 
 
-# ── File extraction from tool output ─────────────────────────────────
-
-
 def extract_files_from_output(output: str) -> set[str]:
-    """Extract .py file paths from ruff/mypy/pytest output lines.
+    """Extract .py file paths from ruff/ty/pytest output lines.
 
     Tries ruff JSON first, falls back to regex line parsing.
     Handles common prefixes like '--> ' and './' in tool output.
     """
-    # Try structured JSON first
     json_files = extract_files_from_ruff_json(output)
     if json_files:
         return json_files
 
-    # Fall back to regex parsing for mypy/pytest/plain ruff output
     files = set()
     for line in output.splitlines():
         line = line.strip()

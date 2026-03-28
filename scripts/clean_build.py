@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """Clean build artifacts, cache, and temp files (cross-platform).
 
 Usage:
@@ -22,7 +21,6 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 def clean_pycache() -> None:
     """Remove __pycache__ and .egg-info directories."""
     for root, dirs, _ in os.walk("."):
-        # Prevent diving into virtual environments
         dirs[:] = [d for d in dirs if not d.startswith(".venv") and d != "venv"]
 
         for dirname in dirs:
@@ -46,12 +44,17 @@ def clean_pytest() -> None:
                 p.unlink()
 
 
-def clean_mypy() -> None:
-    """Remove mypy cache."""
-    p = Path(".mypy_cache")
+def clean_ty() -> None:
+    """Remove ty cache."""
+    p = Path(".ty_cache")
     if p.exists():
-        logger.info("Removing .mypy_cache")
+        logger.info("Removing .ty_cache")
         shutil.rmtree(p, ignore_errors=True)
+    # Also clean up old mypy cache if it exists
+    p_mypy = Path(".mypy_cache")
+    if p_mypy.exists():
+        logger.info("Removing .mypy_cache")
+        shutil.rmtree(p_mypy, ignore_errors=True)
 
 
 def clean_ruff() -> None:
@@ -101,7 +104,7 @@ def main() -> int:
 
     if "--cache-only" in args:
         logger.info("[CLEAN] Cache only...")
-        clean_mypy()
+        clean_ty()
         clean_ruff()
     elif "--tests-only" in args:
         logger.info("[CLEAN] Test artifacts only...")
@@ -111,7 +114,7 @@ def main() -> int:
         logger.info("[CLEAN] Build artifacts and caches...")
         clean_pycache()
         clean_pytest()
-        clean_mypy()
+        clean_ty()
         clean_ruff()
         clean_build()
         clean_hypothesis()
