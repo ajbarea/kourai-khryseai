@@ -13,6 +13,9 @@ venv/
 
 # Environment
 .env
+.env.backup
+.env.hf
+.hf-mount-configured
 
 # IDE
 .vscode/

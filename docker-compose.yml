@@ -1,14 +1,11 @@
-# Kourai Khryseai — Multi-Agent A2A System
-# Usage:
-#   docker compose up                      # everything (agents + infra)
-#   docker compose up mneme                # single agent + deps
-#
-# Phase 3 MCP Sidecars:
-#   - memory-mcp:   Shared knowledge graph (Puck/Cupid/Mneme) — port 5000 health, 5001 SSE
-#   - context7-mcp: Live docs for Techne/Metis — port 3001 SSE
-# Phase E4:
-#   - dokimasia: Includes Chromium + Playwright for frontend E2E testing
+# Defines the multi-agent application infrastructure and components.
+# Adheres to best practices: common anchors, explicit dependency management, and healthchecks.
 
+# ----------------------------------------------------------------------
+# EXTENSION FIELDS (Anchors)
+# ----------------------------------------------------------------------
+# Common configuration block for agent services to adhere to DRY principles.
+# Configures shared build contexts, telemetry (OTEL), and healthcheck endpoints.
 x-agent-common: &agent-common
   build:
     context: .
@@ -20,40 +17,44 @@ x-agent-common: &agent-common
     OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
     KOURAI_LOG_LEVEL: ${KOURAI_LOG_LEVEL:-INFO}
     KOURAI_STREAM_ENABLED: ${KOURAI_STREAM_ENABLED:-true}
-    MEMORY_MCP_URL: http://memory-mcp:5000          # health check endpoint
-    MEMORY_MCP_SSE_URL: http://memory-mcp:5001/sse  # MCP SSE endpoint (Phase 3)
-    CONTEXT7_MCP_URL: http://context7-mcp:3001/sse  # Context7 MCP SSE endpoint (Phase 3)
+    MEMORY_MCP_URL: http://memory-mcp:5000
+    MEMORY_MCP_SSE_URL: http://memory-mcp:5001/sse
+    CONTEXT7_MCP_URL: http://context7-mcp:3001/sse
+    HF_TOKEN: ${HF_TOKEN:-}
+    AGENT_ARTIFACTS_DIR: ${AGENT_ARTIFACTS_DIR:-/tmp/artifacts}
   volumes:
-    - ./shared:/app/shared                    # hot reload shared code
+    - ./shared:/app/shared
   networks:
     - kourai
   restart: unless-stopped
   depends_on:
     jaeger:
       condition: service_started
-    # memory-mcp and context7-mcp not in depends_on: agents degrade gracefully if sidecars are slow
   logging:
     driver: "json-file"
     options:
       max-size: "10m"
       max-file: "3"
 
+# ----------------------------------------------------------------------
+# SERVICES OVERVIEW
+# ----------------------------------------------------------------------
 services:
+
   # ──────────────── Infrastructure ────────────────
+  # Jaeger: Distributed tracing backend for telemetry data.
   jaeger:
     image: jaegertracing/all-in-one:1.60
     ports:
-      - "16686:16686"   # Jaeger UI
-      - "4317:4317"     # OTLP gRPC
-      - "4318:4318"     # OTLP HTTP
-      - "14269:14269"   # Metrics port for Prometheus
+      - "16686:16686"
+      - "4317:4317"
+      - "4318:4318"
+      - "14269:14269"
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
-      # --- SPM Configuration (v1.x) ---
       METRICS_STORAGE_TYPE: "prometheus"
       PROMETHEUS_SERVER_URL: "http://prometheus:9090"
       PROMETHEUS_QUERY_SUPPORT_SPAN_UNIT: "true"
-      # Enable span metrics generation
       SPAN_STORAGE_TYPE: "memory"
     networks:
       - kourai
@@ -68,12 +69,13 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # Prometheus: Time-series database for metrics aggregation.
   prometheus:
     image: prom/prometheus:v2.54.1
     volumes:
       - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
-      - "9090:9090"     # Prometheus UI (optional to visit)
+      - "9090:9090"
     networks:
       - kourai
     restart: unless-stopped
@@ -87,24 +89,22 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # ──────────────── MCP Servers (Phase 3) ────────────────
+  # ──────────────── MCP Sidecars ────────────────
+  # Memory MCP: Shared knowledge graph sidecar.
   memory-mcp:
-    # Phase 3: Shared memory knowledge graph for Puck/Cupid/Mneme
-    # Port 5000: HTTP health check
-    # Port 5001: MCP SSE endpoint (supergateway → @modelcontextprotocol/server-memory)
     build:
       context: .
       dockerfile: docker/memory-mcp.Dockerfile
     volumes:
-      - ./docker/memory-mcp-server.js:/app/memory-mcp-server.js  # hot reload
+      - ./docker/memory-mcp-server.js:/app/memory-mcp-server.js
       - memory-graph-storage:/data
     environment:
       PORT: "5000"
       MCP_PORT: "5001"
       MEMORY_FILE_PATH: /data/memory_graph.json
     ports:
-      - "5000:5000"   # health check
-      - "5001:5001"   # MCP SSE endpoint
+      - "5000:5000"
+      - "5001:5001"
     networks:
       - kourai
     restart: unless-stopped
@@ -118,22 +118,19 @@ services:
         max-size: "10m"
         max-file: "3"
     healthcheck:
-      # Real readiness check: /health returns 200 only after supergateway port is open
       test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:5000/health',r=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))\""]
       interval: 15s
       timeout: 5s
       start_period: 60s
       retries: 5
 
+  # Context7 MCP: Live documentation context provider.
   context7-mcp:
-    # Phase 3: Live documentation for Techne/Metis
-    # Port 3001: MCP SSE endpoint (supergateway → @upstash/context7-mcp)
-    # Free tier: 1,000 req/month — no API key required
     build:
       context: .
       dockerfile: docker/context7-mcp.Dockerfile
     ports:
-      - "3001:3001"   # MCP SSE endpoint
+      - "3001:3001"
     networks:
       - kourai
     restart: unless-stopped
@@ -154,6 +151,7 @@ services:
       retries: 5
 
   # ──────────────── Specialist Agents ────────────────
+  # Mneme
   mneme:
     <<: *agent-common
     build:
@@ -166,8 +164,8 @@ services:
     ports:
       - "10005:10005"
     volumes:
-      - ./agents/mneme:/app/agents/mneme      # hot reload mneme code
-      - ./shared:/app/shared                  # hot reload shared code
+      - ./agents/mneme:/app/agents/mneme
+      - ./shared:/app/shared
       - ./tests:/app/tests
     develop:
       watch:
@@ -190,7 +188,9 @@ services:
       resources:
         limits:
           memory: 1G
+          cpus: "1.5"
 
+  # Kallos
   kallos:
     <<: *agent-common
     build:
@@ -203,9 +203,10 @@ services:
     ports:
       - "10004:10004"
     volumes:
-      - ./agents/kallos:/app/agents/kallos    # hot reload kallos code
-      - ./shared:/app/shared                  # hot reload shared code
+      - ./agents/kallos:/app/agents/kallos
+      - ./shared:/app/shared
       - ./tests:/app/tests
+      - hf-mount://ajbar/kourai-artifacts/kallos:/agent-artifacts
     develop:
       watch:
         - action: sync
@@ -227,7 +228,9 @@ services:
       resources:
         limits:
           memory: 1G
+          cpus: "1.5"
 
+  # Techne
   techne:
     <<: *agent-common
     build:
@@ -240,9 +243,10 @@ services:
     ports:
       - "10002:10002"
     volumes:
-      - ./agents/techne:/app/agents/techne    # hot reload techne code
-      - ./shared:/app/shared                  # hot reload shared code
+      - ./agents/techne:/app/agents/techne
+      - ./shared:/app/shared
       - ./tests:/app/tests
+      - hf-mount://ajbar/kourai-artifacts/techne:/agent-artifacts
     develop:
       watch:
         - action: sync
@@ -264,7 +268,9 @@ services:
       resources:
         limits:
           memory: 1G
+          cpus: "1.5"
 
+  # Dokimasia
   dokimasia:
     <<: *agent-common
     build:
@@ -277,9 +283,10 @@ services:
     ports:
       - "10003:10003"
     volumes:
-      - ./agents/dokimasia:/app/agents/dokimasia  # hot reload dokimasia code
-      - ./shared:/app/shared                      # hot reload shared code
+      - ./agents/dokimasia:/app/agents/dokimasia
+      - ./shared:/app/shared
       - ./tests:/app/tests
+      - hf-mount://ajbar/kourai-artifacts/dokimasia:/agent-artifacts
     develop:
       watch:
         - action: sync
@@ -291,7 +298,6 @@ services:
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
       PORT: 10003
-      # Phase E4: Playwright configuration for headless browser testing
       PLAYWRIGHT_BROWSERS_PATH: /home/kourai/.cache/ms-playwright
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "0"
     healthcheck:
@@ -304,7 +310,9 @@ services:
       resources:
         limits:
           memory: 1G
+          cpus: "2"
 
+  # Metis
   metis:
     <<: *agent-common
     build:
@@ -317,9 +325,10 @@ services:
     ports:
       - "10001:10001"
     volumes:
-      - ./agents/metis:/app/agents/metis      # hot reload metis code
-      - ./shared:/app/shared                  # hot reload shared code
+      - ./agents/metis:/app/agents/metis
+      - ./shared:/app/shared
       - ./tests:/app/tests
+      - hf-mount://ajbar/kourai-artifacts/metis:/agent-artifacts
     develop:
       watch:
         - action: sync
@@ -341,8 +350,10 @@ services:
       resources:
         limits:
           memory: 1G
+          cpus: "1.5"
 
   # ──────────────── Companion Spirits ────────────────
+  # Puck
   puck:
     <<: *agent-common
     build:
@@ -378,7 +389,9 @@ services:
       resources:
         limits:
           memory: 512M
+          cpus: "0.5"
 
+  # Cupid
   cupid:
     <<: *agent-common
     build:
@@ -414,8 +427,10 @@ services:
       resources:
         limits:
           memory: 512M
+          cpus: "0.5"
 
   # ──────────────── Quality Spirits ────────────────
+  # Aidos
   aidos:
     <<: *agent-common
     build:
@@ -451,7 +466,9 @@ services:
       resources:
         limits:
           memory: 512M
+          cpus: "0.5"
 
+  # Aletheia
   aletheia:
     <<: *agent-common
     build:
@@ -487,15 +504,17 @@ services:
       resources:
         limits:
           memory: 512M
+          cpus: "0.5"
 
   # ──────────────── VN Bridge ────────────────
+  # VN Bridge: Connects the multi-agent system to the visual novel frontend.
   vn-bridge:
     build:
       context: .
       dockerfile: docker/host.Dockerfile
       args:
         HOST_TYPE: vn_bridge
-        PACKAGE_NAME: hephaestus   # install hephaestus deps (a2a-sdk, starlette, httpx, uvicorn)
+        PACKAGE_NAME: hephaestus
         PORT: 10010
     env_file: .env
     environment:
@@ -506,9 +525,9 @@ services:
     ports:
       - "10010:10010"
     volumes:
-      - ./agents/vn_bridge.py:/app/agents/vn_bridge.py   # hot reload
+      - ./agents/vn_bridge.py:/app/agents/vn_bridge.py
       - ./shared:/app/shared
-      - ~/.kourai_khryseai:/home/kourai/.kourai_khryseai  # player data persistence
+      - ~/.kourai_khryseai:/home/kourai/.kourai_khryseai
     networks:
       - kourai
     restart: unless-stopped
@@ -525,6 +544,7 @@ services:
       resources:
         limits:
           memory: 512M
+          cpus: "1"
     logging:
       driver: "json-file"
       options:
@@ -532,6 +552,7 @@ services:
         max-file: "3"
 
   # ──────────────── Orchestrator ────────────────
+  # Hephaestus: The central orchestration agent that manages sub-agents.
   hephaestus:
     <<: *agent-common
     build:
@@ -544,8 +565,8 @@ services:
     ports:
       - "10000:10000"
     volumes:
-      - ./agents/hephaestus:/app/agents/hephaestus  # hot reload hephaestus code
-      - ./shared:/app/shared                        # hot reload shared code
+      - ./agents/hephaestus:/app/agents/hephaestus
+      - ./shared:/app/shared
     develop:
       watch:
         - action: sync
@@ -567,6 +588,7 @@ services:
       resources:
         limits:
           memory: 1G
+          cpus: "2"
     depends_on:
       jaeger:
         condition: service_started
@@ -589,11 +611,20 @@ services:
       aletheia:
         condition: service_healthy
 
+# ----------------------------------------------------------------------
+# PERSISTENT VOLUMES
+# ----------------------------------------------------------------------
+# Define named volumes for persistent data storage across restarts.
 volumes:
   memory-graph-storage:
     driver: local
+  hf-mount:
+    driver: local
 
+# ----------------------------------------------------------------------
+# NETWORKS
+# ----------------------------------------------------------------------
+# Custom bridge network for isolated inter-container communication.
 networks:
   kourai:
     driver: bridge
-
