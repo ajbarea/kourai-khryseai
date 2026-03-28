@@ -32,7 +32,14 @@ hide:
   <div class="scroll-chevron"></div>
 </div>
 
-<section class="landing-section">
+<section class="landing-section landing-section--intro">
+  <div class="section-inner">
+    <h2 class="section-title">What Is Kourai Khryseai?</h2>
+    <p class="section-lead">Kourai Khryseai is a multi-agent AI system composed of 10 MCP-compliant agents that coordinate via the A2A protocol to enable scalable, reproducible, and fault-tolerant distributed intelligence.</p>
+  </div>
+</section>
+
+<section class="landing-section landing-section--promise">
   <div class="section-inner">
     <h2 class="section-title">You Direct. They Create.</h2>
     <p class="section-lead">Describe what you need. Specialized agents plan, code, test, review, and document &mdash; streaming their work in real-time. When decisions matter, they ask.<br><strong>Nothing surprises you.</strong></p>

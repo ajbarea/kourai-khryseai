@@ -702,6 +702,24 @@ body.hero-page .md-header {
   transition: opacity 0.7s ease, transform 0.7s ease;
 }
 
+/* Intro + promise sections should read as separate viewport moments */
+.landing-section--intro,
+.landing-section--promise {
+  min-height: 88vh;
+  min-height: 88svh;
+  display: flex;
+  align-items: center;
+}
+
+/* Create extra breathing room between the two opening sections */
+.landing-section--intro {
+  padding-bottom: 14vh;
+}
+
+.landing-section--promise {
+  padding-top: 14vh;
+}
+
 .landing-section.visible {
   opacity: 1;
   transform: translateY(0);
@@ -1035,6 +1053,20 @@ body.hero-page .md-header {
     padding: 3.5rem 1.2rem;
   }
 
+  .landing-section--intro,
+  .landing-section--promise {
+    min-height: 74vh;
+    min-height: 74svh;
+  }
+
+  .landing-section--intro {
+    padding-bottom: 10vh;
+  }
+
+  .landing-section--promise {
+    padding-top: 10vh;
+  }
+
   .pipeline-flow {
     gap: 1.5rem;
     padding: 0 1rem;
@@ -1056,6 +1088,18 @@ body.hero-page .md-header {
 
   .landing-section {
     padding: 2.5rem 1rem;
+  }
+
+  .landing-section--intro,
+  .landing-section--promise {
+    min-height: 70vh;
+    min-height: 70svh;
+  }
+
+  .landing-section--intro,
+  .landing-section--promise {
+    padding-top: 3.5rem;
+    padding-bottom: 3.5rem;
   }
 
   .pipeline-flow {
