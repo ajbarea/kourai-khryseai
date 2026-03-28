@@ -1,5 +1,5 @@
 global:
-  scrape_interval: 1s # Frequent scrapes for live-feeling graphs
+  scrape_interval: 15s # Balanced scrape frequency (avoid cardinality limits)
 
 scrape_configs:
   - job_name: 'jaeger-metrics'

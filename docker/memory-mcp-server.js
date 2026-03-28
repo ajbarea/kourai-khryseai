@@ -21,11 +21,14 @@ const MEMORY_FILE = process.env.MEMORY_FILE_PATH || '/data/memory_graph.json';
 
 let mcpReady = false;
 
-// Launch supergateway to expose memory-mcp-server as SSE on MCP_PORT.
+// Launch supergateway to expose memory server as SSE on MCP_PORT.
 // supergateway bridges the stdio MCP server to SSE so Python agents can
 // connect via mcp.client.sse without Node.js in their containers.
+// Use a shell command to resolve the binary via node_modules.
 const gatewayArgs = [
-  '--stdio', 'memory-mcp-server',
+  '--stdio', '/bin/sh',
+  '-c',
+  'node /usr/local/lib/node_modules/@modelcontextprotocol/server-memory/dist/index.js',
   '--port', String(MCP_PORT),
   '--host', '0.0.0.0',
 ];

@@ -2,6 +2,8 @@
 # Entrypoint that execs python directly so it receives signals as PID 1.
 set -e
 
+echo "Starting ${HOST_TYPE}:${PACKAGE_NAME} on port ${PORT:-default}..."
+
 if [ "${HOST_TYPE}" = "agent" ]; then
     exec python -m "agents.${PACKAGE_NAME}"
 elif [ "${HOST_TYPE}" = "vn_bridge" ]; then
