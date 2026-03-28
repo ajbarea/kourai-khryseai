@@ -62,7 +62,9 @@ dev:                       ## Start services + GUI (full development stack in on
 	@$(MAKE) --no-print-directory up
 	@echo
 	@echo Starting GUI...
-	@$(MAKE) --no-print-directory gui
+# 	@$(MAKE) --no-print-directory cli
+# 	@$(MAKE) --no-print-directory gui
+	@$(MAKE) --no-print-directory vn
 
 dev-vn:                    ## Start services + Ren'Py VN (full development stack with visual novel)
 	@$(MAKE) --no-print-directory down
@@ -136,7 +138,7 @@ test-performance:          ## Run performance tests only
 	uv run --no-active pytest tests/performance/ -v --tb=short --cov=. --cov-append --cov-report=xml:logs/coverage.xml --cov-report=term-missing
 
 clean:                     ## Remove build artifacts, cache, and temp files
-	uv run --no-active python scripts/clean_build.py
+	@uv run --no-active python scripts/clean_build.py
 
 clean-cache:               ## Remove cache directories only
 	uv run --no-active python scripts/clean_build.py --cache-only
@@ -152,4 +154,4 @@ prune:                     ## Remove stopped containers, dangling images, and un
 # ════════════════════════════════════════════════════════════════════════════
 
 help:                      ## Show this help message
-	uv run --no-active python scripts/show_help.py
+	@uv run --no-active python scripts/show_help.py
