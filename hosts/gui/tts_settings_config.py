@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from .dialogue_pacing import PacingMode
 
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 class TTSSettingsConfig:
     """Manages TTS settings persistence."""
 
-    DEFAULT_CONFIG = {
+    DEFAULT_CONFIG: ClassVar[dict[str, Any]] = {
         "tts_enabled": True,
         "pacing_mode": "NORMAL",
         "thinking_pause_enabled": True,

@@ -115,7 +115,7 @@ def play_emote_sfx(
         sfx_path = resolve_sfx(emote, agent_name)
         if sfx_path:
             try:
-                audio_manager.play_sfx(sfx_path)  # type: ignore[attr-defined]
+                audio_manager.play_sfx(sfx_path)  # type: ignore[attr-defined]  # ty: ignore[unresolved-attribute]
                 logger.debug("Emote SFX triggered: '%s' → %s", emote, sfx_path.stem)
             except Exception as e:
                 logger.warning("Failed to play emote SFX for '%s': %s", emote, e)

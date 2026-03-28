@@ -197,8 +197,8 @@ def _center_window_position(
 
 def _sanitize_size(size: object) -> tuple[int, int]:
     try:
-        width = int(size[0])  # type: ignore[index]
-        height = int(size[1])  # type: ignore[index]
+        width = int(size[0])  # type: ignore[index]  # ty: ignore[not-subscriptable]
+        height = int(size[1])  # type: ignore[index]  # ty: ignore[not-subscriptable]
     except (TypeError, ValueError, IndexError):
         return W, H
 

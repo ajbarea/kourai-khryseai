@@ -101,8 +101,8 @@ def _render_image_ansi(
         line_chars: list[str] = []
         for col in range(width):
             # Top pixel (row*2) and bottom pixel (row*2+1)
-            tr, tg, tb, ta = pixels[col, row * 2]
-            br, bg, bb, ba = pixels[col, row * 2 + 1]
+            tr, tg, tb, ta = pixels[col, row * 2]  # ty: ignore[not-iterable]
+            br, bg, bb, ba = pixels[col, row * 2 + 1]  # ty: ignore[not-iterable]
 
             top_transparent = ta < 64
             bot_transparent = ba < 64
