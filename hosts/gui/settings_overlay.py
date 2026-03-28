@@ -67,6 +67,7 @@ class SettingsOverlay:
         self.font_small = pygame.freetype.SysFont("segoeui, inter, arial", 12)
 
         self.on_quit_callback: Callable[[], None] | None = None
+        self.on_fullscreen_toggle: Callable[[bool], None] | None = None
         self._init_controls()
 
     def update_layout(self, screen_w: int, screen_h: int):
@@ -145,8 +146,7 @@ class SettingsOverlay:
                         self.gui.high_contrast.enable_high_contrast()
                     else:
                         self.gui.high_contrast.disable_high_contrast()
-                elif k == "fullscreen" and hasattr(self, "on_fullscreen_toggle"):
-                    # Trigger fullscreen toggle via callback
+                elif k == "fullscreen" and self.on_fullscreen_toggle is not None:
                     self.on_fullscreen_toggle(new_state)
 
                 self.gui.save_all_settings()

@@ -186,6 +186,7 @@ async def handle_gossip(request: Request) -> JSONResponse:
         f'Respond with ONLY valid JSON: {{"hint": "*stage direction*", "line": "Your observation."}}'
     )
 
+    result = ""
     try:
         result = await chat(
             agent,

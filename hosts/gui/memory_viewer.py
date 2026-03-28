@@ -93,6 +93,7 @@ class MemoryViewerPanel:
 
     def _refresh_data(self) -> None:
         """Load current player data for display."""
+        profile = None
         try:
             from kourai_common.player import (
                 PlayerProfile,
