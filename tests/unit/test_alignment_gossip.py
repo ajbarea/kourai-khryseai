@@ -13,8 +13,6 @@ from kourai_common.player import (
     get_player_memories,
 )
 
-# ── Fixtures ────────────────────────────────────────────────────────────
-
 
 @pytest.fixture(autouse=True)
 def _isolate_db(tmp_path, monkeypatch):
@@ -41,6 +39,7 @@ def _isolate_db(tmp_path, monkeypatch):
     conn.commit()
 
     import kourai_common.player as player_mod
+    import kourai_common.player_context as player_ctx
 
     player_mod._tables_initialized = False
     _ensure_player_tables(conn)
@@ -50,14 +49,11 @@ def _isolate_db(tmp_path, monkeypatch):
     monkeypatch.setattr(player_mod, "ACTIVE_PROFILE_FILE", tmp_path / "active_profile.txt")
     monkeypatch.setattr(player_mod, "_LEGACY_PLAYER_FILE", tmp_path / "player.json")
 
-    player_mod._profile_cache = None
-    player_mod._profile_cache_ts = 0.0
+    player_ctx._profile_cache = None
+    player_ctx._profile_cache_ts = 0.0
 
     yield conn
     conn.close()
-
-
-# ── Alignment Scoring ──────────────────────────────────────────────────
 
 
 class TestAlignmentScoring:
@@ -82,7 +78,7 @@ class TestAlignmentScoring:
 
         p = PlayerProfile(display_name="AJ", sovereignty=0, devotion=0)
         sov, dev = score_alignment("You're so gorgeous~", p)
-        assert dev >= 2  # Flirt + mild devotion
+        assert dev >= 2
         assert p.devotion >= 2
 
     def test_neutral_text_no_change(self):
@@ -107,8 +103,8 @@ class TestAlignmentScoring:
 
         p = PlayerProfile(display_name="AJ", sovereignty=0, devotion=0)
         sov, dev = score_alignment("Fix this now, but thanks for trying", p)
-        assert sov > 0  # "fix this"
-        assert dev > 0  # "thanks"
+        assert sov > 0
+        assert dev > 0
 
     def test_gossip_context_amplifies(self):
         from kourai_common.hooks import score_alignment
@@ -119,7 +115,7 @@ class TestAlignmentScoring:
         p2 = PlayerProfile(display_name="B", sovereignty=0, devotion=0)
         sov2, _ = score_alignment("Do it again, not acceptable!", p2, context="gossip")
 
-        assert sov2 > sov1  # Gossip amplifies by 1.5x
+        assert sov2 > sov1
 
     def test_sovereignty_clamped_at_100(self):
         from kourai_common.hooks import score_alignment
@@ -136,9 +132,6 @@ class TestAlignmentScoring:
         assert p.devotion == 100
 
 
-# ── Gossip Alignment Scoring ───────────────────────────────────────────
-
-
 class TestGossipScoring:
     def test_scold_in_gossip(self):
         from kourai_common.hooks import score_gossip_response
@@ -146,7 +139,7 @@ class TestGossipScoring:
         p = PlayerProfile(display_name="AJ", sovereignty=0, devotion=0)
         sov, dev, affinity = score_gossip_response("Get back to work!", p, ["kallos", "metis"])
         assert sov > 0
-        # Kallos (devotion-preferring) hurt, authority-agents neutral/positive
+
         assert affinity["kallos"] < affinity.get("metis", 0.01) or affinity["kallos"] <= 0.01
 
     def test_flirt_in_gossip(self):
@@ -157,7 +150,7 @@ class TestGossipScoring:
             "You're both so gorgeous~", p, ["kallos", "metis"]
         )
         assert dev > 0
-        # Both agents should get positive affinity
+
         assert all(v > 0 for v in affinity.values())
 
     def test_warm_response_affinity(self):
@@ -178,9 +171,6 @@ class TestGossipScoring:
         assert set(affinity.keys()) == {"techne", "kallos", "metis"}
 
 
-# ── Pattern Detection ──────────────────────────────────────────────────
-
-
 class TestPatternDetection:
     def test_get_time_bucket(self):
         from kourai_common.hooks import get_time_bucket
@@ -199,7 +189,6 @@ class TestPatternDetection:
         bucket = record_session_pattern(p.player_id, hour=23)
         assert bucket == "night"
 
-        # Check memory was created
         mems = get_player_memories(p.player_id, category="pattern")
         assert any("session_time:night" in m["content"] for m in mems)
 
@@ -210,14 +199,13 @@ class TestPatternDetection:
         bucket1 = record_session_pattern(p.player_id, hour=23)
         bucket2 = record_session_pattern(p.player_id, hour=23)
         assert bucket1 == "night"
-        assert bucket2 is None  # Deduped
+        assert bucket2 is None
 
     def test_detect_time_pattern_histogram(self):
         from kourai_common.hooks import detect_time_pattern
 
         p = PlayerProfile(display_name="AJ")
-        # We can't easily record multiple days, but we can test the histogram reader
-        # by manually inserting pattern memories
+
         from kourai_common.player import add_player_memory
 
         for _ in range(5):
@@ -237,7 +225,7 @@ class TestPatternDetection:
         from kourai_common.player import add_player_memory
 
         p = PlayerProfile(display_name="AJ")
-        # Create enough late_night patterns to trigger a hint
+
         for i in range(5):
             add_player_memory(
                 p.player_id,
@@ -277,7 +265,7 @@ class TestPatternDetection:
 
         mems = get_player_memories(p.player_id, category="pattern")
         refactor_count = sum(1 for m in mems if "work_habit:refactor_lover" in m["content"])
-        assert refactor_count == 1  # Deduped
+        assert refactor_count == 1
 
     def test_work_pattern_summary(self):
         from kourai_common.hooks import detect_work_patterns, get_work_pattern_summary
@@ -296,9 +284,6 @@ class TestPatternDetection:
 
         p = PlayerProfile(display_name="AJ")
         assert get_work_pattern_summary(p.player_id) is None
-
-
-# ── Unified Post-Task Hook ─────────────────────────────────────────────
 
 
 class TestRunPostTaskHooks:
@@ -322,27 +307,21 @@ class TestRunPostTaskHooks:
             success=True,
         )
 
-        # Affinity updated
         aff = get_affinity(p.player_id, "techne")
         assert aff["affinity_score"] > 0
 
-        # Memories extracted
         mems = get_player_memories(p.player_id)
         assert any(m["category"] == "preference" for m in mems)
         assert any(m["category"] == "achievement" for m in mems)
 
-        # Alignment changed (profile saved to disk)
         reloaded = PlayerProfile.load()
         assert reloaded is not None
-        assert reloaded.devotion > 0  # "Great job" → devotion
+        assert reloaded.devotion > 0
 
     def test_noop_without_player_id(self):
         from kourai_common.hooks import run_post_task_hooks
 
-        run_post_task_hooks("", "metis", "hello", "world")  # Should not raise
-
-
-# ── Gossip Engine ──────────────────────────────────────────────────────
+        run_post_task_hooks("", "metis", "hello", "world")
 
 
 class TestGossipPairSelection:
@@ -366,7 +345,7 @@ class TestGossipPairSelection:
         from kourai_common.gossip import select_gossip_pair
 
         pair = select_gossip_pair("techne", all_agents=["techne", "metis"])
-        assert pair is None  # Only 1 idle agent
+        assert pair is None
 
     def test_pair_chemistry_known(self):
         from kourai_common.gossip import get_pair_chemistry
@@ -377,10 +356,9 @@ class TestGossipPairSelection:
     def test_pair_chemistry_reversed(self):
         from kourai_common.gossip import get_pair_chemistry
 
-        # Known pairs should return the same chemistry regardless of order
         chem1 = get_pair_chemistry("techne", "kallos")
         chem2 = get_pair_chemistry("kallos", "techne")
-        assert chem1 == chem2  # Normalized lookup
+        assert chem1 == chem2
 
     def test_pair_chemistry_unknown(self):
         from kourai_common.gossip import get_pair_chemistry
@@ -441,15 +419,13 @@ class TestGossipSession:
             topic=GossipTopic.PLAYER_HABITS,
         )
 
-        # Low alignment — no special options
         p_low = PlayerProfile(display_name="AJ", sovereignty=10, devotion=10)
         opts_low = generate_response_options(session, profile=p_low)
 
-        # High sovereignty — gets Command option
         p_sov = PlayerProfile(display_name="AJ", sovereignty=70, devotion=10)
         opts_sov = generate_response_options(session, profile=p_sov)
 
-        assert len(opts_sov) > len(opts_low)  # Sovereignty unlocks Command
+        assert len(opts_sov) > len(opts_low)
 
     def test_commander_option(self):
         from kourai_common.gossip import (
@@ -466,7 +442,7 @@ class TestGossipSession:
         p = PlayerProfile(display_name="AJ", sovereignty=85, devotion=85)
         opts = generate_response_options(session, profile=p)
         emojis = [o.emoji for o in opts]
-        assert "👑" in emojis  # Commander rally option
+        assert "👑" in emojis
 
 
 class TestGossipRound:
@@ -498,7 +474,6 @@ class TestGossipRound:
             await generate_gossip_round(session)
             assert session.is_complete
 
-            # Additional rounds produce nothing
             msgs = await generate_gossip_round(session)
             assert msgs == []
 
@@ -512,7 +487,7 @@ class TestGossipRound:
             mock_chat.side_effect = Exception("LLM down")
             messages = await generate_gossip_round(session)
             assert len(messages) == 2
-            # Fallback messages should contain agent names
+
             assert "Metis" in messages[0].text
             assert "Kallos" in messages[1].text
 
@@ -550,7 +525,7 @@ class TestGossipPlayerResponse:
 
             assert len(reactions) == 2
             assert session.player_joined is True
-            # Player message should be in history
+
             assert any(m.is_player for m in session.messages)
 
     @pytest.mark.asyncio
@@ -623,7 +598,7 @@ class TestGossipPlayerResponse:
         with patch("kourai_common.llm.chat", new_callable=AsyncMock) as mock_chat:
             mock_chat.return_value = "Welcome~"
             await process_player_response(session, opt)
-            assert session.max_rounds == 4  # Extended by 1
+            assert session.max_rounds == 4
 
     @pytest.mark.asyncio
     async def test_complete_session_no_response(self):
@@ -685,21 +660,16 @@ class TestGossipTopicSelection:
     def test_topic_without_profile_favors_banter(self):
         from kourai_common.gossip import GossipTopic, select_gossip_topic
 
-        # Run many times to check distribution tendency
         topics = [select_gossip_topic(None, "metis", "kallos") for _ in range(100)]
         banter_count = sum(1 for t in topics if t == GossipTopic.AGENT_BANTER)
-        # Should be heavily weighted toward banter without a profile
+
         assert banter_count > 30
 
 
-# Helper to import and call generate_gossip_round
 async def session_round(session):
     from kourai_common.gossip import generate_gossip_round
 
     return await generate_gossip_round(session)
-
-
-# ── Alignment Dialogue Gating ──────────────────────────────────────────
 
 
 class TestDialogueGating:
@@ -755,7 +725,7 @@ class TestDialogueGating:
 
         p = PlayerProfile(display_name="AJ", sovereignty=75, devotion=75)
         ctx = build_player_context(p, "kallos")
-        # Should contain alignment gating
+
         assert "DEVOTION" in ctx or "SOVEREIGNTY" in ctx
 
     def test_both_gauges_high_but_below_commander(self):
@@ -763,13 +733,10 @@ class TestDialogueGating:
 
         p = PlayerProfile(display_name="AJ", sovereignty=70, devotion=70)
         instructions = get_alignment_gated_instructions(p, "dokimasia")
-        # Both sovereignty and devotion gating present, but not Commander
+
         assert "COMMANDER" not in instructions
         assert "SOVEREIGNTY" in instructions
         assert "DEVOTION" in instructions
-
-
-# ── CLI Gossip ─────────────────────────────────────────────────────────
 
 
 class TestCliGossip:
@@ -824,7 +791,7 @@ class TestCliGossip:
         session = start_gossip_session("metis", "kallos", max_rounds=1)
 
         output_lines: list[str] = []
-        inputs = iter([""])  # Just press enter (ignore)
+        inputs = iter([""])
 
         with patch("kourai_common.llm.chat", new_callable=AsyncMock) as mock_chat:
             mock_chat.return_value = "*waves* Hello there~"
@@ -839,15 +806,12 @@ class TestCliGossip:
         assert any("Hello" in line for line in output_lines)
 
 
-# ── Affinity Tier System ───────────────────────────────────────────────
-
-
 class TestAffinityTiers:
     def test_tier_instructions_exist(self):
         from kourai_common.player import AFFINITY_TIER_INSTRUCTIONS
 
-        assert 0 in AFFINITY_TIER_INSTRUCTIONS  # Stranger
-        assert 3 in AFFINITY_TIER_INSTRUCTIONS  # Bonded
+        assert 0 in AFFINITY_TIER_INSTRUCTIONS
+        assert 3 in AFFINITY_TIER_INSTRUCTIONS
         assert len(AFFINITY_TIER_INSTRUCTIONS) == 4
 
     def test_tier_context_stranger(self):
@@ -863,11 +827,8 @@ class TestAffinityTiers:
 
         p = PlayerProfile(display_name="AJ")
         ctx = build_player_context(p, "metis")
-        # Should contain tier instruction (Stranger for new player)
+
         assert "formal" in ctx.lower() or "polite" in ctx.lower()
-
-
-# ── Romance Eligibility ───────────────────────────────────────────────
 
 
 class TestRomanceEligibility:
@@ -895,11 +856,10 @@ class TestRomanceEligibility:
         )
 
         p = PlayerProfile(display_name="AJ", sovereignty=0, devotion=80)
-        # Build up affinity to bonded
+
         for _ in range(40):
             update_affinity(p.player_id, "kallos", 0.02)
 
-        # Add gossip-sourced memories
         for i in range(4):
             add_player_memory(
                 p.player_id,
@@ -950,9 +910,6 @@ class TestRomanceEligibility:
         assert aff["romance_stage"] == "spark"
 
 
-# ── Run Post-Task Hooks (updated) ──────────────────────────────────────
-
-
 class TestRunPostTaskHooksV2:
     def test_returns_results_dict(self, tmp_path, monkeypatch):
         from kourai_common.hooks import run_post_task_hooks
@@ -985,18 +942,14 @@ class TestRunPostTaskHooksV2:
         assert results == {}
 
 
-# ── Romance Dialogue System ────────────────────────────────────────────
-
-
 class TestRomanceDialogueInstructions:
     def _setup_romance(self, agent: str, stage: str, profile: PlayerProfile):
         """Helper to set up an agent at a specific romance stage."""
         from kourai_common.player import update_affinity
 
-        # Build affinity to bonded
         for _ in range(40):
             update_affinity(profile.player_id, agent, 0.02)
-        # Force the romance stage
+
         conn = player._get_player_db()
         conn.execute(
             "UPDATE agent_affinity SET romance_stage = ? WHERE player_id = ? AND agent_name = ?",
@@ -1144,9 +1097,6 @@ class TestRomanceInPlayerContext:
         assert "intellectual seduction" in ctx.lower()
 
 
-# ── Jealousy Confrontation System ──────────────────────────────────────
-
-
 class TestJealousyTrigger:
     def _setup_multi_romance(self, profile, agents_and_stages):
         """Set up multiple agents at various romance stages."""
@@ -1226,10 +1176,10 @@ class TestJealousyTrigger:
         )
         session = start_gossip_session("metis", "kallos")
         result = check_jealousy_trigger(session, ResponseTone.FLIRT, p)
-        # dokimasia is absent and at flame (kindling+) → should trigger
+
         assert result is not None
         assert result.jealous_agent == "dokimasia"
-        assert result.rival_agent == "metis"  # metis has higher romance in session
+        assert result.rival_agent == "metis"
         assert "confrontation" in result.trigger or "flirted" in result.trigger
         assert len(result.response_options) >= 2
 
@@ -1245,7 +1195,7 @@ class TestJealousyTrigger:
             p,
             [
                 ("metis", "kindling"),
-                ("dokimasia", "spark"),  # spark doesn't trigger jealousy
+                ("dokimasia", "spark"),
             ],
         )
         session = start_gossip_session("metis", "kallos")
@@ -1262,7 +1212,7 @@ class TestJealousyResponses:
         labels = [o.label for o in options]
         assert "Reassure" in labels
         assert "Deflect" in labels
-        # No high-alignment options
+
         assert "Assert" not in labels
         assert "Cherish" not in labels
 
@@ -1345,13 +1295,12 @@ class TestResolveJealousy:
         p = PlayerProfile(display_name="AJ", sovereignty=70, devotion=0)
         p.save()
 
-        # Hephaestus likes sovereignty
         event = self._make_event("hephaestus")
         option = GossipResponseOption(ResponseTone.SCOLD, "🔴", "Assert", "Don't question me.")
         result = resolve_jealousy(event, option, p)
 
         assert result["sovereignty_points"] == 3
-        assert result["affinity_delta"] > 0  # hephaestus respects authority
+        assert result["affinity_delta"] > 0
 
     def test_assert_authority_devotion_agent_negative(self, tmp_path, monkeypatch):
         from kourai_common.gossip import (
@@ -1370,12 +1319,11 @@ class TestResolveJealousy:
         p = PlayerProfile(display_name="AJ", sovereignty=70, devotion=0)
         p.save()
 
-        # Kallos dislikes sovereignty
         event = self._make_event("kallos")
         option = GossipResponseOption(ResponseTone.SCOLD, "🔴", "Assert", "Don't question me.")
         result = resolve_jealousy(event, option, p)
 
-        assert result["affinity_delta"] < 0  # kallos is hurt
+        assert result["affinity_delta"] < 0
 
     def test_deflect_mixed_results(self, tmp_path, monkeypatch):
         from kourai_common.gossip import (

@@ -13,8 +13,6 @@ from kourai_common.player import (
     update_affinity,
 )
 
-# ── Fixtures ────────────────────────────────────────────────────────────
-
 
 @pytest.fixture(autouse=True)
 def _isolate_db(tmp_path, monkeypatch):
@@ -41,6 +39,7 @@ def _isolate_db(tmp_path, monkeypatch):
     conn.commit()
 
     import kourai_common.player as player_mod
+    import kourai_common.player_context as player_ctx
 
     player_mod._tables_initialized = False
     _ensure_player_tables(conn)
@@ -50,14 +49,11 @@ def _isolate_db(tmp_path, monkeypatch):
     monkeypatch.setattr(player_mod, "ACTIVE_PROFILE_FILE", tmp_path / "active_profile.txt")
     monkeypatch.setattr(player_mod, "_LEGACY_PLAYER_FILE", tmp_path / "player.json")
 
-    player_mod._profile_cache = None
-    player_mod._profile_cache_ts = 0.0
+    player_ctx._profile_cache = None
+    player_ctx._profile_cache_ts = 0.0
 
     yield conn
     conn.close()
-
-
-# ── Achievement System ──────────────────────────────────────────────────
 
 
 class TestAchievementDefinitions:
@@ -83,7 +79,7 @@ class TestAchievementDefinitions:
         from kourai_common.achievements import ACHIEVEMENTS
 
         hidden = [a for a in ACHIEVEMENTS.values() if a.hidden]
-        assert len(hidden) >= 2  # thousand_hammers, heartbreaker, harem_protagonist
+        assert len(hidden) >= 2
 
 
 class TestAchievementChecking:
@@ -106,7 +102,7 @@ class TestAchievementChecking:
         unlocked1 = check_achievements(p.player_id, p)
         unlocked2 = check_achievements(p.player_id, p)
         assert len(unlocked1) > 0
-        # first_forge should NOT appear again
+
         ids2 = [a.id for a in unlocked2]
         assert "first_forge" not in ids2
 
@@ -126,7 +122,7 @@ class TestAchievementChecking:
         from kourai_common.achievements import check_achievements
 
         p = PlayerProfile(display_name="AJ")
-        # Set up a romance
+
         for _ in range(40):
             update_affinity(p.player_id, "kallos", 0.02)
         conn = player._get_player_db()
@@ -179,7 +175,7 @@ class TestAchievementChecking:
         from kourai_common.achievements import check_achievements
 
         p = PlayerProfile(display_name="AJ")
-        # Build multiple bonded relationships
+
         for agent in ["metis", "techne", "dokimasia", "kallos", "mneme"]:
             for _ in range(40):
                 update_affinity(p.player_id, agent, 0.02)
@@ -205,7 +201,7 @@ class TestAchievementProgress:
 
         progress = get_achievement_progress(p.player_id, p)
         assert progress["total"] == len(ACHIEVEMENTS)
-        assert progress["unlocked_count"] >= 3  # first_forge + alignment
+        assert progress["unlocked_count"] >= 3
         assert "alignment" in progress["by_category"]
 
     def test_notification_format(self):
@@ -220,18 +216,14 @@ class TestAchievementProgress:
         assert "First Forge" in text
 
 
-# ── Memory Moments ──────────────────────────────────────────────────────
-
-
 class TestMemoryMoments:
     def test_should_trigger_low_tier(self):
         from kourai_common.memory_moments import should_trigger_moment
 
         p = PlayerProfile(display_name="AJ")
-        # Stranger tier — very low probability
-        # Run many times and check it triggers sometimes but not always
+
         triggered = sum(1 for _ in range(1000) if should_trigger_moment(p.player_id, "metis", p))
-        assert triggered < 100  # Less than 10% for strangers (2% expected)
+        assert triggered < 100
 
     def test_should_trigger_high_tier(self):
         from kourai_common.memory_moments import should_trigger_moment
@@ -240,9 +232,8 @@ class TestMemoryMoments:
         for _ in range(40):
             update_affinity(p.player_id, "metis", 0.02)
 
-        # Bonded tier — higher probability
         triggered = sum(1 for _ in range(1000) if should_trigger_moment(p.player_id, "metis", p))
-        assert triggered > 100  # More than 10% for bonded (25% expected)
+        assert triggered > 100
 
     def test_romance_bonus_probability(self):
         from kourai_common.memory_moments import should_trigger_moment
@@ -258,9 +249,8 @@ class TestMemoryMoments:
         )
         conn.commit()
 
-        # Bonded + bonfire = 0.25 + 0.20 = 0.45 probability
         triggered = sum(1 for _ in range(1000) if should_trigger_moment(p.player_id, "metis", p))
-        assert triggered > 300  # ~45% expected
+        assert triggered > 300
 
     def test_select_memory_with_memories(self):
         from kourai_common.memory_moments import select_memory_for_moment
@@ -301,7 +291,6 @@ class TestMemoryMoments:
             importance=0.8,
         )
 
-        # Force trigger by patching random
         with patch("kourai_common.memory_moments.random.random", return_value=0.01):
             ctx = generate_moment_context(p.player_id, "metis", p)
 
@@ -312,7 +301,6 @@ class TestMemoryMoments:
     def test_moment_type_romance(self):
         from kourai_common.memory_moments import _select_moment_type
 
-        # At flame/bonfire, "intimate" type should be possible
         results = set()
         for _ in range(100):
             results.add(_select_moment_type(3, "flame", "moment"))
@@ -323,9 +311,6 @@ class TestMemoryMoments:
 
         for _ in range(20):
             assert _select_moment_type(2, "none", "achievement") == "growth"
-
-
-# ── Personality Adaptation ──────────────────────────────────────────────
 
 
 class TestPersonalityAdaptation:
@@ -397,7 +382,7 @@ class TestPersonalityAdaptation:
         agents = ["metis", "techne", "dokimasia", "kallos", "mneme", "hephaestus"]
         for agent in agents:
             assert agent in AGENT_TIER_ADAPTATIONS
-            assert len(AGENT_TIER_ADAPTATIONS[agent]) == 4  # Tiers 0-3
+            assert len(AGENT_TIER_ADAPTATIONS[agent]) == 4
             assert agent in ALIGNMENT_PERSONALITY_MODIFIERS
             mods = ALIGNMENT_PERSONALITY_MODIFIERS[agent]
             assert "high_sovereignty" in mods
@@ -405,11 +390,9 @@ class TestPersonalityAdaptation:
             assert "commander" in mods
 
 
-# ── Integration: Enriched System Prompt ─────────────────────────────────
-
-
 class TestEnrichedPromptIntegration:
     def test_enriched_prompt_includes_adaptation(self):
+        import kourai_common.player_context as player_ctx
         from kourai_common.player import get_enriched_system_prompt
 
         p = PlayerProfile(display_name="AJ", sovereignty=70, devotion=0)
@@ -417,14 +400,13 @@ class TestEnrichedPromptIntegration:
         for _ in range(15):
             update_affinity(p.player_id, "metis", 0.02)
 
-        # Clear cache
-        player._profile_cache = None
-        player._profile_cache_ts = 0
+        player_ctx._profile_cache = None
+        player_ctx._profile_cache_ts = 0
 
         result = get_enriched_system_prompt("Base prompt here.", "metis")
         assert "Base prompt here." in result
         assert "PLAYER IDENTITY" in result
-        # Personality adaptation should be present (acquaintance tier)
+
         assert "PERSONALITY ADAPTATION" in result
 
     def test_hooks_include_achievements(self, tmp_path, monkeypatch):
@@ -441,5 +423,5 @@ class TestEnrichedPromptIntegration:
 
         results = run_post_task_hooks(p.player_id, "techne", "hello", "done", success=True)
         assert "achievements_unlocked" in results
-        # first_forge should unlock on first interaction
+
         assert "first_forge" in results["achievements_unlocked"]
