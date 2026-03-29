@@ -52,11 +52,11 @@ class TestBackupScriptValidation:
         assert setup_script.is_file()
         assert setup_script.stat().st_size > 0, "Script file is empty"
 
-    def test_env_backup_template_exists(self):
-        """.env.backup template should exist."""
+    def test_env_example_has_backup_vars(self):
+        """.env.example should document all backup-related variables."""
         repo_root = get_project_root()
-        env_file = repo_root / ".env.backup"
-        assert env_file.exists(), ".env.backup template not found"
+        env_file = repo_root / ".env.example"
+        assert env_file.exists(), ".env.example not found"
         content = env_file.read_text(encoding="utf-8")
         assert "HF_TOKEN" in content
 
@@ -129,10 +129,10 @@ class TestBackupScriptContent:
 class TestBackupConfiguration:
     """Test backup configuration files."""
 
-    def test_env_backup_has_required_variables(self):
-        """.env.backup should document all required variables."""
+    def test_env_example_has_required_backup_variables(self):
+        """.env.example should document all backup-related variables."""
         repo_root = get_project_root()
-        env_file = repo_root / ".env.backup"
+        env_file = repo_root / ".env.example"
         content = env_file.read_text(encoding="utf-8")
 
         assert "HF_TOKEN" in content, "Should document HF_TOKEN"
@@ -140,10 +140,10 @@ class TestBackupConfiguration:
         assert "BACKUP_BUCKET_NAME" in content, "Should document BACKUP_BUCKET_NAME"
         assert "BACKUP_RETENTION_DAYS" in content, "Should document retention"
 
-    def test_env_backup_has_helpful_comments(self):
-        """.env.backup should have clear documentation."""
+    def test_env_example_has_helpful_comments(self):
+        """.env.example should have clear documentation."""
         repo_root = get_project_root()
-        env_file = repo_root / ".env.backup"
+        env_file = repo_root / ".env.example"
         content = env_file.read_text(encoding="utf-8")
 
         assert "#" in content, "Should have comments"
@@ -220,24 +220,21 @@ class TestBackupLogging:
 class TestBackupSecurityAndIgnore:
     """Test that sensitive files are properly protected."""
 
-    def test_env_backup_in_gitignore(self):
-        """Both .env.hf and .env.backup should be in .gitignore."""
+    def test_env_in_gitignore(self):
+        """Credential files should be in .gitignore."""
         repo_root = get_project_root()
         gitignore = (repo_root / ".gitignore").read_text(encoding="utf-8")
 
-        assert ".env.backup" in gitignore, ".env.backup not in .gitignore"
+        assert ".env" in gitignore, ".env not in .gitignore"
         assert ".env.hf" in gitignore, ".env.hf not in .gitignore"
 
-    def test_env_backup_not_committed(self):
-        """.env.backup should not be in git."""
+    def test_env_example_is_placeholder_only(self):
+        """.env.example should never contain real tokens."""
         repo_root = get_project_root()
-        env_file = repo_root / ".env.backup"
+        content = (repo_root / ".env.example").read_text(encoding="utf-8")
 
-        assert env_file.exists()
-
-        content = env_file.read_text(encoding="utf-8")
-        assert "hf_your_token" in content or "YOUR" in content or "here" in content.lower(), (
-            ".env.backup should be a template, not contain real tokens"
+        assert "hf_your" not in content.lower() or "xxx" in content or "YOUR" in content, (
+            ".env.example should only contain placeholder values"
         )
 
 
@@ -257,8 +254,8 @@ class TestBackupIntegration:
             script_path = repo_root / script
             assert script_path.exists(), f"Missing: {script}"
 
-        env_file = repo_root / ".env.backup"
-        assert env_file.exists(), "Missing: .env.backup"
+        env_file = repo_root / ".env.example"
+        assert env_file.exists(), "Missing: .env.example"
 
     def test_backup_directories_writable(self):
         """Backup log directories should be writable."""
