@@ -13,9 +13,7 @@ venv/
 
 # Environment
 .env
-.env.backup
-.env.hf
-.hf-mount-configured
+.hf-buckets-configured
 
 # IDE
 .vscode/
@@ -63,4 +61,3 @@ hosts/vn/kourai_vn/game/saves/
 hosts/vn/kourai_vn/game/log.txt
 hosts/vn/kourai_vn/.ren'py_compiler_cache
 hosts/vn/kourai_vn/logs/
-aboutme/aware-ai-cover-letter.txt

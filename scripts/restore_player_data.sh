@@ -40,10 +40,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-# Source .env.backup if it exists
-if [ -f "$PROJECT_ROOT/.env.backup" ]; then
+# Source .env if it exists
+if [ -f "$PROJECT_ROOT/.env" ]; then
     # shellcheck disable=SC1090
-    source "$PROJECT_ROOT/.env.backup"
+    source "$PROJECT_ROOT/.env"
 fi
 
 # Defaults
@@ -77,7 +77,7 @@ ACTION="${1:-list}"
 
 # Validate HF_TOKEN
 if [ -z "${HF_TOKEN:-}" ]; then
-    error "HF_TOKEN not set. Please set HF_TOKEN or source .env.backup"
+    error "HF_TOKEN not set. Set HF_TOKEN in .env or as an environment variable."
 fi
 
 # Check hf CLI

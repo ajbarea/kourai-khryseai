@@ -23,7 +23,7 @@
 #   # Custom retention period (keep backups >14 days old)
 #   BACKUP_RETENTION_DAYS=14 bash scripts/backup_player_data.sh
 #
-# Environment Variables (set in .env.backup or pass on command line):
+# Environment Variables (set in .env or pass on command line):
 #   HF_TOKEN                 - HuggingFace API token (required)
 #   BACKUP_USER              - HuggingFace username (default: extracted from HF_TOKEN metadata)
 #   BACKUP_BUCKET_NAME       - Bucket name (default: kourai-backups)
@@ -41,10 +41,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-# Source .env.backup if it exists
-if [ -f "$PROJECT_ROOT/.env.backup" ]; then
+# Source .env if it exists
+if [ -f "$PROJECT_ROOT/.env" ]; then
     # shellcheck disable=SC1090
-    source "$PROJECT_ROOT/.env.backup"
+    source "$PROJECT_ROOT/.env"
 fi
 
 # Defaults
@@ -101,7 +101,7 @@ info "=== Kourai Player Data Backup ==="
 
 # Check HF_TOKEN is set
 if [ -z "${HF_TOKEN:-}" ]; then
-    error "HF_TOKEN not set. Please set HF_TOKEN environment variable or create .env.backup"
+    error "HF_TOKEN not set. Set HF_TOKEN in .env or as an environment variable."
 fi
 
 # Check hf CLI is installed

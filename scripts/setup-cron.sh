@@ -76,7 +76,7 @@ case "$ACTION" in
         
         # Create backup script cron line
         BACKUP_SCRIPT="$PROJECT_ROOT/scripts/backup_player_data.sh"
-        CRON_LINE="$BACKUP_CRON_MINUTE $BACKUP_CRON_HOUR * * * source $PROJECT_ROOT/.env.backup 2>/dev/null; $BACKUP_SCRIPT >> $PROJECT_ROOT/logs/backups/cron.log 2>&1"
+        CRON_LINE="$BACKUP_CRON_MINUTE $BACKUP_CRON_HOUR * * * source $PROJECT_ROOT/.env 2>/dev/null; $BACKUP_SCRIPT >> $PROJECT_ROOT/logs/backups/cron.log 2>&1"
         
         # Safety: backup existing crontab
         CRONTAB_BACKUP="/tmp/crontab.backup.$(date +%Y%m%d_%H%M%S)"
