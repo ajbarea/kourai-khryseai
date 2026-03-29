@@ -12,10 +12,6 @@ x-agent-common: &agent-common
     dockerfile: docker/host.Dockerfile
     args:
       HOST_TYPE: agent
-    cache_from:
-      - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-${PACKAGE_NAME}:latest
-    cache_to:
-      - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-${PACKAGE_NAME}:latest,mode=max
   env_file: .env
   environment:
     OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
@@ -178,6 +174,10 @@ services:
         HOST_TYPE: agent
         PACKAGE_NAME: mneme
         PORT: 10005
+      cache_from:
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-mneme:latest
+      cache_to:
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-mneme:latest,mode=max
       tags:
         - ${DOCKER_HUB_USERNAME}/kourai-mneme:latest
     ports:
@@ -219,6 +219,10 @@ services:
         HOST_TYPE: agent
         PACKAGE_NAME: kallos
         PORT: 10004
+      cache_from:
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-kallos:latest
+      cache_to:
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-kallos:latest,mode=max
       tags:
         - ${DOCKER_HUB_USERNAME}/kourai-kallos:latest
     ports:
@@ -261,6 +265,10 @@ services:
         HOST_TYPE: agent
         PACKAGE_NAME: techne
         PORT: 10002
+      cache_from:
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-techne:latest
+      cache_to:
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-techne:latest,mode=max
       tags:
         - ${DOCKER_HUB_USERNAME}/kourai-techne:latest
     ports:
@@ -303,6 +311,10 @@ services:
         HOST_TYPE: agent
         PACKAGE_NAME: dokimasia
         PORT: 10003
+      cache_from:
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-dokimasia:latest
+      cache_to:
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-dokimasia:latest,mode=max
       tags:
         - ${DOCKER_HUB_USERNAME}/kourai-dokimasia:latest
     ports:
@@ -347,6 +359,10 @@ services:
         HOST_TYPE: agent
         PACKAGE_NAME: metis
         PORT: 10001
+      cache_from:
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-metis:latest
+      cache_to:
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-metis:latest,mode=max
       tags:
         - ${DOCKER_HUB_USERNAME}/kourai-metis:latest
     ports:
@@ -390,6 +406,10 @@ services:
         HOST_TYPE: agent
         PACKAGE_NAME: puck
         PORT: 10006
+      cache_from:
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-puck:latest
+      cache_to:
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-puck:latest,mode=max
       tags:
         - ${DOCKER_HUB_USERNAME}/kourai-puck:latest
     ports:
@@ -430,6 +450,10 @@ services:
         HOST_TYPE: agent
         PACKAGE_NAME: cupid
         PORT: 10007
+      cache_from:
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-cupid:latest
+      cache_to:
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-cupid:latest,mode=max
       tags:
         - ${DOCKER_HUB_USERNAME}/kourai-cupid:latest
     ports:
@@ -471,6 +495,10 @@ services:
         HOST_TYPE: agent
         PACKAGE_NAME: aidos
         PORT: 10008
+      cache_from:
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-aidos:latest
+      cache_to:
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-aidos:latest,mode=max
       tags:
         - ${DOCKER_HUB_USERNAME}/kourai-aidos:latest
     ports:
@@ -511,6 +539,10 @@ services:
         HOST_TYPE: agent
         PACKAGE_NAME: aletheia
         PORT: 10009
+      cache_from:
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-aletheia:latest
+      cache_to:
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-aletheia:latest,mode=max
       tags:
         - ${DOCKER_HUB_USERNAME}/kourai-aletheia:latest
     ports:
@@ -603,6 +635,10 @@ services:
         HOST_TYPE: agent
         PACKAGE_NAME: hephaestus
         PORT: 10000
+      cache_from:
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-hephaestus:latest
+      cache_to:
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-hephaestus:latest,mode=max
       tags:
         - ${DOCKER_HUB_USERNAME}/kourai-hephaestus:latest
     ports:
