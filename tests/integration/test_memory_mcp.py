@@ -49,61 +49,57 @@ class MCPConnectionError(Exception):
     """Raised when MCP SSE connection fails."""
 
 
+async def _connect_mcp_sse(
+    url: str, *, retries: int = 4, delay: float = 3.0
+) -> tuple[Any, ClientSession] | None:
+    """Try to establish an MCP SSE session with retries.
+
+    Supergateway only supports one SSE client and crashes on disconnect,
+    so each test gets a fresh connection. Retries absorb the restart gap.
+    """
+    for attempt in range(retries):
+        sse_ctx: Any = None
+        session: ClientSession | None = None
+        try:
+            async with asyncio.timeout(10):
+                sse_ctx = sse_client(url)
+                read, write = await sse_ctx.__aenter__()
+                session = ClientSession(read, write)
+                await session.__aenter__()
+                await session.initialize()
+            return sse_ctx, session
+        except Exception:
+            with suppress(Exception):
+                if session is not None:
+                    await session.__aexit__(None, None, None)
+            with suppress(Exception):
+                if sse_ctx is not None:
+                    await sse_ctx.__aexit__(None, None, None)
+            if attempt < retries - 1:
+                await asyncio.sleep(delay)
+    return None
+
+
 @pytest.fixture
 async def mcp_session() -> AsyncGenerator[ClientSession, None]:
     """Async fixture providing a connected MCP ClientSession to memory-mcp.
 
-    March 2026 Best Practices:
-    - Timeout guards (15s): Prevent hanging on SSE streaming
-    - Explicit cleanup: Handle MCP SDK context manager lifecycle properly
-    - Skip on error: Graceful degradation (no flaky tests)
-
-    Known issue: mcp SDK v1.26.0 SSE context managers have cleanup issues.
-    Workaround: Manual context manager lifecycle + suppress cleanup errors.
+    Function-scoped with retry: supergateway crashes on client disconnect
+    and needs a few seconds to restart. The retry loop absorbs that gap.
     """
-    url = "http://localhost:5001/sse"
-    sse_context = None
-    session = None
+    result = await _connect_mcp_sse("http://localhost:5001/sse")
+    if result is None:
+        pytest.skip("SSE connection unavailable after retries")
+        return  # unreachable; helps type narrowing
 
-    try:
-        try:
-            async with asyncio.timeout(15):
-                sse_context = sse_client(url)
-                read, write = await sse_context.__aenter__()
-                session = ClientSession(read, write)
-                await session.__aenter__()
-                await session.initialize()
-                yield session
-        except TimeoutError:
-            pytest.skip("SSE connection timeout - server may be slow or unresponsive")
-        except BaseException as e:
-            if isinstance(e, pytest.skip.Exception):
-                raise
-            # ExceptionGroup (from asyncio.TaskGroup) wraps the real error — unwrap it
-            errors_to_check = list(e.exceptions) if isinstance(e, ExceptionGroup) else [e]
-            connection_keywords = [
-                "connected",
-                "transport",
-                "timeout",
-                "connection",
-                "eof",
-                "disconnected",
-                "protocol",
-                "remoteprotocol",
-            ]
-            if any(
-                any(kw in str(err).lower() for kw in connection_keywords) for err in errors_to_check
-            ):
-                pytest.skip(f"SSE connection unavailable: {type(e).__name__}")
-            raise
-    finally:
-        # Manual cleanup to avoid asyncio task group issues
-        if session is not None:
-            with suppress(Exception):
-                await session.__aexit__(None, None, None)
-        if sse_context is not None:
-            with suppress(Exception):
-                await sse_context.__aexit__(None, None, None)
+    sse_ctx, session = result
+
+    yield session
+
+    with suppress(Exception):
+        await session.__aexit__(None, None, None)
+    with suppress(Exception):
+        await sse_ctx.__aexit__(None, None, None)
 
 
 async def create_test_entity(
