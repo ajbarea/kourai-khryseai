@@ -44,8 +44,8 @@ CLI_ARGS ?=
 setup:                     ## Install all Python dependencies + optional HF-Mount if token set
 	uv run --no-active python scripts/setup.py
 
-setup-artifacts:            ## Configure HF-Mount for agent artifacts (Phase 1)
-	uv run --no-active python scripts/setup_hf_mount.py
+setup-artifacts:            ## Create HF Storage Bucket for agent artifacts
+	uv run --no-active python scripts/setup_buckets.py
 
 setup-artifacts-force:      ## Force re-configure HF-Mount artifacts (skips marker check)
 	uv run --no-active python scripts/setup.py --force-artifacts
