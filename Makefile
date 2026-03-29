@@ -41,13 +41,13 @@ CLI_ARGS ?=
 # Setup & Maintenance (run first time, or when dependencies change)
 # ════════════════════════════════════════════════════════════════════════════
 
-setup:                     ## Install all Python dependencies + optional HF-Mount if token set
+setup:                     ## Install all Python dependencies + optional HF Storage Buckets if token set
 	uv run --no-active python scripts/setup.py
 
 setup-artifacts:            ## Create HF Storage Bucket for agent artifacts
 	uv run --no-active python scripts/setup_buckets.py
 
-setup-artifacts-force:      ## Force re-configure HF-Mount artifacts (skips marker check)
+setup-artifacts-force:      ## Force re-configure HF Storage Bucket artifacts (skips marker check)
 	uv run --no-active python scripts/setup.py --force-artifacts
 
 upgrade:                   ## Update all dependencies to latest versions
