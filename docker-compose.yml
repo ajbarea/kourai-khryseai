@@ -21,7 +21,8 @@ x-agent-common: &agent-common
     MEMORY_MCP_SSE_URL: http://memory-mcp:5001/sse
     CONTEXT7_MCP_URL: http://context7-mcp:3001/sse
     HF_TOKEN: ${HF_TOKEN:-}
-    AGENT_ARTIFACTS_DIR: ${AGENT_ARTIFACTS_DIR:-/tmp/artifacts}
+    KOURAI_BUCKET_ID: ${KOURAI_BUCKET_ID:-ajbar/kourai-artifacts}
+    AGENT_ARTIFACTS_DIR: /agent-artifacts
   volumes:
     - ./shared:/app/shared
   networks:
@@ -206,7 +207,7 @@ services:
       - ./agents/kallos:/app/agents/kallos
       - ./shared:/app/shared
       - ./tests:/app/tests
-      - hf-mount://ajbar/kourai-artifacts/kallos:/agent-artifacts
+      - kourai-artifacts-kallos:/agent-artifacts
     develop:
       watch:
         - action: sync
@@ -246,7 +247,7 @@ services:
       - ./agents/techne:/app/agents/techne
       - ./shared:/app/shared
       - ./tests:/app/tests
-      - hf-mount://ajbar/kourai-artifacts/techne:/agent-artifacts
+      - kourai-artifacts-techne:/agent-artifacts
     develop:
       watch:
         - action: sync
@@ -286,7 +287,7 @@ services:
       - ./agents/dokimasia:/app/agents/dokimasia
       - ./shared:/app/shared
       - ./tests:/app/tests
-      - hf-mount://ajbar/kourai-artifacts/dokimasia:/agent-artifacts
+      - kourai-artifacts-dokimasia:/agent-artifacts
     develop:
       watch:
         - action: sync
@@ -328,7 +329,7 @@ services:
       - ./agents/metis:/app/agents/metis
       - ./shared:/app/shared
       - ./tests:/app/tests
-      - hf-mount://ajbar/kourai-artifacts/metis:/agent-artifacts
+      - kourai-artifacts-metis:/agent-artifacts
     develop:
       watch:
         - action: sync
@@ -618,7 +619,13 @@ services:
 volumes:
   memory-graph-storage:
     driver: local
-  hf-mount:
+  kourai-artifacts-kallos:
+    driver: local
+  kourai-artifacts-techne:
+    driver: local
+  kourai-artifacts-dokimasia:
+    driver: local
+  kourai-artifacts-metis:
     driver: local
 
 # ----------------------------------------------------------------------

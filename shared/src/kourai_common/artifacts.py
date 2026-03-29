@@ -1,21 +1,34 @@
-"""Agentic artifact storage via HF-Mount buckets.
+"""Agentic artifact storage with HuggingFace Bucket sync.
 
 Agents use this module to persist working outputs (test reports, traces,
-debug logs) to HuggingFace Storage Buckets without needing git versioning.
+debug logs) to HuggingFace Storage Buckets.
 
-Requires: hf-mount running with agent's bucket mounted at AGENT_ARTIFACTS_DIR env var.
+Local writes are always fast and synchronous. Cloud sync is explicit:
+call pull() at agent startup to restore prior state from HF, and push()
+after task completion to persist artifacts to the bucket.
+
+Without HF_TOKEN the module operates in local-only mode without error —
+useful for development and testing.
 
 Example:
     from kourai_common.artifacts import ArtifactStorage
 
     storage = ArtifactStorage("dokimasia")
+    storage.pull()                                    # restore from HF on startup
+
     report = {"passed": 100, "failed": 5}
     storage.save_artifact("test_reports", report, name="run_001")
+    storage.push()                                    # sync to HF after task
+
+Bucket layout on HF:
+    hf://buckets/<KOURAI_BUCKET_ID>/<agent_name>/<artifact_type>/<filename>
+    e.g. hf://buckets/ajbar/kourai-artifacts/dokimasia/test_reports/run_001.json
 
 """
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os
@@ -29,13 +42,14 @@ logger = logging.getLogger(__name__)
 AGENT_ARTIFACTS_DIR = Path(
     os.getenv("AGENT_ARTIFACTS_DIR") or Path(tempfile.gettempdir()) / "kourai-artifacts"
 )
+_DEFAULT_BUCKET_ID = "ajbar/kourai-artifacts"
 
 
 class ArtifactStorage:
-    """Manages artifact persistence for agents via HF-Mount.
+    """Manages artifact persistence for agents with HuggingFace Bucket sync.
 
-    Artifacts are automatically synced to HF Storage Buckets when hf-mount
-    is running. Without hf-mount, artifacts save to local temporary storage.
+    Local writes are always synchronous and fast. Cloud sync is explicit via
+    push() / pull(). If HF_TOKEN is not set, operates in local-only mode.
     """
 
     def __init__(self, agent_name: str):
@@ -45,7 +59,12 @@ class ArtifactStorage:
             agent_name: Name of the agent (e.g., 'dokimasia', 'techne')
         """
         self.agent_name = agent_name
-        self.base_dir = AGENT_ARTIFACTS_DIR
+        self.base_dir = Path(os.getenv("AGENT_ARTIFACTS_DIR") or AGENT_ARTIFACTS_DIR)
+        self._bucket_id = os.getenv("KOURAI_BUCKET_ID", _DEFAULT_BUCKET_ID)
+        self.hf_enabled = bool(os.getenv("HF_TOKEN"))
+
+        if not self.hf_enabled:
+            logger.debug("HF_TOKEN not set — artifact storage in local-only mode")
 
         try:
             self.base_dir.mkdir(parents=True, exist_ok=True)
@@ -55,8 +74,62 @@ class ArtifactStorage:
                 "Using fallback temporary directory."
             )
             fallback_dir = Path(tempfile.gettempdir()) / "kourai-artifacts-fallback"
-            fallback_dir.mkdir(parents=True, exist_ok=True)
+            with contextlib.suppress(OSError):
+                fallback_dir.mkdir(parents=True, exist_ok=True)
             self.base_dir = fallback_dir
+
+    @property
+    def hf_path(self) -> str:
+        """Remote HF bucket path for this agent's artifacts."""
+        return f"hf://buckets/{self._bucket_id}/{self.agent_name}"
+
+    def push(self) -> bool:
+        """Sync local artifacts to HuggingFace bucket.
+
+        Uses rsync-style transfer — only changed files are uploaded.
+        Blocking network call; run at task completion, not in hot paths.
+        No-op (returns True) if HF_TOKEN is not set.
+
+        Returns:
+            True if sync succeeded or skipped, False on error.
+        """
+        if not self.hf_enabled:
+            logger.debug("push() skipped — HF_TOKEN not set")
+            return True
+        try:
+            from huggingface_hub import sync_bucket  # type: ignore[import-untyped]
+
+            sync_bucket(str(self.base_dir), self.hf_path, quiet=True)
+            logger.info("Artifacts pushed → %s", self.hf_path)
+            return True
+        except Exception as e:
+            logger.warning("Failed to push artifacts to HF bucket: %s", e)
+            return False
+
+    def pull(self) -> bool:
+        """Sync artifacts from HuggingFace bucket to local storage.
+
+        Uses rsync-style transfer — only changed files are downloaded.
+        Blocking network call; run at agent startup, not in hot paths.
+        No-op (returns True) if HF_TOKEN is not set. Non-fatal if the
+        remote path does not exist yet (first run).
+
+        Returns:
+            True if sync succeeded or skipped, False on hard error.
+        """
+        if not self.hf_enabled:
+            logger.debug("pull() skipped — HF_TOKEN not set")
+            return True
+        try:
+            from huggingface_hub import sync_bucket  # type: ignore[import-untyped]
+
+            sync_bucket(self.hf_path, str(self.base_dir), quiet=True)
+            logger.info("Artifacts pulled ← %s", self.hf_path)
+            return True
+        except Exception as e:
+            # Remote path may not exist on first run — treat as non-fatal.
+            logger.debug("pull() non-fatal (expected on first run): %s", e)
+            return False
 
     def save_artifact(
         self,
@@ -65,7 +138,7 @@ class ArtifactStorage:
         name: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> Path:
-        """Save an artifact to the bucket.
+        """Save an artifact to local storage.
 
         Args:
             artifact_type: Category (e.g., 'test_reports', 'debug_traces', 'tool_outputs')
@@ -82,7 +155,6 @@ class ArtifactStorage:
             path = storage.save_artifact("test_reports", report, name="run_20260325")
 
         """
-
         artifact_dir = self.base_dir / artifact_type
         artifact_dir.mkdir(parents=True, exist_ok=True)
 
@@ -159,7 +231,7 @@ class ArtifactStorage:
 
         names = set()
         for path in artifact_dir.glob("*"):
-            if path.suffix == ".metadata":
+            if ".metadata" in path.suffixes:
                 continue
             name = path.stem
             names.add(name)
@@ -187,14 +259,14 @@ class ArtifactStorage:
 
     @property
     def artifacts_path(self) -> Path:
-        """Get the mounted artifacts directory."""
+        """Get the local artifacts directory."""
         return self.base_dir
 
     def summary(self) -> dict[str, Any]:
         """Get summary of all artifacts for this agent.
 
         Returns:
-            Dict with artifact counts by type
+            Dict with artifact counts by type and HF sync status
         """
         types_summary: dict[str, int] = {}
 
@@ -208,5 +280,7 @@ class ArtifactStorage:
         return {
             "agent": self.agent_name,
             "artifacts_path": str(self.artifacts_path),
+            "hf_enabled": self.hf_enabled,
+            "hf_bucket": self.hf_path if self.hf_enabled else None,
             "types": types_summary,
         }

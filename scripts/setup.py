@@ -20,7 +20,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
-SETUP_MARKER = Path(".hf-mount-configured")
+SETUP_MARKER = Path(".hf-buckets-configured")
 
 
 def run_command(cmd: list[str]) -> int:
@@ -54,15 +54,15 @@ def should_setup_artifacts(force: bool = False) -> bool:
         return False
 
     if SETUP_MARKER.exists():
-        logger.info("ℹ️  HF-Mount already configured (marker file exists)")
+        logger.info("ℹ️  HF bucket already configured (marker file exists)")
         return False
 
     return True
 
 
 def mark_artifacts_configured() -> None:
-    """Create marker file to indicate artifacts have been configured."""
-    SETUP_MARKER.write_text("# Marker file: HF-Mount artifacts configured\n")
+    """Create marker file to indicate HF bucket has been configured."""
+    SETUP_MARKER.write_text("# Marker file: HF bucket configured\n")
     logger.info(f"✅ Created marker file: {SETUP_MARKER}")
 
 
@@ -79,21 +79,20 @@ def main() -> int:
     if should_setup_artifacts(force=force_artifacts):
         logger.info("")
         logger.info("🚀 Setting up HuggingFace Storage Buckets...")
-        if run_command(["uv", "run", "--no-active", "python", "scripts/setup_hf_mount.py"]) == 0:
+        if run_command(["uv", "run", "--no-active", "python", "scripts/setup_buckets.py"]) == 0:
             mark_artifacts_configured()
-            logger.info("✅ HF-Mount configured!")
+            logger.info("✅ HF bucket configured!")
         else:
-            logger.warning("⚠ HF-Mount setup failed or incomplete")
+            logger.warning("⚠ HF bucket setup failed or incomplete")
             return 1
     else:
         hf_token = os.environ.get("HF_TOKEN")
         if not hf_token:
             logger.info("")
             logger.info("ℹ️  HF_TOKEN not set (optional). To enable HuggingFace artifact storage:")
-            logger.info("   1. Get token: https://huggingface.co/settings/tokens")
-            logger.info("   2. Create NEW token with 'write' scope")
-            logger.info("   3. Run: export HF_TOKEN=hf_xxx...")
-            logger.info("   4. Run: make setup")
+            logger.info("   1. Get a write-scope token: https://huggingface.co/settings/tokens")
+            logger.info("   2. Add to .env:  HF_TOKEN=hf_xxx...")
+            logger.info("   3. Run: make setup")
 
     logger.info("")
     logger.info("✅ Setup complete!")

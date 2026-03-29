@@ -190,18 +190,19 @@ if [ -n "$CUTOFF_DATE" ]; then
     info "Cutoff date: $CUTOFF_DATE (keeping backups newer than this)"
     
     # List all backup folders and delete old ones
-    # Note: hf buckets ls output format: "folder_name/"
-    if hf buckets ls "$BACKUP_USER/$BACKUP_BUCKET_NAME/profiles/" --quiet 2>/dev/null | while read -r folder; do
+    # Note: hf buckets list --quiet outputs one path per line (e.g. "20260325_140000/")
+    if hf buckets list "$BACKUP_USER/$BACKUP_BUCKET_NAME/profiles/" --quiet 2>/dev/null | while read -r folder; do
         # Extract date from folder name (YYYYMMDD_HHMMSS format)
         folder_date=$(echo "$folder" | cut -d'_' -f1 | tr -d '/')
-        
+
         if [ -n "$folder_date" ] && [ "$folder_date" -lt "$CUTOFF_DATE" ]; then
             info "Deleting old backup: $folder"
-            # Use rm-folder if available, otherwise skip
-            if hf buckets delete-folder "$BACKUP_USER/$BACKUP_BUCKET_NAME/profiles/$folder" --quiet 2>/dev/null; then
+            if [ "$BACKUP_DRY_RUN" = "1" ]; then
+                info "DRY RUN: would delete hf://buckets/$BACKUP_USER/$BACKUP_BUCKET_NAME/profiles/$folder"
+            elif hf buckets rm "$BACKUP_USER/$BACKUP_BUCKET_NAME/profiles/$folder" --recursive --quiet 2>/dev/null; then
                 info "Deleted: $folder"
             else
-                debug "Could not delete: $folder (may not be supported)"
+                debug "Could not delete: $folder"
             fi
         fi
     done; then
