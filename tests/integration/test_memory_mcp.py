@@ -67,19 +67,21 @@ async def mcp_session() -> AsyncGenerator[ClientSession, None]:
     - Skip on error: Graceful degradation (no flaky tests)
 
     Known issue: mcp SDK v1.26.0 SSE context managers have cleanup issues.
-    Workaround: Use suppress(Exception) + explicit __aexit__ call.
+    Workaround: Manual context manager lifecycle + suppress cleanup errors.
     """
     url = "http://localhost:5001/sse"
     sse_context = None
+    session = None
 
     try:
         try:
             async with asyncio.timeout(15):
                 sse_context = sse_client(url)
                 read, write = await sse_context.__aenter__()
-                async with ClientSession(read, write) as s:
-                    await s.initialize()
-                    yield s
+                session = ClientSession(read, write)
+                await session.__aenter__()
+                await session.initialize()
+                yield session
         except TimeoutError:
             pytest.skip("SSE connection timeout - server may be slow or unresponsive")
         except BaseException as e:
@@ -103,6 +105,10 @@ async def mcp_session() -> AsyncGenerator[ClientSession, None]:
                 pytest.skip(f"SSE connection unavailable: {type(e).__name__}")
             raise
     finally:
+        # Manual cleanup to avoid asyncio task group issues
+        if session is not None:
+            with suppress(Exception):
+                await session.__aexit__(None, None, None)
         if sse_context is not None:
             with suppress(Exception):
                 await sse_context.__aexit__(None, None, None)
