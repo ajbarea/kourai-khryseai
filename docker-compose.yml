@@ -93,12 +93,12 @@ services:
   # ──────────────── MCP Sidecars ────────────────
   # Memory MCP: Shared knowledge graph sidecar.
   memory-mcp:
-    image: ${DOCKER_HUB_USERNAME}/kourai-memory-mcp:latest
+    image: ${DOCKER_HUB_USERNAME}/kourai-khryseai:memory-mcp
     build:
       context: .
       dockerfile: docker/memory-mcp.Dockerfile
       cache_from:
-        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-memory-mcp:latest
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-khryseai:memory-mcp
       cache_to:
         - type=inline
     volumes:
@@ -132,12 +132,12 @@ services:
 
   # Context7 MCP: Live documentation context provider.
   context7-mcp:
-    image: ${DOCKER_HUB_USERNAME}/kourai-context7-mcp:latest
+    image: ${DOCKER_HUB_USERNAME}/kourai-khryseai:context7-mcp
     build:
       context: .
       dockerfile: docker/context7-mcp.Dockerfile
       cache_from:
-        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-context7-mcp:latest
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-khryseai:context7-mcp
       cache_to:
         - type=inline
     ports:
@@ -165,7 +165,7 @@ services:
   # Mneme
   mneme:
     <<: *agent-common
-    image: ${DOCKER_HUB_USERNAME}/kourai-mneme:latest
+    image: ${DOCKER_HUB_USERNAME}/kourai-khryseai:mneme
     build:
       context: .
       dockerfile: docker/host.Dockerfile
@@ -174,7 +174,7 @@ services:
         PACKAGE_NAME: mneme
         PORT: 10005
       cache_from:
-        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-mneme:latest
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-khryseai:mneme
       cache_to:
         - type=inline
     ports:
@@ -209,7 +209,7 @@ services:
   # Kallos
   kallos:
     <<: *agent-common
-    image: ${DOCKER_HUB_USERNAME}/kourai-kallos:latest
+    image: ${DOCKER_HUB_USERNAME}/kourai-khryseai:kallos
     build:
       context: .
       dockerfile: docker/host.Dockerfile
@@ -218,7 +218,7 @@ services:
         PACKAGE_NAME: kallos
         PORT: 10004
       cache_from:
-        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-kallos:latest
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-khryseai:kallos
       cache_to:
         - type=inline
     ports:
@@ -254,7 +254,7 @@ services:
   # Techne
   techne:
     <<: *agent-common
-    image: ${DOCKER_HUB_USERNAME}/kourai-techne:latest
+    image: ${DOCKER_HUB_USERNAME}/kourai-khryseai:techne
     build:
       context: .
       dockerfile: docker/host.Dockerfile
@@ -263,7 +263,7 @@ services:
         PACKAGE_NAME: techne
         PORT: 10002
       cache_from:
-        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-techne:latest
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-khryseai:techne
       cache_to:
         - type=inline
     ports:
@@ -299,7 +299,7 @@ services:
   # Dokimasia
   dokimasia:
     <<: *agent-common
-    image: ${DOCKER_HUB_USERNAME}/kourai-dokimasia:latest
+    image: ${DOCKER_HUB_USERNAME}/kourai-khryseai:dokimasia
     build:
       context: .
       dockerfile: docker/host.Dockerfile
@@ -308,7 +308,7 @@ services:
         PACKAGE_NAME: dokimasia
         PORT: 10003
       cache_from:
-        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-dokimasia:latest
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-khryseai:dokimasia
       cache_to:
         - type=inline
     ports:
@@ -346,7 +346,7 @@ services:
   # Metis
   metis:
     <<: *agent-common
-    image: ${DOCKER_HUB_USERNAME}/kourai-metis:latest
+    image: ${DOCKER_HUB_USERNAME}/kourai-khryseai:metis
     build:
       context: .
       dockerfile: docker/host.Dockerfile
@@ -355,7 +355,7 @@ services:
         PACKAGE_NAME: metis
         PORT: 10001
       cache_from:
-        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-metis:latest
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-khryseai:metis
       cache_to:
         - type=inline
     ports:
@@ -392,7 +392,7 @@ services:
   # Puck
   puck:
     <<: *agent-common
-    image: ${DOCKER_HUB_USERNAME}/kourai-puck:latest
+    image: ${DOCKER_HUB_USERNAME}/kourai-khryseai:puck
     build:
       context: .
       dockerfile: docker/host.Dockerfile
@@ -401,7 +401,7 @@ services:
         PACKAGE_NAME: puck
         PORT: 10006
       cache_from:
-        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-puck:latest
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-khryseai:puck
       cache_to:
         - type=inline
     ports:
@@ -435,7 +435,7 @@ services:
   # Cupid
   cupid:
     <<: *agent-common
-    image: ${DOCKER_HUB_USERNAME}/kourai-cupid:latest
+    image: ${DOCKER_HUB_USERNAME}/kourai-khryseai:cupid
     build:
       context: .
       dockerfile: docker/host.Dockerfile
@@ -444,7 +444,7 @@ services:
         PACKAGE_NAME: cupid
         PORT: 10007
       cache_from:
-        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-cupid:latest
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-khryseai:cupid
       cache_to:
         - type=inline
     ports:
@@ -479,7 +479,7 @@ services:
   # Aidos
   aidos:
     <<: *agent-common
-    image: ${DOCKER_HUB_USERNAME}/kourai-aidos:latest
+    image: ${DOCKER_HUB_USERNAME}/kourai-khryseai:aidos
     build:
       context: .
       dockerfile: docker/host.Dockerfile
@@ -488,7 +488,7 @@ services:
         PACKAGE_NAME: aidos
         PORT: 10008
       cache_from:
-        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-aidos:latest
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-khryseai:aidos
       cache_to:
         - type=inline
     ports:
@@ -522,7 +522,7 @@ services:
   # Aletheia
   aletheia:
     <<: *agent-common
-    image: ${DOCKER_HUB_USERNAME}/kourai-aletheia:latest
+    image: ${DOCKER_HUB_USERNAME}/kourai-khryseai:aletheia
     build:
       context: .
       dockerfile: docker/host.Dockerfile
@@ -531,7 +531,7 @@ services:
         PACKAGE_NAME: aletheia
         PORT: 10009
       cache_from:
-        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-aletheia:latest
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-khryseai:aletheia
       cache_to:
         - type=inline
     ports:
@@ -565,7 +565,7 @@ services:
   # ──────────────── VN Bridge ────────────────
   # VN Bridge: Connects the multi-agent system to the visual novel frontend.
   vn-bridge:
-    image: ${DOCKER_HUB_USERNAME}/kourai-vn-bridge:latest
+    image: ${DOCKER_HUB_USERNAME}/kourai-khryseai:vn-bridge
     build:
       context: .
       dockerfile: docker/host.Dockerfile
@@ -574,7 +574,7 @@ services:
         PACKAGE_NAME: hephaestus
         PORT: 10010
       cache_from:
-        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-vn-bridge:latest
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-khryseai:vn-bridge
       cache_to:
         - type=inline
     env_file: .env
@@ -616,7 +616,7 @@ services:
   # Hephaestus: The central orchestration agent that manages sub-agents.
   hephaestus:
     <<: *agent-common
-    image: ${DOCKER_HUB_USERNAME}/kourai-hephaestus:latest
+    image: ${DOCKER_HUB_USERNAME}/kourai-khryseai:hephaestus
     build:
       context: .
       dockerfile: docker/host.Dockerfile
@@ -625,7 +625,7 @@ services:
         PACKAGE_NAME: hephaestus
         PORT: 10000
       cache_from:
-        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-hephaestus:latest
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-khryseai:hephaestus
       cache_to:
         - type=inline
     ports:
