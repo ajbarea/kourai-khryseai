@@ -24,17 +24,18 @@ let mcpReady = false;
 // Launch supergateway to expose memory server as SSE on MCP_PORT.
 // supergateway bridges the stdio MCP server to SSE so Python agents can
 // connect via mcp.client.sse without Node.js in their containers.
-// Use a shell command to resolve the binary via node_modules.
+// The --stdio flag expects a single command string that will be executed via shell.
 const gatewayArgs = [
-  '--stdio', '/bin/sh',
-  '-c',
-  'node /usr/local/lib/node_modules/@modelcontextprotocol/server-memory/dist/index.js',
-  '--port', String(MCP_PORT),
-  '--host', '0.0.0.0',
+  '--stdio',
+  `node /usr/local/lib/node_modules/@modelcontextprotocol/server-memory/dist/index.js`,
+  '--port',
+  String(MCP_PORT),
+  '--host',
+  '0.0.0.0',
 ];
 
 const gatewayProcess = spawn('supergateway', gatewayArgs, {
-  stdio: 'inherit',
+  stdio: ['pipe', 'inherit', 'inherit'],
   env: { ...process.env, MEMORY_FILE_PATH: MEMORY_FILE },
 });
 
