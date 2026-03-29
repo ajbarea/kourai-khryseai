@@ -59,7 +59,7 @@ class TestSetupIdempotency:
     def test_mark_artifacts_configured_creates_file(self) -> None:
         """Test that marker file is created."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            marker_path = Path(tmpdir) / ".hf-mount-configured"
+            marker_path = Path(tmpdir) / ".hf-buckets-configured"
 
             with patch("scripts.setup.SETUP_MARKER", marker_path):
                 from scripts.setup import mark_artifacts_configured
@@ -74,7 +74,7 @@ class TestSetupIdempotency:
             patch.dict(os.environ, {"HF_TOKEN": "hf_test123"}),
             tempfile.TemporaryDirectory() as tmpdir,
         ):
-            marker_path = Path(tmpdir) / ".hf-mount-configured"
+            marker_path = Path(tmpdir) / ".hf-buckets-configured"
 
             with (
                 patch("scripts.setup.SETUP_MARKER", marker_path),
@@ -102,7 +102,7 @@ class TestSetupIdempotency:
             patch.dict(os.environ, {"HF_TOKEN": "hf_test123"}),
             tempfile.TemporaryDirectory() as tmpdir,
         ):
-            marker_path = Path(tmpdir) / ".hf-mount-configured"
+            marker_path = Path(tmpdir) / ".hf-buckets-configured"
             marker_path.write_text("# Already configured\n")
 
             with patch("scripts.setup.SETUP_MARKER", marker_path):
@@ -120,7 +120,7 @@ class TestSetupMarkerFile:
         """Test that marker file is in project root."""
         from scripts.setup import SETUP_MARKER
 
-        assert SETUP_MARKER.name == ".hf-mount-configured"
+        assert SETUP_MARKER.name == ".hf-buckets-configured"
 
     def test_marker_file_is_path_object(self) -> None:
         """Test that SETUP_MARKER is a Path object."""
@@ -131,7 +131,7 @@ class TestSetupMarkerFile:
     def test_marker_content_is_idempotent(self) -> None:
         """Test that marker content doesn't change on re-write."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            marker_path = Path(tmpdir) / ".hf-mount-configured"
+            marker_path = Path(tmpdir) / ".hf-buckets-configured"
 
             with patch("scripts.setup.SETUP_MARKER", marker_path):
                 from scripts.setup import mark_artifacts_configured
@@ -170,7 +170,7 @@ class TestSetupMessages:
             patch.dict(os.environ, {"HF_TOKEN": "hf_test123"}),
             tempfile.TemporaryDirectory() as tmpdir,
         ):
-            marker_path = Path(tmpdir) / ".hf-mount-configured"
+            marker_path = Path(tmpdir) / ".hf-buckets-configured"
             marker_path.write_text("# configured\n")
 
             with patch("scripts.setup.SETUP_MARKER", marker_path):

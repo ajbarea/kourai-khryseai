@@ -1,11 +1,11 @@
-"""Integration tests for artifact storage with hf-mount.
+"""Integration tests for artifact storage with HuggingFace Bucket sync.
 
-These tests verify that artifacts work correctly with hf-mount mounted directories,
-and that the storage gracefully handles missing hf-mount.
+Tests verify filesystem operations and push()/pull() sync behaviour.
+HF sync tests mock huggingface_hub.sync_bucket so no real token is needed.
 
-To run with hf-mount enabled:
-    HF_TOKEN=hf_xxx AGENT_ARTIFACTS_DIR=/tmp/hf-dokimasia \
-    pytest tests/integration/test_artifacts_integration.py -v
+To run against a real HF bucket:
+    HF_TOKEN=hf_xxx KOURAI_BUCKET_ID=ajbar/kourai-artifacts \
+    pytest tests/integration/test_artifacts_integration.py -v -k real
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -47,12 +48,14 @@ class TestArtifactStorageWithRealFilesystem:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir_path = Path(tmpdir)
 
-            # Different agents save to same base dir
+            # Different agents each get their own subdirectory (mirrors production hf-mount layout)
             storage_a = ArtifactStorage("agent_a")
-            storage_a.base_dir = tmpdir_path
+            storage_a.base_dir = tmpdir_path / "agent_a"
+            storage_a.base_dir.mkdir()
 
             storage_b = ArtifactStorage("agent_b")
-            storage_b.base_dir = tmpdir_path
+            storage_b.base_dir = tmpdir_path / "agent_b"
+            storage_b.base_dir.mkdir()
 
             # Each saves its own artifact
             data_a = {"agent": "a"}
@@ -297,3 +300,135 @@ class TestArtifactWorkflow:
             # Load and verify first trace
             first_trace = storage.load_artifact("debug_traces", "trace_000")
             assert "Starting code analysis" in first_trace  # ty: ignore[unsupported-operator]
+
+
+class TestArtifactStorageHFSync:
+    """Tests for push() / pull() HuggingFace bucket sync."""
+
+    def test_hf_disabled_when_no_token(self, monkeypatch) -> None:
+        """hf_enabled is False when HF_TOKEN is not set."""
+        monkeypatch.delenv("HF_TOKEN", raising=False)
+        storage = ArtifactStorage("test_agent")
+        assert storage.hf_enabled is False
+
+    def test_hf_enabled_when_token_set(self, monkeypatch) -> None:
+        """hf_enabled is True when HF_TOKEN is set."""
+        monkeypatch.setenv("HF_TOKEN", "hf_fake_token_for_testing")
+        storage = ArtifactStorage("test_agent")
+        assert storage.hf_enabled is True
+
+    def test_hf_path_uses_bucket_id(self, monkeypatch) -> None:
+        """hf_path is built from KOURAI_BUCKET_ID and agent name."""
+        monkeypatch.setenv("HF_TOKEN", "hf_fake")
+        monkeypatch.setenv("KOURAI_BUCKET_ID", "myuser/my-bucket")
+        storage = ArtifactStorage("dokimasia")
+        assert storage.hf_path == "hf://buckets/myuser/my-bucket/dokimasia"
+
+    def test_hf_path_default_bucket_id(self, monkeypatch) -> None:
+        """hf_path uses the default bucket ID when env var is absent."""
+        monkeypatch.setenv("HF_TOKEN", "hf_fake")
+        monkeypatch.delenv("KOURAI_BUCKET_ID", raising=False)
+        storage = ArtifactStorage("techne")
+        assert "kourai-artifacts" in storage.hf_path
+        assert "techne" in storage.hf_path
+
+    def test_push_calls_sync_bucket(self, monkeypatch, tmp_path) -> None:
+        """push() calls sync_bucket(local -> hf_path)."""
+        monkeypatch.setenv("HF_TOKEN", "hf_fake")
+        monkeypatch.setenv("KOURAI_BUCKET_ID", "ajbar/kourai-artifacts")
+        storage = ArtifactStorage("dokimasia")
+        storage.base_dir = tmp_path
+
+        with patch("huggingface_hub.sync_bucket") as mock_sync:
+            result = storage.push()
+
+        assert result is True
+        mock_sync.assert_called_once_with(
+            str(tmp_path),
+            "hf://buckets/ajbar/kourai-artifacts/dokimasia",
+            quiet=True,
+        )
+
+    def test_pull_calls_sync_bucket(self, monkeypatch, tmp_path) -> None:
+        """pull() calls sync_bucket(hf_path -> local)."""
+        monkeypatch.setenv("HF_TOKEN", "hf_fake")
+        monkeypatch.setenv("KOURAI_BUCKET_ID", "ajbar/kourai-artifacts")
+        storage = ArtifactStorage("dokimasia")
+        storage.base_dir = tmp_path
+
+        with patch("huggingface_hub.sync_bucket") as mock_sync:
+            result = storage.pull()
+
+        assert result is True
+        mock_sync.assert_called_once_with(
+            "hf://buckets/ajbar/kourai-artifacts/dokimasia",
+            str(tmp_path),
+            quiet=True,
+        )
+
+    def test_push_no_op_without_token(self, monkeypatch, tmp_path) -> None:
+        """push() returns True and does nothing when HF_TOKEN is absent."""
+        monkeypatch.delenv("HF_TOKEN", raising=False)
+        storage = ArtifactStorage("dokimasia")
+        storage.base_dir = tmp_path
+
+        with patch("huggingface_hub.sync_bucket") as mock_sync:
+            result = storage.push()
+
+        assert result is True
+        mock_sync.assert_not_called()
+
+    def test_pull_no_op_without_token(self, monkeypatch, tmp_path) -> None:
+        """pull() returns True and does nothing when HF_TOKEN is absent."""
+        monkeypatch.delenv("HF_TOKEN", raising=False)
+        storage = ArtifactStorage("dokimasia")
+        storage.base_dir = tmp_path
+
+        with patch("huggingface_hub.sync_bucket") as mock_sync:
+            result = storage.pull()
+
+        assert result is True
+        mock_sync.assert_not_called()
+
+    def test_push_returns_false_on_error(self, monkeypatch, tmp_path) -> None:
+        """push() returns False and logs warning when sync_bucket raises."""
+        monkeypatch.setenv("HF_TOKEN", "hf_fake")
+        storage = ArtifactStorage("dokimasia")
+        storage.base_dir = tmp_path
+
+        with patch("huggingface_hub.sync_bucket", side_effect=RuntimeError("network error")):
+            result = storage.push()
+
+        assert result is False
+
+    def test_pull_returns_false_on_hard_error(self, monkeypatch, tmp_path) -> None:
+        """pull() returns False when sync_bucket raises."""
+        monkeypatch.setenv("HF_TOKEN", "hf_fake")
+        storage = ArtifactStorage("dokimasia")
+        storage.base_dir = tmp_path
+
+        with patch("huggingface_hub.sync_bucket", side_effect=RuntimeError("network error")):
+            result = storage.pull()
+
+        assert result is False
+
+    def test_summary_includes_hf_fields(self, monkeypatch, tmp_path) -> None:
+        """summary() includes hf_enabled and hf_bucket fields."""
+        monkeypatch.setenv("HF_TOKEN", "hf_fake")
+        monkeypatch.setenv("KOURAI_BUCKET_ID", "ajbar/kourai-artifacts")
+        storage = ArtifactStorage("metis")
+        storage.base_dir = tmp_path
+
+        summary = storage.summary()
+        assert summary["hf_enabled"] is True
+        assert summary["hf_bucket"] == "hf://buckets/ajbar/kourai-artifacts/metis"
+
+    def test_summary_hf_bucket_none_without_token(self, monkeypatch, tmp_path) -> None:
+        """summary() has hf_bucket=None when HF_TOKEN is absent."""
+        monkeypatch.delenv("HF_TOKEN", raising=False)
+        storage = ArtifactStorage("metis")
+        storage.base_dir = tmp_path
+
+        summary = storage.summary()
+        assert summary["hf_enabled"] is False
+        assert summary["hf_bucket"] is None
