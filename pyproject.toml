@@ -21,6 +21,11 @@ dev = [
 
 [tool.uv]
 package = false
+# Pin transitive deps broken on Python 3.13.12 (unterminated regex character classes)
+override-dependencies = [
+    "jinja2<3.1.6",
+    "aiohttp<3.13",
+]
 
 [tool.uv.workspace]
 members = [
