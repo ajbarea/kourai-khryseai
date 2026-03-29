@@ -58,6 +58,7 @@ body.hero-page .md-content__inner {
   justify-content: flex-end;
   text-align: center;
   background:
+    radial-gradient(ellipse at center, transparent 20%, color-mix(in srgb, var(--obsidian) 20%, transparent) 60%, color-mix(in srgb, var(--obsidian) 60%, transparent) 100%),
     linear-gradient(to bottom,
       color-mix(in srgb, var(--obsidian) 40%, transparent) 0%,
       color-mix(in srgb, var(--obsidian) 10%, transparent) 40%,
@@ -336,6 +337,7 @@ body.hero-page .md-header {
   /* Hero adjustments */
   .hero {
     background:
+      radial-gradient(ellipse at center, transparent 15%, color-mix(in srgb, var(--obsidian) 25%, transparent) 55%, color-mix(in srgb, var(--obsidian) 70%, transparent) 100%),
       linear-gradient(to bottom,
         color-mix(in srgb, var(--obsidian) 50%, transparent) 0%,
         color-mix(in srgb, var(--obsidian) 15%, transparent) 25%,
@@ -831,6 +833,54 @@ body.hero-page .md-header {
   float: right;
   margin: 0 0 1rem 1.5rem;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.specialist-avatar:hover {
+  transform: scale(1.08);
+  box-shadow: 0 0 24px color-mix(in srgb, var(--gold-metallic) 45%, transparent);
+}
+
+/* ==========================================================================
+   Specialist Avatar Lightbox
+   ========================================================================== */
+
+.avatar-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(1, 2, 1, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.avatar-lightbox--visible {
+  opacity: 1;
+}
+
+.avatar-lightbox__img {
+  max-width: min(520px, 90vw);
+  max-height: 90vh;
+  border-radius: 12px;
+  border: 2px solid var(--gold-dark);
+  box-shadow:
+    0 0 40px rgba(0, 0, 0, 0.8),
+    0 0 80px color-mix(in srgb, var(--gold-metallic) 20%, transparent);
+  cursor: default;
+  transform: scale(0.92);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: none;
+}
+
+.avatar-lightbox--visible .avatar-lightbox__img {
+  transform: scale(1);
 }
 
 .agent-name {

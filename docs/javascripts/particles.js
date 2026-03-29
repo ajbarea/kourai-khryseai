@@ -133,3 +133,63 @@
     sections.forEach(s => revealObserver.observe(s));
   }
 })();
+
+// Avatar lightbox — click any .specialist-avatar to view full-size
+(function () {
+  let overlay = null;
+
+  function openLightbox(src, alt) {
+    overlay = document.createElement('div');
+    overlay.className = 'avatar-lightbox';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-label', alt || 'Avatar');
+
+    const img = document.createElement('img');
+    img.className = 'avatar-lightbox__img';
+    img.src = src;
+    img.alt = alt || '';
+    overlay.appendChild(img);
+
+    overlay.addEventListener('click', closeLightbox);
+    document.addEventListener('keydown', onKeyDown);
+    document.body.appendChild(overlay);
+
+    // Double rAF ensures the transition fires after the element is painted
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      overlay.classList.add('avatar-lightbox--visible');
+    }));
+
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeLightbox() {
+    if (!overlay) return;
+    overlay.classList.remove('avatar-lightbox--visible');
+    const el = overlay;
+    overlay = null;
+    document.removeEventListener('keydown', onKeyDown);
+    document.body.style.overflow = '';
+    setTimeout(() => el.remove(), 280);
+  }
+
+  function onKeyDown(e) {
+    if (e.key === 'Escape') closeLightbox();
+  }
+
+  function init() {
+    document.querySelectorAll('.specialist-avatar').forEach(img => {
+      // Guard against double-binding on instant navigation re-runs
+      if (img.dataset.lightboxBound) return;
+      img.dataset.lightboxBound = '1';
+      img.addEventListener('click', () => openLightbox(img.src, img.alt));
+    });
+  }
+
+  // MkDocs Material instant navigation fires document$ on each page load
+  if (typeof document$ !== 'undefined') {
+    document$.subscribe(init);
+  } else {
+    document.addEventListener('DOMContentLoaded', init);
+  }
+})();
