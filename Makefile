@@ -10,7 +10,7 @@
 ##   make down          Stop all services
 ##
 
-.PHONY: help setup setup-artifacts upgrade dev dev-vn up down restart status gui cli vn docs lint test test-unit test-integration test-performance clean prune
+.PHONY: help setup setup-artifacts upgrade yolo dev dev-vn up down restart status gui cli vn docs lint test test-unit test-integration test-performance clean prune
 .DEFAULT_GOAL := help
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -52,6 +52,13 @@ setup-artifacts-force:      ## Force re-configure HF-Mount artifacts (skips mark
 
 upgrade:                   ## Update all dependencies to latest versions
 	uv run --no-active python scripts/upgrade.py
+
+yolo:                      ## Nuke and rebuild: clean → down → setup → upgrade → clean
+	@$(MAKE) --no-print-directory clean
+	@$(MAKE) --no-print-directory down
+	@$(MAKE) --no-print-directory setup
+	@$(MAKE) --no-print-directory upgrade
+	@$(MAKE) --no-print-directory clean
 
 # ════════════════════════════════════════════════════════════════════════════
 # Core Development Workflows (primary entry points)
