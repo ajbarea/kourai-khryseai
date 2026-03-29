@@ -140,9 +140,6 @@ OTEL_ENDPOINT = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318"
 # Provider selection: "anthropic" (default), "google", or "local"
 PROVIDER = os.getenv("KOURAI_PROVIDER", "anthropic").lower()
 
-# Agents always resolve each other via Docker service names
-DOCKER_MODE = True
-
 
 _PROVIDER_TIERS: dict[str, dict[str, dict[str, str]]] = {
     "anthropic": {
@@ -173,8 +170,6 @@ def get_model(agent_name: str) -> str:
 
 
 def get_agent_url(agent_name: str) -> str:
-    """Get the URL for an agent. Uses Docker service names in container mode."""
+    """Get the URL for an agent. Uses Docker service names."""
     port = AGENT_PORTS[agent_name]
-    if DOCKER_MODE:
-        return f"http://{agent_name}:{port}/"
-    return f"http://127.0.0.1:{port}/"
+    return f"http://{agent_name}:{port}/"
