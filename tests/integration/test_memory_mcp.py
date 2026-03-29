@@ -49,15 +49,32 @@ class MCPConnectionError(Exception):
     """Raised when MCP SSE connection fails."""
 
 
+async def _wait_for_sse_port(url: str, *, seconds: float = 15.0) -> bool:
+    """Poll until the SSE port is accepting connections."""
+    base = url.rsplit("/", 1)[0]  # e.g. http://localhost:5001
+    deadline = asyncio.get_event_loop().time() + seconds
+    async with httpx.AsyncClient() as client:
+        while asyncio.get_event_loop().time() < deadline:
+            with suppress(httpx.HTTPError, OSError):
+                await client.get(base, timeout=2.0)
+                return True
+            await asyncio.sleep(1.0)
+    return False
+
+
 async def _connect_mcp_sse(
-    url: str, *, retries: int = 4, delay: float = 3.0
+    url: str, *, retries: int = 6, delay: float = 3.0
 ) -> tuple[Any, ClientSession] | None:
     """Try to establish an MCP SSE session with retries.
 
     Supergateway only supports one SSE client and crashes on disconnect,
-    so each test gets a fresh connection. Retries absorb the restart gap.
+    so each test gets a fresh connection. Before each attempt, poll the
+    SSE port to avoid wasting retries on a server that isn't listening.
     """
     for attempt in range(retries):
+        if attempt > 0:
+            if not await _wait_for_sse_port(url):
+                continue
         sse_ctx: Any = None
         session: ClientSession | None = None
         try:
