@@ -48,6 +48,7 @@ class RenPyBridge:
         self.log_dir = self.project_root / "logs"
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.log_file = self.log_dir / "bridge_renpy.log"
+        self.game_dir: Path = Path(__file__).resolve().parent.parent
 
     # ── Logging ───────────────────────────────────────────────────────────
 
@@ -186,8 +187,7 @@ class RenPyBridge:
                     self._log("TTS returned empty audio")
                     return None
                 # game/audio/tts/ — Ren'Py resolves audio relative to game/
-                game_dir = Path(__file__).resolve().parent.parent
-                audio_dir = game_dir / "audio" / "tts"
+                audio_dir = self.game_dir / "audio" / "tts"
                 audio_dir.mkdir(parents=True, exist_ok=True)
                 filename = f"tts_{agent}.mp3"
                 (audio_dir / filename).write_bytes(audio_data)

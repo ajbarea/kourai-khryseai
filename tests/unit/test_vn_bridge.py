@@ -26,12 +26,13 @@ from bridge import RenPyBridge, _find_project_root  # type: ignore[import-not-fo
 
 @pytest.fixture()
 def bridge(tmp_path: Path) -> RenPyBridge:
-    """RenPyBridge with its project root redirected to a temp directory.
+    """RenPyBridge with its project root and game dir redirected to a temp directory.
 
-    Prevents log file creation in the real project tree during tests.
+    Prevents log file and TTS audio file creation in the real project tree during tests.
     """
     with patch("bridge._find_project_root", return_value=tmp_path):
         b = RenPyBridge(agent_script="agents/vn_bridge.py")
+    b.game_dir = tmp_path / "game"
     return b
 
 
@@ -263,12 +264,8 @@ class TestRequestTts:
         audio_bytes = b"\xff\xfb\x90\x00" * 50
         with patch("urllib.request.urlopen", return_value=_audio_response(audio_bytes)):
             bridge.request_tts("Test audio.", "kallos")
-        # Verify the file was created relative to bridge.py location
-        # (mocked project root, so check via the path logic)
-        game_dir = Path(__file__).parents[2] / "hosts/vn/kourai_vn/game"
-        tts_file = game_dir / "audio" / "tts" / "tts_kallos.mp3"
-        if tts_file.exists():
-            assert tts_file.read_bytes() == audio_bytes
+        tts_file = bridge.game_dir / "audio" / "tts" / "tts_kallos.mp3"
+        assert tts_file.read_bytes() == audio_bytes
 
     def test_returns_none_on_http_error(self, bridge: RenPyBridge) -> None:
         """HTTP failure returns None, not an exception."""
