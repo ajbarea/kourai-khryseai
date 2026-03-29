@@ -15,8 +15,8 @@ from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP("kourai-shell")
 
-# WHY: allowlist prevents prompt-injection attacks from convincing an agent to
-# run arbitrary shell commands. Only the tools the agents actually need
+# Allowlist prevents prompt-injection attacks from convincing an agent to
+# run arbitrary shell commands. Only the tools the agents actually need.
 _ALLOWED_COMMANDS: frozenset[str] = frozenset(
     {
         "ruff",
@@ -26,9 +26,9 @@ _ALLOWED_COMMANDS: frozenset[str] = frozenset(
         "python",
         "python3",
         "uv",
-        "node",  # Phase B2: Node.js runtime for frontend/tooling
-        "npx",  # Phase B2: npm package executor (Context Hub, etc.)
-        "chub",  # Phase B2: Context Hub CLI for documentation lookup fallback
+        "node",
+        "npx",
+        "chub",  # Context Hub CLI for documentation lookup
     }
 )
 

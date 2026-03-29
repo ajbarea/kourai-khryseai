@@ -46,7 +46,7 @@ cp .env.example .env
 | `GOOGLE_API_KEY` | Google API key — alias for `GEMINI_API_KEY` |
 | `OLLAMA_BASE_URL` | Ollama server URL (default: `http://localhost:11434`) |
 
-#### MCP Servers (Phase B+)
+#### MCP Servers
 
 Required for agent MCP integrations. **All are free tiers available.**
 

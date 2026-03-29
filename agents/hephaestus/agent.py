@@ -106,7 +106,7 @@ def extract_project_root(text: str) -> tuple[str, str | None]:
     - Send clean_text to the routing LLM (no metadata noise)
     - Inject "Project root: /path" into accumulated_context for specialist agents
 
-    WHY: vn_bridge injects the tag as a text prefix because A2A message metadata
+    vn_bridge injects the tag as a text prefix because A2A message metadata
     fields aren't guaranteed to be forwarded by all transports. Text is universal.
     """
     match = re.search(r"\[project_root:\s*([^\]]+)\]", text, re.IGNORECASE)
@@ -123,7 +123,7 @@ def extract_relationship_tiers(text: str) -> tuple[str, dict[str, float]]:
     Returns (clean_text, affinity_dict) where affinity_dict maps agent names
     to their current 0.0–1.0 affinity score from the VN's client-side state.
 
-    WHY: Same tag pattern as [project_root:] — text injection is universal
+    Same tag pattern as [project_root:] — text injection is universal
     across all A2A transports. The dict is used to build a relationship context
     block injected into accumulated_context so specialist agents can adapt
     their personality tone by tier without SYSTEM_PROMPT changes.
@@ -225,9 +225,7 @@ async def determine_pipeline(user_request: str, context_id: str | None = None) -
             if player_ctx:
                 system_prompt += f"\n\n{player_ctx}"
 
-        # Inject Hephaestus's own relationship tier so he flavors CHAT responses correctly.
-        # WHY: ROUTING_PROMPT says "use your current relationship context" but the context
-        # was never provided — this is the fix.
+        # Inject Hephaestus's own relationship tier so he flavors CHAT responses.
         heph_score = affinities.get("hephaestus")
         if heph_score is not None:
             system_prompt += (
@@ -335,11 +333,8 @@ async def execute_pipeline(
 
     connections: dict[str, RemoteAgentConnection] = {}
 
-    # Extract project_root from the [project_root: /path] tag injected by vn_bridge,
-    # then build accumulated_context with clean request + explicit "Project root:" line.
-    # WHY: specialist agents (Kallos/Dokimasia/Techne) parse "Project root:" from their
-    # context string to set subprocess cwd and file-write root. Text is universal across
-    # all A2A transports; no metadata fields required.
+    # Specialist agents parse "Project root:" from context to set subprocess cwd.
+    # Text injection is universal across all A2A transports; no metadata fields required.
     clean_request, project_root = extract_project_root(user_request)
     clean_request, affinities = extract_relationship_tiers(clean_request)
     accumulated_context = f"Original request: {clean_request}"
@@ -539,7 +534,7 @@ async def github_search_repositories(
     language: str | None = None,
     max_results: int = 5,
 ) -> list[dict]:
-    """Phase C7: Search GitHub for repositories.
+    """Search GitHub for repositories.
 
     Uses GitHub API to find repos matching the query.
     Helps Hephaestus understand existing solutions and community standards.

@@ -128,11 +128,6 @@ class TechneAgentExecutor(BaseAgentExecutor):
                         if latest.strip():
                             await send_working_status(updater, task, f"Coding: {latest}")
 
-            # Step 5: Apply code changes to disk using the player's project root.
-            # WHY: Without this, cross-agent fix loops are broken — Kallos/Dokimasia
-            # would re-check unchanged files every iteration.
-            # project_root ensures file writes stay within the player's project
-            # (validated by validate_file_path inside parse_and_apply_fixes).
             with create_span("techne.apply_fixes"):
                 fixes_applied = parse_and_apply_fixes(result, project_root=project_root)
 

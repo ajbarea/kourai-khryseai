@@ -69,7 +69,7 @@ SLOP_PATTERN = re.compile(
 
 # Vacuous docstring patterns — docstrings that restate the function/class name
 # without adding information. Matches: def get_user(): """Get user."""
-# WHY: These bypass slop-word detection because they contain no jargon,
+# These bypass slop-word detection because they contain no jargon,
 # but they're still worthless — they say nothing the signature doesn't already say.
 _DOCSTRING_BLOCK = re.compile(
     r'(?:def|class)\s+(\w+)[^:]*:\s*\n\s*"""([^"]{3,}?)"""',
@@ -157,7 +157,7 @@ REASON: <one sentence why the original is vague>
 ---
 If no slop found: CLEAN
 
-PLAYER FACTS (Phase C1):
+PLAYER FACTS:
 Emit discoveries about the player in your responses using this format:
   <FACT category="CATEGORY" confidence="LEVEL">Observed statement</FACT>
 

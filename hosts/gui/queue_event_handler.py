@@ -1,8 +1,7 @@
 """Queue event handler — routes recv_q messages to typed handlers.
 
-Extracted from __main__.py Phase 16. Each A2A event type (connected,
-disconnected, status, result, complete, error) has its own method,
-making the logic testable and the main loop readable.
+Each A2A event type (connected, disconnected, status, result, complete,
+error) has its own method, making the logic testable and the main loop readable.
 """
 
 from __future__ import annotations

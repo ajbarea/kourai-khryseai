@@ -148,7 +148,7 @@ init python:
     def _get_virtue_context_dict():
         """Build virtue data structure for Forge Journal visualization.
 
-        Phase C12: Returns dict with virtue scores, session deltas, and discoveries.
+        Returns dict with virtue scores, session deltas, and discoveries.
         Queries the python agent subprocess via the bridge to avoid sqlite3 dependency issues.
         """
         try:
@@ -383,7 +383,7 @@ init python:
     def _validate_and_set_project(project_path):
         """Validate project directory and add to recent projects.
 
-        Phase C13: Checks if path exists and contains a git repo or valid project marker.
+        Checks if path exists and contains a git repo or valid project marker.
         """
         import os
 
@@ -495,7 +495,7 @@ init python:
     }
 
     # Fallback gossip lines per agent — used when live /gossip endpoint is unavailable.
-    # Phase 14: gossip trigger tries bridge.request_gossip() first; falls back here.
+    # Gossip trigger tries bridge.request_gossip() first; falls back here.
     # Each entry: (stage_direction, spoken_line).
     GOSSIP_LINES = {
         "techne": [

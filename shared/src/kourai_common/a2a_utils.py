@@ -3,7 +3,7 @@
 Centralizes common A2A message handling patterns used across multiple agents.
 
 # A2A Spec v1.0 migration notes
-# WHY: The v1.0 spec replaces TextPart/FilePart/DataPart with a unified Part
+# The v1.0 spec replaces TextPart/FilePart/DataPart with a unified Part
 # type using member-based discrimination ("text" in part, "url" in part, etc.)
 # and renames mimeType → mediaType. All Part inspection is funnelled through
 # _is_file_part() and _get_file_bytes() so migration is a single-function change.

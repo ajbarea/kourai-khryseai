@@ -1,6 +1,6 @@
 """Tests for the player fact extraction and pipeline system.
 
-Phase 4.5: Full pipeline coverage — extraction, storage, stripping,
+Full pipeline coverage — extraction, storage, stripping,
 process_agent_output, PlayerFact normalization, and KnowledgeGraphFact conversion.
 """
 

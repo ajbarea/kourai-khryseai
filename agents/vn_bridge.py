@@ -300,16 +300,10 @@ async def handle_message(request: Request) -> StreamingResponse:
     # Both "message" and "choice" resolve to a user text turn
     user_text = data.get("choice", "") if action == "choice" else data.get("text", "")
 
-    # Inject project context so Hephaestus can pass it to specialist agents.
-    # WHY: vn_bridge previously dropped project_path on the floor; agents always
-    # operated on the Kourai codebase regardless of the player's selected project.
     if project_path:
         user_text = f"[project_root: {project_path}]\n{user_text}"
 
     # Inject affinity snapshot so Hephaestus can calibrate relationship tier context.
-    # WHY: ROUTING_PROMPT says "use your current relationship context" but no context
-    # was ever provided. This closes the loop — agents adapt tone by tier without
-    # SYSTEM_PROMPT changes; tier context flows via accumulated_context only.
     affinity_data: dict = data.get("affinity") or {}
     if affinity_data:
         tiers_str = ",".join(
@@ -390,8 +384,6 @@ async def handle_message(request: Request) -> StreamingResponse:
                     elif isinstance(update, TaskArtifactUpdateEvent):
                         if update.artifact and update.artifact.parts:
                             # Extract jealousy_trigger from DataPart before processing text.
-                            # WHY: Phase 5.2 embeds this signal in DataPart; bridge previously
-                            # iterated only TextPart so the signal was silently dropped.
                             for p in update.artifact.parts:
                                 part_data = getattr(p.root, "data", None)
                                 if isinstance(part_data, dict):

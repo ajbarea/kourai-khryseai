@@ -183,7 +183,7 @@ class MCPToolkit:
         log.debug(f"{agent_name}: requesting tool '{tool_name}' from {server.name}")
 
         # For now, return a stub that agents can detect (they have real implementations)
-        # Real MCP client SDK integration happens in Phase E upgrade
+        # Real MCP client SDK integration pending
         class ToolStub:
             def __init__(self, tool_name: str, server_name: str) -> None:
                 self.tool_name = tool_name
@@ -192,7 +192,7 @@ class MCPToolkit:
             def __call__(self, *args: Any, **kwargs: Any) -> Any:
                 raise MCPUnavailable(
                     f"Tool '{self.tool_name}' on server '{self.server_name}' "
-                    f"requires full MCP SDK integration (Phase E+). "
+                    f"requires full MCP SDK integration. "
                     f"Agent should use fallback implementation."
                 )
 
@@ -255,15 +255,15 @@ def _initialize_default_registry(toolkit: MCPToolkit) -> None:
 
     Follows assignments from MARCH_20.md MCP target assignment matrix.
     """
-    # Register known servers (all free, all optional for Phase B+)
+    # Register known servers (all free as of March 2026, all optional)
     toolkit.register_server("context7", enabled=True)
     toolkit.register_server("context_hub", enabled=True)
     toolkit.register_server("github", enabled=True)
     toolkit.register_server("memory", enabled=True)
     toolkit.register_server("shell", enabled=True)
-    toolkit.register_server("playwright", enabled=False)  # Phase E
+    toolkit.register_server("playwright", enabled=False)
     toolkit.register_server("brave_search", enabled=True)
-    toolkit.register_server("dbhub", enabled=False)  # Phase E
+    toolkit.register_server("dbhub", enabled=False)
 
     # Assign servers to agents (from MARCH_20.md)
     toolkit.assign_servers("hephaestus", ["github"], fallback_mode="none")

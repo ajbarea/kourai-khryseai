@@ -61,7 +61,7 @@ class DokimasiaAgentExecutor(BaseAgentExecutor):
             )
 
             if is_e2e_request:
-                # Phase E1: Playwright E2E testing
+                # Playwright E2E testing
                 await send_working_status(
                     updater,
                     task,

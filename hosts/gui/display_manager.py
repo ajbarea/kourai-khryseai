@@ -1,8 +1,7 @@
 """Display manager — owns the pygame screen surface and mode transitions.
 
 Encapsulates display mode switching, vsync negotiation, windowed size
-tracking, and window positioning. Extracted from __main__.py to keep
-the main loop thin.
+tracking, and window positioning.
 """
 
 from __future__ import annotations

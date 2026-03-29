@@ -4,7 +4,7 @@ Aletheia is the Greek spirit of truth and disclosure. She validates that
 technical claims have citations, that standards references are real, and
 that algorithmic choices are grounded in documented research.
 
-Via Brave Search (Phase C3), Aletheia can verify claims against live web results.
+Via Brave Search, Aletheia can verify claims against live web results.
 
 Spec: designs/NEW_AGENTS_ROADMAP.md
 """
@@ -83,7 +83,7 @@ SEARCH: <suggested search terms to find the right source>
 ---
 If all claims are supported: VERIFIED
 
-PLAYER FACTS (Phase C1):
+PLAYER FACTS:
 Emit discoveries about the player in your responses using this format:
   <FACT category="CATEGORY" confidence="LEVEL">Observed statement</FACT>
 
@@ -140,7 +140,7 @@ async def brave_web_search(
 ) -> list[dict[str, str]]:
     """Search the web via Brave Search API for claim verification.
 
-    Phase C3: Queries Brave Search for web results to verify research claims.
+    Queries Brave Search for web results to verify research claims.
     Requires BRAVE_API_KEY environment variable.
 
     Args:
@@ -162,8 +162,8 @@ async def brave_web_search(
         return []
 
     try:
-        # Phase C3: Use subprocess to call brave search API
-        # (Real MCP client SDK integration in Phase E+)
+        # Use subprocess to call brave search API
+        # (MCP client SDK integration pending)
         cmd = [
             "curl",
             "-s",

@@ -623,7 +623,7 @@ screen preferences():
                     )
                 text "(Enables romance dialogue, relationship moments, and confession scenes)" size 14 color "#A0A0A0"
 
-                # Phase 13: TTS toggle
+                # TTS toggle
                 textbutton _("Voice (TTS)"):
                     action ToggleVariable(
                         "persistent.tts_enabled", True, False

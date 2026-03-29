@@ -1,6 +1,6 @@
 """Tests for doc_lookup.py — Context7 MCP round-trip and fallback chain.
 
-Phase 4.2: Tests Context7 → Context Hub fallback, formatting, and graceful
+Tests Context7 → Context Hub fallback, formatting, and graceful
 degradation when the MCP sidecar is unavailable.
 """
 

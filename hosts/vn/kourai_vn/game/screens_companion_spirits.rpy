@@ -154,7 +154,7 @@ screen tier_up(agent_id, new_tier):
 
 
 ################################################################################
-## Phase 7 — Companion Spirit Overlays
+## Companion Spirit Overlays
 ################################################################################
 
 ## puck_nudge — bottom-right corner overlay, auto-dismisses after 12 s
@@ -523,7 +523,7 @@ screen virtue_milestone_toast(agent_id, virtue_name, line):
 
 ################################################################################
 
-## Phase 21 — Puck Tutorial + Cupid Vulnerability Moment
+## Puck Tutorial + Cupid Vulnerability Moment
 ################################################################################
 
 ## puck_tutorial — first-run onboarding modal.

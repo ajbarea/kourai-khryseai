@@ -244,10 +244,10 @@ screen project_selection():
 
 
 ################################################################################
-## Phase 8 — Jealousy Routing + Tier-Up Notifications
+## Jealousy Routing + Tier-Up Notifications
 ################################################################################
 
-## Phase 10 — Confession System
+## Confession System
 ################################################################################
 
 ## pre_confession_window — fires once when any agent crosses tier 4 (affinity 0.8+).

@@ -186,7 +186,7 @@ class MnemeAgentExecutor(BaseAgentExecutor):
                             emoji="🏛️",
                         )
 
-            # Phase C6–C8: Offer GitHub PR creation (HOTL confirmation)
+            # Offer GitHub PR creation (HOTL confirmation)
             # Check if we should offer PR creation (clean commits, GitHub token available)
             import os
 

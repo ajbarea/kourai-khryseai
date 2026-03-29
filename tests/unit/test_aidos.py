@@ -1,6 +1,6 @@
 """Tests for Aidos anti-slop detection — slop words and vacuous docstrings.
 
-Phase 15: Unit tests for pre-screen layer (pure functions, no LLM calls).
+Unit tests for pre-screen layer (pure functions, no LLM calls).
 """
 
 from __future__ import annotations

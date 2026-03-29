@@ -42,11 +42,11 @@ label start:
         if not hasattr(persistent, "romance_mode_enabled"):
             persistent.romance_mode_enabled = True
 
-        # Phase 7: Cupid first-appearance flag — fires once when affinity ≥ 0.6
+        # Cupid first-appearance flag — fires once when affinity ≥ 0.6
         if not hasattr(persistent, "cupid_appeared"):
             persistent.cupid_appeared = False
 
-        # Phase 10: Confession system — per-agent tracking
+        # Confession system — per-agent tracking
         if not hasattr(persistent, "pre_confession_seen"):
             persistent.pre_confession_seen = set()
         if not hasattr(persistent, "confessed_to"):
@@ -54,26 +54,26 @@ label start:
         if not hasattr(persistent, "confession_defer"):
             persistent.confession_defer = {}  # agent → turn counter threshold
 
-        # Phase 11: Virtue milestone toasts — tracks which threshold moments have fired.
+        # Virtue milestone toasts — tracks which threshold moments have fired.
         # Keys are "virtue_name@threshold" e.g. "arete@0.3", "synergy@0.7"
         if not hasattr(persistent, "virtue_milestones"):
             persistent.virtue_milestones = set()
 
-        # Phase 13: VN TTS — per-beat voice synthesis via vn-bridge /tts endpoint
+        # VN TTS — per-beat voice synthesis via vn-bridge /tts endpoint
         if not hasattr(persistent, "tts_enabled"):
             persistent.tts_enabled = False
 
-        # Phase 20: Forge Virtues wellness guardrails
+        # Forge Virtues wellness guardrails
         if not hasattr(persistent, "wellness_warning_seen"):
             persistent.wellness_warning_seen = False
         if not hasattr(persistent, "virtue_tracking_enabled"):
             persistent.virtue_tracking_enabled = True
 
-        # Phase 21: Puck tutorial — shown once to first-run players
+        # Puck tutorial — shown once to first-run players
         if not hasattr(persistent, "puck_tutorial_seen"):
             persistent.puck_tutorial_seen = False
 
-        # Phase 21: Vulnerability moment cooldown — {agent_id: last_turn_fired}
+        # Vulnerability moment cooldown — {agent_id: last_turn_fired}
         if not hasattr(persistent, "vulnerability_cooldown"):
             persistent.vulnerability_cooldown = {}
 
@@ -148,14 +148,14 @@ label start:
     "System" "Connection to Kourai Khryseai established."
     "System" "The Master of the Forge is listening."
 
-    # Phase 20: Wellness warning — shown once per player, before the HUD appears.
+    # Wellness warning — shown once per player, before the HUD appears.
     # Respects virtue_tracking_enabled (can opt-out via "Disable" button).
     if not persistent.wellness_warning_seen and persistent.virtue_tracking_enabled:
         call screen wellness_warning
         # CODEX: Unlock wellness entry after warning shown
         $ unlock_codex_entry("virtue_wellness", silent=False)
 
-    # Phase 21: Puck tutorial — first-run players only. Shown after wellness
+    # Puck tutorial — first-run players only. Shown after wellness
     # warning so the player has context before Puck speaks.
     if not persistent.puck_tutorial_seen:
         $ renpy.call_screen("puck_tutorial")

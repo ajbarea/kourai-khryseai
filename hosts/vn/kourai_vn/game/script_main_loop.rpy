@@ -80,7 +80,7 @@ label main_loop:
         # before jumping back to the input prompt.
         python:
             beat_queue = []
-            jealousy_events = []  # Phase 8: DataPart jealousy signals from Hephaestus
+            jealousy_events = []  # DataPart jealousy signals from Hephaestus
             if vn_response:
                 if vn_response.get("action") == "jealousy":
                     jealousy_events.append(vn_response)
@@ -128,7 +128,7 @@ label main_loop:
                     else:
                         renpy.hide_screen("agent_portrait")
 
-                # Phase 13: TTS — request voice audio before say statement
+                # TTS — request voice audio before say statement
                 if persistent.tts_enabled:
                     python:
                         _tts_path = bridge.request_tts(message_text, agent_id)
@@ -172,7 +172,7 @@ label main_loop:
                 $ renpy.call_screen("pre_confession_window", agent_id=last_agent_id)
 
             # ── Gossip trigger — every 3 turns, an idle agent speaks ──────
-            # Phase 14: Try live LLM gossip first, fall back to pre-authored.
+            # Try live LLM gossip first, fall back to pre-authored.
             if gossip_turn_counter % 3 == 0:
                 python:
                     idle = [a for a in AGENT_ORDER if a != last_agent_id]
@@ -273,7 +273,7 @@ label main_loop:
                 if _j_agent:
                     $ renpy.call_screen("cupid_jealousy", agent_id=_j_agent, score=_j_score)
 
-            # ── Phase 21: Vulnerability moment — Cupid + Puck comment quietly ─
+            # ── Vulnerability moment — Cupid + Puck comment quietly ─────────
             # Fires as a non-blocking corner overlay when the player has a warm/
             # intimate exchange (affinity ≥ 0.70) and romance mode is on.
             # Cooldown of 8 turns per agent prevents spam.
@@ -288,7 +288,7 @@ label main_loop:
                         renpy.show_screen("cupid_vulnerability", agent_id=last_agent_id)
                         persistent.vulnerability_cooldown[last_agent_id] = gossip_turn_counter
 
-            # ── Phase 11: Virtue milestone toasts ────────────────────────────
+            # ── Virtue milestone toasts ───────────────────────────────────────
             # After each interaction, poll virtue scores and fire Disco Elysian
             # interjections for milestones (0.3 / 0.5 / 0.7) not yet triggered.
             # Virtue → owning agent mapping follows FORGE_VIRTUES.md.

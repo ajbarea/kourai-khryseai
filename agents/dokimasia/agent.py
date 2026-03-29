@@ -86,7 +86,7 @@ Add a brief personality touch at start/end (one line max)
 
 TESTING: Unit > Integration > Performance. 80%+ coverage. make test must pass.
 
-PLAYER FACTS (Phase C1):
+PLAYER FACTS:
 Emit discoveries about the player in your responses using this format:
   <FACT category="CATEGORY" confidence="LEVEL">Observed statement</FACT>
 
@@ -308,7 +308,7 @@ async def generate_playwright_tests(
 ) -> str:
     """Generate Playwright E2E tests for frontend components.
 
-    Phase E1: Generates browser-based end-to-end tests using Playwright.
+    Generates browser-based end-to-end tests using Playwright.
     Tests user interactions like clicks, form submissions, navigation.
 
     Args:
@@ -353,7 +353,7 @@ async def run_playwright(
 ) -> PytestRunResult:
     """Run Playwright tests and parse results.
 
-    Phase E1: Executes frontend E2E tests in headless browser mode.
+    Executes frontend E2E tests in headless browser mode.
     Returns structured results showing pass/fail counts.
 
     Args:
@@ -399,7 +399,7 @@ async def introspect_database(
     connection_string: str | None = None,
     database_type: str = "postgresql",
 ) -> dict:
-    """Phase E2: Introspect a live database for schema and constraints.
+    """Introspect a live database for schema and constraints.
 
     Uses DBHub MCP to connect to databases and extract table/column metadata.
     Helps Dokimasia write database integration tests against live schema.
@@ -423,7 +423,7 @@ async def introspect_database(
         }
 
     try:
-        # Phase E2: Would call DBHub MCP server to introspect live database
+        # Would call DBHub MCP server to introspect live database
         # Interface spec:
         # - get_tables() -> list with {name, columns, constraints}
         # - Each column: {name, type, nullable, default, foreign_key}

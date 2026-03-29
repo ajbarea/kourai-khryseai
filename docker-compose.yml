@@ -12,6 +12,10 @@ x-agent-common: &agent-common
     dockerfile: docker/host.Dockerfile
     args:
       HOST_TYPE: agent
+    cache_from:
+      - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-${PACKAGE_NAME}:latest
+    cache_to:
+      - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-${PACKAGE_NAME}:latest,mode=max
   env_file: .env
   environment:
     OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
@@ -96,6 +100,12 @@ services:
     build:
       context: .
       dockerfile: docker/memory-mcp.Dockerfile
+      cache_from:
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-memory-mcp:latest
+      cache_to:
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-memory-mcp:latest,mode=max
+      tags:
+        - ${DOCKER_HUB_USERNAME}/kourai-memory-mcp:latest
     volumes:
       - ./docker/memory-mcp-server.js:/app/memory-mcp-server.js
       - memory-graph-storage:/data
@@ -130,6 +140,12 @@ services:
     build:
       context: .
       dockerfile: docker/context7-mcp.Dockerfile
+      cache_from:
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-context7-mcp:latest
+      cache_to:
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-context7-mcp:latest,mode=max
+      tags:
+        - ${DOCKER_HUB_USERNAME}/kourai-context7-mcp:latest
     ports:
       - "3001:3001"
     networks:
@@ -162,6 +178,8 @@ services:
         HOST_TYPE: agent
         PACKAGE_NAME: mneme
         PORT: 10005
+      tags:
+        - ${DOCKER_HUB_USERNAME}/kourai-mneme:latest
     ports:
       - "10005:10005"
     volumes:
@@ -201,6 +219,8 @@ services:
         HOST_TYPE: agent
         PACKAGE_NAME: kallos
         PORT: 10004
+      tags:
+        - ${DOCKER_HUB_USERNAME}/kourai-kallos:latest
     ports:
       - "10004:10004"
     volumes:
@@ -241,6 +261,8 @@ services:
         HOST_TYPE: agent
         PACKAGE_NAME: techne
         PORT: 10002
+      tags:
+        - ${DOCKER_HUB_USERNAME}/kourai-techne:latest
     ports:
       - "10002:10002"
     volumes:
@@ -281,6 +303,8 @@ services:
         HOST_TYPE: agent
         PACKAGE_NAME: dokimasia
         PORT: 10003
+      tags:
+        - ${DOCKER_HUB_USERNAME}/kourai-dokimasia:latest
     ports:
       - "10003:10003"
     volumes:
@@ -323,6 +347,8 @@ services:
         HOST_TYPE: agent
         PACKAGE_NAME: metis
         PORT: 10001
+      tags:
+        - ${DOCKER_HUB_USERNAME}/kourai-metis:latest
     ports:
       - "10001:10001"
     volumes:
@@ -364,6 +390,8 @@ services:
         HOST_TYPE: agent
         PACKAGE_NAME: puck
         PORT: 10006
+      tags:
+        - ${DOCKER_HUB_USERNAME}/kourai-puck:latest
     ports:
       - "10006:10006"
     volumes:
@@ -402,6 +430,8 @@ services:
         HOST_TYPE: agent
         PACKAGE_NAME: cupid
         PORT: 10007
+      tags:
+        - ${DOCKER_HUB_USERNAME}/kourai-cupid:latest
     ports:
       - "10007:10007"
     volumes:
@@ -441,6 +471,8 @@ services:
         HOST_TYPE: agent
         PACKAGE_NAME: aidos
         PORT: 10008
+      tags:
+        - ${DOCKER_HUB_USERNAME}/kourai-aidos:latest
     ports:
       - "10008:10008"
     volumes:
@@ -479,6 +511,8 @@ services:
         HOST_TYPE: agent
         PACKAGE_NAME: aletheia
         PORT: 10009
+      tags:
+        - ${DOCKER_HUB_USERNAME}/kourai-aletheia:latest
     ports:
       - "10009:10009"
     volumes:
@@ -517,6 +551,12 @@ services:
         HOST_TYPE: vn_bridge
         PACKAGE_NAME: hephaestus
         PORT: 10010
+      cache_from:
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-vn-bridge:latest
+      cache_to:
+        - type=registry,ref=${DOCKER_HUB_USERNAME}/kourai-vn-bridge:latest,mode=max
+      tags:
+        - ${DOCKER_HUB_USERNAME}/kourai-vn-bridge:latest
     env_file: .env
     environment:
       HOST_TYPE: vn_bridge
@@ -563,6 +603,8 @@ services:
         HOST_TYPE: agent
         PACKAGE_NAME: hephaestus
         PORT: 10000
+      tags:
+        - ${DOCKER_HUB_USERNAME}/kourai-hephaestus:latest
     ports:
       - "10000:10000"
     volumes:

@@ -1,6 +1,6 @@
 """Tests for Aletheia agent — Brave Search fallback and claim detection.
 
-Phase 4.4: Verifies Brave Search graceful degradation (missing key, curl failure,
+Verifies Brave Search graceful degradation (missing key, curl failure,
 parse errors) and the regex-based find_unsupported_claims pre-screen.
 """
 

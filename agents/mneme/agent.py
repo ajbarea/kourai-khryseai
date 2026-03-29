@@ -72,7 +72,7 @@ Constraints:
 - NO marketing language ("comprehensive", "robust")
 - Add a brief personality touch at start/end (one line max)
 
-PLAYER FACTS (Phase C1):
+PLAYER FACTS:
 Emit discoveries about the player in your responses using this format:
   <FACT category="CATEGORY" confidence="LEVEL">Observed statement</FACT>
 
@@ -143,7 +143,7 @@ async def generate_commit_messages_stream(
 def parse_commits_for_pr(commit_text: str) -> dict:
     """Extract PR metadata from commit message groups.
 
-    Phase C6: Parses the output of generate_commit_messages() to extract
+    Parses the output of generate_commit_messages() to extract
     structured information suitable for GitHub PR creation.
 
     Args:
@@ -193,9 +193,9 @@ async def create_github_pr(
 ) -> str:
     """Create a GitHub PR with commit messages.
 
-    Phase C6–C8: Framework for GitHub PR creation via MCP.
+    Framework for GitHub PR creation via MCP.
     Returns a formatted choice event for HOTL confirmation.
-    Phase E1: Actual GitHub API call implemented in github_create_pull_request_impl().
+    Actual GitHub API call implemented in github_create_pull_request_impl().
 
     Args:
         pr_metadata: Dict from parse_commits_for_pr() with title, body, etc.
@@ -217,7 +217,7 @@ async def create_github_pr(
             }
         )
 
-    # Phase C8: HOTL (Human-On-The-Loop) confirmation
+    # HOTL (Human-On-The-Loop) confirmation
     # Return a choice event for the VN to display
     choice_event = {
         "action": "choice",
@@ -244,7 +244,7 @@ async def github_create_pull_request_impl(
     github_token: str | None = None,
     context_id: str | None = None,
 ) -> dict:
-    """Phase E1: Actually create a PR on GitHub.
+    """Actually create a PR on GitHub.
 
     Called AFTER user confirms via HOTL choice event.
     Uses GitHub API (PyGithub) with graceful fallback to MCP.
@@ -281,7 +281,7 @@ async def github_create_pull_request_impl(
 
         owner, repo_name = match.groups()
 
-        # Phase E1: Use PyGithub for API calls (graceful fallback pattern)
+        # Use PyGithub for API calls (graceful fallback pattern)
         try:
             from github import Github
 
@@ -314,7 +314,7 @@ async def github_create_pull_request_impl(
 
         except ImportError:
             log.warning("PyGithub not installed — attempting MCP fallback")
-            # Phase E: Would call MCP GitHub server here
+            # Would call MCP GitHub server here
             return {
                 "success": False,
                 "error": ("PyGithub not installed. Install with: uv add PyGithub"),

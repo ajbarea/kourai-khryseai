@@ -1,8 +1,7 @@
 """Theme manager — alignment-based visual theming.
 
-Extracted from __main__.py Phase 18. Handles periodic alignment
-profile refresh and palette computation/application. High-contrast
-mode bypasses alignment palette entirely.
+Handles periodic alignment profile refresh and palette computation/application.
+High-contrast mode bypasses alignment palette entirely.
 """
 
 from __future__ import annotations

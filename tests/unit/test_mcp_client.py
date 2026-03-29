@@ -1,7 +1,7 @@
 """Unit tests for MCPToolkit — MCP server registry, agent assignments,
 and the async MCP client functions (Context7 + Memory sidecars).
 
-Phase 4.3: Tests that async functions raise MCPUnavailable on connection
+Tests that async functions raise MCPUnavailable on connection
 failure, and that the graceful-degradation contract is preserved.
 """
 

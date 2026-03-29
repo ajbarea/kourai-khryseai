@@ -1,9 +1,8 @@
 """Render pipeline — composites all GUI layers to screen.
 
-Extracted from __main__.py Phase 18. Each visual layer has its own
-draw call in explicit z-order: background → particles → portrait →
-flash → banner → dialogue → border → quick actions → input →
-debug log → scratchpad → overlays.
+Each visual layer has its own draw call in explicit z-order: background →
+particles → portrait → flash → banner → dialogue → border → quick actions →
+input → debug log → scratchpad → overlays.
 """
 
 from __future__ import annotations

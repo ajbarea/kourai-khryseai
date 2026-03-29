@@ -56,7 +56,7 @@ RUN if [ "${HOST_TYPE}" = "agent" ] || [ "${HOST_TYPE}" = "cli" ]; then \
     rm -rf /var/lib/apt/lists/*; \
     fi
 
-# Dokimasia: Chromium + Playwright for E2E frontend testing (Phase E4)
+# Dokimasia: Chromium + Playwright for E2E frontend testing
 RUN if [ "${HOST_TYPE}" = "agent" ] && [ "${PACKAGE_NAME}" = "dokimasia" ]; then \
     apt-get update && \
     apt-get install -y --no-install-recommends \

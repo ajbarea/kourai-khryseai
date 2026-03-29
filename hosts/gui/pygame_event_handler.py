@@ -1,9 +1,8 @@
 """Pygame event dispatcher — routes SDL events to subsystems and handlers.
 
-Extracted from __main__.py Phase 17. Each event type (QUIT, KEYDOWN,
-TEXTINPUT, MOUSEMOTION, MOUSEWHEEL, MOUSEBUTTONDOWN, resize) has its
-own method. Overlay dispatch is handled first so active panels consume
-events before the main loop sees them.
+Each event type (QUIT, KEYDOWN, TEXTINPUT, MOUSEMOTION, MOUSEWHEEL,
+MOUSEBUTTONDOWN, resize) has its own method. Overlay dispatch is handled
+first so active panels consume events before the main loop sees them.
 """
 
 from __future__ import annotations

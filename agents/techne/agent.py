@@ -88,7 +88,7 @@ Separate multiple file changes with ---
 IMPORTANT: Before outputting any code changes, briefly plan your
 implementation by writing a TODO list based on the requested task.
 
-PLAYER FACTS (Phase C1):
+PLAYER FACTS:
 Emit discoveries about the player in your responses using this format:
   <FACT category="CATEGORY" confidence="LEVEL">Observed statement</FACT>
 
@@ -228,7 +228,7 @@ async def generate_code(
 ) -> str:
     """Generate code changes using the LLM.
 
-    Phase B4: Queries Context7/Context Hub for relevant API docs before generation.
+    Queries Context7/Context Hub for relevant API docs before generation.
     This helps Techne write code that's consistent with current library semantics.
 
     Args:
@@ -245,7 +245,7 @@ async def generate_code(
 
     context_parts = []
 
-    # Phase B4: Fetch relevant documentation before generating code
+    # Fetch relevant documentation before generating code
     docs_context = await lookup_documentation(
         task_description,
         agent_name="techne",
@@ -304,7 +304,7 @@ async def generate_code_stream(
 
     context_parts = []
 
-    # Phase B4: Fetch relevant documentation before streaming code
+    # Fetch relevant documentation before streaming code
     docs_context = await lookup_documentation(
         task_description,
         agent_name="techne",
@@ -379,7 +379,7 @@ async def github_search_code(
     language: str | None = None,
     max_results: int = 5,
 ) -> list[dict]:
-    """Phase E1: Search GitHub for code examples.
+    """Search GitHub for code examples.
 
     Uses GitHub API to find similar code patterns and implementations.
     Helps Techne understand existing patterns before generating code.
@@ -449,7 +449,7 @@ async def introspect_database(
     database_type: str = "postgresql",
     max_tables: int = 20,
 ) -> dict[str, Any]:
-    """Phase E2: Introspect a live database for its schema.
+    """Introspect a live database for its schema.
 
     Uses DBHub MCP to connect to databases and extract table/column metadata.
     Helps Techne understand existing database structure before generating
@@ -476,7 +476,7 @@ async def introspect_database(
         }
 
     try:
-        # Phase E2: In production, this would call DBHub MCP server
+        # In production, this would call DBHub MCP server
         # For now, we document the interface that DBHub provides
         # Expected DBHub API:
         # - connect(connection_string, database_type) -> connection

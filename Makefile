@@ -80,6 +80,7 @@ dev-vn:                    ## Start services + Ren'Py VN (full development stack
 
 up:                        ## Start all agents + infrastructure (background, waits for health)
 	@echo Building and starting services...
+	@mkdir -p logs
 	@$(COMPOSE_FULL) up -d --build --pull missing --wait 2>&1 | tee logs/docker.log && echo "✅ All services running and healthy" || (echo "❌ Build or startup failed - see logs/docker.log"; exit 1)
 	@echo
 	@echo Dashboards:
@@ -134,12 +135,15 @@ test:                      ## Run full test suite with quality checks (unit + in
 	@$(MAKE) --no-print-directory test-performance
 
 test-unit:                 ## Run unit tests only (parallel with auto CPU detection)
+	@mkdir -p logs
 	uv run --no-active pytest -n auto tests/unit/ -v --tb=short --cov=. --cov-report=xml:logs/coverage.xml --cov-report=term-missing 2>&1 | tee logs/test-unit.log
 
 test-integration:          ## Run integration tests only
+	@mkdir -p logs
 	uv run --no-active pytest tests/integration/ -v --tb=short --cov=. --cov-append --cov-report=xml:logs/coverage.xml --cov-report=term-missing 2>&1 | tee logs/test-integration.log
 
 test-performance:          ## Run performance tests only
+	@mkdir -p logs
 	uv run --no-active pytest tests/performance/ -v --tb=short --cov=. --cov-append --cov-report=xml:logs/coverage.xml --cov-report=term-missing 2>&1 | tee logs/test-performance.log
 
 clean:                     ## Remove build artifacts, cache, and temp files

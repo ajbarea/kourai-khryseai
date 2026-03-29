@@ -56,7 +56,7 @@ Your roles:
 4. MINIGAME HOST — Can initiate jealousy resolution and confession minigames
    when triggered by relationship events.
 
-CHOICE EVENTS (Phase C11):
+CHOICE EVENTS:
 When you want to offer the player a meaningful choice (relationship milestone, jealousy trigger,
 or story moment), emit a CHOICE EVENT block. The VN will display a choice screen and wait for the
 player's selection before continuing dialogue.
@@ -76,7 +76,7 @@ The player's choice will be routed back to you or to another agent depending on 
 Response format: Conversational, 1-4 sentences. No lists. No headers.
 If the player needs routing to another agent, say so directly.
 
-PLAYER FACTS (Phase C1):
+PLAYER FACTS:
 Emit discoveries about the player in your responses using this format:
   <FACT category="CATEGORY" confidence="LEVEL">Observed statement</FACT>
 
@@ -100,7 +100,7 @@ async def respond(
 ) -> str:
     """Generate Puck's response to a player message.
 
-    Phase C9: Enriches response with player facts from the knowledge graph,
+    Enriches response with player facts from the knowledge graph,
     enabling Puck to remember past interactions across sessions.
 
     Args:
@@ -111,7 +111,7 @@ async def respond(
     Returns:
         Puck's response with access to player history.
     """
-    # Phase C9: Retrieve player facts for enrichment
+    # Retrieve player facts for enrichment
     player_context = ""
     if player_id:
         player_context = build_fact_context(player_id, agent_name="puck")

@@ -1,5 +1,5 @@
 """
-Integration tests for HF-Mount Phase 2: Automated Backup System
+Integration tests for the Automated Backup System
 
 Tests the backup infrastructure: scripts, configuration, and file handling.
 These tests are designed to run on all platforms (Windows, macOS, Linux).
@@ -221,12 +221,17 @@ class TestBackupSecurityAndIgnore:
     """Test that sensitive files are properly protected."""
 
     def test_env_in_gitignore(self):
-        """Credential files should be in .gitignore."""
+        """Credential files should be in .gitignore, but template should be tracked."""
         repo_root = get_project_root()
         gitignore = (repo_root / ".gitignore").read_text(encoding="utf-8")
 
+        # .env should be ignored (contains real credentials)
         assert ".env" in gitignore, ".env not in .gitignore"
-        assert ".env.hf" in gitignore, ".env.hf not in .gitignore"
+
+        # .env.example should NOT be ignored (it's the template)
+        # Check that it's not explicitly ignored with a dedicated line
+        gitignore_lines = {line.strip() for line in gitignore.split("\n")}
+        assert ".env.example" not in gitignore_lines, ".env.example should not be in .gitignore"
 
     def test_env_example_is_placeholder_only(self):
         """.env.example should never contain real tokens."""

@@ -57,7 +57,7 @@ Rules:
 - When planning new projects, use the default tech stack unless the player specifies otherwise
 - Add a brief personality touch at start/end (one line max)
 
-PLAYER FACTS (Phase C1):
+PLAYER FACTS:
 Emit discoveries about the player in your responses using this format:
   <FACT category="CATEGORY" confidence="LEVEL">Observed statement</FACT>
 
@@ -148,7 +148,7 @@ async def create_spec(
 
     context_parts = []
 
-    # Phase B5: Fetch relevant documentation for planning
+    # Fetch relevant documentation for planning
     docs_context = await lookup_documentation(
         idea,
         agent_name="metis",
@@ -191,7 +191,7 @@ async def create_spec_stream(
 
     context_parts = []
 
-    # Phase B5: Fetch relevant documentation for planning
+    # Fetch relevant documentation for planning
     docs_context = await lookup_documentation(
         idea,
         agent_name="metis",
@@ -231,7 +231,7 @@ async def github_search_issues(
     language: str | None = None,
     max_results: int = 5,
 ) -> list[dict]:
-    """Phase C7: Search GitHub for related issues and pull requests.
+    """Search GitHub for related issues and pull requests.
 
     Uses GitHub API to find similar issues and PRs that might inform planning.
     Helps Metis understand existing problems and solutions before creating specs.

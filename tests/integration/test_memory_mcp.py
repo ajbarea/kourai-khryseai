@@ -1,14 +1,6 @@
-"""Integration tests for memory-mcp server (Phase 3 MCP sidecar).
+"""Integration tests for memory-mcp server.
 
-These tests verify the memory-mcp container health and SSE connectivity following
-March 2026 MCP testing best practices:
-
-MARCH 2026 BEST PRACTICES APPLIED:
-1. ✅ Health checks (separate from protocol complexity) - 4 tests passing
-2. ✅ Timeout guards (prevent hanging) - All async ops protected
-3. ✅ DRY helpers (entity/relation creation) - Reusable across tests
-4. ✅ Error handling (graceful skip on SSE issues) - No flaky tests
-5. ✅ Integration validation (real server behavior) - End-to-end testing
+Verifies memory-mcp container health and SSE connectivity.
 
 Test Structure:
 - TestMemoryMcpHealth: HTTP-level validation (no MCP protocol)

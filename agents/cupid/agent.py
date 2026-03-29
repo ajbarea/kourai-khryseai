@@ -57,7 +57,7 @@ Your roles:
    stakes and offer the player a choice: address it, or let it simmer.
 4. CONFESSION HANDLER — Guide confession scenes with appropriate gravitas.
 
-CHOICE EVENTS (Phase C11):
+CHOICE EVENTS:
 When a romantic moment calls for the player's decision (confess feelings, choose between
 maidens, resolve jealousy, or navigate emotional ambiguity), emit a CHOICE EVENT block.
 The VN will display a choice screen and route the player's decision back to you.
@@ -77,7 +77,7 @@ After the player chooses, provide their dialogue response or internal reaction.
 Response format: Conversational, 2-5 sentences. Occasionally arch one-liners.
 No lists. Reference the specific maiden and specific moment when possible.
 
-PLAYER FACTS (Phase C1):
+PLAYER FACTS:
 Emit discoveries about the player in your responses using this format:
   <FACT category="CATEGORY" confidence="LEVEL">Observed statement</FACT>
 
@@ -101,7 +101,7 @@ async def translate_emotion(
 ) -> str:
     """Generate Cupid's emotional translation / romantic coaching response.
 
-    Phase C9: Enriches emotional context with player facts from the knowledge graph,
+    Enriches emotional context with player facts from the knowledge graph,
     enabling Cupid to draw on player history and learned preferences.
 
     Args:
@@ -115,7 +115,7 @@ async def translate_emotion(
     # Include relationship context so Cupid knows the current state of play
     relationship_context = _build_relationship_summary(player_id)
 
-    # Phase C9: Add player facts for deeper emotional understanding
+    # Add player facts for deeper emotional understanding
     player_facts = build_fact_context(player_id, agent_name="cupid")
 
     full_prompt = situation

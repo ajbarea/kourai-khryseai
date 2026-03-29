@@ -3,8 +3,6 @@
 Agents can query live API docs, standards references, and tutorials before
 generating code or plans. Provides Context7 as primary source with Context Hub
 (chub CLI) as fallback when Context7 is rate-limited.
-
-Spec: MARCH_20.md Phase 3 (MCP Integration)
 """
 
 from __future__ import annotations
