@@ -21,6 +21,7 @@ Requires: memory-mcp container running (docker-compose up memory-mcp)
 from __future__ import annotations
 
 import asyncio
+import time
 from contextlib import suppress
 from typing import TYPE_CHECKING, Any
 
@@ -31,6 +32,25 @@ from mcp.client.sse import sse_client
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
+
+
+@pytest.fixture(scope="module", autouse=True)
+def wait_for_memory_mcp() -> None:
+    """Poll health endpoint until ready before any memory-mcp tests run.
+
+    Docker's healthcheck passes before Node.js fully warms up, causing the
+    first HTTP requests to time out. This fixture absorbs that startup gap.
+    """
+    url = "http://localhost:5000/health"
+    deadline = time.monotonic() + 30
+    with httpx.Client() as client:
+        while time.monotonic() < deadline:
+            with suppress(httpx.HTTPError, OSError):
+                response = client.get(url, timeout=5.0)
+                if response.status_code == 200:
+                    return
+            time.sleep(0.5)
+    pytest.skip("memory-mcp not available within 30s")
 
 
 class MCPConnectionError(Exception):
@@ -65,19 +85,20 @@ async def mcp_session() -> AsyncGenerator[ClientSession, None]:
         except BaseException as e:
             if isinstance(e, pytest.skip.Exception):
                 raise
-            error_str = str(e).lower()
+            # ExceptionGroup (from asyncio.TaskGroup) wraps the real error — unwrap it
+            errors_to_check = list(e.exceptions) if isinstance(e, ExceptionGroup) else [e]
+            connection_keywords = [
+                "connected",
+                "transport",
+                "timeout",
+                "connection",
+                "eof",
+                "disconnected",
+                "protocol",
+                "remoteprotocol",
+            ]
             if any(
-                x in error_str
-                for x in [
-                    "connected",
-                    "transport",
-                    "timeout",
-                    "connection",
-                    "eof",
-                    "disconnected",
-                    "protocol",
-                    "remoteprotocol",
-                ]
+                any(kw in str(err).lower() for kw in connection_keywords) for err in errors_to_check
             ):
                 pytest.skip(f"SSE connection unavailable: {type(e).__name__}")
             raise
