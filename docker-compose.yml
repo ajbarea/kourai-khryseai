@@ -6,6 +6,12 @@
 # ----------------------------------------------------------------------
 # Common configuration block for agent services to adhere to DRY principles.
 # Configures shared build contexts, telemetry (OTEL), and healthcheck endpoints.
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 x-agent-common: &agent-common
   build:
     context: .
@@ -31,11 +37,7 @@ x-agent-common: &agent-common
   depends_on:
     jaeger:
       condition: service_started
-  logging:
-    driver: "json-file"
-    options:
-      max-size: "10m"
-      max-file: "3"
+  logging: *default-logging
 
 # ----------------------------------------------------------------------
 # SERVICES OVERVIEW
@@ -64,11 +66,7 @@ services:
       resources:
         limits:
           memory: 512M
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+    logging: *default-logging
 
   # Prometheus: Time-series database for metrics aggregation.
   prometheus:
@@ -84,11 +82,7 @@ services:
       resources:
         limits:
           memory: 256M
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+    logging: *default-logging
 
   # ──────────────── MCP Sidecars ────────────────
   # Memory MCP: Shared knowledge graph sidecar.
@@ -118,11 +112,7 @@ services:
       resources:
         limits:
           memory: 256M
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+    logging: *default-logging
     healthcheck:
       test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:5000/health',r=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))\""]
       interval: 15s
@@ -149,11 +139,7 @@ services:
       resources:
         limits:
           memory: 256M
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+    logging: *default-logging
     healthcheck:
       test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:3001/',r=>{process.exit(r.statusCode<500?0:1)}).on('error',()=>process.exit(1))\""]
       interval: 15s
@@ -198,7 +184,7 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:10005/.well-known/agent-card.json"]
       interval: 15s
       timeout: 5s
-      start_period: 10s
+      start_period: 30s
       retries: 3
     deploy:
       resources:
@@ -243,7 +229,7 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:10004/.well-known/agent-card.json"]
       interval: 15s
       timeout: 5s
-      start_period: 10s
+      start_period: 30s
       retries: 3
     deploy:
       resources:
@@ -288,7 +274,7 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:10002/.well-known/agent-card.json"]
       interval: 15s
       timeout: 5s
-      start_period: 10s
+      start_period: 30s
       retries: 3
     deploy:
       resources:
@@ -335,7 +321,7 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:10003/.well-known/agent-card.json"]
       interval: 15s
       timeout: 5s
-      start_period: 10s
+      start_period: 30s
       retries: 3
     deploy:
       resources:
@@ -380,7 +366,7 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:10001/.well-known/agent-card.json"]
       interval: 15s
       timeout: 5s
-      start_period: 10s
+      start_period: 30s
       retries: 3
     deploy:
       resources:
@@ -424,7 +410,7 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:10006/.well-known/agent-card.json"]
       interval: 15s
       timeout: 5s
-      start_period: 10s
+      start_period: 30s
       retries: 3
     deploy:
       resources:
@@ -467,7 +453,7 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:10007/.well-known/agent-card.json"]
       interval: 15s
       timeout: 5s
-      start_period: 10s
+      start_period: 30s
       retries: 3
     deploy:
       resources:
@@ -511,7 +497,7 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:10008/.well-known/agent-card.json"]
       interval: 15s
       timeout: 5s
-      start_period: 10s
+      start_period: 30s
       retries: 3
     deploy:
       resources:
@@ -554,7 +540,7 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:10009/.well-known/agent-card.json"]
       interval: 15s
       timeout: 5s
-      start_period: 10s
+      start_period: 30s
       retries: 3
     deploy:
       resources:
@@ -606,11 +592,7 @@ services:
         limits:
           memory: 512M
           cpus: "1"
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+    logging: *default-logging
 
   # ──────────────── Orchestrator ────────────────
   # Hephaestus: The central orchestration agent that manages sub-agents.
@@ -648,7 +630,7 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:10000/.well-known/agent-card.json"]
       interval: 15s
       timeout: 5s
-      start_period: 10s
+      start_period: 30s
       retries: 3
     deploy:
       resources:
