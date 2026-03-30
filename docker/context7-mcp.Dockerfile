@@ -12,10 +12,12 @@ WORKDIR /app
 
 # Pre-install packages so container starts instantly (avoids npx cold-download)
 RUN npm install -g \
-    @upstash/context7-mcp@latest \
-    supergateway@latest && \
+    @upstash/context7-mcp@2.1.6 \
+    supergateway@3.4.3 && \
     # Verify supergateway is on PATH
     supergateway --version
+
+USER node
 
 EXPOSE 3001
 

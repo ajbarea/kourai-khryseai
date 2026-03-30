@@ -13,11 +13,15 @@ WORKDIR /app
 # Pre-install packages so container starts instantly (avoids npx cold-download)
 RUN npm install -g \
     @modelcontextprotocol/server-memory@2026.1.26 \
-    supergateway@latest && \
+    supergateway@3.4.3 && \
     # Verify supergateway is on PATH
     supergateway --version
 
 COPY docker/memory-mcp-server.js /app/memory-mcp-server.js
+
+RUN chown -R node:node /app
+
+USER node
 
 EXPOSE 5000 5001
 
