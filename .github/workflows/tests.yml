@@ -34,7 +34,7 @@ jobs:
           python-version-file: "pyproject.toml"
 
       - name: Install dependencies
-        run: uv sync --dev --frozen
+        run: uv sync --all-packages --dev --frozen
 
       - name: Run ruff format check
         run: uv run ruff format --check .
@@ -135,6 +135,17 @@ jobs:
 
       - name: Install dependencies
         run: uv sync --all-packages --dev --frozen
+
+      - name: Create .env for CI
+        run: |
+          cat > .env << 'EOF'
+          DOCKER_HUB_USERNAME=ajb6289
+          KOURAI_PROVIDER=local
+          KOURAI_MODEL_TIER=cheap
+          KOURAI_LOG_LEVEL=INFO
+          ENVIRONMENT=ci
+          SERVICE_VERSION=0.1.0
+          EOF
 
       - name: Start Docker stack
         run: docker compose up -d --build --wait
