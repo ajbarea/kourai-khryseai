@@ -20,7 +20,6 @@ import pytest
 
 pytest.importorskip("pygame")
 
-from anyio import Path as AnyioPath
 
 # ===================================================================
 # 1. TTSEngine — mock pygame.mixer to avoid hardware dependency
@@ -132,25 +131,6 @@ class TestTTSEngineVolume:
         assert engine._on_complete is cb
 
 
-class TestTTSEngineGetConverter:
-    def test_finds_ffmpeg(self, mock_mixer):
-        from hosts.gui.tts_engine import TTSEngine
-
-        engine = TTSEngine()
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = Mock(returncode=0)
-            result = engine._get_converter()
-        assert result == "ffmpeg"
-
-    def test_no_converter(self, mock_mixer):
-        from hosts.gui.tts_engine import TTSEngine
-
-        engine = TTSEngine()
-        with patch("subprocess.run", side_effect=FileNotFoundError):
-            result = engine._get_converter()
-        assert result is None
-
-
 class TestTTSEngineStop:
     def test_stop_playing(self, mock_mixer):
         from hosts.gui.tts_engine import TTSEngine
@@ -198,56 +178,19 @@ class TestTTSEngineSpeak:
         from hosts.gui.tts_engine import TTSEngine
 
         engine = TTSEngine()
-        mock_communicate = MagicMock()
-        mock_communicate.save = AsyncMock()
 
         mock_sound = MagicMock()
         mock_sound.get_volume.return_value = 0.5
 
-        with (
-            patch(
-                "hosts.gui.tts_engine.edge_tts.Communicate",
-                return_value=mock_communicate,
-            ),
-            patch("pygame.mixer.Sound", return_value=mock_sound),
-            patch.object(engine, "_get_converter", return_value=None),
-        ):
-            # Make the temp file exist after "save"
-            async def fake_save(path):
-                await AnyioPath(path).touch()
+        async def mock_stream(*args, **kwargs):
+            yield b"dummy_audio"
 
-            mock_communicate.save = fake_save
+        engine.backend.stream_synthesize = MagicMock(side_effect=mock_stream)  # type: ignore
+
+        with patch("pygame.mixer.Sound", return_value=mock_sound):
             await engine.speak("Hello world", agent_name="metis")
 
         assert engine.is_playing is False  # completed
-
-    @pytest.mark.asyncio
-    async def test_speak_with_converter(self, mock_mixer):
-        from hosts.gui.tts_engine import TTSEngine
-
-        engine = TTSEngine()
-
-        async def fake_save(path):
-            await AnyioPath(path).touch()
-
-        mock_communicate = MagicMock()
-        mock_communicate.save = fake_save
-
-        mock_sound = MagicMock()
-        mock_sound.get_volume.return_value = 0.5
-
-        mock_run = Mock(returncode=0, stderr="")
-
-        with (
-            patch(
-                "hosts.gui.tts_engine.edge_tts.Communicate",
-                return_value=mock_communicate,
-            ),
-            patch("pygame.mixer.Sound", return_value=mock_sound),
-            patch.object(engine, "_get_converter", return_value="ffmpeg"),
-            patch("subprocess.run", return_value=mock_run),
-        ):
-            await engine.speak("Test", voice_key="aria", speed=0.9)
 
     @pytest.mark.asyncio
     async def test_speak_error_handling(self, mock_mixer):
@@ -257,11 +200,9 @@ class TestTTSEngineSpeak:
         cb = Mock()
         engine.set_on_complete(cb)
 
-        with patch(
-            "hosts.gui.tts_engine.edge_tts.Communicate",
-            side_effect=Exception("network error"),
-        ):
-            await engine.speak("Hello")
+        engine.backend.stream_synthesize = MagicMock(side_effect=Exception("network error"))  # type: ignore
+
+        await engine.speak("Hello")
 
         assert engine.is_playing is False
         cb.assert_called_once()

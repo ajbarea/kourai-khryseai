@@ -16,7 +16,7 @@ class TestVoiceConfig:
     def test_init(self):
         vc = VoiceConfig("Test", "en-US-TestNeural")
         assert vc.name == "Test"
-        assert vc.edge_id == "en-US-TestNeural"
+        assert vc.voice_id == "en-US-TestNeural"
         assert vc.speed == 1.0
         assert vc.pitch == 1.0
         assert vc.emotion == "default"
@@ -31,8 +31,8 @@ class TestVoiceConfig:
 class TestVoiceRoster:
     def test_roster_has_voices(self):
         assert len(VOICE_ROSTER) >= 5
-        assert "aria" in VOICE_ROSTER
-        assert "jenny" in VOICE_ROSTER
+        assert "am_michael" in VOICE_ROSTER
+        assert "af_sarah" in VOICE_ROSTER
 
     def test_all_agents_have_voices(self):
         for agent, voice_key in AGENT_VOICES.items():
