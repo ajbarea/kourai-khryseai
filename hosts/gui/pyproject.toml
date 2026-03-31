@@ -9,7 +9,9 @@ dependencies = [
     "pygame-ce>=2.5.0",  # Community edition with enhanced audio support
     "pillow>=10.0",
     "httpx>=0.27",
-    "edge-tts>=0.30.0",  # Neural TTS with real-time prosody control
+    "kokoro>=0.4.0",       # Local neural TTS (Apache 2.0, 82M params)
+    "soundfile>=0.13.0",   # WAV I/O for Kokoro audio output
+    "edge-tts>=0.30.0",   # Fallback cloud TTS (remove once Kokoro is stable)
     "emoji>=2.15.0",
     "numpy>=1.26",
 ]
