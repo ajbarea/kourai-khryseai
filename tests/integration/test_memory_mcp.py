@@ -7,13 +7,12 @@ Test Structure:
 - TestMemoryMcpSSE: MCP protocol connectivity with timeout guards
 - TestMemoryMcpToolExecution: Tool call validation
 
-Requires: memory-mcp container running (docker-compose up memory-mcp)
+Requires: testcontainers library (automated lifecycle)
 """
 
 from __future__ import annotations
 
 import asyncio
-import time
 from contextlib import suppress
 from typing import TYPE_CHECKING, Any
 
@@ -25,24 +24,22 @@ from mcp.client.sse import sse_client
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
+    from testcontainers.core.container import DockerContainer
 
-@pytest.fixture(scope="module", autouse=True)
-def wait_for_memory_mcp() -> None:
-    """Poll health endpoint until ready before any memory-mcp tests run.
 
-    Docker's healthcheck passes before Node.js fully warms up, causing the
-    first HTTP requests to time out. This fixture absorbs that startup gap.
-    """
-    url = "http://localhost:5000/health"
-    deadline = time.monotonic() + 30
-    with httpx.Client() as client:
-        while time.monotonic() < deadline:
-            with suppress(httpx.HTTPError, OSError):
-                response = client.get(url, timeout=5.0)
-                if response.status_code == 200:
-                    return
-            time.sleep(0.5)
-    pytest.skip("memory-mcp not available within 30s")
+@pytest.fixture(scope="module")
+def memory_mcp_urls(memory_mcp_container: DockerContainer) -> dict[str, str]:
+    """Provide dynamic URLs for the started container."""
+    host = memory_mcp_container.get_container_host_ip()
+    port_5000 = memory_mcp_container.get_exposed_port(5000)
+    port_5001 = memory_mcp_container.get_exposed_port(5001)
+
+    return {
+        "health": f"http://{host}:{port_5000}/health",
+        "root": f"http://{host}:{port_5000}/",
+        "sse": f"http://{host}:{port_5001}/sse",
+        "base_sse": f"http://{host}:{port_5001}",
+    }
 
 
 class MCPConnectionError(Exception):
@@ -63,7 +60,7 @@ async def _wait_for_sse_port(url: str, *, seconds: float = 15.0) -> bool:
 
 
 async def _connect_mcp_sse(
-    url: str, *, retries: int = 6, delay: float = 3.0
+    url: str, *, retries: int = 15, delay: float = 2.0
 ) -> tuple[Any, ClientSession] | None:
     """Try to establish an MCP SSE session with retries.
 
@@ -98,13 +95,13 @@ async def _connect_mcp_sse(
 
 
 @pytest.fixture
-async def mcp_session() -> AsyncGenerator[ClientSession, None]:
+async def mcp_session(memory_mcp_urls: dict[str, str]) -> AsyncGenerator[ClientSession, None]:
     """Async fixture providing a connected MCP ClientSession to memory-mcp.
 
     Function-scoped with retry: supergateway crashes on client disconnect
     and needs a few seconds to restart. The retry loop absorbs that gap.
     """
-    result = await _connect_mcp_sse("http://localhost:5001/sse")
+    result = await _connect_mcp_sse(memory_mcp_urls["sse"])
     if result is None:
         pytest.skip("SSE connection unavailable after retries")
         return  # unreachable; helps type narrowing
@@ -172,42 +169,41 @@ async def create_test_relation(
 
 
 class TestMemoryMcpHealth:
-    """Tests for memory-mcp health endpoint.
-
-    March 2026 pattern: Separate health validation from SSE protocol tests.
-    Health checks should always pass if container is responsive.
-    """
+    """Tests for memory-mcp health endpoint."""
 
     @pytest.mark.asyncio
-    async def test_health_endpoint_returns_200(self) -> None:
+    async def test_health_endpoint_returns_200(self, memory_mcp_urls: dict[str, str]) -> None:
         """Verify health endpoint responds with HTTP 200."""
         async with httpx.AsyncClient() as client:
-            response = await client.get("http://localhost:5000/health", timeout=10.0)
+            response = await client.get(memory_mcp_urls["health"], timeout=10.0)
             assert response.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_health_endpoint_returns_healthy_status(self) -> None:
+    async def test_health_endpoint_returns_healthy_status(
+        self, memory_mcp_urls: dict[str, str]
+    ) -> None:
         """Verify health endpoint reports healthy status."""
         async with httpx.AsyncClient() as client:
-            response = await client.get("http://localhost:5000/health", timeout=10.0)
+            response = await client.get(memory_mcp_urls["health"], timeout=10.0)
             data = response.json()
             assert "status" in data
             assert data["status"] == "healthy"
 
     @pytest.mark.asyncio
-    async def test_health_endpoint_reports_mcp_port(self) -> None:
+    async def test_health_endpoint_reports_mcp_port(self, memory_mcp_urls: dict[str, str]) -> None:
         """Verify health response includes MCP port number."""
         async with httpx.AsyncClient() as client:
-            response = await client.get("http://localhost:5000/health", timeout=10.0)
+            response = await client.get(memory_mcp_urls["health"], timeout=10.0)
             data = response.json()
             assert "mcp_port" in data
+            # mcp_port in response is the INTERNAL port (5001), not the exposed one
             assert data["mcp_port"] == 5001
 
     @pytest.mark.asyncio
-    async def test_root_endpoint_also_works(self) -> None:
+    async def test_root_endpoint_also_works(self, memory_mcp_urls: dict[str, str]) -> None:
         """Verify / endpoint works (fallback for Docker health check)."""
         async with httpx.AsyncClient() as client:
-            response = await client.get("http://localhost:5000/", timeout=10.0)
+            response = await client.get(memory_mcp_urls["root"], timeout=10.0)
             assert response.status_code == 200
             data = response.json()
             assert data["status"] == "healthy"
@@ -216,7 +212,6 @@ class TestMemoryMcpHealth:
 class TestMemoryMcpSSE:
     """Tests for memory-mcp SSE endpoint connectivity and tool discovery.
 
-    March 2026 Best Practices:
     - Timeout guards: All async operations protected from hanging
     - Graceful skip: SSE issues don't fail tests, they skip with reason
     - Isolation: Test protocol connectivity separate from tool execution
@@ -260,7 +255,6 @@ class TestMemoryMcpSSE:
 class TestMemoryMcpToolExecution:
     """Tests for memory-mcp tool calls (entity creation, relations, etc.).
 
-    March 2026 Best Practices:
     - Real tool execution against running server
     - Response validation (check .content attribute per MCP spec)
     - Error handling with timeout guards
@@ -286,10 +280,7 @@ class TestMemoryMcpToolExecution:
 
     @pytest.mark.asyncio
     async def test_read_graph_returns_content(self, mcp_session: ClientSession) -> None:
-        """Verify read_graph returns valid MCP tool result with .content.
-
-        This validates the response structure per MCP spec.
-        """
+        """Verify read_graph returns valid MCP tool result with .content."""
 
         await create_test_entity(mcp_session, "integration_test_entity")
 
@@ -301,10 +292,7 @@ class TestMemoryMcpToolExecution:
 
     @pytest.mark.asyncio
     async def test_search_nodes_returns_content(self, mcp_session: ClientSession) -> None:
-        """Verify search_nodes tool returns valid MCP result.
-
-        March 2026: Test response structure, not just success.
-        """
+        """Verify search_nodes tool returns valid MCP result."""
 
         entity_name = "search_test_distinctive_name_unique"
         await create_test_entity(
@@ -321,10 +309,7 @@ class TestMemoryMcpToolExecution:
 
     @pytest.mark.asyncio
     async def test_add_observations_to_entity(self, mcp_session: ClientSession) -> None:
-        """Verify add_observations tool works and validates response.
-
-        March 2026: Full response validation.
-        """
+        """Verify add_observations tool works and validates response."""
         entity_name = "observation_test_entity"
 
         await create_test_entity(

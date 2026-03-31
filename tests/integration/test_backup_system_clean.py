@@ -4,7 +4,6 @@ Integration tests for the Automated Backup System
 Tests the backup infrastructure: scripts, configuration, and file handling.
 These tests are designed to run on all platforms (Windows, macOS, Linux).
 
-March 2026 Best Practices:
 - Cross-platform test compatibility
 - Test file structure and configuration
 - Mock external dependencies (HF CLI) when needed
