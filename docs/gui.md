@@ -269,10 +269,6 @@ Adjust character-based reading duration
 - **Loudness normalization** for consistency
 - **Personality audio profiles** with warmth/presence
 
-### For Technical Details
-
-See `designs/TTS_ARCHITECTURE.md` for the complete API reference, audio processing pipeline, and migration guide.
-
 ---
 
 ## Settings

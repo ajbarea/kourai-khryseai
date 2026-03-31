@@ -137,8 +137,6 @@ Auto-dismisses after 8 seconds.
 
 Portraits live in `game/images/portraits/` and use a warm forge aesthetic.
 
-See [Portrait Generation Guide](https://github.com/ajbarea/kourai_khryseai/tree/main/designs/PORTRAIT_GENERATION_GUIDE.md) for the AI art prompts.
-
 ---
 
 ## Color Scheme

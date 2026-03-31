@@ -127,8 +127,6 @@ Controlled by `KOURAI_PROVIDER` and `KOURAI_MODEL_TIER` in `.env`:
 
 ## 🎙️ TTS Ecosystem
 
-TTS is an optional layer. See [`TTS_ARCHITECTURE.md`](https://github.com/ajbarea/kourai-khryseai/blob/main/designs/TTS_ARCHITECTURE.md) in `designs/` for the full implementation plan.
-
 | Engine | Version | Licence | Notes |
 |---|---|---|---|
 | `edge-tts` | 7.2.7 | MIT | Microsoft Edge voices, no API key, 40K weekly downloads |
