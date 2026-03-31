@@ -69,7 +69,7 @@ jobs:
         run: mkdir -p logs
 
       - name: Run unit tests
-        run: uv run pytest -n auto tests/unit/ -v --tb=short --cov=. --cov-report=xml:logs/coverage.xml --cov-report=term-missing
+        run: uv run pytest -n auto tests/unit/ -v --tb=short --cov=. --cov-report=xml:logs/coverage.xml --cov-report=term-missing --junitxml=logs/junit.xml
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v6.0.0
@@ -79,6 +79,12 @@ jobs:
           files: logs/coverage.xml
           flags: unit
           fail_ci_if_error: false
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   performance-tests:
     name: Performance Tests
@@ -100,11 +106,16 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-packages --dev --frozen
 
+      - name: Setup Testcontainers Cloud Client
+        uses: atomicjar/testcontainers-cloud-setup-action@v1
+        with:
+          token: ${{ secrets.TC_CLOUD_TOKEN }}
+
       - name: Create logs directory
         run: mkdir -p logs
 
       - name: Run performance tests
-        run: uv run pytest tests/performance/ -v --tb=short --cov=. --cov-report=xml:logs/coverage.xml --cov-report=term-missing
+        run: uv run pytest tests/performance/ -v --tb=short --cov=. --cov-report=xml:logs/coverage.xml --cov-report=term-missing --junitxml=logs/junit.xml
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v6.0.0
@@ -114,6 +125,12 @@ jobs:
           files: logs/coverage.xml
           flags: performance
           fail_ci_if_error: false
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   integration-tests:
     name: Integration Tests
@@ -136,6 +153,11 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-packages --dev --frozen
 
+      - name: Setup Testcontainers Cloud Client
+        uses: atomicjar/testcontainers-cloud-setup-action@v1
+        with:
+          token: ${{ secrets.TC_CLOUD_TOKEN }}
+
       - name: Create .env for CI
         run: |
           cat > .env << 'EOF'
@@ -147,22 +169,11 @@ jobs:
           SERVICE_VERSION=0.1.0
           EOF
 
-      - name: Start Docker stack
-        run: docker compose up -d --build --wait
-
       - name: Create logs directory
         run: mkdir -p logs
 
       - name: Run integration tests
-        run: uv run pytest tests/integration/ -v --tb=short --cov=. --cov-report=xml:logs/coverage.xml --cov-report=term-missing
-
-      - name: Dump container logs on failure
-        if: failure()
-        run: docker compose logs
-
-      - name: Stop Docker stack
-        if: always()
-        run: docker compose down --remove-orphans
+        run: uv run pytest tests/integration/ -v --tb=short --cov=. --cov-report=xml:logs/coverage.xml --cov-report=term-missing --junitxml=logs/junit.xml
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v6.0.0
@@ -172,3 +183,9 @@ jobs:
           files: logs/coverage.xml
           flags: integration
           fail_ci_if_error: false
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
