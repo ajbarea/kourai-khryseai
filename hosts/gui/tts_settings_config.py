@@ -20,6 +20,7 @@ class TTSSettingsConfig:
 
     DEFAULT_CONFIG: ClassVar[dict[str, Any]] = {
         "tts_enabled": True,
+        "tts_backend": "kokoro",  # "kokoro" | "edge" | "disabled"
         "pacing_mode": "NORMAL",
         "thinking_pause_enabled": True,
         "thinking_pause_duration": 0.5,
@@ -98,6 +99,11 @@ class TTSSettingsConfig:
         self.settings["thinking_pause_enabled"] = manager.pacer.config.enable_thinking_pause
         self.settings["thinking_pause_duration"] = manager.pacer.config.thinking_pause_duration
         self.settings["min_chars_per_second"] = manager.pacer.config.min_chars_per_second
+
+        # Persist backend selection
+        if hasattr(manager, "backend") and manager.backend:
+            backend_name = type(manager.backend).__name__.replace("Backend", "").lower()
+            self.settings["tts_backend"] = backend_name
 
     def reset_to_defaults(self) -> None:
         """Reset all settings to defaults."""

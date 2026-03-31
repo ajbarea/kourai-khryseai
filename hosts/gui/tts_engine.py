@@ -1,8 +1,11 @@
 """Text-to-Speech engine for agent dialogue with personality voices.
 
-Uses edge-tts for natural neural voices and Pygame for playback.
-Supports streaming, volume control, audio effects, and asynchronous playback.
-Optimized with low-latency streaming and MP3→WAV conversion.
+Uses a pluggable TTSBackend (default: Kokoro-82M) for speech synthesis
+and Pygame for playback. Supports volume control, audio effects, and
+asynchronous playback.
+
+The backend abstraction lives in kourai_common.tts_backend — see that
+module for voice mapping and the TTSBackend protocol.
 """
 
 from __future__ import annotations
@@ -10,64 +13,61 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-import subprocess
 import tempfile
-from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import edge_tts
 import pygame
+
+from kourai_common.tts_backend import (
+    AGENT_VOICE_MAP,
+    TTSVoiceConfig,
+    get_voice_for_agent,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from kourai_common.tts_backend import TTSBackend
+
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class VoiceConfig:
-    """Configuration for a voice personality."""
-
-    name: str
-    edge_id: str
-    speed: float = 1.0
-    pitch: float = 1.0
-    emotion: str = "default"
+# Re-export for test compatibility — tests import these from tts_engine
+VoiceConfig = TTSVoiceConfig
+VOICE_ROSTER = {v.voice_id: v for v in AGENT_VOICE_MAP.values()}
+AGENT_VOICES = {agent: cfg.voice_id for agent, cfg in AGENT_VOICE_MAP.items()}
 
 
-VOICE_ROSTER = {
-    "aria": VoiceConfig("Aria", "en-US-AriaNeural", 0.95),
-    "jenny": VoiceConfig("Jenny", "en-US-JennyNeural", 0.90),
-    "michelle": VoiceConfig("Michelle", "en-US-MichelleNeural", 0.92),
-    "sonia": VoiceConfig("Sonia", "en-GB-SoniaNeural", 0.93),
-    "guy": VoiceConfig("Guy", "en-US-GuyNeural", 0.95),
-}
+def _create_default_backend() -> TTSBackend:
+    """Create the default TTS backend (Kokoro, falling back to edge-tts)."""
+    try:
+        from kourai_common.tts_kokoro import KokoroBackend
 
-AGENT_VOICES = {
-    "hephaestus": "guy",
-    "metis": "aria",
-    "kallos": "jenny",
-    "mneme": "michelle",
-    "techne": "sonia",
-    "dokimasia": "aria",
-}
+        return KokoroBackend()
+    except ImportError:
+        logger.warning(
+            "Kokoro not available (pip install kokoro soundfile). Falling back to edge-tts."
+        )
+        from kourai_common.tts_edge import EdgeTTSBackend
+
+        return EdgeTTSBackend()
 
 
 class TTSEngine:
     """Manages text-to-speech generation and playback with advanced audio control.
 
     Features:
-    - Low-latency streaming audio with MP3→WAV conversion for compatibility
+    - Pluggable backend (Kokoro-82M local or edge-tts cloud)
     - Volume normalization and fade effects
     - Asynchronous playback with cancellation support
     - Memory-efficient cleanup
     - Personality voice effects and prosody control
-    - Comprehensive logging for debugging
     """
 
     def __init__(
         self,
+        backend: TTSBackend | None = None,
         temp_dir: Path | None = None,
         master_volume: float = 0.8,
         enable_effects: bool = True,
@@ -75,10 +75,12 @@ class TTSEngine:
         """Initialize the TTS engine.
 
         Args:
+            backend: TTS synthesis backend. Auto-detected if None.
             temp_dir: Directory for temporary audio files. Uses system temp if None.
             master_volume: Master volume (0.0 to 1.0).
             enable_effects: Enable audio effects and normalization.
         """
+        self.backend = backend or _create_default_backend()
         self.temp_dir = temp_dir or Path(tempfile.gettempdir()) / "kourai_tts"
         self.temp_dir.mkdir(exist_ok=True)
         self.is_playing = False
@@ -88,7 +90,12 @@ class TTSEngine:
         self._on_complete: Callable[[], None] | None = None
         self._mixer_initialized = False
         self._init_mixer()
-        logger.info(f"TTSEngine initialized: temp_dir={self.temp_dir}, volume={self.master_volume}")
+        logger.info(
+            "TTSEngine initialized: backend=%s, temp_dir=%s, volume=%s",
+            type(self.backend).__name__,
+            self.temp_dir,
+            self.master_volume,
+        )
 
     def _init_mixer(self) -> None:
         """Initialize pygame mixer with optimal settings.
@@ -145,23 +152,11 @@ class TTSEngine:
         channel = getattr(self, "_tts_channel", None)
         if channel is not None:
             channel.set_volume(self.master_volume)
-        logger.debug(f"Master volume set to {self.master_volume}")
+        logger.debug("Master volume set to %s", self.master_volume)
 
     def set_on_complete(self, callback: Callable[[], None]) -> None:
         """Set callback to fire when playback completes."""
         self._on_complete = callback
-
-    def _get_converter(self) -> str | None:
-        """Find available audio converter (ffmpeg or avconv)."""
-        for converter in ["ffmpeg", "avconv"]:
-            try:
-                subprocess.run([converter, "-version"], capture_output=True, timeout=2)  # noqa: S603
-                logger.debug(f"Found converter: {converter}")
-                return converter
-            except (FileNotFoundError, subprocess.TimeoutExpired):
-                continue
-        logger.warning("No audio converter found (ffmpeg or avconv). MP3 playback may fail.")
-        return None
 
     async def speak(
         self,
@@ -171,12 +166,12 @@ class TTSEngine:
         speed: float | None = None,
         pitch: float | None = None,
     ) -> None:
-        """Generate and play speech asynchronously.
+        """Generate and play speech asynchronously with low-latency streaming.
 
         Args:
             text: Text to speak.
             agent_name: Agent name to auto-select voice. Ignored if voice_key provided.
-            voice_key: Explicit voice key from VOICE_ROSTER.
+            voice_key: Explicit voice_id to use. Overrides agent_name lookup.
             speed: Override voice speed (0.5 to 2.0).
             pitch: Override voice pitch (0.5 to 2.0).
         """
@@ -184,99 +179,79 @@ class TTSEngine:
             logger.debug("Empty text, skipping TTS")
             return
 
-        if voice_key is None:
-            voice_key = AGENT_VOICES.get(agent_name or "hephaestus", "aria")
+        # Resolve voice config
+        if voice_key is not None:
+            voice_cfg = VOICE_ROSTER.get(voice_key, get_voice_for_agent(None))
+        else:
+            voice_cfg = get_voice_for_agent(agent_name)
 
-        voice_cfg = VOICE_ROSTER.get(voice_key, VOICE_ROSTER["aria"])
-        final_speed = speed if speed is not None else voice_cfg.speed
-
-        temp_mp3 = self.temp_dir / f"speech_{abs(hash(text)) % 1000000}.mp3"
-        temp_wav = self.temp_dir / f"speech_{abs(hash(text)) % 1000000}.wav"
+        # Apply overrides
+        if speed is not None or pitch is not None:
+            voice_cfg = TTSVoiceConfig(
+                name=voice_cfg.name,
+                voice_id=voice_cfg.voice_id,
+                lang_code=voice_cfg.lang_code,
+                speed=speed if speed is not None else voice_cfg.speed,
+                pitch=pitch if pitch is not None else voice_cfg.pitch,
+                emotion=voice_cfg.emotion,
+            )
 
         try:
             logger.info(
-                "TTS: Starting speech generation - "
-                f"agent={agent_name}, voice={voice_key}, "
-                f"speed={final_speed}, text_len={len(text)}"
+                "TTS: Starting streaming speech generation — "
+                "agent=%s, voice=%s (%s), speed=%.2f, text_len=%d",
+                agent_name,
+                voice_cfg.voice_id,
+                type(self.backend).__name__,
+                voice_cfg.speed,
+                len(text),
             )
-
-            communicate = edge_tts.Communicate(
-                text, voice_cfg.edge_id, rate=f"{(final_speed - 1.0) * 50:+.0f}%"
-            )
-            await communicate.save(str(temp_mp3))
-
-            if not temp_mp3.exists():
-                raise RuntimeError(f"Edge-TTS failed to generate audio file: {temp_mp3}")
-
-            logger.debug(f"TTS: MP3 generated ({temp_mp3.stat().st_size} bytes)")
-
-            converter = self._get_converter()
-            playback_path = temp_mp3
-            if converter:
-                logger.debug(f"TTS: Converting MP3→WAV using {converter}")
-                try:
-                    proc = await asyncio.create_subprocess_exec(
-                        converter,
-                        "-i",
-                        str(temp_mp3),
-                        "-acodec",
-                        "pcm_s16le",
-                        "-ar",
-                        "44100",
-                        "-ac",
-                        "2",
-                        str(temp_wav),
-                        "-y",
-                        stdout=asyncio.subprocess.PIPE,
-                        stderr=asyncio.subprocess.PIPE,
-                    )
-                    try:
-                        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=10)
-                    except TimeoutError:
-                        with contextlib.suppress(Exception):
-                            proc.kill()
-                        await proc.wait()
-                        logger.warning("TTS: Converter timed out, falling back to MP3")
-                        _stdout, stderr = b"", b""
-
-                    if proc.returncode != 0 and proc.returncode is not None:
-                        logger.warning(
-                            f"TTS: Converter returned code {proc.returncode}: {stderr.decode()}"
-                        )
-                    if temp_wav.exists():
-                        logger.debug(f"TTS: WAV generated ({temp_wav.stat().st_size} bytes)")
-                        playback_path = temp_wav
-                    else:
-                        logger.warning("TTS: WAV not created, falling back to MP3")
-                except Exception as e:
-                    logger.warning(f"TTS: Conversion error, falling back to MP3: {e}")
-            else:
-                logger.warning("TTS: No converter available, using MP3 directly (may fail)")
 
             self._init_mixer()
             if pygame.mixer.get_init() is None:
                 logger.info("Skipping TTS playback; audio is disabled.")
                 return
+
             self.is_playing = True
-
-            logger.debug(f"TTS: Loading sound from {playback_path}")
-            sound = pygame.mixer.Sound(str(playback_path))
-
-            # Apply volume normalization (peak normalization for consistent loudness)
-            if self.enable_effects:
-                sound.set_volume(self.master_volume * 0.85)
-            else:
-                sound.set_volume(self.master_volume)
-
             channel: pygame.mixer.Channel | None = getattr(self, "_tts_channel", None)
             playback_duration: float = 0.0
-            if channel is not None:
-                logger.info(f"TTS: Playing on reserved channel 2, volume={sound.get_volume():.2f}")
-                channel.play(sound)
-            else:
-                logger.info(f"TTS: Playing on default, volume={sound.get_volume():.2f}")
-                sound.play()
+            chunk_count = 0
 
+            # Stream chunks from the backend
+            async for chunk_bytes in self.backend.stream_synthesize(text, voice_cfg):
+                if not chunk_bytes:
+                    continue
+
+                chunk_count += 1
+                sound = pygame.mixer.Sound(chunk_bytes)
+
+                # Apply volume normalization
+                if self.enable_effects:
+                    sound.set_volume(self.master_volume * 0.85)
+                else:
+                    sound.set_volume(self.master_volume)
+
+                if channel is not None:
+                    # For the first chunk, play immediately
+                    if chunk_count == 1:
+                        logger.debug("TTS: Playing first chunk (latency optimized)")
+                        channel.play(sound)
+                    else:
+                        # For subsequent chunks, queue them for gapless playback
+                        # If the queue is full (pygame only supports 1 queued sound),
+                        # wait until the current sound finishes or the queue is free.
+                        while channel.get_queue() is not None:
+                            await asyncio.sleep(0.01)
+                            playback_duration += 0.01
+                        channel.queue(sound)
+                else:
+                    # Fallback if no reserved channel: play sequentially (less ideal)
+                    sound.play()
+                    while pygame.mixer.get_busy():
+                        await asyncio.sleep(0.01)
+                        playback_duration += 0.01
+
+            # Wait for final chunks to finish playing
             if channel is not None:
                 while channel.get_busy():
                     await asyncio.sleep(0.05)
@@ -286,19 +261,16 @@ class TTSEngine:
                     await asyncio.sleep(0.05)
                     playback_duration += 0.05
 
-            logger.info(f"TTS: Playback complete (duration={playback_duration:.2f}s)")
+            logger.info(
+                "TTS: Streaming playback complete (chunks=%d, duration=%.2fs)",
+                chunk_count,
+                playback_duration,
+            )
 
         except Exception as e:
-            logger.error(f"TTS playback error: {type(e).__name__}: {e}", exc_info=True)
+            logger.error("TTS streaming playback error: %s: %s", type(e).__name__, e, exc_info=True)
         finally:
             self.is_playing = False
-            for temp_file in [temp_mp3, temp_wav]:
-                if temp_file.exists():
-                    try:
-                        temp_file.unlink()
-                        logger.debug(f"TTS: Cleaned up {temp_file}")
-                    except OSError as e:
-                        logger.warning(f"TTS: Failed to clean up {temp_file}: {e}")
             if self._on_complete:
                 self._on_complete()
 
@@ -342,10 +314,10 @@ class TTSEngine:
         """
         self.stop()
         if self.temp_dir.exists():
-            for f in self.temp_dir.glob("*.mp3"):
+            for f in self.temp_dir.glob("*.wav"):
                 with contextlib.suppress(OSError):
                     f.unlink()
-            for f in self.temp_dir.glob("*.wav"):
+            for f in self.temp_dir.glob("*.mp3"):
                 with contextlib.suppress(OSError):
                     f.unlink()
         logger.debug("TTSEngine cleanup complete")

@@ -12,6 +12,10 @@ from typing import TYPE_CHECKING
 
 from .dialogue_pacing import DialoguePacer, PacingConfig, PacingMode
 from .tts_engine import TTSEngine
+from .tts_settings_config import TTSSettingsConfig
+
+if TYPE_CHECKING:
+    from kourai_common.tts_backend import TTSBackend
 
 logger = logging.getLogger(__name__)
 
@@ -131,6 +135,7 @@ class TTSGUIManager:
         recv_q: _queue.Queue[dict],
         enable_tts: bool = True,
         pacing_mode: PacingMode = PacingMode.NORMAL,
+        config: TTSSettingsConfig | None = None,
     ):
         """Initialize the TTS GUI manager.
 
@@ -138,22 +143,87 @@ class TTSGUIManager:
             recv_q: Queue for GUI events (from client).
             enable_tts: Whether to enable text-to-speech.
             pacing_mode: Initial dialogue pacing mode.
+            config: TTS settings config (uses default if None).
         """
         self.recv_q = recv_q
         self.enable_tts = enable_tts
-        self.tts_engine = TTSEngine() if enable_tts else None
+        self.config = config or TTSSettingsConfig()
+        self.backend = self._create_backend_from_settings()
+        self.tts_engine = TTSEngine(backend=self.backend) if enable_tts else None
         self.pacer = DialoguePacer(PacingConfig(mode=pacing_mode))
         self._tts_thread: threading.Thread | None = None
         self._current_agent: str | None = None
         logger.info(
-            f"TTSGUIManager initialized: enable_tts={enable_tts}, pacing_mode={pacing_mode.name}"
+            f"TTSGUIManager initialized: enable_tts={enable_tts}, pacing_mode={pacing_mode.name}, "
+            f"backend={type(self.backend).__name__ if self.backend else 'None'}"
         )
+
+    def _create_backend_from_settings(self) -> TTSBackend | None:
+        """Create TTS backend based on settings.
+
+        Returns:
+            TTSBackend instance (Kokoro preferred, edge-tts fallback) or None if disabled.
+        """
+        backend_name = self.config.get("tts_backend", "kokoro")
+
+        if backend_name == "disabled":
+            logger.info("TTS backend set to 'disabled'")
+            return None
+
+        if backend_name == "edge":
+            try:
+                from kourai_common.tts_edge import EdgeTTSBackend
+
+                logger.info("Using Edge-TTS backend")
+                return EdgeTTSBackend()
+            except ImportError:
+                logger.error("Edge-TTS not installed")
+                return None
+
+        # Default to Kokoro, fall back to edge-tts
+        try:
+            from kourai_common.tts_kokoro import KokoroBackend
+
+            logger.info("Using Kokoro-82M backend")
+            return KokoroBackend()
+        except ImportError:
+            logger.warning("Kokoro not available, falling back to edge-tts")
+            try:
+                from kourai_common.tts_edge import EdgeTTSBackend
+
+                return EdgeTTSBackend()
+            except ImportError:
+                logger.error("Neither Kokoro nor edge-tts available")
+                return None
+
+    def set_backend(self, backend_name: str) -> None:
+        """Switch to a different TTS backend at runtime.
+
+        Args:
+            backend_name: "kokoro", "edge", or "disabled".
+        """
+        if backend_name not in ("kokoro", "edge", "disabled"):
+            logger.warning(f"Invalid backend name: {backend_name}")
+            return
+
+        self.config.set("tts_backend", backend_name)
+        self.config.save()
+        old_backend = type(self.backend).__name__ if self.backend else "None"
+
+        self.backend = self._create_backend_from_settings()
+
+        if self.tts_engine:
+            self.tts_engine.backend = self.backend
+
+        new_backend = type(self.backend).__name__ if self.backend else "None"
+        logger.info(f"TTS backend switched: {old_backend} → {new_backend}")
 
     def set_tts_enabled(self, enabled: bool) -> None:
         """Enable or disable TTS."""
         self.enable_tts = enabled
         if enabled and self.tts_engine is None:
-            self.tts_engine = TTSEngine()
+            self.backend = self._create_backend_from_settings()
+            self.tts_engine = TTSEngine(backend=self.backend)
             logger.info("TTS enabled")
         elif not enabled and self.tts_engine:
             self.tts_engine.stop()
