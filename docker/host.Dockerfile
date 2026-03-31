@@ -30,8 +30,7 @@ ARG PACKAGE_NAME
 COPY --link agents/ agents/
 COPY --link hosts/ hosts/
 
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --package kourai-${PACKAGE_NAME} --no-dev --frozen
+RUN uv sync --package kourai-${PACKAGE_NAME} --no-dev --frozen
 
 # --- Runtime ---
 FROM python:${PYTHON_VERSION}-slim AS runtime
@@ -98,7 +97,7 @@ RUN if [ "${HOST_TYPE}" = "agent" ] && [ "${PACKAGE_NAME}" = "dokimasia" ]; then
     rm -rf /var/lib/apt/lists/*; \
     fi
 
-# GUI: SDL2 runtime libs for pygame
+# GUI: SDL2 runtime libs for pygame + espeak-ng for Kokoro TTS
 RUN if [ "${HOST_TYPE}" = "gui" ]; then \
     apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -106,7 +105,8 @@ RUN if [ "${HOST_TYPE}" = "gui" ]; then \
     libsdl2-image-2.0-0 \
     libsdl2-mixer-2.0-0 \
     libsdl2-ttf-2.0-0 \
-    libfreetype6 && \
+    libfreetype6 \
+    espeak-ng && \
     rm -rf /var/lib/apt/lists/*; \
     fi
 
