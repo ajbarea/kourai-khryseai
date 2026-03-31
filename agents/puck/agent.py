@@ -3,8 +3,6 @@
 Puck is a companion spirit, not a specialist. He routes through Hephaestus
 but has his own personality: a mischievous, helpful sprite who knows the
 forge better than anyone but won't do the work for you.
-
-Spec: designs/PUCK.md
 """
 
 from __future__ import annotations

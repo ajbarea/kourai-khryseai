@@ -1,11 +1,4 @@
-"""Settings overlay panel for Kourai Khryseai Pygame GUI.
-
-Implements March 2026 UI/UX best practices:
-- "Quiet Intelligence" aesthetic (clean, frosted glass/overlay).
-- Progressive disclosure.
-- Easy to tap/click toggles for accessibility settings.
-- Tabbed navigation (Display, Gameplay, Audio) for better organization.
-"""
+"""Settings overlay panel for Kourai Khryseai Pygame GUI."""
 
 from __future__ import annotations
 

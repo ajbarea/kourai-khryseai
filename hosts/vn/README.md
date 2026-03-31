@@ -59,8 +59,6 @@ The VN Host communicates with the `@agents/**` backend via a **JSON-over-Subproc
 - Reflect agent state through portraits and transitions.
 - Track player-agent relationship metrics (Affinity/Tiers).
 
-For technical details, see [designs/AGENT_RENPY_BRIDGE.md](../../designs/AGENT_RENPY_BRIDGE.md).
-
 ---
 
 ## ⌨️ Development Tips

@@ -5,8 +5,6 @@ technical claims have citations, that standards references are real, and
 that algorithmic choices are grounded in documented research.
 
 Via Brave Search, Aletheia can verify claims against live web results.
-
-Spec: designs/NEW_AGENTS_ROADMAP.md
 """
 
 from __future__ import annotations

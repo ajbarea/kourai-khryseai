@@ -4,8 +4,6 @@ Inspired by Disco Elysium's skill system. Six psychological dimensions that
 track the player's development as a craftsperson and collaborator.
 Each virtue has a score (0.0–1.0) and generates agent interjections when
 thresholds are crossed (both low and high).
-
-Spec: designs/FORGE_VIRTUES.md
 """
 
 from __future__ import annotations

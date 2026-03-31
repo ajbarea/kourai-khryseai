@@ -251,11 +251,8 @@ def get_mcp_toolkit() -> MCPToolkit:
 
 
 def _initialize_default_registry(toolkit: MCPToolkit) -> None:
-    """Initialize default MCP server registry and agent assignments.
-
-    Follows assignments from MARCH_20.md MCP target assignment matrix.
-    """
-    # Register known servers (all free as of March 2026, all optional)
+    """Initialize default MCP server registry and agent assignments."""
+    # Register known servers
     toolkit.register_server("context7", enabled=True)
     toolkit.register_server("context_hub", enabled=True)
     toolkit.register_server("github", enabled=True)
@@ -265,7 +262,7 @@ def _initialize_default_registry(toolkit: MCPToolkit) -> None:
     toolkit.register_server("brave_search", enabled=True)
     toolkit.register_server("dbhub", enabled=False)
 
-    # Assign servers to agents (from MARCH_20.md)
+    # Assign servers to agents
     toolkit.assign_servers("hephaestus", ["github"], fallback_mode="none")
     toolkit.assign_servers(
         "metis", ["context7", "context_hub", "github"], fallback_mode="subprocess"

@@ -52,8 +52,6 @@ init python:
     }
 
     # Name → epithet lookup for the say screen subtitle display.
-    # Matches Hades dialogue UI: "ATHENA / Goddess of Wisdom".
-    # Canonical epithets from designs/FORGE_AESTHETIC.md § Ten Agents.
     AGENT_EPITHETS = {
         "Hephaestus": "Master of the Forge",
         "Techne":     "Artisan of Code",
@@ -84,7 +82,7 @@ init python:
     # Canonical display order for the affinity HUD (6 maidens only — spirits are sidebar)
     AGENT_ORDER = ["hephaestus", "techne", "kallos", "metis", "dokimasia", "mneme"]
 
-    # @mention prefix → agent_id (matches MARCH_20.md @Mention Routing table)
+    # @mention prefix → agent_id
     MENTION_MAP = {
         "heph": "hephaestus",
         "tech": "techne",
@@ -98,9 +96,7 @@ init python:
         "ale":  "aletheia",
     }
 
-    # Valid portrait states per agent — canonical names from
-    # designs/PORTRAIT_GENERATION_GUIDE.md.  Must stay in sync with
-    # kourai_common.companion.PORTRAIT_STATES (the inference source).
+    # Valid portrait states per agent
     PORTRAIT_STATES = {
         "hephaestus": {"neutral", "vulnerable", "fierce"},
         "techne":     {"neutral", "vulnerable", "fired_up"},

@@ -3,8 +3,6 @@
 Cupid mediates the romantic dimension of the player's relationship with the
 golden maidens. He is arch, knowing, and a little smug — but ultimately
 invested in genuine connection, not cheap drama.
-
-Spec: designs/COMPANION_SPIRITS.md
 """
 
 from __future__ import annotations

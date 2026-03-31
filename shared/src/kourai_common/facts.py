@@ -12,8 +12,6 @@ Knowledge Graph Schema:
 - Node: A fact (topic, claim, preference)
 - Edges: Relationships between facts (refines, contradicts, supports)
 - Attributes: confidence, source_agent, reinforcement_count, validity
-
-Spec: MARCH_20.md Player Facts section
 """
 
 from __future__ import annotations

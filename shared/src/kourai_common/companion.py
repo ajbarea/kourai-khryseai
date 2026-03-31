@@ -2,19 +2,11 @@
 
 Pure functions for companion spirit gameplay mechanics, used by both
 the Ren'Py VN and testable in isolation.
-
-Spec: designs/COMPANION_SPIRITS.md
 """
 
 from __future__ import annotations
 
 # ── Portrait state constants ───────────────────────────────────────────────
-#
-# Canonical per-agent portrait states.  State names must stay in sync with:
-#   - designs/PORTRAIT_GENERATION_GUIDE.md  (art direction / filenames)
-#   - hosts/vn/kourai_vn/game/script.rpy    (Ren'Py allowlist)
-#   - agents/vn_bridge.py                   (inference → NDJSON "portrait" field)
-#
 PORTRAIT_STATES: dict[str, frozenset[str]] = {
     "hephaestus": frozenset({"neutral", "vulnerable", "fierce"}),
     "techne": frozenset({"neutral", "vulnerable", "fired_up"}),

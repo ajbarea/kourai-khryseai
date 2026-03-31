@@ -3,8 +3,6 @@
 Aidos is the Greek spirit of shame and self-awareness. She reviews code,
 documentation, and commit messages for vague, jargon-heavy, or "slop" language
 and replaces it with concrete, specific, honest prose.
-
-Spec: designs/NEW_AGENTS_ROADMAP.md
 """
 
 from __future__ import annotations

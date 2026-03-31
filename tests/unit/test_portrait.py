@@ -1,7 +1,6 @@
 """Unit tests for kourai_common.companion portrait inference.
 
 Covers infer_portrait_state() and the PORTRAIT_STATES constant.
-Spec: designs/PORTRAIT_GENERATION_GUIDE.md
 """
 
 from __future__ import annotations
