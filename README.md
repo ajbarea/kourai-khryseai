@@ -221,7 +221,8 @@ Visual interface with agent portraits, dialogue bubbles, and neural text-to-spee
 
 - 🎨 Full-color agent portraits (JRPG aesthetic)
 - 💬 Real-time dialogue with streaming responses
-- 🔊 Neural voice synthesis (Microsoft Edge TTS)
+- 🔊 Low-latency neural voice synthesis (**Kokoro-82M local SLM** + Edge-TTS fallback)
+- ⚡ **170ms "Human-Like" Latency** via real-time audio chunk streaming
 - ⚙️ Settings for accessibility and voice customization
 - 📜 Scrollable chat history
 
@@ -245,6 +246,13 @@ KOURAI_MODEL_TIER=standard    # cheap | standard | smart
 | **standard** | Sonnet | Opus | Sonnet | Sonnet | Haiku | Haiku |
 | **smart** | Opus | Opus | Opus | Sonnet | Sonnet | Sonnet |
 
+### TTS Backends
+
+Kourai Khryseai prioritizes local execution for privacy and speed.
+
+- **Kokoro-82M (Default)**: High-quality, Apache 2.0 local TTS. Runs on CPU with ~350MB RAM.
+- **Edge-TTS (Fallback)**: Microsoft Azure Neural voices (requires internet).
+
 See [Configuration](docs/configuration.md) for full environment variable reference.
 
 ---
@@ -262,7 +270,9 @@ make help       # Show all available commands
 - **Framework** — [a2a-sdk](https://github.com/a2a-org/a2a-sdk) + [Starlette](https://www.starlette.io/)
 - **Language** — Python 3.12+ with modern type hints
 - **LLM** — [LiteLLM](https://docs.litellm.ai/) (pluggable: Claude, Gemini, Ollama, etc.)
-- **Tools** — [MCP](https://modelcontextprotocol.io/) (filesystem, git, shell)
+- **TTS** — **Kokoro-82M** (Local) / **Edge-TTS** (Cloud) with real-time streaming
+- **MCP** — [MCP](https://modelcontextprotocol.io/) (filesystem, git, shell, context7)
+- **Browser Context** — **Accessibility-Tree Snapshots** for token-efficient E2E reasoning
 - **Linting** — [Ruff](https://docs.astral.sh/ruff/) + [ty](https://docs.astral.sh/ty/) (Python)
 - **Packaging** — [uv](https://docs.astral.sh/uv/) workspaces
 - **Observability** — [OpenTelemetry](https://opentelemetry.io/) → [Jaeger](https://www.jaegertracing.io/) + [Prometheus](https://prometheus.io/)
