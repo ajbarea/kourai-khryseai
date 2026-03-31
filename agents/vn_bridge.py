@@ -9,7 +9,6 @@ Exposes five endpoints:
 """
 
 import contextlib
-import io
 import json
 import logging
 import re
@@ -18,7 +17,6 @@ from collections.abc import AsyncGenerator
 from typing import cast
 from uuid import uuid4
 
-import edge_tts
 import httpx
 import uvicorn
 from a2a.client import A2ACardResolver, ClientConfig, ClientFactory
@@ -38,6 +36,7 @@ from starlette.routing import Route
 from kourai_common.companion import infer_portrait_state
 from kourai_common.config import get_agent_url
 from kourai_common.facts import process_agent_output
+from kourai_common.tts_backend import get_voice_for_agent
 
 PORT = 10010
 
@@ -64,23 +63,7 @@ AGENT_NAMES = {
 # Status keywords promoted to dialogue beats vs. silent HUD updates
 DIALOGUE_KEYWORDS = ["pipeline:", "dispatching", "complete", "failed", "error"]
 
-# Agent → edge-tts voice config. Source of truth: designs/TTS_ARCHITECTURE.md
-VOICE_MAP: dict[str, dict] = {
-    "hephaestus": {"voice": "en-US-GuyNeural", "rate": "-5%", "pitch": "+0Hz"},
-    "metis": {"voice": "en-US-AriaNeural", "rate": "-10%", "pitch": "+10%"},
-    "kallos": {"voice": "en-US-JennyNeural", "rate": "+5%", "pitch": "+15%"},
-    "mneme": {"voice": "en-US-MichelleNeural", "rate": "-8%", "pitch": "-5%"},
-    "techne": {"voice": "en-GB-SoniaNeural", "rate": "-7%", "pitch": "+5%"},
-    "dokimasia": {"voice": "en-US-AriaNeural", "rate": "-12%", "pitch": "+0Hz"},
-    "puck": {"voice": "en-US-AndrewNeural", "rate": "+5%", "pitch": "+0Hz"},
-    "cupid": {"voice": "en-US-AmberNeural", "rate": "-5%", "pitch": "+10%"},
-    "aidos": {"voice": "en-US-JaneNeural", "rate": "-10%", "pitch": "-5%"},
-    "aletheia": {"voice": "en-US-NancyNeural", "rate": "-7%", "pitch": "+0Hz"},
-}
-_DEFAULT_VOICE = {"voice": "en-US-AriaNeural", "rate": "+0%", "pitch": "+0Hz"}
-
 # Short personality hints for gossip generation — keeps prompts small and fast.
-# Source of truth: designs/CHARACTER_DESIGN.md
 GOSSIP_HINTS: dict[str, str] = {
     "hephaestus": "Gruff forge-master. Laconic. Shows approval through craft metaphors.",
     "techne": "Precise British coder. Dry wit. Notices technical habits. Tsundere about caring.",
@@ -101,6 +84,20 @@ def _paginate(text: str) -> list[str]:
     return [s.strip() for s in sentences if s.strip()]
 
 
+def _create_tts_backend():
+    """Create the TTS backend (Kokoro preferred, edge-tts fallback)."""
+    try:
+        from kourai_common.tts_kokoro import KokoroBackend
+
+        log.info("Using Kokoro-82M TTS backend")
+        return KokoroBackend()
+    except ImportError:
+        log.warning("Kokoro not available, falling back to edge-tts")
+        from kourai_common.tts_edge import EdgeTTSBackend
+
+        return EdgeTTSBackend()
+
+
 @contextlib.asynccontextmanager
 async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
     agent_url = get_agent_url("hephaestus")
@@ -117,36 +114,35 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
     except Exception as e:
         log.error(f"Failed to connect to Hephaestus: {e}")
         app.state.a2a_client = None
+    app.state.tts_backend = _create_tts_backend()
     app.state.context_id = uuid4().hex
     yield
     await httpx_client.aclose()
 
 
 async def handle_tts(request: Request) -> StreamingResponse | JSONResponse:
-    """Generate MP3 audio from text using edge-tts with per-agent voice settings."""
+    """Generate audio stream from text using the configured TTS backend."""
     data: dict = await request.json()
     text = data.get("text", "").strip()
     agent = data.get("agent", "").lower().strip()
     if not text:
         return JSONResponse({"error": "Missing 'text' field"}, status_code=400)
 
-    voice_cfg = VOICE_MAP.get(agent, _DEFAULT_VOICE)
-    log.info(f"TTS ({agent}): {text[:60]}... → {voice_cfg['voice']}")
+    voice_cfg = get_voice_for_agent(agent)
+    backend = request.app.state.tts_backend
+    log.info(
+        f"TTS Streaming ({agent}): {text[:60]}... → {voice_cfg.voice_id} [{type(backend).__name__}]"
+    )
+
+    # Detect media type from backend type
+    backend_name = type(backend).__name__
+    media_type = "audio/wav" if "Kokoro" in backend_name else "audio/mpeg"
+
     try:
-        communicate = edge_tts.Communicate(
-            text,
-            voice=voice_cfg["voice"],
-            rate=voice_cfg["rate"],
-            pitch=voice_cfg["pitch"],
-        )
-        buf = io.BytesIO()
-        async for chunk in communicate.stream():
-            if chunk["type"] == "audio":
-                buf.write(chunk["data"])
-        buf.seek(0)
-        return StreamingResponse(buf, media_type="audio/mpeg")
+        # stream_synthesize yields valid audio chunks (WAVs or MP3 frames)
+        return StreamingResponse(backend.stream_synthesize(text, voice_cfg), media_type=media_type)
     except Exception as e:
-        log.error(f"TTS generation failed: {e}", exc_info=True)
+        log.error(f"TTS streaming failed: {e}", exc_info=True)
         return JSONResponse({"error": f"TTS failed: {e}"}, status_code=500)
 
 
