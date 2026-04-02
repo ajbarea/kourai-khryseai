@@ -57,7 +57,7 @@ class EdgeTTSBackend(TTSBackend):
 
         # Convert pitch multiplier to edge-tts pitch string
         pitch_pct = (voice.pitch - 1.0) * 100
-        pitch_str = f"{pitch_pct:+.0f}%"
+        pitch_str = f"{pitch_pct:+.0f}Hz"
 
         logger.info(
             "Edge-TTS: voice=%s, rate=%s, pitch=%s, text_len=%d",
@@ -99,7 +99,7 @@ class EdgeTTSBackend(TTSBackend):
 
         # Convert pitch multiplier to edge-tts pitch string
         pitch_pct = (voice.pitch - 1.0) * 100
-        pitch_str = f"{pitch_pct:+.0f}%"
+        pitch_str = f"{pitch_pct:+.0f}Hz"
 
         communicate = edge_tts.Communicate(
             text,

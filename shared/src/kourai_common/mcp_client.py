@@ -4,8 +4,8 @@ Centralizes MCP client lifecycle, server registry, per-agent tool assignments,
 and the real async MCP client functions for Context7 and Memory sidecars.
 
 MCP Servers in Kourai Khryseai:
-- Context7: Documentation lookup via context7-mcp sidecar (SSE on port 3001)
-- Memory: Player facts, relationship persistence via memory-mcp sidecar (SSE on port 5001)
+- Context7: Documentation lookup via context7-mcp sidecar (HTTP Streamable on port 3001)
+- Memory: Player facts, relationship persistence via memory-mcp sidecar (HTTP Streamable on port 5001)
 - GitHub: Issue/PR/repo operations (direct PyGithub)
 - Shell: pytest, ruff, npx, node (direct subprocess)
 - Playwright: Frontend E2E testing (direct subprocess)
@@ -286,7 +286,7 @@ def _initialize_default_registry(toolkit: MCPToolkit) -> None:
 
 # ── Real async MCP client functions ──────────────────────────────────────────
 #
-# Context7 and Memory sidecars expose SSE endpoints via supergateway.
+# Context7 and Memory sidecars expose HTTP Streamable endpoints via supergateway.
 # Agents import these directly; all failures raise MCPUnavailable.
 # Callers should catch MCPUnavailable and fall back gracefully.
 
@@ -296,7 +296,7 @@ _MCP_CALL_TIMEOUT = 15.0  # seconds
 async def query_context7(library: str, topic: str, tokens: int = 5000) -> str:
     """Query the Context7 MCP sidecar for live documentation.
 
-    Connects to the context7-mcp Docker service (SSE transport, port 3001).
+    Connects to the context7-mcp Docker service (HTTP Streamable transport, port 3001).
     Resolves the library ID then fetches documentation for the given topic.
 
     Args:
@@ -311,12 +311,12 @@ async def query_context7(library: str, topic: str, tokens: int = 5000) -> str:
         MCPUnavailable: If the context7-mcp sidecar is unreachable or the call fails.
     """
     from mcp import ClientSession
-    from mcp.client.sse import sse_client
+    from mcp.client.streamable_http import streamable_http_client
 
-    url = os.getenv("CONTEXT7_MCP_URL", "http://context7-mcp:3001/sse")
+    url = os.getenv("CONTEXT7_MCP_URL", "http://context7-mcp:3001/mcp")
     try:
         async with asyncio.timeout(_MCP_CALL_TIMEOUT):
-            async with sse_client(url) as (read, write):
+            async with streamable_http_client(url) as (read, write, _):
                 async with ClientSession(read, write) as session:
                     await session.initialize()
                     lib_result = await session.call_tool(
@@ -348,7 +348,7 @@ async def query_context7(library: str, topic: str, tokens: int = 5000) -> str:
 async def create_memory_entities(entities: list[dict]) -> None:
     """Store entities in the shared Memory MCP knowledge graph.
 
-    Connects to the memory-mcp Docker service (SSE transport, port 5001).
+    Connects to the memory-mcp Docker service (HTTP Streamable transport, port 5001).
     Entity format: {"name": str, "entityType": str, "observations": list[str]}.
 
     Args:
@@ -358,12 +358,12 @@ async def create_memory_entities(entities: list[dict]) -> None:
         MCPUnavailable: If the memory-mcp sidecar is unreachable or the call fails.
     """
     from mcp import ClientSession
-    from mcp.client.sse import sse_client
+    from mcp.client.streamable_http import streamable_http_client
 
-    url = os.getenv("MEMORY_MCP_SSE_URL", "http://memory-mcp:5001/sse")
+    url = os.getenv("MEMORY_MCP_URL", "http://memory-mcp:5001/mcp")
     try:
         async with asyncio.timeout(_MCP_CALL_TIMEOUT):
-            async with sse_client(url) as (read, write):
+            async with streamable_http_client(url) as (read, write, _):
                 async with ClientSession(read, write) as session:
                     await session.initialize()
                     await session.call_tool("create_entities", {"entities": entities})
@@ -377,7 +377,7 @@ async def create_memory_entities(entities: list[dict]) -> None:
 async def search_memory_nodes(query: str) -> str:
     """Search the Memory MCP knowledge graph for relevant nodes.
 
-    Connects to the memory-mcp Docker service (SSE transport, port 5001).
+    Connects to the memory-mcp Docker service (HTTP Streamable transport, port 5001).
 
     Args:
         query: Search string to find relevant entities/observations.
@@ -389,12 +389,12 @@ async def search_memory_nodes(query: str) -> str:
         MCPUnavailable: If the memory-mcp sidecar is unreachable or the call fails.
     """
     from mcp import ClientSession
-    from mcp.client.sse import sse_client
+    from mcp.client.streamable_http import streamable_http_client
 
-    url = os.getenv("MEMORY_MCP_SSE_URL", "http://memory-mcp:5001/sse")
+    url = os.getenv("MEMORY_MCP_URL", "http://memory-mcp:5001/mcp")
     try:
         async with asyncio.timeout(_MCP_CALL_TIMEOUT):
-            async with sse_client(url) as (read, write):
+            async with streamable_http_client(url) as (read, write, _):
                 async with ClientSession(read, write) as session:
                     await session.initialize()
                     result = await session.call_tool("search_nodes", {"query": query})
