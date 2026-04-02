@@ -30,9 +30,9 @@ define config.version = "0.1.0-pre-alpha"
 ## triple-quotes, and leave a blank line between paragraphs.
 
 define gui.about = _p("""
-Kourai Khryseai is a visual novel experience exploring the divine automatons of Hephaestus.
+Kourai Khryseai is a visual novel experience exploring the divine agentic ai automatons of Hephaestus.
 
-Developed by AJ.
+Developed by AJ Barea.
 """)
 
 
@@ -161,6 +161,23 @@ define config.window_icon = "gui/window_icon.png"
 ## This section controls how Ren'Py turns your project into distribution files.
 
 init python:
+    import signal
+
+    ## Handle Ctrl+C (SIGINT) from the terminal to quit gracefully
+    def _terminal_sigint_handler(signum, frame):
+        import pygame_sdl2 as pygame
+        pygame.event.post(pygame.event.Event(pygame.QUIT))
+        
+    try:
+        signal.signal(signal.SIGINT, _terminal_sigint_handler)
+    except Exception:
+        pass
+
+    ## Map Ctrl+C to quit gracefully instead of copying text
+    if 'ctrl_K_c' in config.keymap.get('copy', []):
+        config.keymap['copy'].remove('ctrl_K_c')
+    if 'ctrl_K_c' not in config.keymap.get('quit', []):
+        config.keymap['quit'].append('ctrl_K_c')
 
     ## The following functions take file patterns. File patterns are case-
     ## insensitive, and matched against the path relative to the base directory,
