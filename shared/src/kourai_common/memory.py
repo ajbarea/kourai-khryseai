@@ -1,9 +1,7 @@
-"""Conversational memory using SQLite.
-
-Implements 2026 Best Practices for A2A Memory:
-- Hierarchical State Management (Working vs Episodic)
-- Structured State Objects
-- Local-First Storage (for Privacy/FL)
+"""Memory management for Kourai agents, including episodic (message history) and semantic (structured state) memory.
+- Episodic Memory: Stores raw message history (role, content) for each agent and context. Supports retrieval with limits and summarization tracking.
+- Semantic Memory: Stores a structured state object (thread_id, goal_hierarchy, checkpoints, semantic_summary, metadata) for each agent and context. Provides get/set functions for state management.
+- Uses SQLite for persistence, with a simple schema for messages and agent states.
 """
 
 import contextlib
@@ -20,8 +18,6 @@ _conn = None
 
 
 class AgentState(TypedDict):
-    """Modern A2A State Schema (2026 Pattern)."""
-
     thread_id: str
     goal_hierarchy: list[str]
     checkpoints: list[dict]

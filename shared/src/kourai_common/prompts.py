@@ -1,13 +1,7 @@
-"""Shared system prompt components for Kourai Khryseai agents.
-
-Centralizes universal rules and standards that apply across all agents.
-
-Prompt architecture (layered, per 2026 best practices):
-- Identity layer (immutable): agent name, role, core function
-- Personality layer (tier-adaptive): warmth, sass, formality baseline
-- Instruction layer (task-specific): checklists, output formats
-- Standards layer: Python standards, git boundaries, universal rules
-- Player context layer: injected at runtime via get_enriched_system_prompt()
+"""
+This module defines the system prompt templates for Kourai agents, including
+identity, personality, instructions, and standards. The build_system_prompt()
+function constructs a complete prompt with layered architecture for any agent role.
 """
 
 from __future__ import annotations
