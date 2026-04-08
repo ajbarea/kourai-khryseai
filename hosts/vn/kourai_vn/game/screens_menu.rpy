@@ -111,8 +111,7 @@ screen main_menu():
 
     if gui.show_name:
 
-        ## Forge title block — Sleek modern 2026 UI composition
-        ## Positioned exactly right of the navigation menu, flowing outwards
+        ## Forge title block
         vbox:
             xpos 350
             yalign 0.42
@@ -615,19 +614,24 @@ screen preferences():
 
             # D4: Romance mode toggle (Phase D)
             vbox:
-                style_prefix "check"
+                style_prefix "radio"
                 label _("Experience Settings")
-                textbutton _("Romance Mode"):
-                    action ToggleVariable(
-                        "persistent.romance_mode_enabled", True, False
-                    )
+
+                text _("Romance Mode") size 22 color "#C9944A"
+                hbox:
+                    spacing 20
+                    textbutton _("Enabled") action SetVariable("persistent.romance_mode_enabled", True)
+                    textbutton _("Disabled") action SetVariable("persistent.romance_mode_enabled", False)
                 text "(Enables romance dialogue, relationship moments, and confession scenes)" size 14 color "#A0A0A0"
+                
+                null height 15
 
                 # TTS toggle
-                textbutton _("Voice (TTS)"):
-                    action ToggleVariable(
-                        "persistent.tts_enabled", True, False
-                    )
+                text _("Voice (TTS)") size 22 color "#C9944A"
+                hbox:
+                    spacing 20
+                    textbutton _("Enabled") action SetVariable("persistent.tts_enabled", True)
+                    textbutton _("Disabled") action SetVariable("persistent.tts_enabled", False)
                 text "(Agent voices via edge-tts — requires vn-bridge /tts service)" size 14 color "#A0A0A0"
 
 

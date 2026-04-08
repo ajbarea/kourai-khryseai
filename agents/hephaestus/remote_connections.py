@@ -59,6 +59,7 @@ class RemoteAgentConnection:
             resolver = A2ACardResolver(self.http, self.agent_url)
             self.card = await resolver.get_agent_card()
             if self.card:
+                self.card.url = self.agent_url
                 config = ClientConfig(
                     streaming=True,
                     httpx_client=self.http,

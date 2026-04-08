@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from typing import TYPE_CHECKING, Any
 
 import httpx
@@ -67,6 +68,12 @@ class LLMResponseError(LLMError):
 )
 async def _execute_completion(timeout_seconds: float, **kwargs: Any) -> Any:
     """Execute acompletion with built-in retries for capacity/network issues."""
+    # Route all requests through a proxy when configured (e.g. litellm mock in tests).
+    # Without this, litellm routes anthropic/ models directly to the Anthropic API,
+    # bypassing OPENAI_API_BASE entirely.
+    api_base = os.getenv("OPENAI_API_BASE")
+    if api_base and "api_base" not in kwargs:
+        kwargs["api_base"] = api_base
     async with asyncio.timeout(timeout_seconds):
         return await litellm.acompletion(**kwargs)
 
