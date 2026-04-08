@@ -2,7 +2,7 @@
 name = "kourai-khryseai"
 version = "0.1.0"
 description = "Multi-agent A2A development system — Golden Maidens of Hephaestus"
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.14"
 dependencies = []
 
 [dependency-groups]
@@ -25,7 +25,6 @@ package = false
 # Pin transitive deps broken on Python 3.13.12 (unterminated regex character classes)
 override-dependencies = [
     "jinja2<3.1.6",
-    "aiohttp<3.13",
 ]
 
 [tool.uv.workspace]
@@ -87,6 +86,8 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "E402"]  # Assert + importorskip-before-import pattern
+"shared/src/kourai_common/dev_cli.py" = ["T201", "S603"]  # CLI tool: intentional print output and safe subprocess calls
+"scripts/*.py" = ["T201", "S607"]  # CLI scripts: intentional terminal output + uv/commands in PATH
 
 [tool.ruff.lint.isort]
 known-first-party = ["kourai_common", "agents", "hosts"]
@@ -99,8 +100,16 @@ indent-style = "space"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+log_level = "INFO"
+log_cli = true
+log_cli_level = "WARNING"
 markers = [
     "integration: mark test as requiring real containers via testcontainers",
+]
+filterwarnings = [
+    "ignore::UserWarning:torch.nn.modules.rnn",
+    "ignore::FutureWarning:torch.nn.utils.weight_norm",
+    "ignore::DeprecationWarning:torch.jit._script",
 ]
 
 [tool.ty.environment]
