@@ -182,7 +182,7 @@ Rich visual experience with agent portraits, dialogue bubbles, and personality-m
 
 - 🎨 Full-color agent portraits with glow effects and crossfade transitions
 - 💬 Real-time dialogue bubbles with streaming responses
-- 🔊 Neural text-to-speech (Microsoft Edge TTS) with volume/pitch control
+- 🔊 Neural text-to-speech ([Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) local + Edge-TTS fallback) with real-time streaming
 - 🌟 Golden particle system and typewriter effects
 - ⚙️ Settings for voice customization and accessibility (WCAG 2.2 AA)
 

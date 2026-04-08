@@ -199,7 +199,7 @@ Kourai Khryseai persists the entire conversation history to a local SQLite datab
 
 **Location:** `.cache/agent_memory.db`
 
-The database implements 2026 Best Practices for A2A Memory (Hierarchical State Management) with two primary tables:
+The database implements A2A Memory (Hierarchical State Management) with two primary tables:
 
 - **`messages`**: Episodic/working memory. Stores every single message exchanged, tracking the `context_id` (thread), `agent_name`, `role`, and the raw `content`.
 - **`agent_states`**: Semantic memory. Stores structured state objects (goal hierarchies, checkpoints, summaries) for each agent and thread.
