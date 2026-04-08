@@ -10,11 +10,11 @@ FROM node:20-slim
 
 WORKDIR /app
 
-# Pre-install packages so container starts instantly (avoids npx cold-download)
-RUN npm install -g \
+# Pre-install packages
+RUN --mount=type=cache,target=/root/.npm,sharing=locked \
+    npm install --cache /root/.npm -g \
     @modelcontextprotocol/server-memory@2026.1.26 \
     supergateway@3.4.3 && \
-    # Verify supergateway is on PATH
     supergateway --version
 
 COPY docker/memory-mcp-server.js /app/memory-mcp-server.js

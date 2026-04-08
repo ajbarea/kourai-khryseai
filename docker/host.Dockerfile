@@ -32,6 +32,9 @@ COPY --link hosts/ hosts/
 
 RUN uv sync --package kourai-${PACKAGE_NAME} --no-dev --frozen
 
+# Pre-create non-root user in builder
+RUN useradd -m -u 1000 kourai
+
 # --- Runtime ---
 FROM python:${PYTHON_VERSION}-slim AS runtime
 
@@ -49,14 +52,19 @@ ENV HOST_TYPE=${HOST_TYPE} \
 WORKDIR /app
 
 # Agent/CLI: git for project context, curl for health checks
-RUN if [ "${HOST_TYPE}" = "agent" ] || [ "${HOST_TYPE}" = "cli" ]; then \
+# Agents: also need espeak-ng for Kokoro TTS (used by VN bridge + agents)
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    if [ "${HOST_TYPE}" = "agent" ] || [ "${HOST_TYPE}" = "cli" ]; then \
     apt-get update && \
-    apt-get install -y --no-install-recommends git curl && \
+    apt-get install -y --no-install-recommends git curl espeak-ng && \
     rm -rf /var/lib/apt/lists/*; \
     fi
 
 # Dokimasia: Chromium + Playwright for E2E frontend testing
-RUN if [ "${HOST_TYPE}" = "agent" ] && [ "${PACKAGE_NAME}" = "dokimasia" ]; then \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    if [ "${HOST_TYPE}" = "agent" ] && [ "${PACKAGE_NAME}" = "dokimasia" ]; then \
     apt-get update && \
     apt-get install -y --no-install-recommends \
     chromium \
@@ -98,7 +106,9 @@ RUN if [ "${HOST_TYPE}" = "agent" ] && [ "${PACKAGE_NAME}" = "dokimasia" ]; then
     fi
 
 # GUI: SDL2 runtime libs for pygame + espeak-ng for Kokoro TTS
-RUN if [ "${HOST_TYPE}" = "gui" ]; then \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    if [ "${HOST_TYPE}" = "gui" ]; then \
     apt-get update && \
     apt-get install -y --no-install-recommends \
     libsdl2-2.0-0 \
@@ -110,19 +120,22 @@ RUN if [ "${HOST_TYPE}" = "gui" ]; then \
     rm -rf /var/lib/apt/lists/*; \
     fi
 
+# Recreate user in runtime stage
+# The second call is fast and idempotent if user already exists
+RUN useradd -m -u 1000 kourai 2>/dev/null || true
+
 COPY --link --from=builder /app/.venv /app/.venv
-COPY --link agents/ agents/
-COPY --link hosts/ hosts/
-COPY --link shared/ shared/
-COPY --link scripts/ scripts/
-COPY --link assets/ assets/
-COPY --link templates/ templates/
-COPY --link docker/entrypoint.sh /app/entrypoint.sh
+COPY --chown=1000:1000 --link agents/ agents/
+COPY --chown=1000:1000 --link hosts/ hosts/
+COPY --chown=1000:1000 --link shared/ shared/
+COPY --chown=1000:1000 --link scripts/ scripts/
+COPY --chown=1000:1000 --link assets/ assets/
+COPY --chown=1000:1000 --link templates/ templates/
+COPY --chown=1000:1000 --link docker/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
 ENV PATH="/app/.venv/bin:$PATH"
 
-RUN useradd -m -u 1000 kourai && chown -R kourai:kourai /app
 USER kourai
 
 EXPOSE ${PORT}

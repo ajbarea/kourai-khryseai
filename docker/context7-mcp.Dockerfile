@@ -11,7 +11,8 @@ FROM node:20-slim
 WORKDIR /app
 
 # Pre-install packages so container starts instantly (avoids npx cold-download)
-RUN npm install -g \
+RUN --mount=type=cache,target=/root/.npm,sharing=locked \
+    npm install --cache /root/.npm -g \
     @upstash/context7-mcp@2.1.6 \
     supergateway@3.4.3 && \
     # Verify supergateway is on PATH
@@ -21,5 +22,5 @@ USER node
 
 EXPOSE 3001
 
-# supergateway exposes context7-mcp as SSE at /sse
-CMD ["supergateway", "--stdio", "context7-mcp", "--port", "3001", "--host", "0.0.0.0"]
+# supergateway exposes context7-mcp as HTTP Streamable
+CMD ["supergateway", "--stdio", "context7-mcp", "--outputTransport", "streamableHttp", "--port", "3001", "--host", "0.0.0.0"]
