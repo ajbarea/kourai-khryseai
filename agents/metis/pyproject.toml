@@ -2,7 +2,7 @@
 name = "kourai-metis"
 version = "0.1.0"
 description = "Planning agent — transforms ideas into implementation specs"
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.14"
 dependencies = ["kourai-common"]
 
 [build-system]
