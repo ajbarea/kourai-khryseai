@@ -1,8 +1,77 @@
-"""Unit tests for TTSBackend implementations (Kokoro + Edge-TTS)."""
+"""Unit tests for TTSBackend implementations (Kokoro + Edge-TTS).
+
+Comprehensive coverage for voice config validation, both backends, and fallback behavior.
+"""
 
 import pytest
 
 from kourai_common.tts_backend import AGENT_VOICE_MAP, TTSVoiceConfig
+
+# ===================================================================
+# TTSVoiceConfig Validation Tests
+# ===================================================================
+
+
+class TestTTSVoiceConfigValidation:
+    """Test voice config parameter validation."""
+
+    def test_valid_voice_config(self):
+        """Valid voice config should not raise."""
+        voice = TTSVoiceConfig(
+            name="Sarah",
+            voice_id="af_sarah",
+            speed=1.0,
+            pitch=1.0,
+            lang_code="a",
+        )
+        assert voice.name == "Sarah"
+        assert voice.voice_id == "af_sarah"
+
+    def test_invalid_speed_too_low(self):
+        """Speed below 0.5 should raise ValueError."""
+        with pytest.raises(ValueError, match=r"speed must be between 0\.5 and 2\.0"):
+            TTSVoiceConfig("Sarah", "af_sarah", speed=0.4)
+
+    def test_invalid_speed_too_high(self):
+        """Speed above 2.0 should raise ValueError."""
+        with pytest.raises(ValueError, match=r"speed must be between 0\.5 and 2\.0"):
+            TTSVoiceConfig("Sarah", "af_sarah", speed=2.1)
+
+    def test_invalid_pitch_too_low(self):
+        """Pitch below 0.5 should raise ValueError."""
+        with pytest.raises(ValueError, match=r"pitch must be between 0\.5 and 2\.0"):
+            TTSVoiceConfig("Sarah", "af_sarah", pitch=0.4)
+
+    def test_invalid_pitch_too_high(self):
+        """Pitch above 2.0 should raise ValueError."""
+        with pytest.raises(ValueError, match=r"pitch must be between 0\.5 and 2\.0"):
+            TTSVoiceConfig("Sarah", "af_sarah", pitch=2.1)
+
+    def test_invalid_lang_code(self):
+        """lang_code must be 'a' or 'b'."""
+        with pytest.raises(ValueError, match=r"lang_code must be 'a'.*'b'"):
+            TTSVoiceConfig("Sarah", "af_sarah", lang_code="c")
+
+    def test_valid_speed_boundaries(self):
+        """Speed at boundaries (0.5, 2.0) should be valid."""
+        voice_slow = TTSVoiceConfig("Sarah", "af_sarah", speed=0.5)
+        assert voice_slow.speed == 0.5
+
+        voice_fast = TTSVoiceConfig("Sarah", "af_sarah", speed=2.0)
+        assert voice_fast.speed == 2.0
+
+    def test_valid_pitch_boundaries(self):
+        """Pitch at boundaries (0.5, 2.0) should be valid."""
+        voice_low = TTSVoiceConfig("Sarah", "af_sarah", pitch=0.5)
+        assert voice_low.pitch == 0.5
+
+        voice_high = TTSVoiceConfig("Sarah", "af_sarah", pitch=2.0)
+        assert voice_high.pitch == 2.0
+
+
+# ===================================================================
+# KokoroBackend Tests
+# ===================================================================
 
 
 @pytest.mark.asyncio
@@ -156,7 +225,7 @@ class TestEdgeTTSBackend:
             audio = await edge_backend.synthesize("Test message", voice)
             assert len(audio) > 0
             mock_comm.assert_called_with(
-                "Test message", voice="en-US-AriaNeural", rate="+0%", pitch="+0%"
+                "Test message", voice="en-US-AriaNeural", rate="+0%", pitch="+0Hz"
             )
 
     async def test_edge_tts_returns_mp3_bytes(self, edge_backend):

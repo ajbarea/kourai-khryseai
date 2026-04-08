@@ -1,5 +1,5 @@
 model_list:
   - model_name: "*"  # Match all models to return a generic mock
     litellm_params:
-      model: mock-model
+      model: openai/mock-model
       mock_response: "MOCK RESPONSE: Task completed successfully by the specialist maiden."

@@ -175,17 +175,41 @@ class TestTTSEngineSpeak:
 
     @pytest.mark.asyncio
     async def test_speak_generates_audio(self, mock_mixer):
+        import io
+        import wave
+
+        import numpy as np
+
         from hosts.gui.tts_engine import TTSEngine
+        from kourai_common.tts_backend import TTSBackend, TTSVoiceConfig
 
         engine = TTSEngine()
 
+        # Mock backend to return valid WAV chunks
+        class MockBackend(TTSBackend):
+            async def synthesize(self, text: str, voice: TTSVoiceConfig) -> bytes:
+                # Return a minimal WAV with ~100ms of silence
+                sample_rate = 24000
+                duration_ms = 100
+                samples = int(sample_rate * duration_ms / 1000)
+                silence = np.zeros(samples, dtype=np.int16)
+                buf = io.BytesIO()
+                with wave.open(buf, "wb") as wav:
+                    wav.setnchannels(1)
+                    wav.setsampwidth(2)
+                    wav.setframerate(sample_rate)
+                    wav.writeframes(silence.tobytes())
+                return buf.getvalue()
+
+            async def stream_synthesize(self, text: str, voice: TTSVoiceConfig):
+                audio = await self.synthesize(text, voice)
+                yield audio
+
+            def available_voices(self):
+                return [TTSVoiceConfig("Test", "test_voice")]
+
+        engine.backend = MockBackend()
         mock_sound = MagicMock()
-        mock_sound.get_volume.return_value = 0.5
-
-        async def mock_stream(*args, **kwargs):
-            yield b"dummy_audio"
-
-        engine.backend.stream_synthesize = MagicMock(side_effect=mock_stream)  # type: ignore
 
         with patch("pygame.mixer.Sound", return_value=mock_sound):
             await engine.speak("Hello world", agent_name="metis")
@@ -195,12 +219,25 @@ class TestTTSEngineSpeak:
     @pytest.mark.asyncio
     async def test_speak_error_handling(self, mock_mixer):
         from hosts.gui.tts_engine import TTSEngine
+        from kourai_common.tts_backend import TTSBackend, TTSVoiceConfig
 
         engine = TTSEngine()
         cb = Mock()
         engine.set_on_complete(cb)
 
-        engine.backend.stream_synthesize = MagicMock(side_effect=Exception("network error"))  # type: ignore
+        # Mock backend that raises an error
+        class FailingBackend(TTSBackend):
+            async def synthesize(self, text: str, voice: TTSVoiceConfig) -> bytes:
+                raise RuntimeError("network error")
+
+            async def stream_synthesize(self, text: str, voice: TTSVoiceConfig):
+                raise RuntimeError("network error")
+                yield  # pragma: no cover
+
+            def available_voices(self):
+                return []
+
+        engine.backend = FailingBackend()
 
         await engine.speak("Hello")
 

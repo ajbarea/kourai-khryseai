@@ -1,10 +1,10 @@
 """Integration tests for memory-mcp server.
 
-Verifies memory-mcp container health and SSE connectivity.
+Verifies memory-mcp container health and HTTP Streamable connectivity.
 
 Test Structure:
 - TestMemoryMcpHealth: HTTP-level validation (no MCP protocol)
-- TestMemoryMcpSSE: MCP protocol connectivity with timeout guards
+- TestMemoryMcpStreamable: MCP protocol connectivity with timeout guards (HTTP Streamable)
 - TestMemoryMcpToolExecution: Tool call validation
 
 Requires: testcontainers library (automated lifecycle)
@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Any
 import httpx
 import pytest
 from mcp import ClientSession
-from mcp.client.sse import sse_client
+from mcp.client.streamable_http import streamable_http_client
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -37,17 +37,17 @@ def memory_mcp_urls(memory_mcp_container: DockerContainer) -> dict[str, str]:
     return {
         "health": f"http://{host}:{port_5000}/health",
         "root": f"http://{host}:{port_5000}/",
-        "sse": f"http://{host}:{port_5001}/sse",
-        "base_sse": f"http://{host}:{port_5001}",
+        "mcp": f"http://{host}:{port_5001}/mcp",  # HTTP Streamable endpoint
+        "base": f"http://{host}:{port_5001}",
     }
 
 
 class MCPConnectionError(Exception):
-    """Raised when MCP SSE connection fails."""
+    """Raised when MCP HTTP Streamable connection fails."""
 
 
-async def _wait_for_sse_port(url: str, *, seconds: float = 15.0) -> bool:
-    """Poll until the SSE port is accepting connections."""
+async def _wait_for_mcp_port(url: str, *, seconds: float = 15.0) -> bool:
+    """Poll until the MCP HTTP Streamable port is accepting connections."""
     base = url.rsplit("/", 1)[0]  # e.g. http://localhost:5001
     deadline = asyncio.get_event_loop().time() + seconds
     async with httpx.AsyncClient() as client:
@@ -59,36 +59,35 @@ async def _wait_for_sse_port(url: str, *, seconds: float = 15.0) -> bool:
     return False
 
 
-async def _connect_mcp_sse(
-    url: str, *, retries: int = 15, delay: float = 2.0
+async def _connect_mcp_streamable(
+    url: str, *, retries: int = 10, delay: float = 2.0
 ) -> tuple[Any, ClientSession] | None:
-    """Try to establish an MCP SSE session with retries.
+    """Try to establish an MCP HTTP Streamable session with retries.
 
-    Supergateway only supports one SSE client and crashes on disconnect,
-    so each test gets a fresh connection. Before each attempt, poll the
-    SSE port to avoid wasting retries on a server that isn't listening.
+    Returns (http_ctx_manager, session) tuple. Caller must keep http_ctx_manager
+    alive while using the session and close it during teardown.
     """
     for attempt in range(retries):
         if attempt > 0:
-            if not await _wait_for_sse_port(url):
+            if not await _wait_for_mcp_port(url):
                 continue
-        sse_ctx: Any = None
+        http_ctx: Any = None
         session: ClientSession | None = None
         try:
             async with asyncio.timeout(10):
-                sse_ctx = sse_client(url)
-                read, write = await sse_ctx.__aenter__()
+                http_ctx = streamable_http_client(url)
+                read, write, _ = await http_ctx.__aenter__()
                 session = ClientSession(read, write)
                 await session.__aenter__()
                 await session.initialize()
-            return sse_ctx, session
+                return http_ctx, session
         except Exception:
             with suppress(Exception):
                 if session is not None:
                     await session.__aexit__(None, None, None)
             with suppress(Exception):
-                if sse_ctx is not None:
-                    await sse_ctx.__aexit__(None, None, None)
+                if http_ctx is not None:
+                    await http_ctx.__aexit__(None, None, None)
             if attempt < retries - 1:
                 await asyncio.sleep(delay)
     return None
@@ -96,24 +95,19 @@ async def _connect_mcp_sse(
 
 @pytest.fixture
 async def mcp_session(memory_mcp_urls: dict[str, str]) -> AsyncGenerator[ClientSession, None]:
-    """Async fixture providing a connected MCP ClientSession to memory-mcp.
-
-    Function-scoped with retry: supergateway crashes on client disconnect
-    and needs a few seconds to restart. The retry loop absorbs that gap.
-    """
-    result = await _connect_mcp_sse(memory_mcp_urls["sse"])
+    """Async fixture providing a connected MCP ClientSession to memory-mcp."""
+    result = await _connect_mcp_streamable(memory_mcp_urls["mcp"])
     if result is None:
-        pytest.skip("SSE connection unavailable after retries")
-        return  # unreachable; helps type narrowing
+        pytest.skip("MCP HTTP Streamable connection unavailable after retries")
+        return
 
-    sse_ctx, session = result
-
+    http_ctx, session = result
     yield session
 
     with suppress(Exception):
         await session.__aexit__(None, None, None)
     with suppress(Exception):
-        await sse_ctx.__aexit__(None, None, None)
+        await http_ctx.__aexit__(None, None, None)
 
 
 async def create_test_entity(
@@ -209,20 +203,20 @@ class TestMemoryMcpHealth:
             assert data["status"] == "healthy"
 
 
-class TestMemoryMcpSSE:
-    """Tests for memory-mcp SSE endpoint connectivity and tool discovery.
+class TestMemoryMcpStreamable:
+    """Tests for memory-mcp HTTP Streamable endpoint connectivity and tool discovery.
 
     - Timeout guards: All async operations protected from hanging
-    - Graceful skip: SSE issues don't fail tests, they skip with reason
+    - Graceful skip: Connection issues don't fail tests, they skip with reason
     - Isolation: Test protocol connectivity separate from tool execution
     """
 
     @pytest.mark.asyncio
-    async def test_sse_client_initializes(self, mcp_session: ClientSession) -> None:
-        """Verify SSE client can connect and initialize.
+    async def test_streamable_client_initializes(self, mcp_session: ClientSession) -> None:
+        """Verify HTTP Streamable client can connect and initialize.
 
         The mcp_session fixture already succeeded if we get here,
-        which means the SSE connection and initialization worked.
+        which means the HTTP Streamable connection and initialization worked.
         """
         assert mcp_session is not None
 
@@ -230,8 +224,8 @@ class TestMemoryMcpSSE:
         assert capabilities is not None
 
     @pytest.mark.asyncio
-    async def test_sse_client_list_tools(self, mcp_session: ClientSession) -> None:
-        """Verify memory-mcp exposes expected tools via SSE.
+    async def test_streamable_client_list_tools(self, mcp_session: ClientSession) -> None:
+        """Verify memory-mcp exposes expected tools via HTTP Streamable.
 
         This validates that the MCP server responds to tool list queries.
         """

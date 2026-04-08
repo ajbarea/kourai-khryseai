@@ -198,9 +198,9 @@ def _make_session_mock(
 
 
 @asynccontextmanager
-async def _mock_sse_client(_url: str):
-    """Async context manager that yields dummy (read, write) streams."""
-    yield (MagicMock(), MagicMock())
+async def _mock_streamable_client(_url: str):
+    """Async context manager that yields dummy (read, write, get_session_id) streams."""
+    yield (MagicMock(), MagicMock(), MagicMock())
 
 
 # ── query_context7 (async MCP) ────────────────────────────────────────────────
@@ -208,14 +208,14 @@ async def _mock_sse_client(_url: str):
 
 class TestQueryContext7Async:
     @pytest.mark.asyncio
-    async def test_raises_mcp_unavailable_when_sse_fails(self):
-        """sse_client connection error is wrapped in MCPUnavailable."""
+    async def test_raises_mcp_unavailable_when_connection_fails(self):
+        """streamable_http_client connection error is wrapped in MCPUnavailable."""
 
-        def failing_sse(_url: str):
+        def failing_client(_url: str):
             raise ConnectionRefusedError("connection refused")
 
         with (
-            patch("mcp.client.sse.sse_client", failing_sse),
+            patch("mcp.client.streamable_http.streamable_http_client", failing_client),
             pytest.raises(MCPUnavailable, match="Context7"),
         ):
             await query_context7("asyncio", "gather")
@@ -224,21 +224,24 @@ class TestQueryContext7Async:
     async def test_raises_mcp_unavailable_on_timeout(self):
         """asyncio.timeout expiry is wrapped in MCPUnavailable."""
 
-        def timeout_sse(_url: str):
+        def timeout_client(_url: str):
             raise TimeoutError()
 
-        with patch("mcp.client.sse.sse_client", timeout_sse), pytest.raises(MCPUnavailable):
+        with (
+            patch("mcp.client.streamable_http.streamable_http_client", timeout_client),
+            pytest.raises(MCPUnavailable),
+        ):
             await query_context7("asyncio", "gather")
 
     @pytest.mark.asyncio
     async def test_raises_mcp_unavailable_preserves_context7_prefix(self):
         """MCPUnavailable message starts with 'Context7:' for easier debugging."""
 
-        def failing_sse(_url: str):
+        def failing_client(_url: str):
             raise OSError("ECONNREFUSED")
 
         with (
-            patch("mcp.client.sse.sse_client", failing_sse),
+            patch("mcp.client.streamable_http.streamable_http_client", failing_client),
             pytest.raises(MCPUnavailable) as exc_info,
         ):
             await query_context7("react", "hooks")
@@ -259,7 +262,7 @@ class TestQueryContext7Async:
             yield session
 
         with (
-            patch("mcp.client.sse.sse_client", _mock_sse_client),
+            patch("mcp.client.streamable_http.streamable_http_client", _mock_streamable_client),
             patch("mcp.ClientSession", mock_client_session),
             pytest.raises(MCPUnavailable, match="resolve library"),
         ):
@@ -276,7 +279,7 @@ class TestQueryContext7Async:
             yield session
 
         with (
-            patch("mcp.client.sse.sse_client", _mock_sse_client),
+            patch("mcp.client.streamable_http.streamable_http_client", _mock_streamable_client),
             patch("mcp.ClientSession", mock_client_session),
         ):
             result = await query_context7("asyncio", "gather")
@@ -285,14 +288,14 @@ class TestQueryContext7Async:
 
     @pytest.mark.asyncio
     async def test_uses_env_var_url(self, monkeypatch: pytest.MonkeyPatch):
-        """Passes CONTEXT7_MCP_URL env var to sse_client."""
-        monkeypatch.setenv("CONTEXT7_MCP_URL", "http://custom-host:9999/sse")
+        """Passes CONTEXT7_MCP_URL env var to streamable_http_client."""
+        monkeypatch.setenv("CONTEXT7_MCP_URL", "http://custom-host:9999/mcp")
         captured_url: list[str] = []
 
         @asynccontextmanager
-        async def capturing_sse(url: str):
+        async def capturing_client(url: str):
             captured_url.append(url)
-            yield (MagicMock(), MagicMock())
+            yield (MagicMock(), MagicMock(), MagicMock())
 
         session = _make_session_mock()
 
@@ -301,12 +304,12 @@ class TestQueryContext7Async:
             yield session
 
         with (
-            patch("mcp.client.sse.sse_client", capturing_sse),
+            patch("mcp.client.streamable_http.streamable_http_client", capturing_client),
             patch("mcp.ClientSession", mock_client_session),
         ):
             await query_context7("asyncio", "gather")
 
-        assert captured_url[0] == "http://custom-host:9999/sse"
+        assert captured_url[0] == "http://custom-host:9999/mcp"
 
 
 # ── create_memory_entities (async MCP) ───────────────────────────────────────
@@ -314,14 +317,14 @@ class TestQueryContext7Async:
 
 class TestCreateMemoryEntitiesAsync:
     @pytest.mark.asyncio
-    async def test_raises_mcp_unavailable_when_sse_fails(self):
+    async def test_raises_mcp_unavailable_when_connection_fails(self):
         """Connection error is wrapped in MCPUnavailable."""
 
-        def failing_sse(_url: str):
+        def failing_client(_url: str):
             raise ConnectionRefusedError("memory-mcp not running")
 
         with (
-            patch("mcp.client.sse.sse_client", failing_sse),
+            patch("mcp.client.streamable_http.streamable_http_client", failing_client),
             pytest.raises(MCPUnavailable, match="Memory MCP"),
         ):
             await create_memory_entities(
@@ -344,7 +347,7 @@ class TestCreateMemoryEntitiesAsync:
         ]
 
         with (
-            patch("mcp.client.sse.sse_client", _mock_sse_client),
+            patch("mcp.client.streamable_http.streamable_http_client", _mock_streamable_client),
             patch("mcp.ClientSession", mock_client_session),
         ):
             await create_memory_entities(entities)
@@ -352,15 +355,15 @@ class TestCreateMemoryEntitiesAsync:
         session.call_tool.assert_called_once_with("create_entities", {"entities": entities})
 
     @pytest.mark.asyncio
-    async def test_uses_memory_mcp_sse_url_env_var(self, monkeypatch: pytest.MonkeyPatch):
-        """Uses MEMORY_MCP_SSE_URL env var for the connection endpoint."""
-        monkeypatch.setenv("MEMORY_MCP_SSE_URL", "http://custom-memory:6000/sse")
+    async def test_uses_memory_mcp_url_env_var(self, monkeypatch: pytest.MonkeyPatch):
+        """Uses MEMORY_MCP_URL env var for the connection endpoint."""
+        monkeypatch.setenv("MEMORY_MCP_URL", "http://custom-memory:6000/mcp")
         captured_url: list[str] = []
 
         @asynccontextmanager
-        async def capturing_sse(url: str):
+        async def capturing_client(url: str):
             captured_url.append(url)
-            yield (MagicMock(), MagicMock())
+            yield (MagicMock(), MagicMock(), MagicMock())
 
         session = AsyncMock()
         session.initialize = AsyncMock(return_value=None)
@@ -371,14 +374,14 @@ class TestCreateMemoryEntitiesAsync:
             yield session
 
         with (
-            patch("mcp.client.sse.sse_client", capturing_sse),
+            patch("mcp.client.streamable_http.streamable_http_client", capturing_client),
             patch("mcp.ClientSession", mock_client_session),
         ):
             await create_memory_entities(
                 [{"name": "P", "entityType": "Player", "observations": []}]
             )
 
-        assert captured_url[0] == "http://custom-memory:6000/sse"
+        assert captured_url[0] == "http://custom-memory:6000/mcp"
 
 
 # ── search_memory_nodes (async MCP) ──────────────────────────────────────────
@@ -386,14 +389,14 @@ class TestCreateMemoryEntitiesAsync:
 
 class TestSearchMemoryNodesAsync:
     @pytest.mark.asyncio
-    async def test_raises_mcp_unavailable_when_sse_fails(self):
+    async def test_raises_mcp_unavailable_when_connection_fails(self):
         """Connection error is wrapped in MCPUnavailable."""
 
-        def failing_sse(_url: str):
+        def failing_client(_url: str):
             raise ConnectionRefusedError("memory-mcp not running")
 
         with (
-            patch("mcp.client.sse.sse_client", failing_sse),
+            patch("mcp.client.streamable_http.streamable_http_client", failing_client),
             pytest.raises(MCPUnavailable, match="Memory MCP"),
         ):
             await search_memory_nodes("Player1")
@@ -413,7 +416,7 @@ class TestSearchMemoryNodesAsync:
             yield session
 
         with (
-            patch("mcp.client.sse.sse_client", _mock_sse_client),
+            patch("mcp.client.streamable_http.streamable_http_client", _mock_streamable_client),
             patch("mcp.ClientSession", mock_client_session),
         ):
             text = await search_memory_nodes("Player1")
@@ -434,7 +437,7 @@ class TestSearchMemoryNodesAsync:
             yield session
 
         with (
-            patch("mcp.client.sse.sse_client", _mock_sse_client),
+            patch("mcp.client.streamable_http.streamable_http_client", _mock_streamable_client),
             patch("mcp.ClientSession", mock_client_session),
         ):
             text = await search_memory_nodes("Player1")
@@ -455,7 +458,7 @@ class TestSearchMemoryNodesAsync:
             yield session
 
         with (
-            patch("mcp.client.sse.sse_client", _mock_sse_client),
+            patch("mcp.client.streamable_http.streamable_http_client", _mock_streamable_client),
             patch("mcp.ClientSession", mock_client_session),
         ):
             await search_memory_nodes("dark mode preference")
