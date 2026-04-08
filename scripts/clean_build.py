@@ -1,4 +1,7 @@
-"""Clean build artifacts, cache, and temp files (cross-platform).
+"""Build artifact and cache cleanup utility.
+
+Removes build artifacts, test caches, and temporary files to maintain a clean
+development environment. Supports selective cleanup via --cache-only and --tests-only.
 
 Usage:
     python scripts/clean_build.py
@@ -8,122 +11,160 @@ Usage:
 
 from __future__ import annotations
 
-import logging
-import os
+import argparse
 import shutil
 import sys
 from pathlib import Path
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format="%(message)s")
+try:
+    from scripts.logging_utils import setup_logger
+except ModuleNotFoundError:
+    from logging_utils import setup_logger
+
+logger = setup_logger(__name__, "clean_build.log")
 
 
-def clean_pycache() -> None:
-    """Remove __pycache__ and .egg-info directories."""
-    for root, dirs, _ in os.walk("."):
-        dirs[:] = [d for d in dirs if not d.startswith(".venv") and d != "venv"]
+def clean_build(cache_only: bool = False, tests_only: bool = False) -> None:
+    """Remove build artifacts and cache directories.
 
-        for dirname in dirs:
-            if dirname in {"__pycache__", ".egg-info"}:
-                path = Path(root) / dirname
-                logger.info(f"Removing {path}")
-                shutil.rmtree(path, ignore_errors=True)
-
-
-def clean_pytest() -> None:
-    """Remove pytest and coverage artifacts."""
-    patterns = [".pytest_cache", "logs", ".coverage", "coverage.xml", "htmlcov"]
-    for pattern in patterns:
-        p = Path(pattern)
-        if p.exists():
-            if p.is_dir():
-                logger.info(f"Removing directory {pattern}")
-                shutil.rmtree(p, ignore_errors=True)
-            else:
-                logger.info(f"Removing file {pattern}")
-                p.unlink()
-
-
-def clean_ty() -> None:
-    """Remove ty cache."""
-    p = Path(".ty_cache")
-    if p.exists():
-        logger.info("Removing .ty_cache")
-        shutil.rmtree(p, ignore_errors=True)
-    # Also clean up old mypy cache if it exists
-    p_mypy = Path(".mypy_cache")
-    if p_mypy.exists():
-        logger.info("Removing .mypy_cache")
-        shutil.rmtree(p_mypy, ignore_errors=True)
-
-
-def clean_ruff() -> None:
-    """Remove ruff cache."""
-    p = Path(".ruff_cache")
-    if p.exists():
-        logger.info("Removing .ruff_cache")
-        shutil.rmtree(p, ignore_errors=True)
-
-
-def clean_build() -> None:
-    """Remove build artifacts."""
-    patterns = [".playwright-mcp", "site", "dist", "build"]
-    for pattern in patterns:
-        p = Path(pattern)
-        if p.exists():
-            logger.info(f"Removing {pattern}")
-            shutil.rmtree(p, ignore_errors=True)
-
-
-def clean_hypothesis() -> None:
-    """Remove hypothesis cache."""
-    p = Path(".hypothesis")
-    if p.exists():
-        logger.info("Removing .hypothesis")
-        shutil.rmtree(p, ignore_errors=True)
-
-
-def clean_uv_backups() -> None:
-    """Remove uv.lock backup files."""
-    for backup_file in Path().glob("uv.lock.backup.*"):
-        logger.info(f"Removing {backup_file}")
-        backup_file.unlink()
-
-
-def clean_docker_logs() -> None:
-    """Remove docker logs."""
-    p = Path("docker-debug.log")
-    if p.exists():
-        logger.info("Removing docker-debug.log")
-        p.unlink()
-
-
-def main() -> int:
-    """Clean all artifacts."""
-    args = sys.argv[1:]
-
-    if "--cache-only" in args:
-        logger.info("[CLEAN] Cache only...")
-        clean_ty()
-        clean_ruff()
-    elif "--tests-only" in args:
-        logger.info("[CLEAN] Test artifacts only...")
-        clean_pytest()
-        clean_pycache()
+    Args:
+        cache_only: If True, only clean cache directories.
+        tests_only: If True, only clean test artifacts.
+    """
+    if cache_only:
+        print("\n  Kourai Cleanup (cache only)")
+    elif tests_only:
+        print("\n  Kourai Cleanup (test artifacts only)")
     else:
-        logger.info("[CLEAN] Build artifacts and caches...")
-        clean_pycache()
-        clean_pytest()
-        clean_ty()
-        clean_ruff()
-        clean_build()
-        clean_hypothesis()
-        clean_uv_backups()
-        clean_docker_logs()
+        print("\n  Kourai Cleanup")
+    print("=" * 60)
+    logger.info("Starting cleanup...")
 
-    logger.info("Done. Workspace cleaned.")
-    return 0
+    root = Path()
+    skip_dirs = {".venv", ".venv-win", ".venv-wsl", "venv", "node_modules"}
+
+    # Close logger handlers before cleaning logs directory
+    for handler in logger.handlers[:]:
+        handler.close()
+        logger.removeHandler(handler)
+
+    if tests_only:
+        _clean_patterns(
+            root, [".pytest_cache", "__pycache__", ".hypothesis", "MagicMock"], skip_dirs
+        )
+        _clean_files(root, [".coverage"])
+        _clean_dirs(root, ["logs", "htmlcov"])
+        _print_done()
+        return
+
+    if cache_only:
+        _clean_dirs(root, [".ty_cache", ".mypy_cache", ".ruff_cache"])
+        _print_done()
+        return
+
+    # Full clean
+    _clean_dirs(
+        root,
+        [
+            "logs",
+            ".pytest_cache",
+            ".ty_cache",
+            ".mypy_cache",
+            ".ruff_cache",
+            ".hypothesis",
+            ".playwright-mcp",
+            "site",
+            "dist",
+            "build",
+            "htmlcov",
+        ],
+    )
+    _clean_patterns(root, ["__pycache__", ".egg-info", "MagicMock"], skip_dirs)
+    _clean_files(root, [".coverage", "docker-debug.log"])
+    _clean_globs(root, [".coverage.*", "uv.lock.backup.*"])
+
+    _print_done()
+
+
+def _clean_dirs(root: Path, dirs: list[str]) -> None:
+    """Remove specific directories if they exist."""
+    removed = []
+    for dirname in dirs:
+        d = root / dirname
+        if d.exists():
+            shutil.rmtree(d, ignore_errors=True)
+            removed.append(dirname)
+    if removed:
+        print("\n  Removing directories...")
+        for d in removed:
+            print(f"  + Removed {d}")
+
+
+def _clean_patterns(root: Path, patterns: list[str], skip_dirs: set[str]) -> None:
+    """Remove directories matching patterns recursively."""
+    pattern_results: dict[str, int] = {}
+    for pattern in patterns:
+        count = 0
+        for p in root.rglob(pattern):
+            if any(part in skip_dirs for part in p.parts):
+                continue
+            try:
+                if p.is_dir():
+                    shutil.rmtree(p)
+                else:
+                    p.unlink()
+                count += 1
+            except PermissionError:
+                print(f"  ! Skipped (locked): {p}")
+        if count > 0:
+            pattern_results[pattern] = count
+    if pattern_results:
+        print("\n  Cleaning artifact patterns...")
+        for pattern, count in pattern_results.items():
+            print(f"  + Cleaned {count} {pattern} artifacts")
+
+
+def _clean_files(root: Path, files: list[str]) -> None:
+    """Remove specific files if they exist."""
+    removed = []
+    for filename in files:
+        f = root / filename
+        if f.exists():
+            f.unlink()
+            removed.append(filename)
+    if removed:
+        print("\n  Removing files...")
+        for f in removed:
+            print(f"  + Removed {f}")
+
+
+def _clean_globs(root: Path, patterns: list[str]) -> None:
+    """Remove files matching glob patterns."""
+    removed = []
+    for pattern in patterns:
+        for f in root.glob(pattern):
+            f.unlink()
+            removed.append(str(f))
+    if removed:
+        print("\n  Removing glob matches...")
+        for f in removed:
+            print(f"  + Removed {f}")
+
+
+def _print_done() -> None:
+    """Print completion message."""
+    print("\n" + "=" * 60)
+    print("+ Cleanup completed successfully")
+    print("=" * 60 + "\n")
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    parser = argparse.ArgumentParser(description="Clean build artifacts.")
+    parser.add_argument("--cache-only", action="store_true", help="Only clean cache directories")
+    parser.add_argument("--tests-only", action="store_true", help="Only clean test artifacts")
+    args = parser.parse_args()
+    try:
+        clean_build(cache_only=args.cache_only, tests_only=args.tests_only)
+    except Exception as e:
+        print(f"x Cleanup failed: {e}")
+        sys.exit(1)

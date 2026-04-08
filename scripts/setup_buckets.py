@@ -42,7 +42,7 @@ def run_python(code: str) -> tuple[str, int]:
     """Run Python code via uv and return (stdout, returncode)."""
     try:
         result = subprocess.run(  # noqa: S603
-            ["uv", "run", "--no-active", "python", "-c", code],  # noqa: S607
+            ["uv", "run", "--no-active", "python", "-c", code],
             capture_output=True,
             text=True,
             shell=False,
@@ -145,7 +145,7 @@ except Exception as e:
     env["HF_TOKEN"] = hf_token
     try:
         result = subprocess.run(  # noqa: S603
-            ["uv", "run", "--no-active", "python", "-c", code],  # noqa: S607
+            ["uv", "run", "--no-active", "python", "-c", code],
             capture_output=True,
             text=True,
             env=env,

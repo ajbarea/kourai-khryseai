@@ -1,42 +1,34 @@
-#!/usr/bin/env python
-"""Display Makefile help message."""
+"""Display help message for Kourai developer commands.
+
+Delegates to dev_cli.print_help() so there's a single source of truth.
+
+Usage:
+    python scripts/show_help.py
+"""
 
 from __future__ import annotations
 
-import logging
-import re
 import sys
 from pathlib import Path
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format="%(message)s")
 
-SCRIPT_DIR = Path(__file__).resolve().parent
-MAKEFILE = SCRIPT_DIR.parent / "Makefile"
+def _load_print_help():
+    """Import print_help from kourai_common, with a local-path fallback."""
+    try:
+        from kourai_common.dev_cli import print_help
+    except ModuleNotFoundError:
+        repo_root = Path(__file__).resolve().parents[1]
+        shared_src = repo_root / "shared" / "src"
+        if str(shared_src) not in sys.path:
+            sys.path.insert(0, str(shared_src))
+        from kourai_common.dev_cli import print_help
+    return print_help
 
 
 def main() -> int:
-    """Print help from Makefile."""
-    if not MAKEFILE.exists():
-        logger.error(f"Makefile not found at {MAKEFILE}")
-        return 1
-
-    content = MAKEFILE.read_text(encoding="utf-8")
-    lines = content.split("\n")
-
-    logger.info("")
-    logger.info("=" * 66)
-    logger.info("  Kourai Khryseai - Make Commands")
-    logger.info("=" * 66)
-    logger.info("")
-
-    for line in lines:
-        match = re.match(r"^([a-zA-Z_-]+):\s+##\s+(.*)", line)
-        if match:
-            target, help_text = match.groups()
-            logger.info(f"  {target:<18} {help_text}")
-
-    logger.info("")
+    """Print help from dev_cli."""
+    print_help = _load_print_help()
+    print_help()
     return 0
 
 

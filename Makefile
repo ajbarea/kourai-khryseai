@@ -1,166 +1,134 @@
 ##
-## Kourai Khryseai — Makefile
-## Multi-agent A2A development system with Pygame GUI or CLI interfaces, 
-## Dockerized agents, and integrated monitoring (Jaeger + Prometheus)
+## Kourai Khryseai - Makefile
+## Optional compatibility wrapper around kourai-dev CLI.
 ##
-## Usage:
-##   make help          Show all available commands
-##   make dev           Full development stack: agents + GUI + monitoring
-##   make up            Start all services (background)
-##   make down          Stop all services
+## Canonical workflow:
+##   uv run kourai-dev <command> [-- <args...>]
+##
+## This Makefile delegates every target to the cross-platform Python CLI,
+## so `make <target>` and `uv run kourai-dev <target>` are equivalent.
 ##
 
-.PHONY: help setup setup-artifacts upgrade yolo dev dev-vn up down restart status gui cli vn docs lint test test-unit test-integration test-performance clean prune
+.PHONY: help check-env setup setup-artifacts upgrade yolo dev dev-vn up down restart rebuild status gui cli vn docs lint validate test test-unit test-integration test-performance audit deps clean clean-cache clean-tests prune
 .DEFAULT_GOAL := help
 
-# ════════════════════════════════════════════════════════════════════════════
+UV_DEV := uv run --no-active --package kourai-common kourai-dev
+
+# ---------------------------------------------------------------------------
 # Environment
-# ════════════════════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------------------
 
-export LC_ALL=en_US.UTF-8
-export LANG=en_US.UTF-8
-export PYTHONIOENCODING=utf-8
+check-env:                 ## Verify uv, Python, and Docker are available
+	@$(UV_DEV) check-env
 
-# Isolate platform-specific virtual environments to prevent binary conflicts
-ifeq ($(OS),Windows_NT)
-    ifdef WSL_DISTRO_NAME
-        export UV_PROJECT_ENVIRONMENT ?= .venv-wsl
-    else
-        export UV_PROJECT_ENVIRONMENT ?= .venv-win
-    endif
-else
-    # macOS and native Linux use standard .venv
-    export UV_PROJECT_ENVIRONMENT ?= .venv
-endif
+# ---------------------------------------------------------------------------
+# Setup & Maintenance
+# ---------------------------------------------------------------------------
 
-COMPOSE_FULL := docker compose
-GUI_ARGS ?= --agent http://localhost:10000/
-CLI_ARGS ?=
+setup:                     ## Install all Python dependencies + optional HF Storage Buckets
+	@$(UV_DEV) setup
 
-# ════════════════════════════════════════════════════════════════════════════
-# Setup & Maintenance (run first time, or when dependencies change)
-# ════════════════════════════════════════════════════════════════════════════
-
-setup:                     ## Install all Python dependencies + optional HF Storage Buckets if token set
-	uv run --no-active python scripts/setup.py
-
-setup-artifacts:            ## Create HF Storage Bucket for agent artifacts
-	uv run --no-active python scripts/setup_buckets.py
-
-setup-artifacts-force:      ## Force re-configure HF Storage Bucket artifacts (skips marker check)
-	uv run --no-active python scripts/setup.py --force-artifacts
+setup-artifacts:           ## Create HF Storage Bucket for agent artifacts
+	@$(UV_DEV) setup-artifacts
 
 upgrade:                   ## Update all dependencies to latest versions
-	uv run --no-active python scripts/upgrade.py
+	@$(UV_DEV) upgrade
 
-yolo:                      ## Nuke and rebuild: clean → down → setup → upgrade → clean
-	@$(MAKE) --no-print-directory clean
-	@$(MAKE) --no-print-directory down
-	@$(MAKE) --no-print-directory setup
-	@$(MAKE) --no-print-directory upgrade
-	@$(MAKE) --no-print-directory clean
+yolo:                      ## Nuke and rebuild: clean -> down -> setup -> upgrade -> clean
+	@$(UV_DEV) yolo
 
-# ════════════════════════════════════════════════════════════════════════════
-# Core Development Workflows (primary entry points)
-# ════════════════════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------------------
+# Development Workflows
+# ---------------------------------------------------------------------------
 
-dev:                       ## Start services + GUI (full development stack in one command)
-	@$(MAKE) --no-print-directory down
-	@$(MAKE) --no-print-directory up
-	@echo
-	@echo Starting GUI...
-	@$(MAKE) --no-print-directory gui
+dev:                       ## Start services + GUI (full development stack)
+	@$(UV_DEV) dev
 
-dev-vn:                    ## Start services + Ren'Py VN (full development stack with visual novel)
-	@$(MAKE) --no-print-directory down
-	@$(MAKE) --no-print-directory up
-	@echo
-	@echo Starting Ren\'Py VN...
-	@$(MAKE) --no-print-directory vn
+dev-vn:                    ## Start services + Ren'Py VN (visual novel stack)
+	@$(UV_DEV) dev-vn
 
-up:                        ## Start all agents + infrastructure (background, waits for health)
-	@echo Building and starting services...
-	@mkdir -p logs
-	@$(COMPOSE_FULL) up -d --build --pull missing --wait 2>&1 | tee logs/docker.log && echo "✅ All services running and healthy" || (echo "❌ Build or startup failed - see logs/docker.log"; exit 1)
-	@echo
-	@echo Dashboards:
-	@echo   Jaeger traces:      http://localhost:16686
-	@echo   Prometheus metrics: http://localhost:9090
-	@echo
-	@$(COMPOSE_FULL) ps
+up:                        ## Start all agents + infrastructure (fast: reuses containers)
+	@$(UV_DEV) up
 
 down:                      ## Stop all services and remove containers
-	$(COMPOSE_FULL) down --remove-orphans
+	@$(UV_DEV) down
 
-restart:                   ## Restart all services (same as: make down && make up)
-	@$(MAKE) --no-print-directory down
-	@$(MAKE) --no-print-directory up
+restart:                   ## Restart all services (down + up)
+	@$(UV_DEV) restart
+
+rebuild:                   ## Full rebuild with Docker cache clear
+	@$(UV_DEV) rebuild
 
 status:                    ## Show current service status and health
-	$(COMPOSE_FULL) ps
+	@$(UV_DEV) status
 
-# ════════════════════════════════════════════════════════════════════════════
-# Client Interfaces (connect to running services)
-# ════════════════════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------------------
+# Client Interfaces
+# ---------------------------------------------------------------------------
 
 gui:                       ## Launch Pygame GUI (runs on host machine)
-	uv run --python managed python -m hosts.gui $(GUI_ARGS)
+	@$(UV_DEV) gui
 
 cli:                       ## Launch terminal CLI client (runs on host machine)
-	uv run --python managed python -m hosts.cli $(CLI_ARGS)
+	@$(UV_DEV) cli
 
 vn:                        ## Launch Ren'Py Visual Novel GUI (runs on host machine)
-	./hosts/vn/renpy-8.5.2-sdk/renpy.exe ./hosts/vn/kourai_vn/
+	@$(UV_DEV) vn
 
-# ════════════════════════════════════════════════════════════════════════════
-# Documentation & Utilities
-# ════════════════════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------------------
+# Documentation
+# ---------------------------------------------------------------------------
 
 docs:                      ## Serve project documentation (Zensical on http://localhost:8000)
-	uv run --no-active zensical serve
+	@$(UV_DEV) docs
 
-# ════════════════════════════════════════════════════════════════════════════
-# Quality Gates (run before commit; cross-platform via Python scripts)
-# ════════════════════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------------------
+# Quality Gates
+# ---------------------------------------------------------------------------
 
 lint:                      ## Run code quality checks (ruff format, ruff check, ty)
-	uv run --no-active ruff format .
-	uv run --no-active ruff check --fix --unsafe-fixes --show-fixes .
-	uv run --no-active ty check agents hosts/cli hosts/gui mcp_servers shared/src tests
+	@$(UV_DEV) lint
 
-test:                      ## Run full test suite with quality checks (unit + integration + performance)
-	@$(MAKE) --no-print-directory lint
-	@$(MAKE) --no-print-directory test-unit
-	@$(MAKE) --no-print-directory test-integration
-	@$(MAKE) --no-print-directory test-performance
+validate:                  ## Quick validation: lint + unit tests only (fast feedback)
+	@$(UV_DEV) validate
+
+test:                      ## Run full test suite (unit + integration + performance)
+	@$(UV_DEV) test
 
 test-unit:                 ## Run unit tests only (parallel with auto CPU detection)
-	@mkdir -p logs
-	uv run --no-active pytest -n auto tests/unit/ -v --tb=short --cov=. --cov-report=xml:logs/coverage.xml --cov-report=term-missing 2>&1 | tee logs/test-unit.log
+	@$(UV_DEV) test-unit
 
-test-integration:          ## Run integration tests only
-	@mkdir -p logs
-	uv run --no-active pytest tests/integration/ -v --tb=short --cov=. --cov-append --cov-report=xml:logs/coverage.xml --cov-report=term-missing 2>&1 | tee logs/test-integration.log
+test-integration:          ## Run integration tests only (auto-starts containers)
+	@$(UV_DEV) test-integration
 
 test-performance:          ## Run performance tests only
-	@mkdir -p logs
-	uv run --no-active pytest tests/performance/ -v --tb=short --cov=. --cov-append --cov-report=xml:logs/coverage.xml --cov-report=term-missing 2>&1 | tee logs/test-performance.log
+	@$(UV_DEV) test-performance
+
+audit:                     ## Audit dependencies for security vulnerabilities
+	@$(UV_DEV) audit
+
+# ---------------------------------------------------------------------------
+# Maintenance
+# ---------------------------------------------------------------------------
+
+deps:                      ## Show dependency tree
+	@$(UV_DEV) deps
 
 clean:                     ## Remove build artifacts, cache, and temp files
-	@uv run --no-active python scripts/clean_build.py
+	@$(UV_DEV) clean
 
 clean-cache:               ## Remove cache directories only
-	uv run --no-active python scripts/clean_build.py --cache-only
+	@$(UV_DEV) clean-cache
 
 clean-tests:               ## Remove test artifacts only
-	uv run --no-active python scripts/clean_build.py --tests-only
+	@$(UV_DEV) clean-tests
 
-prune:                     ## Remove stopped containers, dangling images, and unused build cache
-	docker system prune -f
+prune:                     ## Remove stopped containers, dangling images, unused build cache
+	@$(UV_DEV) prune
 
-# ════════════════════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------------------
 # Help
-# ════════════════════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------------------
 
 help:                      ## Show this help message
-	@uv run --no-active python scripts/show_help.py
+	@$(UV_DEV) help
