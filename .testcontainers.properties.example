@@ -1,0 +1,17 @@
+# Testcontainers Configuration
+# Copy to .testcontainers.properties or set via environment variables
+#
+# Testcontainers will read from:
+# 1. Environment variables (highest priority)
+# 2. .testcontainers.properties file
+# 3. ~/.testcontainers.properties (user home directory)
+
+# Testcontainers Cloud configuration
+# Get token from: https://testcontainers.com/cloud/
+testcontainers.cloud.token=${TESTCONTAINERS_CLOUD_TOKEN}
+
+# Testcontainers Cloud endpoint (optional, usually auto-detected)
+# testcontainers.cloud.endpoint=https://api.testcontainers.cloud
+
+# Enable Testcontainers Cloud for integration tests
+testcontainers.cloud.enabled=true
