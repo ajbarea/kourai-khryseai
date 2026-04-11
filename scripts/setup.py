@@ -112,9 +112,9 @@ def main() -> int:
     print("=" * 60)
     logger.info("Starting Kourai setup...")
 
-    # Step 1: Install dependencies
+    # Step 1: Install dependencies (all workspace members for complete dev environment)
     if not run_step(
-        ["uv", "sync", "--all-packages", "--no-active"],
+        ["uv", "sync", "--all-packages"],
         "Installing dependencies",
         required=True,
     ):
