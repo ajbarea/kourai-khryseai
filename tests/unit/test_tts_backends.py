@@ -3,9 +3,17 @@
 Comprehensive coverage for voice config validation, both backends, and fallback behavior.
 """
 
+import sys
+from pathlib import Path
+
 import pytest
 
 from kourai_common.tts_backend import AGENT_VOICE_MAP, TTSVoiceConfig
+
+# tts_engine is not an installable package — add its directory to the path
+_GUI_DIR = Path(__file__).parents[2] / "hosts/gui"
+if str(_GUI_DIR) not in sys.path:
+    sys.path.insert(0, str(_GUI_DIR))
 
 # ===================================================================
 # TTSVoiceConfig Validation Tests
@@ -323,6 +331,7 @@ class TestBackendFallback:
 
     async def test_create_default_backend_function(self):
         """_create_default_backend() should prefer Kokoro, fallback to edge-tts."""
+        pytest.importorskip("pygame")
         from tts_engine import _create_default_backend
 
         backend = _create_default_backend()
