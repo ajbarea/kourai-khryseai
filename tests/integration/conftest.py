@@ -19,6 +19,20 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+
+def _is_docker_available() -> bool:
+    """Check if Docker daemon is accessible and configured correctly."""
+    try:
+        # Try importing and initializing docker client
+        import docker
+
+        client = docker.from_env()
+        client.ping()
+        return True
+    except Exception as e:
+        logger.debug(f"Docker not available: {e}")
+        return False
+
 # Registry where production images are pushed
 _REGISTRY_USER = os.getenv("DOCKER_HUB_USERNAME", "ajb6289")
 _REGISTRY_REPO = "kourai-khryseai"
@@ -62,6 +76,8 @@ def pytest_runtest_makereport(item, call):
 @pytest.fixture(scope="session")
 def shared_network() -> Generator[Network, None, None]:
     """Shared Docker network for inter-container communication."""
+    if not _is_docker_available():
+        pytest.skip("Docker daemon not available or misconfigured")
     with Network() as network:
         yield network
 
