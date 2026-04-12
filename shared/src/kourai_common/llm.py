@@ -71,7 +71,10 @@ async def _execute_completion(timeout_seconds: float, **kwargs: Any) -> Any:
     # Route all requests through a proxy when configured (e.g. litellm mock in tests).
     # Without this, litellm routes anthropic/ models directly to the Anthropic API,
     # bypassing OPENAI_API_BASE entirely.
+    # For Ollama, OLLAMA_API_BASE overrides the default http://localhost:11434.
     api_base = os.getenv("OPENAI_API_BASE")
+    if not api_base and kwargs.get("model", "").startswith("ollama/"):
+        api_base = os.getenv("OLLAMA_API_BASE")
     if api_base and "api_base" not in kwargs:
         kwargs["api_base"] = api_base
     async with asyncio.timeout(timeout_seconds):

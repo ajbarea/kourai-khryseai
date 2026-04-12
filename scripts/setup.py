@@ -11,6 +11,7 @@ Usage:
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -100,6 +101,43 @@ def mark_artifacts_configured() -> None:
     logger.info(f"Created marker file: {SETUP_MARKER}")
 
 
+def _setup_ollama() -> None:
+    """Check Ollama connectivity and report status.
+
+    Models are pulled on demand by Ollama at first LLM call — no bulk download needed.
+    """
+    print()
+    print("  Ollama Setup (KOURAI_PROVIDER=local)")
+    print("-" * 40)
+
+    # Health check
+    try:
+        result = subprocess.run(
+            ["ollama", "list"],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            print("  x Ollama is installed but not responding (is 'ollama serve' running?)")
+            logger.warning("Ollama list failed: %s", result.stderr.strip())
+            return
+    except FileNotFoundError:
+        print("  x Ollama not found")
+        return
+
+    print("  + Ollama is running")
+
+    # Report which models are already available
+    lines = result.stdout.strip().splitlines()[1:]
+    installed = [line.split()[0] for line in lines if line.strip()]
+    if installed:
+        for model in installed:
+            print(f"  + {model}")
+    else:
+        print("  i No models pulled yet — Ollama will download them on first use")
+        print("    Tip: pre-pull a small model with: ollama pull llama3.3:8b (~5GB)")
+
+
 def main() -> int:
     """Main setup workflow.
 
@@ -112,9 +150,9 @@ def main() -> int:
     print("=" * 60)
     logger.info("Starting Kourai setup...")
 
-    # Step 1: Install dependencies
+    # Install dependencies
     if not run_step(
-        ["uv", "sync", "--all-packages", "--no-active"],
+        ["uv", "sync", "--all-packages"],
         "Installing dependencies",
         required=True,
     ):
@@ -124,7 +162,7 @@ def main() -> int:
         logger.error("Setup failed")
         return 1
 
-    # Step 2: Optional HF bucket setup
+    # Optional HF bucket setup (only if HF_TOKEN is set and not already configured)
     if should_setup_artifacts(force=force_artifacts):
         if run_step(
             ["uv", "run", "--no-active", "python", "scripts/setup_buckets.py"],
@@ -146,6 +184,15 @@ def main() -> int:
             print("    1. Get a write-scope token: https://huggingface.co/settings/tokens")
             print("    2. Add to .env:  HF_TOKEN=hf_xxx...")
             print("    3. Run: make setup")
+
+    # Optional Ollama setup (only when KOURAI_PROVIDER=local)
+    provider = os.environ.get("KOURAI_PROVIDER", "").lower()
+    if provider == "local" and shutil.which("ollama"):
+        _setup_ollama()
+    elif provider == "local":
+        print()
+        print("  ! KOURAI_PROVIDER=local but ollama not found in PATH")
+        print("    Install from: https://ollama.com/")
 
     print("\n" + "=" * 60)
     print("+ Setup completed successfully")
