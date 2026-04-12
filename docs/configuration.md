@@ -6,11 +6,22 @@ All configuration is managed through environment variables in `.env` (or exporte
 cp .env.example .env
 ```
 
+The `.env.example` file is intentionally minimal — it only contains variables you need to set. Everything else has sensible defaults in code and can be overridden in `.env` when needed.
+
 ---
 
-## Environment Variables
+## Required Settings
 
-### Required (per provider)
+### LLM Provider
+
+```bash title=".env"
+KOURAI_PROVIDER=anthropic          # anthropic | google | local
+KOURAI_MODEL_TIER=cheap            # cheap | standard | smart
+```
+
+### API Keys
+
+Set the key matching your provider:
 
 | Provider | Variable | Where to get it |
 |---|---|---|
@@ -18,43 +29,106 @@ cp .env.example .env
 | `google` | `GEMINI_API_KEY` | [aistudio.google.com](https://aistudio.google.com) |
 | `local` | *(none)* | [Ollama](https://ollama.com/) runs locally |
 
+---
+
+## Optional Integrations
+
+These are all optional. The system works without them — features that need a missing key are skipped gracefully.
+
+### GitHub
+
+Used by Mneme (PR generation), Techne (code search), Metis, and Hephaestus.
+
+```bash
+GITHUB_PERSONAL_ACCESS_TOKEN=github_pat_xxxx...
+```
+
+Create a token at [github.com/settings/tokens](https://github.com/settings/tokens) with scopes: `repo`, `read:org`, `gist`.
+
+### Brave Search
+
+Used by Aletheia for web search and claim verification.
+
+```bash
+BRAVE_API_KEY=YOUR_BRAVE_API_KEY
+```
+
+Sign up at [brave.com/search/api](https://brave.com/search/api/).
+
+### HuggingFace (Artifact Storage)
+
+Enables agent artifact sync and automated backups to HF Storage Buckets. Without this, artifacts save to local Docker volumes only.
+
+```bash
+HF_TOKEN=hf_xxx...
+```
+
+Create a write-scope token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens). The bucket ID is auto-derived as `<your-username>/kourai-artifacts` via the HF API. Override with `KOURAI_BUCKET_ID` if needed.
+
+### Player Project Database
+
+Used by Techne and Dokimasia for database schema introspection. Only needed for database-backed player projects.
+
+```bash
+DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/mydb
+```
+
+### Docker Hub
+
+For pushing built images and build cache.
+
+```bash
+DOCKER_HUB_USERNAME=your-username
+```
+
+Setup: create an account at [hub.docker.com](https://hub.docker.com), create a PAT under Security settings, then `docker login`.
+
+### OpenAI (Fallback)
+
+Optional fallback provider via LiteLLM.
+
+```bash
+OPENAI_API_KEY=sk-proj-...
+```
+
+---
+
+## Defaults & Overrides
+
+These variables have sensible defaults in code. You only need to set them if you want to change the default behavior.
+
 ### Agent Behavior
 
 | Variable | Default | Description |
 |---|---|---|
 | `KOURAI_LOG_LEVEL` | `INFO` | Logging level: `DEBUG`, `INFO`, `WARNING`, `ERROR` |
-| `KOURAI_PROVIDER` | `anthropic` | LLM provider: `anthropic`, `google`, or `local` |
-| `KOURAI_MODEL_TIER` | `cheap` | Quality tier within the provider: `cheap`, `standard`, `smart` |
-| `KOURAI_MAX_ITERATIONS` | `5` | Max Kallos ↔ Techne feedback loop iterations before giving up |
+| `KOURAI_MAX_ITERATIONS` | `5` | Max Kallos / Techne feedback loop iterations before giving up |
 | `KOURAI_STREAM_ENABLED` | `true` | Enable SSE streaming for real-time progress |
 
-### Infrastructure
+### Infrastructure & Observability
 
 | Variable | Default | Description |
 |---|---|---|
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://jaeger:4318` | Jaeger OTLP HTTP endpoint (set by Docker Compose) |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4318` | Jaeger OTLP HTTP endpoint (overridden to `http://jaeger:4318` in Docker Compose) |
 | `ENVIRONMENT` | `development` | Environment tag for traces |
 | `SERVICE_VERSION` | `0.1.0` | Version tag for traces |
 
-### Optional API Keys
+### Local LLM (Ollama)
 
-#### LLM Fallbacks
-
-| Variable | Description |
-|---|---|
-| `OPENAI_API_KEY` | OpenAI API key (for GPT models via LiteLLM) |
-| `GOOGLE_API_KEY` | Google API key — alias for `GEMINI_API_KEY` |
-| `OLLAMA_BASE_URL` | Ollama server URL (default: `http://localhost:11434`) |
-
-#### MCP Servers
-
-Required for agent MCP integrations. **All are free tiers available.**
-
-| Variable | Agent(s) | Description |
+| Variable | Default | Description |
 |---|---|---|
-| `GITHUB_PERSONAL_ACCESS_TOKEN` | Mneme, Techne, Metis, Hephaestus | GitHub PAT for PR creation, issue search, code search. Scopes: `repo`, `read:org`, `gist` |
-| `BRAVE_API_KEY` | Aletheia | Brave Search API for web search + claim verification |
-| `CONTEXT7_API_KEY` | Techne, Metis | Context7 API (optional; agents fall back to Context Hub CLI) |
+| `OLLAMA_API_BASE` | `http://localhost:11434` | Ollama server URL. Only needed if running Ollama on a non-default address |
+
+When `KOURAI_PROVIDER=local`, `make setup` will check Ollama connectivity and auto-pull required models.
+
+### Artifact & Backup Settings
+
+| Variable | Default | Description |
+|---|---|---|
+| `KOURAI_BUCKET_ID` | *(auto-derived: `<username>/kourai-artifacts`)* | HF Storage Bucket for agent artifacts. Auto-resolved from your HF token |
+| `BACKUP_USER` | *(auto-detected from HF_TOKEN)* | HuggingFace username for backup ownership |
+| `BACKUP_BUCKET_NAME` | `kourai-backups` | HF bucket name for player data backups |
+| `BACKUP_RETENTION_DAYS` | `30` | Days to retain old backups before cleanup |
 
 ---
 
