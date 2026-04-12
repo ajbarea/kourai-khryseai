@@ -21,8 +21,8 @@ Example:
     storage.push()                                    # sync to HF after task
 
 Bucket layout on HF:
-    hf://buckets/<KOURAI_BUCKET_ID>/<agent_name>/<artifact_type>/<filename>
-    e.g. hf://buckets/ajbar/kourai-artifacts/dokimasia/test_reports/run_001.json
+    hf://buckets/<user>/kourai-artifacts/<agent_name>/<artifact_type>/<filename>
+    e.g. hf://buckets/jdoe/kourai-artifacts/dokimasia/test_reports/run_001.json
 
 """
 
@@ -42,7 +42,39 @@ logger = logging.getLogger(__name__)
 AGENT_ARTIFACTS_DIR = Path(
     os.getenv("AGENT_ARTIFACTS_DIR") or Path(tempfile.gettempdir()) / "kourai-artifacts"
 )
-_DEFAULT_BUCKET_ID = "ajbar/kourai-artifacts"
+_DEFAULT_BUCKET_SUFFIX = "kourai-artifacts"
+_cached_bucket_id: str | None = None
+_bucket_id_resolved = False
+
+
+def _resolve_bucket_id() -> str | None:
+    """Derive the HF bucket ID from KOURAI_BUCKET_ID or the authenticated user.
+
+    Result is cached per-process so the HF API is called at most once,
+    not once per agent.
+    """
+    global _cached_bucket_id, _bucket_id_resolved
+
+    explicit = os.getenv("KOURAI_BUCKET_ID")
+    if explicit:
+        return explicit
+
+    if _bucket_id_resolved:
+        return _cached_bucket_id
+
+    try:
+        from huggingface_hub import HfApi  # type: ignore[import-untyped]
+
+        username = HfApi().whoami()["name"]
+        _cached_bucket_id = f"{username}/{_DEFAULT_BUCKET_SUFFIX}"
+        logger.info("KOURAI_BUCKET_ID not set — using %s", _cached_bucket_id)
+    except Exception as e:
+        logger.debug("Could not resolve HF username for bucket ID: %s", e)
+        _cached_bucket_id = None
+    finally:
+        _bucket_id_resolved = True
+
+    return _cached_bucket_id
 
 
 class ArtifactStorage:
@@ -60,10 +92,17 @@ class ArtifactStorage:
         """
         self.agent_name = agent_name
         self.base_dir = Path(os.getenv("AGENT_ARTIFACTS_DIR") or AGENT_ARTIFACTS_DIR)
-        self._bucket_id = os.getenv("KOURAI_BUCKET_ID", _DEFAULT_BUCKET_ID)
         self.hf_enabled = bool(os.getenv("HF_TOKEN"))
 
-        if not self.hf_enabled:
+        if self.hf_enabled:
+            self._bucket_id = _resolve_bucket_id()
+            if not self._bucket_id:
+                logger.warning(
+                    "HF_TOKEN is set but bucket ID could not be resolved — disabling HF sync"
+                )
+                self.hf_enabled = False
+        else:
+            self._bucket_id = None
             logger.debug("HF_TOKEN not set — artifact storage in local-only mode")
 
         try:

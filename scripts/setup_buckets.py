@@ -1,6 +1,6 @@
 """HuggingFace Storage Bucket setup for Kourai Khryseai.
 
-Creates the agent artifact bucket (ajbar/kourai-artifacts) on the HF Hub
+Creates the agent artifact bucket (<username>/kourai-artifacts) on the HF Hub
 using the huggingface_hub Python API. No FUSE daemon or binary required —
 agents sync artifacts via push()/pull() in ArtifactStorage.
 
