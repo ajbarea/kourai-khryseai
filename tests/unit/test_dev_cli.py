@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from kourai_common import dev_cli
 
@@ -32,8 +32,7 @@ def test_run_task_sets_utf8_defaults(monkeypatch) -> None:
     assert captured["cwd"] == dev_cli.PROJECT_ROOT
     assert captured["check"] is False
 
-    env = captured["env"]
-    assert isinstance(env, dict)
+    env = cast("dict[str, str]", captured["env"])
     assert env["PYTHONUTF8"] == "1"
     assert env["PYTHONIOENCODING"] == "utf-8"
 
