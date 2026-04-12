@@ -61,3 +61,5 @@ hosts/vn/kourai_vn/game/saves/
 hosts/vn/kourai_vn/game/log.txt
 hosts/vn/kourai_vn/.ren'py_compiler_cache
 hosts/vn/kourai_vn/logs/
+.cache/
+.coverage.runsc.pid*
