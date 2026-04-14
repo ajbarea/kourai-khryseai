@@ -14,6 +14,7 @@ import httpx
 import pytest
 from testcontainers.core.container import DockerContainer
 from testcontainers.core.network import Network
+from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 from testcontainers.core.waiting_utils import wait_for_logs
 
 # docker-py 7.1.0's compare_version crashes on empty version segments, which
@@ -97,7 +98,7 @@ def litellm_proxy(shared_network: Network) -> Generator[DockerContainer, None, N
         .with_command("--config /app/config.yaml")
         .with_exposed_ports(4000) as container
     ):
-        wait_for_logs(container, "Uvicorn running on")
+        wait_for_logs(container, LogMessageWaitStrategy("Uvicorn running on"))
 
         # Poll the HTTP health endpoint to confirm readiness (not just log output)
         host = container.get_container_host_ip()
@@ -172,7 +173,7 @@ def mneme_container(
 ) -> Generator[DockerContainer, None, None]:
     """Start Mneme agent container from registry image."""
     with _start_agent_container(_registry_image("mneme"), shared_network, "mneme", 10005) as c:
-        wait_for_logs(c, "📜 Mneme starting")
+        wait_for_logs(c, LogMessageWaitStrategy("📜 Mneme starting"))
         _wait_for_agent_ready(c, 10005)
         register_container("mneme", c)
         yield c
@@ -186,7 +187,7 @@ def hephaestus_container(
     with _start_agent_container(
         _registry_image("hephaestus"), shared_network, "hephaestus", 10000
     ) as c:
-        wait_for_logs(c, "🔥 Hephaestus starting")
+        wait_for_logs(c, LogMessageWaitStrategy("🔥 Hephaestus starting"))
         _wait_for_agent_ready(c, 10000)
         register_container("hephaestus", c)
         yield c
@@ -198,7 +199,7 @@ def metis_container(
 ) -> Generator[DockerContainer, None, None]:
     """Start Metis agent container from registry image."""
     with _start_agent_container(_registry_image("metis"), shared_network, "metis", 10001) as c:
-        wait_for_logs(c, "📐 Metis starting")
+        wait_for_logs(c, LogMessageWaitStrategy("📐 Metis starting"))
         _wait_for_agent_ready(c, 10001)
         register_container("metis", c)
         yield c
@@ -210,7 +211,7 @@ def techne_container(
 ) -> Generator[DockerContainer, None, None]:
     """Start Techne agent container from registry image."""
     with _start_agent_container(_registry_image("techne"), shared_network, "techne", 10002) as c:
-        wait_for_logs(c, "⚙️ Techne starting")
+        wait_for_logs(c, LogMessageWaitStrategy("⚙️ Techne starting"))
         _wait_for_agent_ready(c, 10002)
         register_container("techne", c)
         yield c
@@ -224,7 +225,7 @@ def dokimasia_container(
     with _start_agent_container(
         _registry_image("dokimasia"), shared_network, "dokimasia", 10003
     ) as c:
-        wait_for_logs(c, "🧪 Dokimasia starting")
+        wait_for_logs(c, LogMessageWaitStrategy("🧪 Dokimasia starting"))
         _wait_for_agent_ready(c, 10003)
         register_container("dokimasia", c)
         yield c
@@ -236,7 +237,7 @@ def kallos_container(
 ) -> Generator[DockerContainer, None, None]:
     """Start Kallos agent container from registry image."""
     with _start_agent_container(_registry_image("kallos"), shared_network, "kallos", 10004) as c:
-        wait_for_logs(c, "✨ Kallos starting")
+        wait_for_logs(c, LogMessageWaitStrategy("✨ Kallos starting"))
         _wait_for_agent_ready(c, 10004)
         register_container("kallos", c)
         yield c
@@ -251,7 +252,7 @@ def jaeger_container(shared_network: Network) -> Generator[DockerContainer, None
         .with_network_aliases("jaeger")
         .with_exposed_ports(16686, 4317, 4318) as container
     ):
-        wait_for_logs(container, "Reporter starting")
+        wait_for_logs(container, LogMessageWaitStrategy("Reporter starting"))
         register_container("jaeger", container)
         yield container
 
@@ -267,7 +268,7 @@ def prometheus_container(shared_network: Network) -> Generator[DockerContainer, 
         .with_volume_mapping(config_path, "/etc/prometheus/prometheus.yml")
         .with_exposed_ports(9090) as container
     ):
-        wait_for_logs(container, "Server is ready to receive web requests")
+        wait_for_logs(container, LogMessageWaitStrategy("Server is ready to receive web requests"))
         register_container("prometheus", container)
         yield container
 
@@ -281,7 +282,7 @@ def context7_container(shared_network: Network) -> Generator[DockerContainer, No
         .with_network_aliases("context7-mcp")
         .with_exposed_ports(3001) as container
     ):
-        wait_for_logs(container, "Listening on port 3001")
+        wait_for_logs(container, LogMessageWaitStrategy("Listening on port 3001"))
         register_container("context7-mcp", container)
         yield container
 
@@ -295,7 +296,7 @@ def memory_mcp_container(shared_network: Network) -> Generator[DockerContainer, 
         .with_network_aliases("memory-mcp")
         .with_exposed_ports(5000, 5001) as container
     ):
-        wait_for_logs(container, "ready on port 5001")
+        wait_for_logs(container, LogMessageWaitStrategy("ready on port 5001"))
 
         # Poll health endpoint to confirm HTTP readiness
         host = container.get_container_host_ip()
