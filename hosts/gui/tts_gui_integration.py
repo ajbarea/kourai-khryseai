@@ -212,7 +212,7 @@ class TTSGUIManager:
 
         self.backend = self._create_backend_from_settings()
 
-        if self.tts_engine:
+        if self.tts_engine and self.backend:
             self.tts_engine.backend = self.backend
 
         new_backend = type(self.backend).__name__ if self.backend else "None"

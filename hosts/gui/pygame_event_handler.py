@@ -136,6 +136,17 @@ class PygameEventDispatcher:
                 profile.title = result["title"]
                 profile.role = result["role"]
                 profile.pronouns = result["pronouns"]
+                experience_mode = result.get("experience_mode", "focused")
+                metrics_enabled = bool(result.get("metrics_tracking_enabled", False))
+                profile.preferences["experience_mode"] = experience_mode
+                profile.preferences["metrics_tracking_enabled"] = metrics_enabled
+                profile.preferences["affinity_tracking_enabled"] = metrics_enabled
+                profile.preferences["virtue_tracking_enabled"] = metrics_enabled
+                profile.preferences["romance_nudges_enabled"] = True
+                profile.preferences["gossip_nudges_enabled"] = True
+                profile.romance_opted_out = True
+                profile.jealousy_enabled = False
+                profile.total_sessions = 1
                 profile.save()
                 set_active_profile(profile.player_id)
                 self.alignment_panel.update_values(
