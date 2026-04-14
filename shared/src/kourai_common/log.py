@@ -46,20 +46,23 @@ def setup_logging(name: str, *, level: str | None = None) -> logging.Logger:
         console.setFormatter(logging.Formatter(_CONSOLE_FMT))
         root.addHandler(console)
 
-    # Per-agent file handler
-    _LOGS_DIR.mkdir(parents=True, exist_ok=True)
-    log_path = _LOGS_DIR / f"{name}.log"
-
-    file_handler = RotatingFileHandler(
-        log_path,
-        maxBytes=_MAX_BYTES,
-        backupCount=_BACKUP_COUNT,
-        encoding="utf-8",
-    )
-    file_handler.setFormatter(logging.Formatter(_FILE_FMT))
-    file_handler.setLevel(resolved_level)
-    root.addHandler(file_handler)
-
     logger = logging.getLogger(name)
     logger.setLevel(resolved_level)
+
+    # Guard prevents stacking handlers if setup_logging is called repeatedly
+    # for the same name (each duplicate would write the same record again).
+    if not any(isinstance(h, RotatingFileHandler) for h in logger.handlers):
+        _LOGS_DIR.mkdir(parents=True, exist_ok=True)
+        log_path = _LOGS_DIR / f"{name}.log"
+
+        file_handler = RotatingFileHandler(
+            log_path,
+            maxBytes=_MAX_BYTES,
+            backupCount=_BACKUP_COUNT,
+            encoding="utf-8",
+        )
+        file_handler.setFormatter(logging.Formatter(_FILE_FMT))
+        file_handler.setLevel(resolved_level)
+        logger.addHandler(file_handler)
+
     return logger
