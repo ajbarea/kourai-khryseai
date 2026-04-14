@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import httpx
 import litellm
@@ -206,6 +206,62 @@ async def chat(
     return content
 
 
+def _coerce_chunk_content(content: object) -> str:
+    """Normalize provider-specific content payloads to plain text."""
+    if isinstance(content, str):
+        return content
+
+    if isinstance(content, list):
+        parts: list[str] = []
+        for item in content:
+            if isinstance(item, str):
+                parts.append(item)
+            elif isinstance(item, dict):
+                text = cast("dict[str, Any]", item).get("text")
+                if isinstance(text, str):
+                    parts.append(text)
+            else:
+                text = getattr(item, "text", None)
+                if isinstance(text, str):
+                    parts.append(text)
+        return "".join(parts)
+
+    if isinstance(content, dict):
+        content_dict = cast("dict[str, Any]", content)
+        text = content_dict.get("text")
+        if isinstance(text, str):
+            return text
+        nested_content = content_dict.get("content")
+        if nested_content is not None:
+            return _coerce_chunk_content(nested_content)
+
+    text = getattr(content, "text", None)
+    if isinstance(text, str):
+        return text
+
+    return ""
+
+
+def _extract_stream_chunk_text(chunk: object) -> str:
+    """Extract text from a streamed chunk across provider/proxy payload formats."""
+    choices = getattr(chunk, "choices", None)
+    if not isinstance(choices, list) or not choices:
+        return ""
+
+    choice = choices[0]
+    delta = getattr(choice, "delta", None)
+    delta_text = _coerce_chunk_content(getattr(delta, "content", None))
+    if delta_text:
+        return delta_text
+
+    message = getattr(choice, "message", None)
+    message_text = _coerce_chunk_content(getattr(message, "content", None))
+    if message_text:
+        return message_text
+
+    return _coerce_chunk_content(getattr(choice, "text", None))
+
+
 async def chat_stream(
     agent_name: str,
     messages: Sequence[dict[str, Any]],
@@ -235,10 +291,28 @@ async def chat_stream(
 
     full_response = []
     async for chunk in response:
-        delta = chunk.choices[0].delta
-        if delta and delta.content:
-            full_response.append(delta.content)
-            yield delta.content
+        chunk_text = _extract_stream_chunk_text(chunk)
+        if chunk_text:
+            full_response.append(chunk_text)
+            yield chunk_text
+
+    if not full_response:
+        log.warning(
+            "LLM stream for %s yielded no text chunks; retrying without streaming",
+            agent_name,
+        )
+        fallback_response = await _execute_completion(
+            timeout_seconds=timeout,
+            model=model,
+            messages=full_messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+        fallback_content = _coerce_chunk_content(fallback_response.choices[0].message.content)
+        if not fallback_content:
+            raise LLMResponseError(agent_name, "empty streamed response")
+        full_response.append(fallback_content)
+        yield fallback_content
 
     if context_id:
         add_message(context_id, agent_name, "assistant", "".join(full_response))

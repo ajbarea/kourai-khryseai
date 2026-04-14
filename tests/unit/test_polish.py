@@ -153,6 +153,51 @@ class TestGracefulDegradation:
             assert len(abort_msgs) == 1
 
 
+class TestChatStreamFallback:
+    """Test chat_stream behavior for non-standard streaming payloads."""
+
+    @pytest.mark.asyncio
+    async def test_chat_stream_falls_back_when_stream_has_no_text(self):
+        """If stream chunks carry no text, fallback non-stream completion is used."""
+        from kourai_common.llm import chat_stream
+
+        chunk = MagicMock()
+        chunk.choices = [MagicMock()]
+        chunk.choices[0].delta = MagicMock()
+        chunk.choices[0].delta.content = None
+        chunk.choices[0].message = MagicMock()
+        chunk.choices[0].message.content = None
+
+        async def empty_text_stream():
+            yield chunk
+
+        fallback_response = MagicMock()
+        fallback_response.choices = [MagicMock()]
+        fallback_response.choices[0].message.content = "MOCK RESPONSE"
+
+        with (
+            patch(
+                "kourai_common.llm._build_contextual_messages",
+                AsyncMock(return_value=[{"role": "user", "content": "hi"}]),
+            ),
+            patch(
+                "kourai_common.llm._execute_completion",
+                AsyncMock(side_effect=[empty_text_stream(), fallback_response]),
+            ),
+            patch("kourai_common.llm.add_message"),
+        ):
+            chunks = [
+                c
+                async for c in chat_stream(
+                    "mneme",
+                    [{"role": "user", "content": "hi"}],
+                    context_id="ctx-1",
+                )
+            ]
+
+        assert chunks == ["MOCK RESPONSE"]
+
+
 class TestCLIVerboseFlag:
     """Test CLI --verbose option exists and formats output."""
 
