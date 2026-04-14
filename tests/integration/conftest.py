@@ -2,17 +2,36 @@
 
 from __future__ import annotations
 
+import functools
 import logging
 import os
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import docker.utils.utils as _docker_utils
 import httpx
 import pytest
 from testcontainers.core.container import DockerContainer
 from testcontainers.core.network import Network
 from testcontainers.core.waiting_utils import wait_for_logs
+
+# docker-py 7.1.0's compare_version crashes on empty version segments, which
+# the Testcontainers Cloud agent's /version endpoint returns ("25.0." etc).
+# Treat empty segments as 0 so version negotiation doesn't abort setup.
+# See: https://github.com/docker/docker-py/issues/3256
+_orig_compare_version = _docker_utils.compare_version
+
+
+@functools.cache
+def _safe_compare_version(v1: str, v2: str) -> int:
+    def _normalize(v: str) -> str:
+        return ".".join(p or "0" for p in (v or "0").split("."))
+
+    return _orig_compare_version(_normalize(v1), _normalize(v2))
+
+
+_docker_utils.compare_version = _safe_compare_version
 
 if TYPE_CHECKING:
     from collections.abc import Generator
