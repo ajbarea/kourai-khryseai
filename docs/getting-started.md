@@ -136,6 +136,21 @@ Opens a full-screen JRPG-styled interface with:
 - **Golden particle effects** and typewriter text animation
 - **Settings overlay** for voice customization and accessibility
 
+??? tip "WSL2 audio prerequisites (TTS, music, ambient)"
+
+    WSLg routes audio through PulseAudio (`PULSE_SERVER`), but your distro still needs Pulse runtime libs:
+
+    ```bash
+    sudo apt update
+    sudo apt install -y libpulse0 pulseaudio-utils libpipewire-0.3-0 espeak-ng
+    ```
+
+    If SDL picks the wrong backend, force PulseAudio for the GUI process:
+
+    ```bash
+    SDL_AUDIODRIVER=pulseaudio make gui
+    ```
+
 See the [GUI Reference](gui.md) for keyboard shortcuts, visual effects, and TTS configuration.
 
 ### :octicons-book-24: Option 3: Ren'Py Visual Novel
