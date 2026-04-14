@@ -1,6 +1,9 @@
 """GUI onboarding overlay for Kourai Khryseai.
 
 First-run experience where the player sets up their identity:
+- Puck-led intro handoff to the forge
+- Focused vs gamified session style
+- Metrics consent (affinity / virtues)
 - Name entry with TTS pronunciation preview
 - Title selection (divine/mortal/custom)
 - Pronoun selection
@@ -22,12 +25,15 @@ from hosts.gui.constants import (
 )
 
 # Onboarding steps
-STEP_NAME = 0
-STEP_PRONUNCIATION = 1
-STEP_TITLE = 2
-STEP_PRONOUNS = 3
-STEP_WELCOME = 4
-STEP_DONE = 5
+STEP_PUCK_INTRO = 0
+STEP_MODE = 1
+STEP_METRICS = 2
+STEP_NAME = 3
+STEP_PRONUNCIATION = 4
+STEP_TITLE = 5
+STEP_PRONOUNS = 6
+STEP_WELCOME = 7
+STEP_DONE = 8
 
 # Role options (role_id, display_label, description)
 ROLE_OPTIONS = [
@@ -40,6 +46,21 @@ ROLE_OPTIONS = [
 
 # Pronoun options
 PRONOUN_OPTIONS = ["he/him", "she/her", "they/them", ""]
+
+EXPERIENCE_OPTIONS = [
+    ("focused", "Focused — minimal game mechanics, terminal-first coding flow"),
+    ("gamified", "Gamified — full forge systems, relationship progression, and lore"),
+]
+
+
+def _puck_handoff_line(role: str) -> str:
+    """Role-sensitive Puck handoff line before meeting Hephaestus."""
+    if role in {"divine", "hero"}:
+        return "Heh. Royal energy. Try not to grin when the Forge King glares."
+    if role in {"mortal", "name_only"}:
+        return "Stay behind me a step. He's intimidating, but fair."
+    return "Easy now. Hephaestus respects those who can hold steady."
+
 
 PANEL_W = 600
 PANEL_H = 530
@@ -62,7 +83,7 @@ class OnboardingOverlay:
         self.screen_h = screen_h
         self.active = False
         self.alpha = 0.0
-        self.step = STEP_NAME
+        self.step = STEP_PUCK_INTRO
 
         # Input state
         self.name_text = ""
@@ -71,6 +92,8 @@ class OnboardingOverlay:
         self.selected_role = ""
         self.selected_pronouns = ""
         self.custom_title = ""
+        self.experience_mode = "focused"
+        self.metrics_tracking_enabled = False
 
         # UI state
         self._cursor_blink = 0.0
@@ -99,7 +122,7 @@ class OnboardingOverlay:
     def start(self) -> None:
         """Activate the onboarding overlay."""
         self.active = True
-        self.step = STEP_NAME
+        self.step = STEP_PUCK_INTRO
         self._result = None
 
     def get_result(self) -> dict | None:
@@ -129,6 +152,18 @@ class OnboardingOverlay:
         return True  # Consume all events while onboarding is active
 
     def _handle_key(self, event: pygame.event.Event) -> bool:
+        if self.step == STEP_PUCK_INTRO:
+            if event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                self.step = STEP_MODE
+            return True
+
+        if self.step == STEP_METRICS and event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            # Default recommendation:
+            # Focused -> OFF, Gamified -> ON.
+            self.metrics_tracking_enabled = self.experience_mode == "gamified"
+            self.step = STEP_NAME
+            return True
+
         if self.step == STEP_NAME:
             if event.key == pygame.K_RETURN and self.name_text.strip():
                 self.tts_text = self.name_text  # Default TTS = display name
@@ -156,6 +191,29 @@ class OnboardingOverlay:
         return True
 
     def _handle_click(self, pos: tuple[int, int]) -> bool:
+        if self.step == STEP_PUCK_INTRO:
+            for rect in self._button_rects:
+                if rect.collidepoint(pos):
+                    self.step = STEP_MODE
+                    self._button_rects.clear()
+                    return True
+
+        if self.step == STEP_MODE:
+            for i, rect in enumerate(self._button_rects):
+                if rect.collidepoint(pos):
+                    self.experience_mode = EXPERIENCE_OPTIONS[i][0]
+                    self.step = STEP_METRICS
+                    self._button_rects.clear()
+                    return True
+
+        if self.step == STEP_METRICS:
+            for i, rect in enumerate(self._button_rects):
+                if rect.collidepoint(pos):
+                    self.metrics_tracking_enabled = i == 0
+                    self.step = STEP_NAME
+                    self._button_rects.clear()
+                    return True
+
         if self.step == STEP_TITLE:
             for i, rect in enumerate(self._button_rects):
                 if rect.collidepoint(pos):
@@ -193,6 +251,8 @@ class OnboardingOverlay:
             "title": self.selected_title,
             "role": self.selected_role or "mortal",
             "pronouns": self.selected_pronouns,
+            "experience_mode": self.experience_mode,
+            "metrics_tracking_enabled": self.metrics_tracking_enabled,
         }
         self.active = False
         self.step = STEP_DONE
@@ -215,7 +275,13 @@ class OnboardingOverlay:
         border = (*theme.gold, min(alpha_int, 150))
         pygame.draw.rect(panel, border, (0, 0, PANEL_W, PANEL_H), width=2, border_radius=12)
 
-        if self.step == STEP_NAME:
+        if self.step == STEP_PUCK_INTRO:
+            self._draw_puck_intro_step(panel, alpha_int)
+        elif self.step == STEP_MODE:
+            self._draw_mode_step(panel, alpha_int)
+        elif self.step == STEP_METRICS:
+            self._draw_metrics_step(panel, alpha_int)
+        elif self.step == STEP_NAME:
             self._draw_name_step(panel, alpha_int)
         elif self.step == STEP_PRONUNCIATION:
             self._draw_pronunciation_step(panel, alpha_int)
@@ -227,6 +293,119 @@ class OnboardingOverlay:
             self._draw_welcome_step(panel, alpha_int)
 
         screen.blit(panel, self.panel_rect.topleft)
+
+    def _draw_puck_intro_step(self, surf: pygame.Surface, alpha: int) -> None:
+        y = 36
+        title_color = (*theme.gold, alpha)
+        FONT_NAME.render_to(surf, (30, y), "✨ Welcome to Kourai Khryseai ✨", title_color)
+        y += 48
+
+        puck_color = (*theme.gold_dim, alpha)
+        FONT_BODY.render_to(surf, (30, y), "Puck:", puck_color)
+        y += 26
+
+        text_color = (*theme.white, alpha)
+        lines = [
+            "Come on, I'll guide you to Hephaestus.",
+            "The forge is waiting.",
+            "",
+            "Let's choose how you want this session to feel.",
+        ]
+        for line in lines:
+            FONT_BODY.render_to(surf, (30, y), line, text_color)
+            y += 24
+
+        self._button_rects.clear()
+        btn_y = PANEL_H - 88
+        rect = pygame.Rect(self.panel_rect.x + 30, self.panel_rect.y + btn_y, PANEL_W - 60, 48)
+        self._button_rects.append(rect)
+
+        local_rect = pygame.Rect(30, btn_y, PANEL_W - 60, 48)
+        btn_bg = (*theme.gold_dim, min(alpha, 100))
+        pygame.draw.rect(surf, btn_bg, local_rect, border_radius=6)
+        btn_border = (*theme.gold, min(alpha, 170))
+        pygame.draw.rect(surf, btn_border, local_rect, width=1, border_radius=6)
+        FONT_BODY.render_to(surf, (50, btn_y + 15), "Continue", (*theme.gold, alpha))
+
+    def _draw_mode_step(self, surf: pygame.Surface, alpha: int) -> None:
+        y = 34
+        title_color = (*theme.gold, alpha)
+        FONT_NAME.render_to(surf, (30, y), "Choose your session style", title_color)
+        y += 42
+
+        sub_color = (*theme.dim_white, alpha)
+        FONT_AGENT.render_to(
+            surf,
+            (30, y),
+            "You can change game mechanics later in settings.",
+            sub_color,
+        )
+        y += 36
+
+        self._button_rects.clear()
+        for i, (_mode, label) in enumerate(EXPERIENCE_OPTIONS):
+            btn_y = y + i * (BUTTON_H + BUTTON_PAD)
+            rect = pygame.Rect(
+                self.panel_rect.x + 30, self.panel_rect.y + btn_y, PANEL_W - 60, BUTTON_H
+            )
+            self._button_rects.append(rect)
+
+            local_rect = pygame.Rect(30, btn_y, PANEL_W - 60, BUTTON_H)
+            if self._hovered_option == i:
+                btn_bg = (*theme.gold_dim, min(alpha, 100))
+            else:
+                btn_bg = (*theme.panel_bg, min(alpha, 150))
+            pygame.draw.rect(surf, btn_bg, local_rect, border_radius=6)
+
+            btn_border = (*theme.gold_dim, min(alpha, 120))
+            pygame.draw.rect(surf, btn_border, local_rect, width=1, border_radius=6)
+
+            label_color = (*theme.gold, alpha)
+            FONT_BODY.render_to(surf, (42, btn_y + 12), f"○ {label}", label_color)
+
+    def _draw_metrics_step(self, surf: pygame.Surface, alpha: int) -> None:
+        y = 34
+        title_color = (*theme.gold, alpha)
+        FONT_NAME.render_to(surf, (30, y), "Enable transparent metrics?", title_color)
+        y += 42
+
+        sub_color = (*theme.dim_white, alpha)
+        recommendation = (
+            "Recommended: ON for Gamified mode"
+            if self.experience_mode == "gamified"
+            else "Recommended: OFF for Focused mode"
+        )
+        FONT_AGENT.render_to(
+            surf,
+            (30, y),
+            "Tracks affinity + virtues so you can see relationship progression.",
+            sub_color,
+        )
+        y += 24
+        FONT_AGENT.render_to(surf, (30, y), recommendation, sub_color)
+        y += 40
+
+        labels = ["Yes, enable metrics", "No, keep this session private"]
+        self._button_rects.clear()
+        for i, label in enumerate(labels):
+            btn_y = y + i * (BUTTON_H + BUTTON_PAD)
+            rect = pygame.Rect(
+                self.panel_rect.x + 30, self.panel_rect.y + btn_y, PANEL_W - 60, BUTTON_H
+            )
+            self._button_rects.append(rect)
+
+            local_rect = pygame.Rect(30, btn_y, PANEL_W - 60, BUTTON_H)
+            if self._hovered_option == i:
+                btn_bg = (*theme.gold_dim, min(alpha, 100))
+            else:
+                btn_bg = (*theme.panel_bg, min(alpha, 150))
+            pygame.draw.rect(surf, btn_bg, local_rect, border_radius=6)
+
+            btn_border = (*theme.gold_dim, min(alpha, 120))
+            pygame.draw.rect(surf, btn_border, local_rect, width=1, border_radius=6)
+
+            label_color = (*theme.gold, alpha)
+            FONT_BODY.render_to(surf, (42, btn_y + 12), f"○ {label}", label_color)
 
     def _draw_name_step(self, surf: pygame.Surface, alpha: int) -> None:
         y = 40
@@ -358,9 +537,13 @@ class OnboardingOverlay:
 
         name = self.name_text.strip() or "traveler"
         title = self.selected_title or "artisan"
+        role = self.selected_role or "mortal"
+        mode = self.experience_mode
 
         text_color = (*theme.white, alpha)
         welcome_lines = [
+            f"Puck: {_puck_handoff_line(role)}",
+            "",
             f"Ah... so you're {name}. *nods slowly*",
             "",
             "The forge has been waiting for someone like you,",
@@ -369,12 +552,17 @@ class OnboardingOverlay:
             "The maidens are eager to meet you.",
             "Each has their own... personality. You'll see~",
             "",
+            f"*mode={mode} · metrics={'ON' if self.metrics_tracking_enabled else 'OFF'}*",
+            "",
             "*turns back to the anvil*",
             "Let's begin.",
         ]
 
         for line in welcome_lines:
-            if line.startswith("*"):
+            if line.startswith("Puck:"):
+                puck_color = (*theme.gold_dim, min(alpha, 190))
+                FONT_AGENT.render_to(surf, (30, y), line, puck_color)
+            elif line.startswith("*"):
                 emote_color = (*theme.gold_dim, min(alpha, 180))
                 FONT_AGENT.render_to(surf, (30, y), line, emote_color)
             else:

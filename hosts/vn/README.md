@@ -6,13 +6,18 @@ The **VN Host** is an alternative user interface for interacting with the Kourai
 
 ## 🛠️ Prerequisites
 
-To develop or run the VN Host, you must have the Ren'Py SDK installed locally in this directory.
+To develop or run the VN Host, you need a Ren'Py SDK install available on your machine.
 
-1.  **Download:** [Ren'Py 8.5.2 SDK](https://www.renpy.org/latest.html) (Windows/Linux/macOS).
-2.  **Install:** Unzip the SDK contents into `hosts/vn/renpy-8.5.2-sdk/`.
-3.  **Verification:** Ensure `hosts/vn/renpy-8.5.2-sdk/renpy.exe` (on Windows) or `renpy.sh` (on Linux/macOS) exists.
+Recommended for **Windows + WSL2**:
+1. **Install once on Windows**, e.g. `C:\Tools\renpy-8.5.2-sdk\renpy.exe`.
+2. Keep only the VN project in-repo: `hosts/vn/kourai_vn/`.
 
-> **Note:** The SDK folder is ignored by git to prevent repository bloat.
+`make vn` / `make dev-vn` now resolve Ren'Py in this order:
+1. `KOURAI_RENPY_EXE` (explicit override)
+2. `hosts/vn/renpy-8.5.2-sdk/renpy.exe` (optional local SDK copy)
+3. `C:\Tools\renpy-8.5.2-sdk\renpy.exe` (via `/mnt/c/...` in WSL)
+
+> **Note:** A local SDK folder under `hosts/vn/` is optional and ignored by git.
 
 ---
 
@@ -22,13 +27,20 @@ To develop or run the VN Host, you must have the Ren'Py SDK installed locally in
 Run the Ren'Py Launcher to manage projects:
 ```powershell
 # Windows
-.\hosts\vn\renpy-8.5.2-sdk\renpy.exe
+C:\Tools\renpy-8.5.2-sdk\renpy.exe
 ```
 
 ### 2. Running the VN Project
-If you have a project directory (e.g., `hosts/vn/kourai_vn/`), you can launch it directly:
+Launch directly from Windows:
 ```powershell
-.\hosts\vn\renpy-8.5.2-sdk\renpy.exe .\hosts\vn\kourai_vn\
+& 'C:\Tools\renpy-8.5.2-sdk\renpy.exe' '\\wsl$\<distro>\home\<user>\ajsoftworks\kourai-khryseai\hosts\vn\kourai_vn'
+```
+
+Or from WSL using project tooling:
+```bash
+make vn
+# or
+make dev-vn
 ```
 
 ---
@@ -66,7 +78,7 @@ The VN Host communicates with the `@agents/**` backend via a **JSON-over-Subproc
 - **Live Reload:** Press `Shift + R` while the game is running to instantly reload script changes.
 - **Linting:** Check for syntax errors using the launcher or CLI:
   ```powershell
-  .\hosts\vn\renpy-8.5.2-sdk\renpy.exe .\hosts\vn\kourai_vn\ lint
+  & 'C:\Tools\renpy-8.5.2-sdk\renpy.exe' '\\wsl$\<distro>\home\<user>\ajsoftworks\kourai-khryseai\hosts\vn\kourai_vn' lint
   ```
 - **Console:** Press `Shift + O` in-game to open the Ren'Py/Python console for debugging.
 - **Trace Logs:** Agent communication logs are written to `logs/bridge_renpy.log`.

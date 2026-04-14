@@ -96,10 +96,15 @@ class TestOnboarding:
         monkeypatch.setattr("kourai_common.player._LEGACY_PLAYER_FILE", tmp_path / "player.json")
         monkeypatch.setattr("kourai_common.player.PLAYER_DIR", tmp_path)
 
+        import hosts.cli.settings as cli_settings_mod
         from hosts.cli.onboarding import run_onboarding
 
-        # Simulate user input: name, tts_name (enter=same), title, role=1, pronouns=1
-        inputs = iter(["TestPlayer", "", "The Tester", "1", "1"])
+        monkeypatch.setattr(cli_settings_mod, "_SETTINGS_FILE", tmp_path / "cli_settings.json")
+
+        # Simulate user input:
+        # mode=gamified(2), metrics=on(1), name, tts_name (enter=same),
+        # title, role=1, pronouns=1
+        inputs = iter(["2", "1", "TestPlayer", "", "The Tester", "1", "1"])
         monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
         profile = run_onboarding()
@@ -108,11 +113,19 @@ class TestOnboarding:
         assert profile.title == "The Tester"
         assert profile.role == "divine"  # First option
         assert profile.pronouns == "he/him"  # First option
+        assert profile.preferences["experience_mode"] == "gamified"
+        assert profile.preferences["metrics_tracking_enabled"] is True
+        assert profile.romance_opted_out is True
 
         # Verify saved to disk
         loaded = PlayerProfile.load()
         assert loaded is not None
         assert loaded.display_name == "TestPlayer"
+
+        settings = cli_settings_mod.CLISettings.load()
+        assert settings.metrics_tracking_enabled is True
+        assert settings.romance_enabled is False
+        assert settings.gossip_enabled is False
 
     def test_increment_session(self, tmp_path, monkeypatch):
         monkeypatch.setattr("kourai_common.player.PROFILES_DIR", tmp_path / "profiles")
@@ -168,6 +181,22 @@ class TestAffinityTracking:
 
         # Should not raise
         track_interaction("", "metis")
+
+    def test_run_post_task_hooks_respects_metrics_opt_out(self):
+        from kourai_common.hooks import run_post_task_hooks
+
+        profile = PlayerProfile(display_name="AJ")
+        profile.preferences["metrics_tracking_enabled"] = False
+        profile.save()
+
+        from kourai_common.player import set_active_profile
+
+        set_active_profile(profile.player_id)
+
+        result = run_post_task_hooks(profile.player_id, "metis", "hello", "world", success=True)
+        assert result["metrics_tracking_enabled"] is False
+        aff = get_affinity(profile.player_id, "metis")
+        assert aff["interaction_count"] == 0
 
     def test_alignment_multiplier_applied(self):
         from kourai_common.hooks import track_interaction

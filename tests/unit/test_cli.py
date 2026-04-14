@@ -13,8 +13,11 @@ pytest.importorskip("asyncclick")
 from hosts.cli.__main__ import (
     _extract_artifact_text,
     _extract_status_text,
+    _format_affinity_bar,
+    _maybe_offer_feature_opt_in,
     send_and_stream,
 )
+from hosts.cli.settings import CLISettings
 
 # ---------------------------------------------------------------------------
 # Extract helpers
@@ -179,3 +182,65 @@ class TestMainCommand:
 
         param_names = [p.name for p in main.params]
         assert "timeout_seconds" in param_names
+
+
+class TestProgressiveOptIn:
+    def test_no_prompt_before_min_turn(self):
+        settings = CLISettings()
+        last_turn, changed, prompted = _maybe_offer_feature_opt_in(
+            settings,
+            feature="romance",
+            turn_counter=2,
+            last_nudge_turn=-999,
+        )
+        assert last_turn == -999
+        assert changed is False
+        assert prompted is False
+
+    def test_enable_choice_turns_feature_on(self, monkeypatch, tmp_path):
+        monkeypatch.setattr("builtins.input", lambda _: "e")
+        monkeypatch.setattr(
+            "hosts.cli.settings._SETTINGS_FILE",
+            tmp_path / "cli_settings.json",
+            raising=False,
+        )
+        settings = CLISettings(romance_enabled=False, romance_nudges_enabled=True)
+        last_turn, changed, prompted = _maybe_offer_feature_opt_in(
+            settings,
+            feature="romance",
+            turn_counter=10,
+            last_nudge_turn=-999,
+        )
+        assert last_turn == 10
+        assert changed is True
+        assert prompted is True
+        assert settings.romance_enabled is True
+
+    def test_never_choice_disables_future_nudges(self, monkeypatch, tmp_path):
+        monkeypatch.setattr("builtins.input", lambda _: "v")
+        monkeypatch.setattr(
+            "hosts.cli.settings._SETTINGS_FILE",
+            tmp_path / "cli_settings.json",
+            raising=False,
+        )
+        settings = CLISettings(gossip_enabled=False, gossip_nudges_enabled=True)
+        last_turn, changed, prompted = _maybe_offer_feature_opt_in(
+            settings,
+            feature="gossip",
+            turn_counter=10,
+            last_nudge_turn=-999,
+        )
+        assert last_turn == 10
+        assert changed is True
+        assert prompted is True
+        assert settings.gossip_nudges_enabled is False
+
+
+class TestMetricsFormatting:
+    def test_affinity_bar_center(self):
+        bar = _format_affinity_bar(0.0, width=10)
+        assert bar == "█████·····"
+
+    def test_affinity_bar_clamps(self):
+        assert _format_affinity_bar(2.0, width=4) == "████"
+        assert _format_affinity_bar(-2.0, width=4) == "····"

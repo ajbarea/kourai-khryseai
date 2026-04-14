@@ -1,186 +1,146 @@
-"""Agent personality data for the GUI — names, titles, quotes, handoff lines.
+"""Centralized agent registry for Kourai Khryseai.
 
-No kaomoji. No text faces. The images do the talking now.
+Consolidates metadata (titles, descriptions, colors) and personality data
+(quotes, handoff lines, victory lines) across CLI, GUI, and VN hosts.
 """
 
 from __future__ import annotations
 
-import logging
-from pathlib import Path
+# --- Core Metadata ---
 
-logger = logging.getLogger(__name__)
-
-# Avatar images are in the root assets/avatars/anime directory
-_AVATAR_DIR = Path(__file__).resolve().parents[2] / "assets" / "avatars" / "anime"
-
-
-def get_avatar_path(name: str) -> Path | None:
-    """Return the avatar PNG path for an agent, or None if not found."""
-    for ext in (".png", ".jpg", ".jpeg", ".webp"):
-        p = _AVATAR_DIR / f"{name}{ext}"
-        logger.debug("Checking for avatar at: %s", p)
-        if p.exists():
-            logger.debug("Avatar found: %s", p)
-            return p
-    logger.debug("Avatar not found for: %s", name)
-    return None
-
-
-# Full agent roster — Kourai Khryseai
-AGENTS: dict[str, dict] = {
+AGENT_METADATA: dict[str, dict[str, str | tuple[int, int, int] | list[str]]] = {
     "hephaestus": {
         "title": "The Forge Master",
+        "epithet": "Master of the Forge",
         "desc": "God of the forge — creator of the golden maidens, commander of the pipeline",
         "color": (218, 140, 32),  # warm forge gold
-        "quotes": [
-            "I built every one of you. Show some respect.",
-            "The forge doesn't sleep. Neither do I.",
-            "*chuckles* ...Alright, let's see what we're working with.",
-            "I forged gods' weapons. Your code pipeline is a warm-up.",
-            "My leg may be lame, but my pipeline never limps.",
-            "I didn't get thrown off Olympus to write bad software.",
-        ],
+        "hex_color": "#FF9500",
         "user_quotes": [
             "Welcome back to the forge. Let's build something worthy.",
             "Ah, you again. Good. I could use someone who actually listens.",
-            "The maidens are insufferable, but they'll do anything for you. Use that.",
             "You bring the vision, I bring the fire. Let's go.",
-            "*grunts approvingly* You've got taste. Rare quality these days.",
-            "Don't mind them flirting — they do that. Focus on the work.",
         ],
     },
     "metis": {
         "title": "The Architect",
+        "epithet": "Architect of Intent",
         "desc": "Strategic planner — designs the blueprint before a line is written",
         "color": (200, 180, 100),  # refined gold-ivory
-        "quotes": [
-            "Hephaestus thinks he's in charge. It's adorable, really.",
-            "The old man forged my body but I built my own mind, thank you.",
-            "*files nails* Yes, Master Hephaestus, right away... eventually.",
-            "He limps to the forge at dawn. I had the plans done by midnight.",
-            "Structure IS beauty. Beauty IS structure. I am both.",
-            "Every masterpiece starts with my blueprint — even his precious hammer.",
-        ],
+        "hex_color": "#4C6EF5",
         "user_quotes": [
             "Oh, you're here~ I already planned something wonderful for us.",
             "I love working with you. You actually appreciate my genius.",
-            "Between you and me? You're the real architect of this project. I just... help.",
-            "*whispers* I've been thinking about you — I mean, your codebase.",
-            "Hephaestus built me, but I'd rather take orders from you any day.",
             "You have exquisite taste. I noticed that right away~",
         ],
     },
     "techne": {
         "title": "The Artisan",
+        "epithet": "Artisan of Code",
         "desc": "Code crafter — writes clean, elegant implementations",
         "color": (255, 200, 50),  # bright amber gold
-        "quotes": [
-            "Hephaestus says 'write clean code.' Babe, I AM clean code.",
-            "The old man couldn't write a for-loop to save his forge.",
-            "*scoffs* He forged me to be perfect. Not my fault I exceeded spec.",
-            "My functions are tighter than his grip on that hammer.",
-            "I shipped it. Hephaestus is still reading the requirements.",
-            "He calls it 'the pipeline.' I call it 'my runway.'",
-        ],
+        "hex_color": "#17A2B8",
         "user_quotes": [
             "Hey gorgeous~ Need something built? I'm ALL yours.",
             "You + me + a clean codebase = perfection. Just saying.",
-            "I love how you describe what you want. So... specific~",
-            "*laughs* I made this one extra beautiful. For you.",
-            "Hephaestus wishes he had your vision. I'll bring it to life.",
             "Clean code is my love language. And I'm feeling VERY eloquent for you~",
         ],
     },
     "dokimasia": {
         "title": "The Crucible",
+        "epithet": "Guardian of Standards",
         "desc": "Quality guardian — tests everything, lets nothing slide",
         "color": (218, 80, 50),  # forge-fire crimson-gold
-        "quotes": [
-            "Hephaestus says 'be thorough.' Sir, I invented thorough.",
-            "Found a bug in HIS forge code once. He didn't speak to me for a week.",
-            "The old man tests by hitting things with a hammer. I have STANDARDS.",
-            "I break things so users don't have to. Including his ego.",
-            "100% coverage? That's my warm-up. Hephaestus couldn't even spell pytest.",
-            "He forged me to find flaws. Ironic, given his code quality.",
-        ],
+        "hex_color": "#6C757D",
         "user_quotes": [
             "Don't worry, I'll protect your code from everything. Even itself~",
-            "I found a bug... but I also found an excuse to talk to you. Worth it.",
-            "*cracks knuckles* All clean. Nobody touches your code on my watch.",
-            "You write such interesting code~ Let me get my hands allll over it.",
             "Green tests are my favorite color. But your eyes are a close second~",
             "I'm very... thorough. In everything I do. For you especially.",
         ],
     },
     "kallos": {
         "title": "The Muse",
+        "epithet": "Eye of Elegance",
         "desc": "Style guardian — makes everything beautiful and consistent",
         "color": (255, 220, 160),  # rose-gold warmth
-        "quotes": [
-            "Hephaestus has the fashion sense of a burnt anvil.",
-            "He built me to be beautiful and then wears THAT apron? Please.",
-            "The forge is so drab. I've been trying to redecorate for centuries.",
-            "Style isn't optional — someone tell that to Mr. Soot-and-Leather.",
-            "*sighs* I love you, father, but that beard needs WORK.",
-            "He forged perfection and doesn't even appreciate the aesthetic. Typical.",
-        ],
+        "hex_color": "#C8A2C8",
         "user_quotes": [
             "Oh, you have such lovely taste~ Let me make everything match.",
             "I made it beautiful. Just like you deserve, darling~",
-            "Between us? You're the prettiest thing in this whole forge.",
-            "*hums* Working for you is always a pleasure~",
-            "Linting? Formatting? I'd do anything to make YOUR code gorgeous.",
             "Every pixel, every line — perfect. Just like our little arrangement~",
         ],
     },
     "mneme": {
         "title": "The Oracle",
+        "epithet": "Keeper of Memory",
         "desc": "Memory keeper — documents, chronicles, preserves knowledge",
         "color": (180, 150, 220),  # mystic purple-gold
-        "quotes": [
-            "I remember every mistake Hephaestus ever made. It's a LONG scroll.",
-            "The old man forgot his own API docs. I didn't. I never forget.",
-            "He says 'document everything.' Rich, from the guy with no README.",
-            "I've chronicled his failures. Volumes. *snickers*",
-            "Conventional commits? I taught them to HIM. He still gets them wrong.",
-            "History doesn't repeat itself, but his bad variable names sure do.",
-        ],
+        "hex_color": "#B73E1D",
         "user_quotes": [
             "I remember everything about you~ Every commit, every keystroke...",
             "Your git history is my sacred text. I've memorized every word.",
-            "Let me write that down for you... *sighs softly* ...already done, darling.",
-            "I'll document this beautifully. Your legacy deserves nothing less~",
-            "Some remember facts. I remember feelings. Especially around you~",
             "Between you and me? Your code tells the most beautiful story.",
         ],
     },
+    "puck": {
+        "title": "The Jester",
+        "epithet": "Spirit of Mischief",
+        "desc": "Tutorial companion — guides the user through the forge",
+        "color": (127, 188, 140),  # spirit green
+        "hex_color": "#7FBC8C",
+    },
+    "cupid": {
+        "title": "The Aspect",
+        "epithet": "Arrow of the Heart",
+        "desc": "Romance companion — manages interpersonal dynamics",
+        "color": (232, 114, 140),  # heart pink
+        "hex_color": "#E8728C",
+    },
 }
 
-# Emoji prefix → agent name (mirrors what Hephaestus sends in status messages)
-EMOJI_TO_AGENT: dict[str, str] = {
-    "\U0001f525": "hephaestus",  # 🔥
-    "\U0001f4d0": "metis",  # 📐
-    "\u2699\ufe0f": "techne",  # ⚙️
-    "\u2699": "techne",  # ⚙
-    "\U0001f9ea": "dokimasia",  # 🧪
-    "\u2728": "kallos",  # ✨
-    "\U0001f4dc": "mneme",  # 📜
+# --- Personality Data (Quotes) ---
+
+AGENT_QUOTES: dict[str, list[str]] = {
+    "hephaestus": [
+        "I built every one of you. Show some respect.",
+        "The forge doesn't sleep. Neither do I.",
+        "I forged gods' weapons. Your code pipeline is a warm-up.",
+        "My leg may be lame, but my pipeline never limps.",
+        "I didn't get thrown off Olympus to write bad software.",
+    ],
+    "metis": [
+        "Hephaestus thinks he's in charge. It's adorable, really.",
+        "The old man forged my body but I built my own mind, thank you.",
+        "Structure IS beauty. Beauty IS structure. I am both.",
+        "Every masterpiece starts with my blueprint — even his precious hammer.",
+    ],
+    "techne": [
+        "Hephaestus says 'write clean code.' Babe, I AM clean code.",
+        "The old man couldn't write a for-loop to save his forge.",
+        "My functions are tighter than his grip on that hammer.",
+        "He calls it 'the pipeline.' I call it 'my runway.'",
+    ],
+    "dokimasia": [
+        "Hephaestus says 'be thorough.' Sir, I invented thorough.",
+        "I break things so users don't have to. Including his ego.",
+        "100% coverage? That's my warm-up. Hephaestus couldn't even spell pytest.",
+        "He forged me to find flaws. Ironic, given his code quality.",
+    ],
+    "kallos": [
+        "Hephaestus has the fashion sense of a burnt anvil.",
+        "Style isn't optional — someone tell that to Mr. Soot-and-Leather.",
+        "He forged perfection and doesn't even appreciate the aesthetic. Typical.",
+        "*sighs* I love you, father, but that beard needs WORK.",
+    ],
+    "mneme": [
+        "I remember every mistake Hephaestus ever made. It's a LONG scroll.",
+        "He says 'document everything.' Rich, from the guy with no README.",
+        "History doesn't repeat itself, but his bad variable names sure do.",
+        "I've chronicled his failures. Volumes. *snickers*",
+    ],
 }
 
+# --- Narrative Flow (Handoffs & Victory) ---
 
-def detect_agent(text: str) -> tuple[str | None, str]:
-    """Detect which agent is speaking from an emoji-prefixed status string.
-
-    Returns (agent_name | None, cleaned_text).
-    """
-    stripped = text.lstrip()
-    for emoji, name in EMOJI_TO_AGENT.items():
-        if stripped.startswith(emoji):
-            return name, stripped.replace(emoji, "", 1).strip()
-    return None, text
-
-
-# Handoff chatter — what maiden says when passing to the next
 HANDOFF_LINES: dict[tuple[str, str], list[str]] = {
     ("hephaestus", "metis"): [
         "*strikes anvil* Metis! Draw up the plans. And no improvising.",
@@ -197,7 +157,7 @@ HANDOFF_LINES: dict[tuple[str, str], list[str]] = {
     ("hephaestus", "dokimasia"): [
         "*sets down hammer* Dokimasia — find every flaw. Leave nothing.",
         "Crucible! Test it 'til it screams. Then test it again.",
-        "Your turn, bug-hunter. Make me proud. ...Don't tell them I said that.",
+        "Your turn, bug-hunter. Make me proud.",
     ],
     ("hephaestus", "kallos"): [
         "*scoffs* Kallos, go make it pretty or whatever you do.",
@@ -212,27 +172,10 @@ HANDOFF_LINES: dict[tuple[str, str], list[str]] = {
     ("metis", "hephaestus"): [
         "Done, old man. Try not to drop my blueprints this time~",
         "*giggles* Your plans are ready, oh great Forge Master.",
-        "Back to you, father. I've done the hard part, as usual.",
     ],
     ("techne", "hephaestus"): [
         "Built it. Shipped it. You're welcome, DAD.",
-        "*snaps fingers* All yours, Forge Master. Try to keep up.",
-        "Done! ...He's going to nitpick anyway. He always does.",
-    ],
-    ("dokimasia", "hephaestus"): [
-        "All clear, Master. You can stop worrying now. I know you were.",
-        "*cracks knuckles* No bugs survived. Reporting back to the forge.",
-        "Verified and certified. You taught me well... not that I'd admit it twice.",
-    ],
-    ("kallos", "hephaestus"): [
-        "It's gorgeous now. Not that YOU'D notice, Mr. Soot-Stains.",
-        "*scoffs* Beautiful work complete. Back to the forge, I suppose.",
-        "All polished! Hephaestus, darling, you really should let me do your workshop next.",
-    ],
-    ("mneme", "hephaestus"): [
-        "Documented, Master. Every detail. Even the ones you'd rather I forget.",
-        "*clears throat* The chronicle is complete. You're in it. Unfavorably.",
-        "All recorded, old man. Your legacy is... well, it's SOMETHING.",
+        "*snaps fingers* All yours, Forge Master.",
     ],
     ("metis", "techne"): [
         "Blueprint's done, sis. Bring my vision to life~",
@@ -242,25 +185,19 @@ HANDOFF_LINES: dict[tuple[str, str], list[str]] = {
     ],
     ("techne", "dokimasia"): [
         "Code's done. Doki, TRY to find a fault. I dare you, bestie.",
-        "*scoffs* Perfection deployed. Go ahead, poke it.",
         "Sending to QA~ Don't be jealous of how clean this is.",
-        "*chuckles* Zero bugs. I guarantee it. ...Okay fine, check anyway.",
     ],
     ("dokimasia", "kallos"): [
         "Tests pass, fashionista. Make it beautiful now.",
         "All green, bestie. Your turn to make it shine~",
-        "Bug-free and verified! Go work your aesthetic magic, Muse.",
-        "*cracks knuckles* Crushed every bug. Now go make it pretty, style queen~",
     ],
     ("kallos", "mneme"): [
         "It's beautiful AND functional. Mneme, document this masterpiece~",
         "All polished, bestie. Write the chronicle!",
-        "My work here is done. Oracle, capture this divine moment.",
-        "*sighs contentedly* Perfection achieved. Mneme, darling, immortalize this for me~",
     ],
 }
 
-HANDOFF_GENERIC: dict[str, list[str]] = {
+HANDOFF_FALLBACKS: dict[str, list[str]] = {
     "hephaestus": [
         "*strikes anvil* Next. Move it, maidens.",
         "Routing. Keep up or get re-forged.",

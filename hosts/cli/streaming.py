@@ -31,12 +31,15 @@ from hosts.cli.events import (
     _victory_chatter,
     get_last_seen_agent,
     reset_last_seen_agent,
+    set_pipeline_chatter_enabled,
 )
 from hosts.cli.rendering import _comms_window, _echo, _render_markdown
 from hosts.cli.styling import _DIM, _GOLD, _GOLD_BRIGHT, _RED, _RESET
 
 if TYPE_CHECKING:
     from a2a.client.client import Client
+
+    from hosts.gui.tts_engine import TTSEngine
 
 # ---------------------------------------------------------------------------
 # Last result store — for :copy / :save
@@ -59,6 +62,8 @@ async def send_and_stream(
     task_id: str | None = None,
     verbose: bool = False,
     attachments: list[tuple[str, str]] | None = None,
+    tts: TTSEngine | None = None,
+    gossip_enabled: bool = True,
 ) -> tuple[bool, str, str | None]:
     """Send a message and stream the response.
 
@@ -68,6 +73,7 @@ async def send_and_stream(
     global _last_result
     t0 = time.monotonic()
     reset_last_seen_agent()  # Reset pipeline tracking for this run
+    set_pipeline_chatter_enabled(gossip_enabled)
 
     # Build multi-part message so images travel alongside text in the A2A envelope.
     parts: list[Part] = [Part(TextPart(text=user_text))]
@@ -102,7 +108,10 @@ async def send_and_stream(
             if isinstance(event, Message):
                 for p in event.parts:
                     if hasattr(p.root, "text"):
-                        _echo(p.root.text)
+                        text = p.root.text
+                        _echo(text)
+                        if tts:
+                            await tts.speak(text, "hephaestus")
                 continue
 
             # ClientEvent: tuple[Task, update | None]
@@ -116,7 +125,13 @@ async def send_and_stream(
                 final_state = update.status.state
                 text = _extract_status_text(update)
                 if text:
-                    _echo(_maidenify_status(text))
+                    formatted, agent = _maidenify_status(text)
+                    _echo(formatted)
+                    if tts and agent:
+                        # Extract the status message without the name box etc.
+                        # For now, just speak the raw status (it doesn't have markdown)
+                        msg = text.split(" ", 1)[-1] if " " in text else text
+                        await tts.speak(msg, agent)
 
             elif isinstance(update, TaskArtifactUpdateEvent):
                 text = _extract_artifact_text(update)
@@ -159,11 +174,13 @@ async def send_and_stream(
 
         # Victory chatter from the last maiden who worked on this
         last_agent = get_last_seen_agent()
-        if last_agent:
+        if last_agent and gossip_enabled:
             victory = _victory_chatter(last_agent)
             if victory:
                 _echo("")
                 _echo(_comms_window(last_agent, victory, style="speak"))
+                if tts:
+                    await tts.speak(victory, last_agent)
 
         # Post-output suggestions
         _echo(f"{_DIM}:copy clipboard \u00b7 :save <file> \u00b7 :help commands{_RESET}")
@@ -176,7 +193,15 @@ async def send_and_stream(
         follow_up: str = await click.prompt(f"\n{_GOLD}\u21b3 Your response{_RESET}")
         if follow_up.strip().lower() in (":q", "quit"):
             return False, context_id, task_id
-        return await send_and_stream(client, follow_up, context_id, task_id, verbose)
+        return await send_and_stream(
+            client,
+            follow_up,
+            context_id,
+            task_id,
+            verbose,
+            tts=tts,
+            gossip_enabled=gossip_enabled,
+        )
 
     return True, context_id, task_id
 

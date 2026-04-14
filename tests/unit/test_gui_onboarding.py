@@ -11,9 +11,12 @@ import pygame.freetype
 
 from hosts.gui.onboarding_ui import (
     STEP_DONE,
+    STEP_METRICS,
+    STEP_MODE,
     STEP_NAME,
     STEP_PRONOUNS,
     STEP_PRONUNCIATION,
+    STEP_PUCK_INTRO,
     STEP_TITLE,
     STEP_WELCOME,
     OnboardingOverlay,
@@ -25,7 +28,7 @@ class TestOnboardingOverlay:
     def test_init(self):
         o = OnboardingOverlay(800, 600)
         assert o.active is False
-        assert o.step == STEP_NAME
+        assert o.step == STEP_PUCK_INTRO
         assert o._result is None
 
     def test_update_layout_repositions_panel(self):
@@ -39,7 +42,41 @@ class TestOnboardingOverlay:
         o = OnboardingOverlay(800, 600)
         o.start()
         assert o.active is True
-        assert o.step == STEP_NAME
+        assert o.step == STEP_PUCK_INTRO
+
+    def test_intro_enter_advances(self):
+        o = OnboardingOverlay(800, 600)
+        o.start()
+        o.alpha = 255
+        event = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN, unicode="\r")
+        o.handle_event(event)
+        assert o.step == STEP_MODE
+
+    def test_mode_step_click(self):
+        o = OnboardingOverlay(800, 600)
+        o.start()
+        o.alpha = 255
+        o.step = STEP_MODE
+        s = _surf()
+        o.draw(s)
+        if o._button_rects:
+            rect = o._button_rects[1]
+            o._handle_click((rect.centerx, rect.centery))
+            assert o.step == STEP_METRICS
+            assert o.experience_mode == "gamified"
+
+    def test_metrics_step_click(self):
+        o = OnboardingOverlay(800, 600)
+        o.start()
+        o.alpha = 255
+        o.step = STEP_METRICS
+        s = _surf()
+        o.draw(s)
+        if o._button_rects:
+            rect = o._button_rects[0]
+            o._handle_click((rect.centerx, rect.centery))
+            assert o.step == STEP_NAME
+            assert o.metrics_tracking_enabled is True
 
     def test_get_result_none(self):
         o = OnboardingOverlay(800, 600)
@@ -60,6 +97,7 @@ class TestOnboardingOverlay:
         o = OnboardingOverlay(800, 600)
         o.start()
         o.alpha = 255
+        o.step = STEP_NAME
         event = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_a, unicode="A")
         o.handle_event(event)
         assert o.name_text == "A"
@@ -68,6 +106,7 @@ class TestOnboardingOverlay:
         o = OnboardingOverlay(800, 600)
         o.start()
         o.alpha = 255
+        o.step = STEP_NAME
         o.name_text = "AB"
         event = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_BACKSPACE, unicode="\b")
         o.handle_event(event)
@@ -77,6 +116,7 @@ class TestOnboardingOverlay:
         o = OnboardingOverlay(800, 600)
         o.start()
         o.alpha = 255
+        o.step = STEP_NAME
         o.name_text = "TestName"
         event = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN, unicode="\r")
         o.handle_event(event)
@@ -87,6 +127,7 @@ class TestOnboardingOverlay:
         o = OnboardingOverlay(800, 600)
         o.start()
         o.alpha = 255
+        o.step = STEP_NAME
         o.name_text = ""
         event = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN, unicode="\r")
         o.handle_event(event)
@@ -156,6 +197,7 @@ class TestOnboardingOverlay:
         assert result is not None
         assert result["display_name"] == "Player"
         assert result["role"] == "mortal"
+        assert result["experience_mode"] == "focused"
 
     def test_welcome_step_click_finalizes(self):
         o = OnboardingOverlay(800, 600)
@@ -176,6 +218,7 @@ class TestOnboardingOverlay:
         assert result["display_name"] == "Test"
         assert result["tts_name"] == "Test"
         assert result["role"] == "mortal"
+        assert result["metrics_tracking_enabled"] is False
 
     def test_update_hover(self):
         o = OnboardingOverlay(800, 600)
@@ -206,6 +249,9 @@ class TestOnboardingOverlay:
         s = _surf()
 
         for step in [
+            STEP_PUCK_INTRO,
+            STEP_MODE,
+            STEP_METRICS,
             STEP_NAME,
             STEP_PRONUNCIATION,
             STEP_TITLE,

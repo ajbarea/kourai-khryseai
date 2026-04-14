@@ -258,6 +258,7 @@ async def handle_action(request: Request) -> JSONResponse:
 
     if action == "get_virtue_context":
         from kourai_common.facts import get_relevant_facts_for_enrichment
+        from kourai_common.player_affinity import get_all_affinities
         from kourai_common.virtues import get_all_virtues, get_virtue_deltas
 
         pid = data.get("player_id", "")
@@ -266,6 +267,7 @@ async def handle_action(request: Request) -> JSONResponse:
                 "action": "virtue_context_result",
                 "virtues": get_all_virtues(pid) if pid else {},
                 "deltas": get_virtue_deltas(pid) if pid else {},
+                "affinities": get_all_affinities(pid) if pid else {},
                 "facts": get_relevant_facts_for_enrichment(pid, limit=5) if pid else [],
             }
         )

@@ -139,3 +139,22 @@ def test_build_env_corrects_windows_plain_venv(monkeypatch) -> None:
 
     env = dev_cli.build_env()
     assert env["UV_PROJECT_ENVIRONMENT"] == ".venv-win"
+
+
+def test_resolve_renpy_executable_uses_env_override(monkeypatch, tmp_path) -> None:
+    """Explicit KOURAI_RENPY_EXE should take priority when provided."""
+    fake_exe = tmp_path / "renpy.exe"
+    fake_exe.write_text("", encoding="utf-8")
+    monkeypatch.setenv("KOURAI_RENPY_EXE", str(fake_exe))
+
+    assert dev_cli.resolve_renpy_executable() == str(fake_exe)
+
+
+def test_resolve_renpy_executable_falls_back_to_project_path(monkeypatch) -> None:
+    """When no candidates exist, keep historical in-repo path fallback."""
+    monkeypatch.delenv("KOURAI_RENPY_EXE", raising=False)
+    monkeypatch.setattr(dev_cli.Path, "exists", lambda _self: False, raising=False)
+
+    assert dev_cli.resolve_renpy_executable() == str(
+        dev_cli.PROJECT_ROOT / "hosts" / "vn" / "renpy-8.5.2-sdk" / "renpy.exe"
+    )

@@ -24,60 +24,43 @@ init python:
     from bridge import RenPyBridge
     import json
     import random as _random
+    from kourai_common.agents import AGENT_METADATA, AGENT_QUOTES
 
     # Global bridge instance (singleton)
     bridge = RenPyBridge(agent_script="agents/vn_bridge.py")
 
-    # Character definitions — colors from FORGE_AESTHETIC.md agent personality colors
-    h   = Character("Hephaestus", color="#FF9500", what_prefix='"', what_suffix='"')
-    t   = Character("Techne",     color="#17A2B8", what_prefix='"', what_suffix='"')
-    k   = Character("Kallos",     color="#C8A2C8", what_prefix='"', what_suffix='"')
-    m   = Character("Metis",      color="#4C6EF5", what_prefix='"', what_suffix='"')
-    d   = Character("Dokimasia",  color="#6C757D", what_prefix='"', what_suffix='"')
-    mn  = Character("Mneme",      color="#B73E1D", what_prefix='"', what_suffix='"')
-    pck = Character("Puck",       color="#7FBC8C", what_prefix='"', what_suffix='"')
-    cpd = Character("Cupid",      color="#E8728C", what_prefix='"', what_suffix='"')
+    # Character definitions — derived from AGENT_METADATA
+    # We still define short handles for script writing
+    h   = Character("Hephaestus", color=AGENT_METADATA["hephaestus"]["hex_color"], what_prefix='"', what_suffix='"')
+    t   = Character("Techne",     color=AGENT_METADATA["techne"]["hex_color"],     what_prefix='"', what_suffix='"')
+    k   = Character("Kallos",     color=AGENT_METADATA["kallos"]["hex_color"],     what_prefix='"', what_suffix='"')
+    m   = Character("Metis",      color=AGENT_METADATA["metis"]["hex_color"],      what_prefix='"', what_suffix='"')
+    d   = Character("Dokimasia",  color=AGENT_METADATA["dokimasia"]["hex_color"],  what_prefix='"', what_suffix='"')
+    mn  = Character("Mneme",      color=AGENT_METADATA["mneme"]["hex_color"],      what_prefix='"', what_suffix='"')
+    pck = Character("Puck",       color=AGENT_METADATA["puck"]["hex_color"],       what_prefix='"', what_suffix='"')
+    cpd = Character("Cupid",      color=AGENT_METADATA["cupid"]["hex_color"],      what_prefix='"', what_suffix='"')
     p   = Character("Player",     color="#E8E8E8")
 
     # Agent ID → (Character, epithet) for dynamic dialogue routing
     AGENT_CHARS = {
-        "hephaestus": (h,   "Master of the Forge"),
-        "techne":     (t,   "Artisan of Code"),
-        "kallos":     (k,   "Eye of Elegance"),
-        "metis":      (m,   "Architect of Intent"),
-        "dokimasia":  (d,   "Guardian of Standards"),
-        "mneme":      (mn,  "Keeper of Memory"),
-        "puck":       (pck, "Spirit of Mischief"),
-        "cupid":      (cpd, "Arrow of the Heart"),
+        "hephaestus": (h,   AGENT_METADATA["hephaestus"]["epithet"]),
+        "techne":     (t,   AGENT_METADATA["techne"]["epithet"]),
+        "kallos":     (k,   AGENT_METADATA["kallos"]["epithet"]),
+        "metis":      (m,   AGENT_METADATA["metis"]["epithet"]),
+        "dokimasia":  (d,   AGENT_METADATA["dokimasia"]["epithet"]),
+        "mneme":      (mn,  AGENT_METADATA["mneme"]["epithet"]),
+        "puck":       (pck, AGENT_METADATA["puck"]["epithet"]),
+        "cupid":      (cpd, AGENT_METADATA["cupid"]["epithet"]),
     }
 
     # Name → epithet lookup for the say screen subtitle display.
-    AGENT_EPITHETS = {
-        "Hephaestus": "Master of the Forge",
-        "Techne":     "Artisan of Code",
-        "Kallos":     "Eye of Elegance",
-        "Metis":      "Architect of Intent",
-        "Dokimasia":  "Guardian of Standards",
-        "Mneme":      "Keeper of Memory",
-        "Puck":       "Voice of Reason",
-        "Cupid":      "Aspect of Love",
-        "Aidos":      "The Honest Mirror",
-        "Aletheia":   "Seeker of Truth",
-    }
+    AGENT_EPITHETS = {meta["title"]: meta["epithet"] for name, meta in AGENT_METADATA.items()}
+    # Fallbacks for titles used as names
+    for name, meta in AGENT_METADATA.items():
+        AGENT_EPITHETS[name.capitalize()] = meta["epithet"]
 
     # Agent accent colors (mirrors AGENT_CHARS, used by HUD, gossip bubble, portrait frame)
-    AGENT_COLORS = {
-        "hephaestus": "#FF9500",
-        "techne":     "#17A2B8",
-        "kallos":     "#C8A2C8",
-        "metis":      "#4C6EF5",
-        "dokimasia":  "#6C757D",
-        "mneme":      "#B73E1D",
-        "puck":       "#007FFF",
-        "cupid":      "#FF85A2",
-        "aidos":      "#B8D4E3",
-        "aletheia":   "#2E8B57",
-    }
+    AGENT_COLORS = {name: meta["hex_color"] for name, meta in AGENT_METADATA.items()}
 
     # Canonical display order for the affinity HUD (6 maidens only — spirits are sidebar)
     AGENT_ORDER = ["hephaestus", "techne", "kallos", "metis", "dokimasia", "mneme"]
@@ -169,6 +152,14 @@ init python:
             virtues = _result.get("virtues", {})
             deltas = _result.get("deltas", {})
             facts = _result.get("facts", [])
+            affinities = _result.get("affinities", {})
+
+            # Sync authoritative affinity scores back to the Ren'Py store
+            import store as _store
+            for agent_name, aff_data in affinities.items():
+                # aff_data is a dict with affinity_score, romance_stage etc.
+                if agent_name in _store.affinity:
+                    _store.affinity[agent_name] = aff_data.get("affinity_score", 0.5)
 
             # Format virtue scores (0.0-1.0 range)
             virtue_dict = {

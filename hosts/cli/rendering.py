@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import re
 import secrets
+import shutil
 import sys
+import textwrap
 from typing import IO, TYPE_CHECKING, Any
 
 from hosts.cli.maidens import (
@@ -173,7 +175,6 @@ def _comms_window(agent_name: str, dialogue: str, *, style: str = "speak") -> st
     if not m:
         return f"  {_DIM}[{agent_name}] {dialogue}{_RESET}"
 
-    str(m["face"])
     title = str(m["title"])
 
     # Style variants
@@ -188,20 +189,43 @@ def _comms_window(agent_name: str, dialogue: str, *, style: str = "speak") -> st
         text_col = _RESET
         border = _GOLD
 
-    # Pad dialogue to minimum width for the frame
-    pad_len = max(36, len(dialogue) + 2)
-    top_bar = "\u2500" * pad_len
-    bot_bar = "\u2500" * pad_len
+    # Dynamic width detection
+    term_w, _ = shutil.get_terminal_size((80, 24))
+    # Leave room for left margin (2) + border (1) + padding (1) + right padding (1) + border (1)
+    max_w = min(120, term_w - 8)
 
-    # Text-only mode: clean RPG dialogue boxes for pipeline status.
-    # The GUI (hosts/gui) renders actual portraits. CLI stays minimal.
-    return (
-        f"  {border}\u256d{top_bar}\u256e{_RESET}\n"
-        f"  {border}\u2502{_RESET} {_GOLD_BOLD}{agent_name.upper()}{_RESET} \u2014"
-        f" {_DIM}{title}{_RESET}\n"
-        f"  {border}\u2502{_RESET} {text_col}{dialogue}{_RESET}\n"
-        f"  {border}\u2570{bot_bar}\u256f{_RESET}"
+    # Wrap dialogue lines
+    wrapped_lines = textwrap.wrap(dialogue, width=max_w)
+    if not wrapped_lines:
+        wrapped_lines = [""]
+
+    # Box width is the longest line length
+    box_w = max(len(line) for line in wrapped_lines)
+    # Ensure header (name — title) fits
+    header_len = len(agent_name) + len(title) + 3
+    box_w = max(box_w, header_len)
+
+    # Final clamping to terminal width
+    box_w = min(box_w, max_w)
+
+    top_bar = "\u2500" * (box_w + 2)
+    bot_bar = "\u2500" * (box_w + 2)
+
+    output = []
+    output.append(f"  {border}\u256d{top_bar}\u256e{_RESET}")
+    output.append(
+        f"  {border}\u2502{_RESET} {_GOLD_BOLD}{agent_name.upper()}{_RESET} \u2014 {_DIM}{title}{_RESET}{' ' * (box_w - header_len + 1)}{border}\u2502{_RESET}"
     )
+
+    for line in wrapped_lines:
+        padding = " " * (box_w - len(line) + 1)
+        output.append(
+            f"  {border}\u2502{_RESET} {text_col}{line}{_RESET}{padding}{border}\u2502{_RESET}"
+        )
+
+    output.append(f"  {border}\u2570{bot_bar}\u256f{_RESET}")
+
+    return "\n".join(output)
 
 
 def _maiden_card(name: str) -> str:
@@ -245,13 +269,27 @@ def _maiden_gallery() -> str:
 
 def _banner() -> str:
     tagline = secrets.choice(_TAGLINES)
+    term_w, _ = shutil.get_terminal_size((80, 24))
+
+    title_text = "Kourai Khryseai \u2014 Golden Maidens"
+    # min 44 to fit title, max 80 for reasonable banner size
+    banner_w = max(44, min(80, term_w - 8))
+
+    top_bar = "\u2500" * banner_w
+
+    # Center the title
+    title_padding = (banner_w - len(title_text)) // 2
+    title_row = (
+        f" {' ' * title_padding}{title_text}{' ' * (banner_w - len(title_text) - title_padding)} "
+    )
+
     return (
-        f"{_GOLD_BOLD}\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e{_RESET}\n"
-        f"{_GOLD_BOLD}\u2502     Kourai Khryseai \u2014 Golden Maidens     \u2502{_RESET}\n"
-        f"{_GOLD_BOLD}\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f{_RESET}\n"
+        f"{_GOLD_BOLD}\u256d{top_bar}\u256e{_RESET}\n"
+        f"{_GOLD_BOLD}\u2502{title_row}\u2502{_RESET}\n"
+        f"{_GOLD_BOLD}\u2570{top_bar}\u256f{_RESET}\n"
         f"{_DIM}{_ITALIC}{tagline}{_RESET}\n"
         f"\n"
-        f"{_GOLD}Alt+Enter{_RESET} send  \u00b7  {_GOLD}Ctrl+V{_RESET} paste  \u00b7  "
+        f"{_GOLD}Enter{_RESET} send  \u00b7  {_GOLD}Ctrl+V{_RESET} paste  \u00b7  "
         f"{_GOLD}Alt+V{_RESET} attach image\n"
         f"{_GOLD}:help{_RESET} commands  \u00b7  {_GOLD}:q{_RESET} quit\n"
     )
@@ -270,26 +308,25 @@ def _render_markdown(text: str) -> str:
     rendered: list[str] = []
     in_code_block = False
 
+    term_w, _ = shutil.get_terminal_size((80, 24))
+    bar_w = min(100, term_w - 4)
+
     for line in lines:
         # Code block fences
         if line.strip().startswith("```"):
             if in_code_block:
                 in_code_block = False
-                rendered.append(
-                    f"{_DIM}\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500{_RESET}"
-                )
+                rendered.append(f"{_DIM}{'\u2500' * bar_w}{_RESET}")
             else:
                 in_code_block = True
                 lang = line.strip().removeprefix("```").strip()
                 if lang:
                     rendered.append(
                         f"{_DIM}\u2500\u2500\u2500 {lang} "
-                        f"{'\u2500' * max(1, 35 - len(lang))}{_RESET}"
+                        f"{'\u2500' * max(1, bar_w - len(lang) - 5)}{_RESET}"
                     )
                 else:
-                    rendered.append(
-                        f"{_DIM}\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500{_RESET}"
-                    )
+                    rendered.append(f"{_DIM}{'\u2500' * bar_w}{_RESET}")
             continue
 
         if in_code_block:
@@ -298,9 +335,7 @@ def _render_markdown(text: str) -> str:
 
         # Horizontal rules
         if re.match(r"^-{3,}\s*$", line.strip()):
-            rendered.append(
-                f"{_GOLD}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501{_RESET}"
-            )
+            rendered.append(f"{_GOLD}{'\u2501' * bar_w}{_RESET}")
             continue
 
         # Headings

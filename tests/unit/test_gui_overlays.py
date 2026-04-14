@@ -200,13 +200,13 @@ class TestOnboardingOverlay:
         yield
 
     def test_initial_state(self):
-        from hosts.gui.onboarding_ui import STEP_NAME, OnboardingOverlay
+        from hosts.gui.onboarding_ui import STEP_PUCK_INTRO, OnboardingOverlay
 
         ob = OnboardingOverlay(1280, 720)
         assert ob.active is False
         ob.start()
         assert ob.active is True
-        assert ob.step == STEP_NAME
+        assert ob.step == STEP_PUCK_INTRO
 
     def test_finalize_produces_result(self):
         from hosts.gui.onboarding_ui import OnboardingOverlay
