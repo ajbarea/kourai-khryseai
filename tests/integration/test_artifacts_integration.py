@@ -314,7 +314,12 @@ class TestArtifactStorageHFSync:
     def test_hf_enabled_when_token_set(self, monkeypatch) -> None:
         """hf_enabled is True when HF_TOKEN is set."""
         monkeypatch.setenv("HF_TOKEN", "hf_fake_token_for_testing")
-        storage = ArtifactStorage("test_agent")
+        # Mock bucket ID resolution so test doesn't need a real HF token
+        with patch(
+            "kourai_common.artifacts._resolve_bucket_id",
+            return_value="fake-user/kourai-artifacts",
+        ):
+            storage = ArtifactStorage("test_agent")
         assert storage.hf_enabled is True
 
     def test_hf_path_uses_bucket_id(self, monkeypatch) -> None:
@@ -328,7 +333,12 @@ class TestArtifactStorageHFSync:
         """hf_path uses the default bucket ID when env var is absent."""
         monkeypatch.setenv("HF_TOKEN", "hf_fake")
         monkeypatch.delenv("KOURAI_BUCKET_ID", raising=False)
-        storage = ArtifactStorage("techne")
+        # Mock bucket ID resolution so test doesn't need a real HF token
+        with patch(
+            "kourai_common.artifacts._resolve_bucket_id",
+            return_value="fake-user/kourai-artifacts",
+        ):
+            storage = ArtifactStorage("techne")
         assert "kourai-artifacts" in storage.hf_path
         assert "techne" in storage.hf_path
 
@@ -393,7 +403,12 @@ class TestArtifactStorageHFSync:
     def test_push_returns_false_on_error(self, monkeypatch, tmp_path) -> None:
         """push() returns False and logs warning when sync_bucket raises."""
         monkeypatch.setenv("HF_TOKEN", "hf_fake")
-        storage = ArtifactStorage("dokimasia")
+        # Mock bucket ID resolution so test doesn't need a real HF token
+        with patch(
+            "kourai_common.artifacts._resolve_bucket_id",
+            return_value="fake-user/kourai-artifacts",
+        ):
+            storage = ArtifactStorage("dokimasia")
         storage.base_dir = tmp_path
 
         with patch("huggingface_hub.sync_bucket", side_effect=RuntimeError("network error")):
@@ -404,7 +419,12 @@ class TestArtifactStorageHFSync:
     def test_pull_returns_false_on_hard_error(self, monkeypatch, tmp_path) -> None:
         """pull() returns False when sync_bucket raises."""
         monkeypatch.setenv("HF_TOKEN", "hf_fake")
-        storage = ArtifactStorage("dokimasia")
+        # Mock bucket ID resolution so test doesn't need a real HF token
+        with patch(
+            "kourai_common.artifacts._resolve_bucket_id",
+            return_value="fake-user/kourai-artifacts",
+        ):
+            storage = ArtifactStorage("dokimasia")
         storage.base_dir = tmp_path
 
         with patch("huggingface_hub.sync_bucket", side_effect=RuntimeError("network error")):
