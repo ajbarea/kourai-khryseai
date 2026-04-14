@@ -23,9 +23,8 @@ x-agent-common: &agent-common
     OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
     KOURAI_LOG_LEVEL: ${KOURAI_LOG_LEVEL:-INFO}
     KOURAI_STREAM_ENABLED: ${KOURAI_STREAM_ENABLED:-true}
-    MEMORY_MCP_URL: http://memory-mcp:5000
-    MEMORY_MCP_SSE_URL: http://memory-mcp:5001/sse
-    CONTEXT7_MCP_URL: http://context7-mcp:3001/sse
+    MEMORY_MCP_URL: http://memory-mcp:5001/mcp
+    CONTEXT7_MCP_URL: http://context7-mcp:3001/mcp
     HF_TOKEN: ${HF_TOKEN:-}
     KOURAI_BUCKET_ID: ${KOURAI_BUCKET_ID:-}
     AGENT_ARTIFACTS_DIR: /agent-artifacts
