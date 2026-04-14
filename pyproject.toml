@@ -110,6 +110,7 @@ filterwarnings = [
     "ignore::UserWarning:torch.nn.modules.rnn",
     "ignore::FutureWarning:torch.nn.utils.weight_norm",
     "ignore::DeprecationWarning:torch.jit._script",
+    "ignore::DeprecationWarning:misaki.en",
 ]
 
 [tool.ty.environment]
