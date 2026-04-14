@@ -19,7 +19,12 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+# Load .env at the root of the project
+load_dotenv(PROJECT_ROOT / ".env")
+
 DEFAULT_ENV = {
     "PYTHONUTF8": "1",
     "PYTHONIOENCODING": "utf-8",
@@ -37,6 +42,33 @@ class Task:
     command_factory: CommandFactory
     timed: bool = True
     cwd: Path = PROJECT_ROOT
+
+
+def _default_project_renpy_exe() -> Path:
+    return PROJECT_ROOT / "hosts" / "vn" / "renpy-8.5.2-sdk" / "renpy.exe"
+
+
+def resolve_renpy_executable() -> str:
+    """Resolve Ren'Py executable path across local repo/Windows installs."""
+    env_override = os.environ.get("KOURAI_RENPY_EXE")
+    candidates: list[Path] = []
+    if env_override:
+        candidates.append(Path(env_override))
+
+    candidates.extend(
+        [
+            _default_project_renpy_exe(),
+            Path("/mnt/c/Tools/renpy-8.5.2-sdk/renpy.exe"),
+            Path("C:/Tools/renpy-8.5.2-sdk/renpy.exe"),
+        ]
+    )
+
+    for exe in candidates:
+        if exe.exists():
+            return str(exe)
+
+    # Fall back to the historical in-repo location so failure remains explicit.
+    return str(_default_project_renpy_exe())
 
 
 def configure_stdio() -> None:
@@ -219,7 +251,7 @@ TASK_GROUPS: tuple[tuple[str, tuple[tuple[str, Task], ...]], ...] = (
                 "cli",
                 Task(
                     description="Launch terminal CLI client (runs on host machine)",
-                    command_factory=lambda: [sys.executable, "-m", "hosts.cli"],
+                    command_factory=lambda: [sys.executable, "-m", "hosts.cli", "--voice"],
                 ),
             ),
             (
@@ -227,7 +259,7 @@ TASK_GROUPS: tuple[tuple[str, tuple[tuple[str, Task], ...]], ...] = (
                 Task(
                     description="Launch Ren'Py Visual Novel GUI (runs on host machine)",
                     command_factory=lambda: [
-                        str(PROJECT_ROOT / "hosts" / "vn" / "renpy-8.5.2-sdk" / "renpy.exe"),
+                        resolve_renpy_executable(),
                         str(PROJECT_ROOT / "hosts" / "vn" / "kourai_vn"),
                     ],
                 ),
