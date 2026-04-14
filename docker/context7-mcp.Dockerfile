@@ -1,9 +1,11 @@
 # Context7 MCP sidecar — live documentation for Techne / Metis
 #
-# Port 3001: MCP SSE endpoint (supergateway → @upstash/context7-mcp)
+# Port 3001: MCP Streamable HTTP endpoint at /mcp
+#            (supergateway → @upstash/context7-mcp)
 #
-# supergateway converts the stdio MCP server to SSE so Python agents can
-# connect via mcp.client.sse without Node.js in their containers.
+# supergateway converts the stdio MCP server to Streamable HTTP so Python
+# agents can connect via mcp.client.streamable_http without Node.js in
+# their containers.
 # Free tier: 1,000 req/month — no API key required.
 
 FROM node:20-slim

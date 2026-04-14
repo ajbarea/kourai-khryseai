@@ -1,10 +1,12 @@
 # Memory MCP sidecar — shared knowledge graph for Puck / Cupid / Mneme
 #
 # Port 5000: HTTP health check
-# Port 5001: MCP SSE endpoint (supergateway → @modelcontextprotocol/server-memory)
+# Port 5001: MCP Streamable HTTP endpoint at /mcp
+#            (memory-mcp-server.js wraps supergateway → @modelcontextprotocol/server-memory)
 #
-# supergateway converts the stdio MCP server to SSE so Python agents can
-# connect via mcp.client.sse without Node.js in their containers.
+# supergateway converts the stdio MCP server to Streamable HTTP so Python
+# agents can connect via mcp.client.streamable_http without Node.js in
+# their containers.
 
 FROM node:20-slim
 
