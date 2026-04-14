@@ -110,11 +110,11 @@ class TestFullPipelineOrchestration:
 
         texts = _status_texts(statuses)
 
-        # Each agent should have a "Sending" and "completed" message
+        # Each agent should have a Hephaestus narration and "completed" message
         for agent_name in pipeline:
-            sending = [t for t in texts if "Sending" in t and agent_name in t.lower()]
+            narration = [t for t in texts if "\U0001f525" in t]
             completed = [t for t in texts if "completed" in t.lower() and agent_name in t.lower()]
-            assert len(sending) > 0, f"No 'Sending' status for {agent_name}"
+            assert len(narration) > 0, f"No Hephaestus narration for {agent_name}"
             assert len(completed) > 0, f"No 'completed' status for {agent_name}"
 
 

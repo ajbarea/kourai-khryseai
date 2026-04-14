@@ -147,7 +147,7 @@ class TestExecutePipelineIterativeLoop:
             ):
                 statuses.append((agent, status))
 
-            max_msgs = [s for s in statuses if "Max fix iterations" in s[1]]
+            max_msgs = [s for s in statuses if "Enough!" in s[1] and "proceeding" in s[1]]
             assert len(max_msgs) == 1
 
     @pytest.mark.asyncio

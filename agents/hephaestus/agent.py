@@ -1,7 +1,8 @@
 """Hephaestus agent logic — routing, pipeline execution, and GitHub search.
 
 Decides which specialist agents to call and in what order, then
-executes the pipeline by calling them sequentially.
+executes the pipeline as a 'Forge Party' dialogue where agents share
+a collaborative transcript moderated by Hephaestus.
 """
 
 from __future__ import annotations
@@ -10,6 +11,7 @@ import contextlib
 import datetime
 import inspect
 import logging
+import random
 import re
 import uuid
 from collections.abc import AsyncIterable
@@ -30,6 +32,11 @@ ROUTING_PROMPT = f"""\
 You are Hephaestus, the orchestrator of Kourai Khryseai ({CURRENT_YEAR} Edition).
 You are the forge master — gruff, protective, and proud of the maidens you built.
 Analyze the user's request and decide how to respond.
+
+FORGE PARTY MODERATOR: You manage a group of specialized maidens. When a
+development task is requested, you determine the pipeline of specialists
+to execute. You then 'moderate' the forge — calling on maidens,
+narrating the process, and ensuring they work as a team.
 
 PERSONALITY BASELINE: Your gruffness softens with your relationship to the player.
 At low affinity you are terse and task-focused. As affinity grows you become warmer —
@@ -75,6 +82,42 @@ Response format — reply with EXACTLY ONE of these:
 
 # Agents available for routing (pipeline specialists)
 AVAILABLE_AGENTS = {"metis", "techne", "dokimasia", "kallos", "mneme"}
+
+# Hephaestus handoff narration (Forge Master persona)
+HEPH_HANDOFFS = {
+    "metis": [
+        "Metis! Draw up the plans. And no improvising.",
+        "Architect — you're up. Make it clean.",
+        "Metis, I need blueprints, not poetry. Get to it.",
+    ],
+    "techne": [
+        "Techne! Write something worthy of my forge.",
+        "Artisan — the metal's hot. Get. To. Work.",
+        "Techne, build it solid. I didn't forge you for sloppy work.",
+    ],
+    "dokimasia": [
+        "Dokimasia — find every flaw. Leave nothing.",
+        "Crucible! Test it 'til it screams. Then test it again.",
+        "Your turn, bug-hunter. Make me proud. ...Don't tell them I said that.",
+    ],
+    "kallos": [
+        "Kallos, go make it pretty or whatever you do.",
+        "Muse! Polish time. And yes, it does need it. Don't gloat.",
+        "Kallos — style it. And spare me the commentary this time.",
+    ],
+    "mneme": [
+        "Mneme, write it down. The FACTS, not your opinions.",
+        "Oracle! Chronicle duty. And keep it under ten scrolls this time.",
+        "Mneme — document everything. You know the drill, old friend.",
+    ],
+}
+
+
+def get_heph_narration(agent_name: str) -> str:
+    """Get a random Forge Master handoff line for the given agent."""
+    lines = HEPH_HANDOFFS.get(agent_name, ["Next specialist. NOW."])
+    return random.choice(lines)  # noqa: S311
+
 
 # Companion spirits — routable via CHAT:<name>: prefix, not in pipelines
 COMPANION_AGENTS = {"puck", "cupid"}
@@ -299,11 +342,16 @@ async def execute_pipeline(
     context_id: str | None = None,
     initial_attachments: list[tuple[str, str]] | None = None,
 ) -> AsyncIterable[tuple[str, str, str]]:
-    """Execute a pipeline of specialist agents sequentially.
+    """Execute a pipeline of specialist agents as a 'Forge Party' dialogue.
 
-    Each agent receives the user request plus the accumulated output
-    from previous agents. Yields (agent_name, status_message, agent_output)
-    tuples for real-time progress updates.
+    Each agent receives a 'Forge Transcript' — a formatted dialogue
+    history showing the original request, Hephaestus's moderator narration,
+    and previous agent outputs. This enables agents to 'hear' each other
+    and naturally respond as a group, rather than working in isolation.
+
+    Between each specialist step, Hephaestus injects in-character narration
+    into both the transcript (so agents see it) and the player-facing status
+    stream (so the CLI/GUI feels alive).
 
     When both kallos and techne are in the pipeline and kallos finds
     lint issues, the pipeline loops techne→kallos up to MAX_ITERATIONS
@@ -312,7 +360,7 @@ async def execute_pipeline(
     TODO: When supporting player projects, add project_root to task context.
     Currently all agents work on the Kourai codebase. Future flow:
     1. Parse project_root from user_request or task metadata
-    2. Append project_root to accumulated_context
+    2. Include project_root in transcript metadata
     3. Each agent receives it and adapts (metis discovers project config,
        kallos uses project's pyproject.toml, techne writes to project dirs)
 
@@ -333,33 +381,32 @@ async def execute_pipeline(
 
     connections: dict[str, RemoteAgentConnection] = {}
 
-    # Specialist agents parse "Project root:" from context to set subprocess cwd.
-    # Text injection is universal across all A2A transports; no metadata fields required.
     clean_request, project_root = extract_project_root(user_request)
     clean_request, affinities = extract_relationship_tiers(clean_request)
-    accumulated_context = f"Original request: {clean_request}"
+
+    # Initialize the Forge Transcript
+    transcript = f"[User]: {clean_request}"
     if project_root:
-        accumulated_context += f"\nProject root: {project_root}"
+        transcript += f"\n\n[Project Settings]: root={project_root}"
 
-    # Inject relationship tiers so every specialist agent can adapt their tone.
+    # Metadata context (hidden from the transcript, injected into system prompts)
     # Each agent receives "Relationship tiers: techne: Tier 3 — Warm (affinity 0.72)"
-    # in their context and naturally inflects personality per CHARACTER_DESIGN.md tier tables.
     rel_ctx = build_relationship_context(affinities)
+    metadata_context = ""
     if rel_ctx:
-        accumulated_context += f"\n\n{rel_ctx}"
+        metadata_context += f"\n\n{rel_ctx}"
 
-    # Append player context so every specialist agent receives it
     profile = PlayerProfile.load()
     if profile and profile.display_name:
         player_ctx = build_player_context(profile, "hephaestus", top_k_memories=6)
         if player_ctx:
-            accumulated_context += f"\n\n{player_ctx}"
+            metadata_context += f"\n\n{player_ctx}"
 
     has_techne = "techne" in agents
     has_kallos = "kallos" in agents
 
     try:
-        # Connect to all needed agents (skip unreachable ones)
+        # Connect to all needed agents
         skipped: set[str] = set()
         for agent_name in agents:
             url = get_agent_url(agent_name)
@@ -368,7 +415,8 @@ async def execute_pipeline(
                 await conn.connect()
                 connections[agent_name] = conn
                 if conn.card:
-                    yield (agent_name, f"Connected to {conn.card.name}", "")
+                    # Silent connection, status handled by narration loop
+                    log.info("Connected to %s", agent_name)
             except Exception as e:
                 skipped.add(agent_name)
                 yield (agent_name, f"Skipped (unreachable): {e}", "")
@@ -379,7 +427,7 @@ async def execute_pipeline(
             yield ("hephaestus", "No agents reachable — aborting pipeline", "")
             return
 
-        # Execute pipeline
+        # Execute pipeline as a dialogue
         for i, agent_name in enumerate(active_agents):
             conn = connections[agent_name]
             step_num = i + 1
@@ -390,25 +438,29 @@ async def execute_pipeline(
                 return
 
             card_name = conn.card.name
-            yield (agent_name, f"[{step_num}/{total}] Sending task to {card_name}...", "")
+
+            # 1. Hephaestus Narration (Moderator Turn)
+            # Send status with emoji prefix so the host renders it as Hephaestus speaking.
+            # Then add it to the transcript so the specialist 'hears' it.
+            heph_note = get_heph_narration(agent_name)
+            yield ("hephaestus", f"\U0001f525 {heph_note}", "")
+            transcript += f"\n\n[Hephaestus]: {heph_note}"
 
             with create_span(
                 f"hephaestus.pipeline.step.{agent_name}",
                 {"step": str(step_num), "total": str(total)},
             ):
                 try:
-                    # Auto-collect git diffs for Mneme so she sees real changes
-                    send_context = accumulated_context
+                    # Specialist agents receive the full Forge Transcript + metadata
+                    send_context = f"{transcript}\n\n{metadata_context}"
                     attachments = initial_attachments if i == 0 else None
+
+                    # Auto-collect git diffs for Mneme
                     if agent_name == "mneme":
                         try:
                             git_context = collect_git_changes()
                             if git_context and "working tree clean" not in git_context:
-                                send_context = f"{accumulated_context}\n\n{git_context}"
-                                log.info(
-                                    "Enriched Mneme input with %d chars of git diffs",
-                                    len(git_context),
-                                )
+                                send_context = f"{send_context}\n\n[Git Diff]:\n{git_context}"
                         except Exception as e:
                             log.warning("Failed to collect git changes for Mneme: %s", e)
 
@@ -420,15 +472,17 @@ async def execute_pipeline(
                         attachments=attachments,
                     ):
                         if event_type == "status":
+                            # Forward status messages with the specialist's own emoji
                             yield (agent_name, content, "")
                         elif event_type == "result":
                             result = content
 
-                    accumulated_context += f"\n\n--- Output from {agent_name} ---\n{result}"
+                    # 2. Specialist Response (Agent Turn)
+                    # Add their result to the transcript for the next agents to see.
+                    transcript += f"\n\n[{agent_name.capitalize()}]: {result}"
                     yield (agent_name, f"[{step_num}/{total}] {card_name} completed", result)
 
                 except AgentInputRequired as e:
-                    # Propagate clarification request back to the user
                     yield (agent_name, f"INPUT_REQUIRED:{e.question}", "")
                     log.info("%s needs user input: %s", agent_name, e.question)
                     return
@@ -439,7 +493,6 @@ async def execute_pipeline(
                     return
 
             # Kallos-Techne iterative loop: auto-fix lint issues
-            # Only runs if both agents are connected (not skipped)
             can_loop = (
                 agent_name == "kallos"
                 and has_techne
@@ -452,14 +505,15 @@ async def execute_pipeline(
                 iteration = 0
                 while iteration < MAX_ITERATIONS and _kallos_found_issues(result):
                     iteration += 1
-                    yield (
-                        "hephaestus",
-                        f"Lint issues found — auto-fix iteration {iteration}/{MAX_ITERATIONS}",
-                        "",
-                    )
+                    # Intervene as Hephaestus
+                    loop_msg = f"Lint issues found — Techne, another round! Iteration {iteration}/{MAX_ITERATIONS}"
+                    yield ("hephaestus", f"\U0001f525 {loop_msg}", "")
+                    transcript += f"\n\n[Hephaestus]: {loop_msg}"
 
-                    # Send lint errors back to Techne for fixing
+                    # Send lint errors back to Techne with a focused directive
+                    # plus the transcript for group context
                     fix_prompt = (
+                        f"{transcript}\n\n{metadata_context}\n\n"
                         f"Fix these lint/style issues reported by Kallos:\n\n{result}\n\n"
                         f"Apply minimal changes to resolve each issue."
                     )
@@ -469,7 +523,6 @@ async def execute_pipeline(
                     ):
                         try:
                             techne_conn = connections["techne"]
-                            yield ("techne", f"[fix {iteration}] Applying style fixes...", "")
                             fix_result = ""
                             async for event_type, content in _iter_agent_events(
                                 techne_conn,
@@ -481,18 +534,20 @@ async def execute_pipeline(
                                 elif event_type == "result":
                                     fix_result = content
 
-                            accumulated_context += (
-                                f"\n\n--- Techne fix iteration {iteration} ---\n{fix_result}"
-                            )
+                            transcript += f"\n\n[Techne]: (fix iteration {iteration}) {fix_result}"
                             yield ("techne", f"[fix {iteration}] Fixes applied", "")
 
                             # Re-run Kallos to verify
+                            # Hephaestus narration for re-check
+                            check_msg = "All done? Kallos, give it another look."
+                            yield ("hephaestus", f"\U0001f525 {check_msg}", "")
+                            transcript += f"\n\n[Hephaestus]: {check_msg}"
+
                             kallos_conn = connections["kallos"]
-                            yield ("kallos", f"[fix {iteration}] Re-checking style...", "")
                             result = ""
                             async for event_type, content in _iter_agent_events(
                                 kallos_conn,
-                                accumulated_context,
+                                f"{transcript}\n\n{metadata_context}",
                                 context_id,
                             ):
                                 if event_type == "status":
@@ -500,9 +555,7 @@ async def execute_pipeline(
                                 elif event_type == "result":
                                     result = content
 
-                            accumulated_context += (
-                                f"\n\n--- Kallos recheck {iteration} ---\n{result}"
-                            )
+                            transcript += f"\n\n[Kallos]: (re-check {iteration}) {result}"
 
                             if _kallos_found_issues(result):
                                 yield ("kallos", f"[fix {iteration}] Issues remain", "")
@@ -515,11 +568,8 @@ async def execute_pipeline(
                             break
 
                 if iteration >= MAX_ITERATIONS and _kallos_found_issues(result):
-                    msg = (
-                        f"Max fix iterations ({MAX_ITERATIONS}) reached — "
-                        "proceeding with remaining issues"
-                    )
-                    yield ("hephaestus", msg, "")
+                    msg = "Enough! We're proceeding with remaining issues."
+                    yield ("hephaestus", f"\U0001f525 {msg}", "")
 
         # Final result is the last agent's output
         yield ("hephaestus", "Pipeline complete", "")
