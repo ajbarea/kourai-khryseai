@@ -91,6 +91,12 @@ def run_post_task_hooks(
         return {}
 
     results: dict[str, Any] = {}
+    metrics_enabled = bool(profile.preferences.get("metrics_tracking_enabled", True))
+    if not metrics_enabled:
+        results["metrics_tracking_enabled"] = False
+        return results
+
+    results["metrics_tracking_enabled"] = True
 
     # 1. Track affinity
     track_interaction(player_id, agent_name, profile=profile, success=success)
