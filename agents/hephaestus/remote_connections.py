@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import TYPE_CHECKING
 from uuid import uuid4
@@ -117,13 +118,16 @@ class RemoteAgentConnection:
             message.metadata = get_trace_context()
 
             log.info("Sending to %s: %d chars", self.agent_name, len(text))
+            latest_artifact_text = ""
 
             async for event in self.client.send_message(message):
                 if isinstance(event, Message):
                     result = self._extract_message_text(event)
-                    log.info("Received from %s: %d chars", self.agent_name, len(result))
-                    yield ("result", result)
-                    return
+                    if result:
+                        log.info("Received from %s: %d chars", self.agent_name, len(result))
+                        yield ("result", result)
+                        return
+                    continue
 
                 # ClientEvent: tuple[Task, update | None]
                 task, update = event
@@ -138,47 +142,72 @@ class RemoteAgentConnection:
                         if status_msg:
                             yield ("status", status_msg)
                 elif isinstance(update, TaskArtifactUpdateEvent):
-                    if update.artifact and update.artifact.parts:
-                        result = "\n".join(
-                            p.root.text for p in update.artifact.parts if hasattr(p.root, "text")
-                        )
-                        log.info("Received from %s: %d chars", self.agent_name, len(result))
-                        yield ("result", result)
-                        return
+                    if update.artifact:
+                        artifact_text = self._extract_artifact_text(update.artifact)
+                        if artifact_text:
+                            latest_artifact_text = artifact_text
                 elif update is None:
                     # Final task snapshot — extract artifacts
                     result = self._extract_task_text(task)
-                    if result:
-                        log.info("Received from %s: %d chars", self.agent_name, len(result))
-                        yield ("result", result)
+                    final_result = result or latest_artifact_text
+                    if final_result:
+                        log.info("Received from %s: %d chars", self.agent_name, len(final_result))
+                        yield ("result", final_result)
                         return
+
+            if latest_artifact_text:
+                log.info("Received from %s: %d chars", self.agent_name, len(latest_artifact_text))
+                yield ("result", latest_artifact_text)
 
     def _extract_message_text(self, message: Message) -> str:
         """Pull text from a direct Message response."""
-        return "\n".join(p.root.text for p in message.parts if hasattr(p.root, "text"))
+        return self._extract_parts_text(message.parts)
 
     def _extract_status_message(self, event: TaskStatusUpdateEvent) -> str:
         """Pull text from a status update's message."""
         if event.status.message and hasattr(event.status.message, "parts"):
-            return "\n".join(
-                p.root.text for p in event.status.message.parts if hasattr(p.root, "text")
-            )
+            return self._extract_parts_text(event.status.message.parts)
         return ""
 
     def _extract_task_text(self, task: Task) -> str:
         """Pull text from a completed task's artifacts or status."""
         if task.artifacts:
-            return "\n".join(
-                p.root.text
+            artifact_text = "\n".join(
+                self._extract_parts_text(artifact.parts)
                 for artifact in task.artifacts
-                for p in artifact.parts
-                if hasattr(p.root, "text")
+                if hasattr(artifact, "parts")
             )
+            if artifact_text:
+                return artifact_text
         if task.status.message and hasattr(task.status.message, "parts"):
-            return "\n".join(
-                p.root.text for p in task.status.message.parts if hasattr(p.root, "text")
-            )
+            return self._extract_parts_text(task.status.message.parts)
         return ""
+
+    def _extract_artifact_text(self, artifact: object) -> str:
+        """Pull text from a task artifact."""
+        if hasattr(artifact, "parts"):
+            return self._extract_parts_text(artifact.parts)
+        return ""
+
+    def _extract_parts_text(self, parts: object) -> str:
+        """Extract text/data payloads from A2A parts."""
+        if not isinstance(parts, list):
+            return ""
+        extracted: list[str] = []
+        for part in parts:
+            root = getattr(part, "root", None)
+            text = getattr(root, "text", None)
+            if isinstance(text, str) and text:
+                extracted.append(text)
+                continue
+
+            data = getattr(root, "data", None)
+            if data is not None:
+                try:
+                    extracted.append(json.dumps(data, sort_keys=True))
+                except TypeError:
+                    extracted.append(str(data))
+        return "\n".join(extracted)
 
     async def close(self) -> None:
         """Close the HTTP client."""

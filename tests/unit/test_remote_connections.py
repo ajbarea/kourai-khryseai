@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -84,6 +85,13 @@ def _make_artifact_part(text: str) -> MagicMock:
     """Create a mock Part with .root.text."""
     part = MagicMock()
     part.root.text = text
+    return part
+
+
+def _make_data_part(data: object) -> MagicMock:
+    """Create a mock Part with .root.data."""
+    part = MagicMock()
+    part.root.data = data
     return part
 
 
@@ -174,6 +182,74 @@ class TestRemoteAgentConnectionSend:
         assert results == ["streamed code"]
 
     @pytest.mark.asyncio
+    async def test_send_ignores_empty_artifact_and_uses_task_snapshot(self):
+        """Empty artifact updates should not terminate the stream early."""
+        task = _make_task_with_artifact("MOCK RESPONSE")
+
+        artifact_event = MagicMock(spec=TaskArtifactUpdateEvent)
+        artifact_event.artifact = MagicMock()
+        artifact_event.artifact.parts = [_make_artifact_part("")]
+
+        mock_client = MagicMock()
+        mock_client.send_message = MagicMock(
+            return_value=_async_iter((task, artifact_event), (task, None))
+        )
+
+        with (
+            patch("agents.hephaestus.remote_connections.create_span"),
+            patch(
+                "agents.hephaestus.remote_connections.get_trace_context",
+                return_value={},
+            ),
+        ):
+            conn = RemoteAgentConnection("mneme", "http://localhost:10005/")
+            conn.client = mock_client
+            results = [
+                content
+                async for event_type, content in conn.send("Generate commit messages", "ctx-1")
+                if event_type == "result"
+            ]
+
+        assert results == ["MOCK RESPONSE"]
+
+    @pytest.mark.asyncio
+    async def test_send_emits_last_non_empty_artifact_when_stream_ends(self):
+        """Artifact-only streams should emit the latest non-empty payload."""
+        task = MagicMock(spec=Task)
+        task.context_id = "ctx-1"
+        task.id = "task-1"
+
+        empty_artifact_event = MagicMock(spec=TaskArtifactUpdateEvent)
+        empty_artifact_event.artifact = MagicMock()
+        empty_artifact_event.artifact.parts = [_make_artifact_part("")]
+
+        non_empty_artifact_event = MagicMock(spec=TaskArtifactUpdateEvent)
+        non_empty_artifact_event.artifact = MagicMock()
+        non_empty_artifact_event.artifact.parts = [_make_artifact_part("final artifact text")]
+
+        mock_client = MagicMock()
+        mock_client.send_message = MagicMock(
+            return_value=_async_iter((task, empty_artifact_event), (task, non_empty_artifact_event))
+        )
+
+        with (
+            patch("agents.hephaestus.remote_connections.create_span"),
+            patch(
+                "agents.hephaestus.remote_connections.get_trace_context",
+                return_value={},
+            ),
+        ):
+            conn = RemoteAgentConnection("mneme", "http://localhost:10005/")
+            conn.client = mock_client
+            results = [
+                content
+                async for event_type, content in conn.send("Generate commit messages", "ctx-1")
+                if event_type == "result"
+            ]
+
+        assert results == ["final artifact text"]
+
+    @pytest.mark.asyncio
     async def test_send_raises_input_required(self):
         """TaskStatusUpdateEvent with input_required state raises."""
         from a2a.types import TaskStatusUpdateEvent
@@ -232,6 +308,17 @@ class TestExtractHelpers:
 
         conn = RemoteAgentConnection("kallos", "http://localhost:10004/")
         assert conn._extract_message_text(msg) == "hello"
+
+    def test_extract_message_text_includes_data_parts(self):
+        from a2a.types import Message
+
+        msg = MagicMock(spec=Message)
+        msg.parts = [_make_data_part({"commit_count": 2, "commit_types": ["feat", "fix"]})]
+
+        conn = RemoteAgentConnection("kallos", "http://localhost:10004/")
+        extracted = conn._extract_message_text(msg)
+
+        assert json.loads(extracted) == {"commit_count": 2, "commit_types": ["feat", "fix"]}
 
     def test_extract_task_text_from_artifacts(self):
         task = _make_task_with_artifact("artifact text")
