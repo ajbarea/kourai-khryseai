@@ -4,7 +4,7 @@
 
 ### **Kourai Khryseai** — *The Golden Maidens*
 
-*Six specialized AI agents that collaborate with you on development—you guide each step, they show their work, iterate in real-time.*
+*Ten specialized AI agents that collaborate with you on development—you guide each step, they show their work, iterate in real-time.*
 
 [![A2A Protocol](https://img.shields.io/badge/A2A_Protocol-v0.4-4285F4?style=flat-square&logo=google&logoColor=white)](https://a2a-protocol.org)
 [![Python](https://img.shields.io/badge/Python-3.12+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
@@ -21,16 +21,22 @@ $ make cli
 
 ❯ add user authentication
 
-🔥 Hephaestus: I'm thinking through the approach...
-📐 Metis: Specification drafted. Should we use JWT or sessions?
+🔥 Hephaestus: Analyzing request...
+🔥 Hephaestus: "Metis! Lay out the path. What does this forge need?"
+📐 Metis: Specification in progress...
+   → Should we use JWT or sessions?
 
 ❯ JWT with refresh tokens
 
-✅ Metis: Got it. Full spec: 8 steps, edge cases noted
-⚙️ Techne: Writing files... (streaming changes live)
-🧪 Dokimasia: Running tests... 12/12 passing
-✨ Kallos: Code review complete, no style issues
-📜 Mneme: Ready for commits
+📐 Metis: Got it. Full spec: 8 steps, edge cases noted ✅
+🔥 Hephaestus: "Well forged, Metis. Techne! Take what she's built and make it real."
+⚙️ Techne: Writing files... (streaming changes live) ✅
+🔥 Hephaestus: "Dokimasia — put it through the fire."
+🧪 Dokimasia: Running tests... 12/12 passing ✅
+🔥 Hephaestus: "Kallos. Standards."
+✨ Kallos: Code review complete, no issues ✅
+🔥 Hephaestus: "Mneme — seal the work."
+📜 Mneme: Commits ready
 ```
 
 </div>
@@ -39,26 +45,43 @@ $ make cli
 
 ## What is this?
 
-Kourai Khryseai is an **interactive multi-agent development system** where six specialized AI agents work *with* you, not *for* you. Instead of running autonomously in the background, agents stream their work in real-time, show their reasoning, and ask for guidance when decisions matter.
+Kourai Khryseai is an **interactive multi-agent development system** where ten specialized AI agents work *with* you, not *for* you. Instead of running autonomously in the background, agents stream their work in real-time, show their reasoning, and ask for guidance when decisions matter.
 
-You describe your goal. The agents break it down, show you options, and execute your feedback. You see everything—from planning through testing through review—and can redirect at any step.
+You describe your goal. **Hephaestus** acts as the Forge Master — narrating in-character between each step while maintaining a running **Forge Transcript** that every specialist reads. No agent works from a decontextualized stub: each sees the full conversation history and all prior reasoning before contributing.
 
-**Access it two ways:**
+**Access it three ways:**
 - **CLI** — Real-time agent output in your terminal
 - **GUI** — Interactive dialogue with personality-matched voices and visual agent profiles
+- **Ren'Py VN** — Visual novel with affinity system and romance routes
 
 ---
 
 ## The Agents
 
+**Core Specialists**
+
 | Agent | Role | Strength |
 |-------|------|----------|
-| 🔥 **Hephaestus** | Orchestrator | Routes requests to the right specialists, manages feedback loops |
+| 🔥 **Hephaestus** | Orchestrator | Forge Master — routes pipelines, narrates handoffs, maintains Forge Transcript |
 | 📐 **Metis** | Planner | Breaks goals into detailed specs, identifies edge cases |
 | ⚙️ **Techne** | Coder | Reads existing patterns, writes clean changes |
 | 🧪 **Dokimasia** | Tester | Writes comprehensive test suites, validates coverage |
 | ✨ **Kallos** | Stylist | Enforces code quality, cleans comments and docstrings |
 | 📜 **Mneme** | Scribe | Generates organized commit messages from diffs |
+
+**Companion Spirits**
+
+| Agent | Role | When they appear |
+|-------|------|----------|
+| 🎭 **Puck** | Guide | Tutorial, idle nudges, minigame facilitation |
+| 💘 **Cupid** | Romance | Relationship coaching and confession scenes (0.6+ affinity) |
+
+**Quality Validators**
+
+| Agent | Role | When they activate |
+|-------|------|----------|
+| 🪞 **Aidos** | Anti-Slop | Detects vague, corporate, or passive language in agent output |
+| 📚 **Aletheia** | Research | Validates citations and checks factual accuracy |
 
 Each is an independent HTTP server communicating via the open [A2A protocol](https://a2a-protocol.org). They can be deployed separately, tested independently, or swapped for custom implementations.
 
@@ -82,7 +105,7 @@ $ make gui
 
 ### 2. Hephaestus Orchestrates
 
-The orchestrator routes your request through a pipeline. Most requests flow: **Metis → Techne → Dokimasia → Kallos → Mneme**. Quick fixes skip planning. Pure styling requests skip coding. Hephaestus routes intelligently.
+Hephaestus routes your request through a pipeline and acts as **Forge Master** throughout. Before each specialist is called, Hephaestus narrates an in-character handoff line and passes the **full Forge Transcript** — every message from every agent so far — to the next specialist. Most requests flow: **Metis → Techne → Dokimasia → Kallos → Mneme**. Quick fixes skip planning. Pure styling requests skip coding.
 
 ### 3. Agents Stream Their Work
 
@@ -190,6 +213,7 @@ See [Getting Started](docs/getting-started.md) for detailed setup and troublesho
 **Key points:**
 - Each agent is an independent HTTP server with its own model assignment
 - A2A protocol enables peer-to-peer communication without a central broker
+- Hephaestus maintains a **Forge Transcript** and passes the full history to every specialist — each agent sees all prior reasoning before contributing
 - Real-time streaming via SSE allows agents to show work as it happens
 - MCP servers handle filesystem, git, and shell access
 - Jaeger + Prometheus trace every request and monitor performance
@@ -206,13 +230,16 @@ Fast, scriptable, works over SSH. See real-time agent output with emoji progress
 ❯ add authentication to /api/users
 
 🔥 Hephaestus: Routing to [techne, dokimasia, kallos, mneme]...
+🔥 Hephaestus: "Techne! We've skipped the planning — get to work."
 ⚙️  Techne: Analyzing existing auth patterns...
    ↳ Found JWT middleware in src/middleware/auth.py
-   ↳ Writing changes to 2 files...
-   ↳ [100%] Complete
+   ↳ Writing changes to 2 files... ✅
+🔥 Hephaestus: "Dokimasia — put it through the fire."
 🧪 Dokimasia: Running tests...
-   ↳ [5/5 passing]
-...
+   ↳ [5/5 passing] ✅
+🔥 Hephaestus: "Kallos. Standards."
+✨ Kallos: Code review complete, no issues ✅
+📜 Mneme: Commits ready
 ```
 
 ### GUI (Desktop)

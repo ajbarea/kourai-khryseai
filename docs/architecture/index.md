@@ -90,11 +90,25 @@ async for result in client.send_message_streaming(request):
     ...
 ```
 
-### Hephaestus ↔ Specialists: Asynchronous Streaming (HOTL)
+### Hephaestus ↔ Specialists: The Forge Transcript
 
-Kourai Khryseai utilizes a **Human-on-the-Loop (HOTL)** architecture. Hephaestus calls specialists using an asynchronous `AsyncGenerator` wrapper over the A2A client with `streaming=True`. 
+Kourai Khryseai uses a **Human-on-the-Loop (HOTL)** architecture built around a shared **Forge Transcript**. Rather than passing each specialist only the previous agent's output, Hephaestus maintains a running dialogue log and broadcasts the **full transcript** to every specialist it calls.
 
-This enables specialists to actively stream their "inner monologues" (e.g., `⚙️ Coding: def parse_ast(node)...`) to Hephaestus, which immediately pipes them back to the GUI. The execution of the pipeline remains sequential (Hephaestus waits for Techne's final artifact before calling Dokimasia), but the _generation_ phase is entirely transparent.
+The transcript grows with each step:
+
+```
+[User]: add user authentication
+[Hephaestus]: Metis! Lay out the path. What does this forge need?
+[Metis]: JWT with refresh token rotation, rate limiting on refresh...
+[Hephaestus]: Well forged, Metis. Techne! Take what she's built and make it real.
+[Techne]: Implementing src/auth/tokens.py and src/api/users.py...
+```
+
+This gives every agent full **group awareness** — Techne sees Metis's reasoning, Dokimasia sees what Techne actually wrote, Kallos sees the whole chain. No specialist works blind from a decontextualized stub.
+
+Between every pipeline step, Hephaestus injects an **in-character narration line** (e.g., *"Dokimasia — put it through the fire."*) before calling the next specialist. These lines are streamed to the UI immediately so the forge feels alive during execution.
+
+Execution remains sequential (Hephaestus awaits each specialist's final artifact before calling the next), but the _generation_ phase is entirely transparent — specialists stream their inner monologue in real-time via `AsyncGenerator` over A2A with `streaming=True`.
 
 ```python
 # RemoteAgentConnection.send() — simplified
@@ -109,7 +123,7 @@ async for event in client.send_message(message):
 
 ### Direct Specialist Handoffs
 
-To facilitate true conversational interaction, the GUI supports `@agent` mentions. A request starting with `@techne` will bypass Hephaestus's normal pipeline routing logic entirely, instantly initiating a 1-on-1 pipeline with that agent.
+Both the CLI and GUI support `@agent` mentions. A request starting with `@techne` bypasses Hephaestus's pipeline routing entirely, initiating a 1-on-1 conversation with that specialist directly.
 
 ### Input Required: Clarification Loop
 
