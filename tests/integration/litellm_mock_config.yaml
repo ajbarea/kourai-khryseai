@@ -1,5 +1,12 @@
 model_list:
-  - model_name: "*"  # Match all models to return a generic mock
+  # Two entries — one for each API format. Both return the same mock response.
+  # Anthropic-format requests (POST /v1/messages) need an anthropic/ model
+  # to avoid format conversion issues in streaming mode.
+  - model_name: "anthropic/*"
+    litellm_params:
+      model: anthropic/claude-haiku-4-5-20251001
+      mock_response: "MOCK RESPONSE: Task completed successfully by the specialist maiden."
+  - model_name: "*"
     litellm_params:
       model: openai/mock-model
       mock_response: "MOCK RESPONSE: Task completed successfully by the specialist maiden."
