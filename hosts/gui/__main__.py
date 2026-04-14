@@ -25,6 +25,8 @@ from typing import Any
 import pygame
 from PIL import Image as PILImage
 
+from kourai_common.audio_env import configure_sdl_audio_driver
+
 from .audio_manager import AudioManager
 from .constants import (
     DIALOGUE_X,
@@ -69,6 +71,7 @@ def _configure_gui_logging() -> None:
 # ---------------------------------------------------------------------------
 def main(agent_url: str | None = None) -> None:
     _configure_gui_logging()
+    configure_sdl_audio_driver()
 
     # Setup shutdown flag and signal handlers for graceful Ctrl+C shutdown
     _shutdown_flag = {"running": True}
