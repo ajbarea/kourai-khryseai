@@ -115,6 +115,7 @@ jobs:
         uses: atomicjar/testcontainers-cloud-setup-action@v1
         with:
           token: ${{ secrets.TC_CLOUD_TOKEN }}
+          wait: true
 
       - name: Create logs directory
         run: mkdir -p logs
@@ -167,6 +168,7 @@ jobs:
         uses: atomicjar/testcontainers-cloud-setup-action@v1
         with:
           token: ${{ secrets.TC_CLOUD_TOKEN }}
+          wait: true
 
       - name: Create .env for CI
         run: |
