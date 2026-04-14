@@ -10,14 +10,14 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Avatar images are in assets/maidens/golden_avatars/<name>.png
-_GOLDEN_AVATARS = Path(__file__).parent.parent.parent / "assets" / "maidens" / "golden_avatars"
+# Avatar images are in the root assets/avatars/anime directory
+_AVATAR_DIR = Path(__file__).resolve().parents[2] / "assets" / "avatars" / "anime"
 
 
 def get_avatar_path(name: str) -> Path | None:
     """Return the avatar PNG path for an agent, or None if not found."""
     for ext in (".png", ".jpg", ".jpeg", ".webp"):
-        p = _GOLDEN_AVATARS / f"{name}{ext}"
+        p = _AVATAR_DIR / f"{name}{ext}"
         logger.debug("Checking for avatar at: %s", p)
         if p.exists():
             logger.debug("Avatar found: %s", p)
