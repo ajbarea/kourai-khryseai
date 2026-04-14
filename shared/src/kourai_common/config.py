@@ -160,7 +160,13 @@ def get_model(agent_name: str) -> str:
 
     Provider is selected via KOURAI_PROVIDER (anthropic/google/local).
     Tier is selected via KOURAI_MODEL_TIER (cheap/standard/smart).
+    Set KOURAI_MODEL_OVERRIDE to force a specific model for all agents
+    (useful in test environments with a mock LLM proxy).
     """
+    override = os.getenv("KOURAI_MODEL_OVERRIDE")
+    if override:
+        return override
+
     if PROVIDER == "local":
         return AGENT_MODELS_LOCAL[agent_name]
 
