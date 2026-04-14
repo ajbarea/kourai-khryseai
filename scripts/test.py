@@ -16,41 +16,44 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import logging
 
 try:
     from scripts.logging_utils import setup_logger
 except ModuleNotFoundError:
     from logging_utils import setup_logger
 
-logger = setup_logger(__name__, "test.log")
 
-
-def run_suite(cmd: list[str], description: str) -> tuple[bool, str]:
+def run_suite(cmd: list[str], description: str, suite_logger: logging.Logger) -> tuple[bool, str]:
     """Execute a test suite and return (passed, output).
 
     Args:
         cmd: Command and arguments as a list.
         description: Human-readable description for logging.
+        suite_logger: Logger to use for this suite.
 
     Returns:
         (True if successful, False otherwise), combined stdout+stderr.
     """
-    logger.info(f"Running: {description}")
+    suite_logger.info(f"Running: {description}")
     try:
         result = subprocess.run(cmd, check=True, capture_output=True, text=True, encoding="utf-8")  # noqa: S603
         output = (result.stdout + result.stderr).strip()
-        logger.info(f"+ {description} passed")
+        suite_logger.info(f"+ {description} passed")
         if output:
-            logger.debug(output)
+            suite_logger.debug(output)
         return True, output
     except subprocess.CalledProcessError as e:
         output = (e.stdout + e.stderr).strip()
-        logger.error(f"x {description} failed (exit code: {e.returncode})")
+        suite_logger.error(f"x {description} failed (exit code: {e.returncode})")
         if output:
-            logger.error(output)
+            suite_logger.error(output)
         return False, output
     except FileNotFoundError:
-        logger.error(f"x {description} - command not found")
+        suite_logger.error(f"x {description} - command not found")
         return False, ""
 
 
@@ -84,17 +87,20 @@ def main() -> int:
     run_performance = "--performance" in args
     run_all = not (run_unit or run_integration or run_performance)
 
-    print("\n  Test Suite")
-    print("=" * 60)
-    logger.info("Starting test suite...")
-
     log_dir = Path("logs")
     log_dir.mkdir(parents=True, exist_ok=True)
     coverage_xml = log_dir / "coverage.xml"
 
-    suites: list[tuple[list[str], str]] = []
+    # Per-suite loggers so each suite writes its own log file. General info
+    # (lint pre-flight, overall summary) is routed to the first selected
+    # suite's logger.
+    primary_logger: logging.Logger | None = None
+
+    suites: list[tuple[list[str], str, logging.Logger]] = []
 
     if run_all or run_unit:
+        unit_logger = setup_logger("unit_test", "unit_test.log")
+        primary_logger = unit_logger
         suites.append(
             (
                 [
@@ -111,10 +117,14 @@ def main() -> int:
                     "--cov-report=term-missing",
                 ],
                 "Unit tests",
+                unit_logger,
             )
         )
 
     if run_all or run_performance:
+        perf_logger = setup_logger("performance_test", "performance_test.log")
+        if primary_logger is None:
+            primary_logger = perf_logger
         cov_args = ["--cov-append"] if (run_all or run_unit) else []
         suites.append(
             (
@@ -131,10 +141,14 @@ def main() -> int:
                     "--cov-report=term-missing",
                 ],
                 "Performance tests",
+                perf_logger,
             )
         )
 
     if run_all or run_integration:
+        int_logger = setup_logger("integration_test", "integration_test.log")
+        if primary_logger is None:
+            primary_logger = int_logger
         cov_args = ["--cov-append"] if (run_all or run_unit or run_performance) else []
         suites.append(
             (
@@ -151,25 +165,42 @@ def main() -> int:
                     "--cov-report=term-missing",
                 ],
                 "Integration tests",
+                int_logger,
             )
         )
 
-    # If running all, run lint first
+    # Fallback only if absolutely no suites selected
+    if primary_logger is None:
+        primary_logger = setup_logger(__name__, "test.log")
+
+    print("\n  Test Suite")
+    print("=" * 60)
+    primary_logger.info("Starting test suite...")
+
+    # If running all, run lint first. Log lint to the primary suite logger.
     if run_all:
         print(f"\n[0/{len(suites)}] Lint (pre-flight)...")
+        primary_logger.info("Running: Lint (pre-flight)")
         lint_result = subprocess.run(  # noqa: S603
             [sys.executable, str(Path(__file__).with_name("lint.py"))],
             check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
         )
         if lint_result.returncode != 0:
             print("\nx Lint failed — fix issues before running tests\n")
+            primary_logger.error("Lint failed")
+            if lint_result.stdout or lint_result.stderr:
+                primary_logger.debug(lint_result.stdout + lint_result.stderr)
             return 1
+        primary_logger.info("+ Lint passed")
 
     results: list[tuple[str, bool, str]] = []
     try:
-        for i, (cmd, description) in enumerate(suites, 1):
+        for i, (cmd, description, sl) in enumerate(suites, 1):
             print(f"\n[{i}/{len(suites)}] {description}...")
-            passed, output = run_suite(cmd, description)
+            passed, output = run_suite(cmd, description, sl)
             results.append((description, passed, output))
     except KeyboardInterrupt:
         print("\n[INTERRUPT] Test run cancelled by user", file=sys.stderr)
@@ -193,13 +224,13 @@ def main() -> int:
 
     if passed_count == total:
         print(f"+ All tests passed ({passed_count}/{total})\n")
-        logger.info(f"All tests passed ({passed_count}/{total})")
+        primary_logger.info(f"All tests passed ({passed_count}/{total})")
         return 0
     else:
         failed = total - passed_count
         print(f"x {failed}/{total} suites failed")
-        print("  See logs/test.log for details\n")
-        logger.error(f"{failed}/{total} suites failed")
+        print("  See logs/*_test.log for details\n")
+        primary_logger.error(f"{failed}/{total} suites failed")
         return 1
 
 
