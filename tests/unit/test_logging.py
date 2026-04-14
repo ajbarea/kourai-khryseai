@@ -1,7 +1,7 @@
 """Unit tests for kourai_common.log module.
 
 Tests the setup_logging function, focusing on handler initialization and
-the console handler guard logic (lines 43-47).
+the console handler guard logic.
 """
 
 from __future__ import annotations
@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 import os
 from contextlib import suppress
+from logging.handlers import RotatingFileHandler
 from unittest.mock import patch
 
 import pytest
@@ -20,12 +21,22 @@ from kourai_common.log import setup_logging
 def _cleanup_handlers():
     """Clean up logging handlers after each test."""
     yield
+    # Clean up root logger
     root = logging.getLogger()
     for handler in root.handlers[:]:
         with suppress(Exception):
             handler.close()
         with suppress(Exception):
             root.removeHandler(handler)
+
+    # Clean up any named loggers created during tests
+    for name in logging.root.manager.loggerDict:
+        logger = logging.getLogger(name)
+        for handler in logger.handlers[:]:
+            with suppress(Exception):
+                handler.close()
+            with suppress(Exception):
+                logger.removeHandler(handler)
 
 
 class TestSetupLoggingBasic:
@@ -36,6 +47,11 @@ class TestSetupLoggingBasic:
         logger = setup_logging("test_agent")
         assert isinstance(logger, logging.Logger)
         assert logger.name == "test_agent"
+        # File handler must be on the named logger, not root, so each agent
+        # writes only its own records to logs/<name>.log.
+        assert any(isinstance(h, RotatingFileHandler) for h in logger.handlers)
+        root = logging.getLogger()
+        assert not any(isinstance(h, RotatingFileHandler) for h in root.handlers)
 
     def test_respects_explicit_level(self):
         """Test that explicit level parameter is used."""
@@ -47,43 +63,38 @@ class TestSetupLoggingBasic:
 
 
 class TestSetupLoggingConsoleGuard:
-    """Test the console handler guard (lines 43-47).
+    """Test the console handler guard.
 
     The guard `if not root.handlers:` ensures the console handler is only
     added on the first call, preventing duplicate console output.
     """
 
     def test_guard_blocks_when_handlers_exist(self):
-        """Test that guard prevents console setup when handlers already exist.
-
-        This verifies lines 43-47 are skipped when root.handlers is not empty.
-        """
+        """Test that guard prevents console setup when handlers already exist."""
         from unittest.mock import MagicMock
 
-        with patch("logging.getLogger") as mock_get:
+        with (
+            patch("logging.getLogger") as mock_get,
+            patch("kourai_common.log.RotatingFileHandler"),
+        ):
             # Simulate: root already has handlers
             mock_root = MagicMock()
-            mock_root.handlers = [MagicMock()]  # Not empty, so guard should fail
+            mock_root.handlers = [MagicMock()]
 
-            # Need to return different objects for different calls
-            # First call returns mock_root, subsequent calls to getLogger("name") return a new logger
             mock_named_logger = MagicMock()
+            mock_named_logger.handlers = []
             mock_get.side_effect = [mock_root, mock_named_logger]
 
             setup_logging("agent")
 
             # When handlers is not empty, root.setLevel should NOT be called
-            # (because lines 44-47 are skipped by the guard)
-            first_call_setLevel = mock_root.setLevel.call_count
-            assert first_call_setLevel == 0, (
-                "Guard should prevent root.setLevel when handlers exist"
-            )
+            assert mock_root.setLevel.call_count == 0
+
+            # But the named logger should have received the file handler
+            assert mock_named_logger.addHandler.call_count == 1
 
     def test_guard_allows_setup_when_empty(self):
-        """Test that guard allows console setup when handlers is empty.
-
-        Verifies lines 44-47 execute when root.handlers is empty.
-        """
+        """Test that guard allows console setup when handlers is empty."""
         # Clear root logger to simulate clean state
         root = logging.getLogger()
         for h in root.handlers[:]:
