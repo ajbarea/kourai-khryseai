@@ -6,6 +6,7 @@ detecting agent transitions and playing handoff chatter.
 
 from __future__ import annotations
 
+import logging
 import secrets
 from typing import TYPE_CHECKING
 
@@ -20,8 +21,11 @@ from hosts.cli.rendering import _comms_window, _echo
 if TYPE_CHECKING:
     from a2a.types import TaskArtifactUpdateEvent, TaskStatusUpdateEvent
 
+logger = logging.getLogger("cli.events")
+
 # Track pipeline flow state for comms rendering
 _last_seen_agent: str = ""
+_pipeline_chatter_enabled: bool = True
 
 
 def reset_last_seen_agent() -> None:
@@ -33,6 +37,12 @@ def reset_last_seen_agent() -> None:
 def get_last_seen_agent() -> str:
     """Return the name of the last agent seen in the pipeline."""
     return _last_seen_agent
+
+
+def set_pipeline_chatter_enabled(enabled: bool) -> None:
+    """Enable/disable optional handoff chatter lines."""
+    global _pipeline_chatter_enabled
+    _pipeline_chatter_enabled = enabled
 
 
 # ---------------------------------------------------------------------------
@@ -75,11 +85,11 @@ def _victory_chatter(last_agent: str) -> str | None:
     return None
 
 
-def _maidenify_status(text: str) -> str:
+def _maidenify_status(text: str) -> tuple[str, str | None]:
     """Replace agent emoji prefixes with full comms-window dialogue.
 
-    Detects agent transitions and plays handoff chatter — like watching
-    mecha pilots banter as they tag in and out of combat.
+    Returns:
+        (formatted_text, agent_name | None)
     """
     global _last_seen_agent
 
@@ -88,16 +98,19 @@ def _maidenify_status(text: str) -> str:
             status_msg = text.replace(emoji, "", 1).strip()
 
             # Detect agent switch → handoff chatter (pilot comms transition)
-            if _last_seen_agent and _last_seen_agent != agent_name:
+            if _last_seen_agent and _last_seen_agent != agent_name and _pipeline_chatter_enabled:
                 handoff = _handoff_chatter(_last_seen_agent, agent_name)
                 if handoff:
+                    logger.debug("Handoff: %s -> %s (%s)", _last_seen_agent, agent_name, handoff)
                     # Outgoing maiden's parting shot
                     _echo(_comms_window(_last_seen_agent, handoff, style="whisper"))
                     _echo("")  # breathing room
+            else:
+                logger.debug("Agent focus: %s", agent_name)
 
             _last_seen_agent = agent_name
 
             # Incoming maiden's status in a comms window
-            return _comms_window(agent_name, status_msg)
+            return _comms_window(agent_name, status_msg), agent_name
 
-    return text
+    return text, None
