@@ -111,6 +111,8 @@ filterwarnings = [
     "ignore::FutureWarning:torch.nn.utils.weight_norm",
     "ignore::DeprecationWarning:torch.jit._script",
     "ignore::DeprecationWarning:misaki.en",
+    "ignore:.*open_text is deprecated.*:DeprecationWarning",
+    "ignore:.*unclosed event loop.*:ResourceWarning",
 ]
 
 [tool.ty.environment]
