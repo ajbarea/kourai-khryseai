@@ -158,12 +158,6 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-packages --dev --frozen
 
-      - name: Setup Testcontainers Cloud Client
-        uses: atomicjar/testcontainers-cloud-setup-action@v1
-        with:
-          token: ${{ secrets.TC_CLOUD_TOKEN }}
-          wait: false
-
       - name: Create .env for CI
         run: |
           cat > .env << 'EOF'
