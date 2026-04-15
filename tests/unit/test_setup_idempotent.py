@@ -76,11 +76,7 @@ class TestSetupIdempotency:
         ):
             marker_path = Path(tmpdir) / ".hf-buckets-configured"
 
-            with (
-                patch("scripts.setup.SETUP_MARKER", marker_path),
-                patch("scripts.setup.run_command") as mock_run,
-            ):
-                mock_run.return_value = 0  # Success
+            with patch("scripts.setup.SETUP_MARKER", marker_path):
                 from scripts.setup import should_setup_artifacts
 
                 # First run: marker doesn't exist

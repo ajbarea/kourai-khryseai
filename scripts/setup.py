@@ -70,15 +70,6 @@ def run_step(cmd: list[str], description: str, *, required: bool = True) -> bool
         return True
 
 
-def run_command(cmd: list[str]) -> int:
-    """Backward-compatible command runner used by older tests/tooling."""
-    try:
-        result = subprocess.run(cmd, check=False)  # noqa: S603
-    except FileNotFoundError:
-        return 127
-    return result.returncode
-
-
 def should_setup_artifacts(force: bool = False) -> bool:
     """Check if artifacts setup is needed."""
     if force:
