@@ -19,8 +19,9 @@ from .maidens import AGENTS
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from kourai_common.audio import AudioManager
+
     from .alignment_gauges import AlignmentGaugePanel
-    from .audio_manager import AudioManager
     from .debug_log import DebugLog
     from .dialogue import DialogueHistory
     from .display_manager import DisplayManager
@@ -32,7 +33,7 @@ if TYPE_CHECKING:
     from .onboarding_ui import OnboardingOverlay
     from .portrait import PortraitPanel
     from .quick_actions import QuickActionBar
-    from .settings_ui import SettingsOverlay
+    from .settings_overlay import SettingsOverlay
     from .typewriter import TypewriterManager
 
 logger = logging.getLogger(__name__)

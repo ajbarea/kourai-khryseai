@@ -1,7 +1,8 @@
 """Comprehensive tests for pygame-dependent GUI widget modules.
 
 Covers:
-- hosts/gui/settings_ui.py  (TabButton, VolumeSlider, ToggleSwitch, Button, CycleButton, SettingsOverlay)
+- hosts/gui/settings_widgets.py + hosts/gui/settings_overlay.py
+  (TabButton, VolumeSlider, ToggleSwitch, Button, CycleButton, SettingsOverlay)
 - hosts/gui/input_bar.py    (InputBar)
 - hosts/gui/scratchpad.py   (Scratchpad)
 - hosts/gui/quick_actions.py (QuickAction, QuickActionBar)
@@ -65,12 +66,12 @@ def _make_gui_integration() -> Mock:
 
 
 # ===================================================================
-# 1. settings_ui.py
+# 1. settings widgets + overlay
 # ===================================================================
-from hosts.gui.settings_ui import (
+from hosts.gui.settings_overlay import SettingsOverlay
+from hosts.gui.settings_widgets import (
     Button,
     CycleButton,
-    SettingsOverlay,
     TabButton,
     ToggleSwitch,
     VolumeSlider,

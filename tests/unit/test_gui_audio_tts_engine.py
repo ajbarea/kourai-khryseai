@@ -2,7 +2,7 @@
 
 Covers:
 - hosts/gui/tts_engine.py (TTSEngine init, volume, stop, cleanup, _get_converter, speak)
-- hosts/gui/audio_manager.py (AudioManager init, volume controls, music, ambient, sfx, cleanup)
+- shared/src/kourai_common/audio.py (AudioManager init, volume controls, music, ambient, sfx, cleanup)
 - hosts/gui/loading_screen.py (run_loading_screen phases)
 - hosts/gui/profile_select.py (run_profile_select)
 - hosts/gui/connection_gui_integration.py
@@ -17,6 +17,8 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
+
+from kourai_common.audio import AudioManager
 
 pytest.importorskip("pygame")
 
@@ -262,9 +264,9 @@ class TestTTSEngineSpeak:
 def mock_audio_mixer():
     """Patch pygame.mixer for AudioManager tests."""
     # Reset singleton
-    from hosts.gui import audio_manager
+    from kourai_common import audio
 
-    audio_manager.AudioManager._instance = None
+    audio.AudioManager._instance = None
 
     mock_channel = MagicMock()
     mock_channel.get_busy.return_value = False
@@ -283,13 +285,11 @@ def mock_audio_mixer():
         yield mock_channel, mock_music, mock_sound_cls
 
     # Reset singleton after test
-    audio_manager.AudioManager._instance = None
+    audio.AudioManager._instance = None
 
 
 class TestAudioManagerInit:
     def test_init(self, mock_audio_mixer):
-        from hosts.gui.audio_manager import AudioManager
-
         am = AudioManager()
         assert am._initialized is True
         assert am.music_volume == 0.25
@@ -300,8 +300,6 @@ class TestAudioManagerInit:
 
 class TestAudioManagerVolume:
     def test_set_music_volume(self, mock_audio_mixer):
-        from hosts.gui.audio_manager import AudioManager
-
         _, mock_music, _ = mock_audio_mixer
         am = AudioManager()
         mock_music.get_busy.return_value = True
@@ -310,8 +308,6 @@ class TestAudioManagerVolume:
         mock_music.set_volume.assert_called_with(0.5)
 
     def test_set_music_volume_not_playing(self, mock_audio_mixer):
-        from hosts.gui.audio_manager import AudioManager
-
         _, mock_music, _ = mock_audio_mixer
         am = AudioManager()
         mock_music.get_busy.return_value = False
@@ -319,30 +315,22 @@ class TestAudioManagerVolume:
         assert am.music_volume == 0.3
 
     def test_set_ambient_volume(self, mock_audio_mixer):
-        from hosts.gui.audio_manager import AudioManager
-
         mock_channel, _, _ = mock_audio_mixer
         am = AudioManager()
         am.set_ambient_volume(0.7)
         assert am.ambient_volume == 0.7
 
     def test_set_voice_volume(self, mock_audio_mixer):
-        from hosts.gui.audio_manager import AudioManager
-
         am = AudioManager()
         am.set_voice_volume(0.9)
         assert am.voice_volume == 0.9
 
     def test_set_sfx_volume(self, mock_audio_mixer):
-        from hosts.gui.audio_manager import AudioManager
-
         am = AudioManager()
         am.set_sfx_volume(0.6)
         assert am.sfx_volume == 0.6
 
     def test_volume_clamps(self, mock_audio_mixer):
-        from hosts.gui.audio_manager import AudioManager
-
         am = AudioManager()
         am.set_music_volume(2.0)
         assert am.music_volume == 1.0
@@ -352,8 +340,6 @@ class TestAudioManagerVolume:
 
 class TestAudioManagerMusic:
     def test_play_music(self, mock_audio_mixer):
-        from hosts.gui.audio_manager import AudioManager
-
         _, mock_music, _ = mock_audio_mixer
         am = AudioManager()
         am.play_music("/fake/music.ogg")
@@ -361,39 +347,29 @@ class TestAudioManagerMusic:
         mock_music.play.assert_called_once()
 
     def test_play_music_error(self, mock_audio_mixer):
-        from hosts.gui.audio_manager import AudioManager
-
         _, mock_music, _ = mock_audio_mixer
         mock_music.load.side_effect = Exception("file not found")
         am = AudioManager()
         am.play_music("/fake/missing.ogg")  # should not raise
 
     def test_fade_to_music(self, mock_audio_mixer):
-        from hosts.gui.audio_manager import AudioManager
-
         _, mock_music, _ = mock_audio_mixer
         am = AudioManager()
         am.fade_to_music("/fake/next.ogg", fade_ms=500)
 
     def test_stop_music(self, mock_audio_mixer):
-        from hosts.gui.audio_manager import AudioManager
-
         _, mock_music, _ = mock_audio_mixer
         am = AudioManager()
         am.stop_music()
         mock_music.stop.assert_called_once()
 
     def test_stop_music_fadeout(self, mock_audio_mixer):
-        from hosts.gui.audio_manager import AudioManager
-
         _, mock_music, _ = mock_audio_mixer
         am = AudioManager()
         am.stop_music(fade_ms=1000)
         mock_music.fadeout.assert_called_once_with(1000)
 
     def test_pause_resume_music(self, mock_audio_mixer):
-        from hosts.gui.audio_manager import AudioManager
-
         _, mock_music, _ = mock_audio_mixer
         am = AudioManager()
         am.pause_music()
@@ -404,8 +380,6 @@ class TestAudioManagerMusic:
 
 class TestAudioManagerAmbient:
     def test_play_ambient_with_path(self, mock_audio_mixer):
-        from hosts.gui.audio_manager import AudioManager
-
         mock_channel, _, mock_sound_cls = mock_audio_mixer
         am = AudioManager()
         am.play_ambient("/fake/ambient.wav")
@@ -413,16 +387,12 @@ class TestAudioManagerAmbient:
         mock_channel.play.assert_called()
 
     def test_play_ambient_generative(self, mock_audio_mixer):
-        from hosts.gui.audio_manager import AudioManager
-
         mock_channel, _, mock_sound_cls = mock_audio_mixer
         am = AudioManager()
         am.play_ambient()  # No path — uses generated synth
         mock_channel.play.assert_called()
 
     def test_play_ambient_error(self, mock_audio_mixer):
-        from hosts.gui.audio_manager import AudioManager
-
         mock_channel, _, mock_sound_cls = mock_audio_mixer
         mock_sound_cls.side_effect = Exception("audio error")
         am = AudioManager()
@@ -431,16 +401,12 @@ class TestAudioManagerAmbient:
 
 class TestAudioManagerSFX:
     def test_play_sfx_generated(self, mock_audio_mixer):
-        from hosts.gui.audio_manager import AudioManager
-
         mock_channel, _, _ = mock_audio_mixer
         am = AudioManager()
         am.play_sfx()  # No path — generated blip
         mock_channel.play.assert_called()
 
     def test_play_sfx_cached(self, mock_audio_mixer):
-        from hosts.gui.audio_manager import AudioManager
-
         mock_channel, _, mock_sound_cls = mock_audio_mixer
         mock_sound = MagicMock()
         mock_sound_cls.return_value = mock_sound
@@ -449,8 +415,6 @@ class TestAudioManagerSFX:
         am.play_sfx("/fake/click.wav")  # second call should use cache
 
     def test_play_sfx_error(self, mock_audio_mixer):
-        from hosts.gui.audio_manager import AudioManager
-
         mock_channel, _, mock_sound_cls = mock_audio_mixer
         mock_sound_cls.side_effect = Exception("error")
         am = AudioManager()
@@ -459,8 +423,6 @@ class TestAudioManagerSFX:
 
 class TestAudioManagerCleanup:
     def test_cleanup(self, mock_audio_mixer):
-        from hosts.gui.audio_manager import AudioManager
-
         mock_channel, mock_music, _ = mock_audio_mixer
         am = AudioManager()
         am.cleanup()
@@ -471,8 +433,6 @@ class TestAudioManagerCleanup:
 
 class TestAudioManagerGenerateWave:
     def test_generate_ambient_wave(self, mock_audio_mixer):
-        from hosts.gui.audio_manager import AudioManager
-
         am = AudioManager()
         wav = am._generate_ambient_wave()
         assert isinstance(wav, bytes)

@@ -47,7 +47,7 @@ class TestAudioManagerGenerateWave:
     """Test the pure-logic _generate_ambient_wave method without mixer init."""
 
     def test_generate_ambient_wave(self):
-        from hosts.gui.audio_manager import AudioManager
+        from kourai_common.audio import AudioManager
 
         # Bypass singleton + mixer init
         am = object.__new__(AudioManager)

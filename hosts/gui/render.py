@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from .particles import ParticleSystem
     from .portrait import PortraitPanel
     from .quick_actions import QuickActionBar
-    from .settings_ui import SettingsOverlay
+    from .settings_overlay import SettingsOverlay
 
 logger = logging.getLogger(__name__)
 

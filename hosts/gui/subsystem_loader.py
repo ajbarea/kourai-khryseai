@@ -29,7 +29,7 @@ from .onboarding_ui import OnboardingOverlay
 from .particles import ParticleSystem
 from .portrait import PortraitPanel
 from .quick_actions import QuickActionBar
-from .settings_ui import SettingsOverlay
+from .settings_overlay import SettingsOverlay
 from .tts_gui_integration import TTSGUIManager
 from .typewriter import TypewriterManager
 
@@ -37,7 +37,7 @@ if TYPE_CHECKING:
     from collections.abc import Generator
     from pathlib import Path
 
-    from .audio_manager import AudioManager
+    from kourai_common.audio import AudioManager
 
 logger = logging.getLogger(__name__)
 

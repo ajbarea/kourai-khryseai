@@ -113,11 +113,6 @@ def _create_font(names: list[str], size: int) -> pygame.freetype.Font:
     return pygame.freetype.SysFont("serif", size)
 
 
-def _load_font(names: list[str], size: int) -> pygame.freetype.Font:
-    """Backwards-compatible font loader used by older tests and helpers."""
-    return _create_font(names, size)
-
-
 class FontProxy:
     """Lazily recreate fonts after pygame.freetype quit/reinit cycles."""
 

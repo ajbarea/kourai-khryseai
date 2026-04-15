@@ -23,8 +23,8 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from hosts.gui.audio_manager import AudioManager as _AudioManager
     from hosts.gui.gui_components_integration import GUIComponentsIntegration
+    from kourai_common.audio import AudioManager as _AudioManager
 
 
 class SettingsOverlay:

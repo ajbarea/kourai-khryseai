@@ -24,7 +24,8 @@ from .tts_gui_integration import extract_speakable
 from .tts_helper import speak_async
 
 if TYPE_CHECKING:
-    from .audio_manager import AudioManager
+    from kourai_common.audio import AudioManager
+
     from .debug_log import DebugLog
     from .dialogue import DialogueHistory
     from .flash_effect import FlashEffect

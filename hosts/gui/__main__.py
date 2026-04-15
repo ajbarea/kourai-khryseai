@@ -25,9 +25,9 @@ from typing import Any
 import pygame
 from PIL import Image as PILImage
 
+from kourai_common.audio import AudioManager
 from kourai_common.audio_env import configure_sdl_audio_driver
 
-from .audio_manager import AudioManager
 from .constants import (
     DIALOGUE_X,
     INPUT_H,
