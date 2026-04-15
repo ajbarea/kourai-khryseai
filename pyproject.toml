@@ -97,6 +97,12 @@ combine-as-imports = true
 quote-style = "double"
 indent-style = "space"
 
+[tool.coverage.report]
+exclude_also = [
+    "def main\\(\\):",
+    "if __name__ == .__main__.:",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
