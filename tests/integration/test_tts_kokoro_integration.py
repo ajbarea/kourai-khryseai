@@ -1,11 +1,20 @@
 """Full integration tests: Kokoro + Edge-TTS backends with audio validation."""
 
 import io
+import os
 import wave
 
 import pytest
 
 from kourai_common.tts_backend import AGENT_VOICE_MAP, TTSVoiceConfig
+
+_IN_CI = os.getenv("CI", "").strip().lower() in {"1", "true", "yes"}
+
+
+def _skip_or_fail_unavailable(reason: str) -> None:
+    if _IN_CI:
+        pytest.fail(reason)
+    pytest.skip(reason)
 
 
 def _read_wav_duration(wav_bytes: bytes) -> float:
@@ -37,7 +46,7 @@ class TestKokoroIntegration:
 
             return KokoroBackend()
         except ImportError:
-            pytest.skip("Kokoro not installed")
+            _skip_or_fail_unavailable("Kokoro not installed")
 
     async def test_kokoro_all_agent_voices_synthesize(self, kokoro_backend):
         """Synthesize speech for all 10 agents using Kokoro."""
@@ -148,7 +157,7 @@ class TestEdgeTTSIntegration:
 
             return EdgeTTSBackend()
         except ImportError:
-            pytest.skip("edge-tts not installed")
+            _skip_or_fail_unavailable("edge-tts not installed")
 
     async def test_edge_tts_voice_mapping_for_agents(self, edge_backend):
         """Edge-TTS should handle Kokoro voice IDs via mapping."""
@@ -210,7 +219,7 @@ class TestBackendInteroperability:
             has_edge = False
 
         if not (has_kokoro or has_edge):
-            pytest.skip("Neither Kokoro nor Edge-TTS available")
+            _skip_or_fail_unavailable("Neither Kokoro nor Edge-TTS available")
 
         voice = TTSVoiceConfig("Sarah", "af_sarah")
 

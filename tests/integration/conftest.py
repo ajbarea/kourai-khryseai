@@ -38,6 +38,7 @@ if TYPE_CHECKING:
     from collections.abc import Generator
 
 logger = logging.getLogger(__name__)
+_IN_CI = os.getenv("CI", "").strip().lower() in {"1", "true", "yes"}
 
 # Registry where production images are pushed
 _REGISTRY_USER = os.getenv("DOCKER_HUB_USERNAME", "ajb6289")
@@ -45,6 +46,13 @@ _REGISTRY_REPO = "kourai-khryseai"
 
 # Container registry for log capture on test failure
 _containers_registry: dict[str, DockerContainer] = {}
+
+
+def _raise_or_warn_unavailable(message: str) -> None:
+    """Fail fast in CI for critical service unavailability; warn locally."""
+    if _IN_CI:
+        raise RuntimeError(message)
+    logger.warning("%s; proceeding anyway", message)
 
 
 def _registry_image(tag: str) -> str:
@@ -118,7 +126,7 @@ def litellm_proxy(shared_network: Network) -> Generator[DockerContainer, None, N
             time.sleep(0.5)
 
         if not ready:
-            logger.warning("LiteLLM proxy HTTP endpoint not responding, proceeding anyway")
+            _raise_or_warn_unavailable("LiteLLM proxy HTTP endpoint not responding after 30s")
 
         register_container("litellm-proxy", container)
         yield container
@@ -164,7 +172,7 @@ def _wait_for_agent_ready(container: DockerContainer, port: int, timeout: float 
             logger.debug("Agent on port %d not ready yet: %s", port, exc)
         time.sleep(0.5)
 
-    logger.warning("Agent on port %d not responding after %.0fs, proceeding anyway", port, timeout)
+    _raise_or_warn_unavailable(f"Agent on port {port} not responding after {timeout:.0f}s")
 
 
 @pytest.fixture(scope="session")
@@ -303,14 +311,19 @@ def memory_mcp_container(shared_network: Network) -> Generator[DockerContainer, 
         port = container.get_exposed_port(5000)
         url = f"http://{host}:{port}/health"
         deadline = time.monotonic() + 30.0
+        ready = False
         while time.monotonic() < deadline:
             try:
                 resp = httpx.get(url, timeout=2.0)
                 if resp.status_code == 200:
+                    ready = True
                     break
             except httpx.HTTPError as exc:
                 logger.debug("memory-mcp health endpoint not ready yet: %s", exc)
             time.sleep(0.5)
+
+        if not ready:
+            _raise_or_warn_unavailable("memory-mcp health endpoint not responding after 30s")
 
         register_container("memory-mcp", container)
         yield container

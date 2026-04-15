@@ -13,6 +13,7 @@ Requires: testcontainers library (automated lifecycle)
 from __future__ import annotations
 
 import asyncio
+import os
 from contextlib import suppress
 from typing import TYPE_CHECKING, Any
 
@@ -21,10 +22,20 @@ import pytest
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 
+pytestmark = pytest.mark.integration
+
+_IN_CI = os.getenv("CI", "").strip().lower() in {"1", "true", "yes"}
+
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
     from testcontainers.core.container import DockerContainer
+
+
+def _skip_or_fail_unavailable(reason: str) -> None:
+    if _IN_CI:
+        pytest.fail(reason)
+    pytest.skip(reason)
 
 
 @pytest.fixture(scope="module")
@@ -98,7 +109,7 @@ async def mcp_session(memory_mcp_urls: dict[str, str]) -> AsyncGenerator[ClientS
     """Async fixture providing a connected MCP ClientSession to memory-mcp."""
     result = await _connect_mcp_streamable(memory_mcp_urls["mcp"])
     if result is None:
-        pytest.skip("MCP HTTP Streamable connection unavailable after retries")
+        _skip_or_fail_unavailable("MCP HTTP Streamable connection unavailable after retries")
         return
 
     http_ctx, session = result
