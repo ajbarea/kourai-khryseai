@@ -48,10 +48,10 @@ services:
   jaeger:
     image: jaegertracing/all-in-one:1.60
     ports:
-      - "16686:16686"
-      - "4317:4317"
-      - "4318:4318"
-      - "14269:14269"
+      - "127.0.0.1:16686:16686"
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:4318:4318"
+      - "127.0.0.1:14269:14269"
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
       METRICS_STORAGE_TYPE: "prometheus"
@@ -73,7 +73,7 @@ services:
     volumes:
       - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     networks:
       - kourai
     restart: unless-stopped
@@ -102,8 +102,8 @@ services:
       MCP_PORT: "5001"
       MEMORY_FILE_PATH: /data/memory_graph.json
     ports:
-      - "5000:5000"
-      - "5001:5001"
+      - "127.0.0.1:5000:5000"
+      - "127.0.0.1:5001:5001"
     networks:
       - kourai
     restart: unless-stopped
@@ -130,7 +130,7 @@ services:
       cache_to:
         - type=inline
     ports:
-      - "3001:3001"
+      - "127.0.0.1:3001:3001"
     networks:
       - kourai
     restart: unless-stopped
@@ -163,7 +163,7 @@ services:
       cache_to:
         - type=inline
     ports:
-      - "10005:10005"
+      - "127.0.0.1:10005:10005"
     volumes:
       - ./agents/mneme:/app/agents/mneme
       - ./shared:/app/shared
@@ -207,7 +207,7 @@ services:
       cache_to:
         - type=inline
     ports:
-      - "10004:10004"
+      - "127.0.0.1:10004:10004"
     volumes:
       - ./agents/kallos:/app/agents/kallos
       - ./shared:/app/shared
@@ -252,7 +252,7 @@ services:
       cache_to:
         - type=inline
     ports:
-      - "10002:10002"
+      - "127.0.0.1:10002:10002"
     volumes:
       - ./agents/techne:/app/agents/techne
       - ./shared:/app/shared
@@ -297,7 +297,7 @@ services:
       cache_to:
         - type=inline
     ports:
-      - "10003:10003"
+      - "127.0.0.1:10003:10003"
     volumes:
       - ./agents/dokimasia:/app/agents/dokimasia
       - ./shared:/app/shared
@@ -344,7 +344,7 @@ services:
       cache_to:
         - type=inline
     ports:
-      - "10001:10001"
+      - "127.0.0.1:10001:10001"
     volumes:
       - ./agents/metis:/app/agents/metis
       - ./shared:/app/shared
@@ -390,7 +390,7 @@ services:
       cache_to:
         - type=inline
     ports:
-      - "10006:10006"
+      - "127.0.0.1:10006:10006"
     volumes:
       - ./agents/puck:/app/agents/puck
       - ./shared:/app/shared
@@ -433,7 +433,7 @@ services:
       cache_to:
         - type=inline
     ports:
-      - "10007:10007"
+      - "127.0.0.1:10007:10007"
     volumes:
       - ./agents/cupid:/app/agents/cupid
       - ./shared:/app/shared
@@ -477,7 +477,7 @@ services:
       cache_to:
         - type=inline
     ports:
-      - "10008:10008"
+      - "127.0.0.1:10008:10008"
     volumes:
       - ./agents/aidos:/app/agents/aidos
       - ./shared:/app/shared
@@ -520,7 +520,7 @@ services:
       cache_to:
         - type=inline
     ports:
-      - "10009:10009"
+      - "127.0.0.1:10009:10009"
     volumes:
       - ./agents/aletheia:/app/agents/aletheia
       - ./shared:/app/shared
@@ -569,7 +569,7 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
       KOURAI_LOG_LEVEL: ${KOURAI_LOG_LEVEL:-INFO}
     ports:
-      - "10010:10010"
+      - "127.0.0.1:10010:10010"
     volumes:
       - ./agents/vn_bridge.py:/app/agents/vn_bridge.py
       - ./shared:/app/shared
@@ -610,7 +610,7 @@ services:
       cache_to:
         - type=inline
     ports:
-      - "10000:10000"
+      - "127.0.0.1:10000:10000"
     volumes:
       - ./agents/hephaestus:/app/agents/hephaestus
       - ./shared:/app/shared

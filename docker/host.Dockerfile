@@ -51,11 +51,11 @@ ENV HOST_TYPE=${HOST_TYPE} \
 
 WORKDIR /app
 
-# Agent/CLI: git for project context, curl for health checks
-# Agents: also need espeak-ng for Kokoro TTS (used by VN bridge + agents)
+# Agent/CLI/VN bridge: git for project context, curl for health checks
+# Agent and VN bridge: espeak-ng for Kokoro TTS runtime support
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    if [ "${HOST_TYPE}" = "agent" ] || [ "${HOST_TYPE}" = "cli" ]; then \
+    if [ "${HOST_TYPE}" = "agent" ] || [ "${HOST_TYPE}" = "cli" ] || [ "${HOST_TYPE}" = "vn_bridge" ]; then \
     apt-get update && \
     apt-get install -y --no-install-recommends git curl espeak-ng && \
     rm -rf /var/lib/apt/lists/*; \
