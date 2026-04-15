@@ -5,7 +5,7 @@ HF sync tests mock huggingface_hub.sync_bucket so no real token is needed.
 
 To run against a real HF bucket:
     HF_TOKEN=hf_xxx KOURAI_BUCKET_ID=ajbar/kourai-artifacts \
-    pytest tests/integration/test_artifacts_integration.py -v -k real
+    pytest tests/unit/test_artifacts_integration.py -v -k real
 """
 
 from __future__ import annotations
