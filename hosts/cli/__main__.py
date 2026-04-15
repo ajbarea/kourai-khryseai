@@ -25,10 +25,6 @@ from prompt_toolkit.formatted_text import ANSI
 from prompt_toolkit.patch_stdout import patch_stdout
 
 from hosts.cli.commands import _build_key_bindings, _copy_to_clipboard, _show_help, _show_settings
-from hosts.cli.events import (  # noqa: F401 — re-exported for backward compat
-    _extract_artifact_text,
-    _extract_status_text,
-)
 from hosts.cli.headless import _headless
 from hosts.cli.maidens import _MAIDEN_FACES, _MAIDENS
 from hosts.cli.rendering import _banner, _echo, _maiden_card, _maiden_gallery, set_raw_out

@@ -11,12 +11,11 @@ from a2a.types import Message, Task, TaskState, TaskStatusUpdateEvent
 pytest.importorskip("asyncclick")
 
 from hosts.cli.__main__ import (
-    _extract_artifact_text,
-    _extract_status_text,
     _format_affinity_bar,
     _maybe_offer_feature_opt_in,
     send_and_stream,
 )
+from hosts.cli.events import _extract_artifact_text, _extract_status_text
 from hosts.cli.settings import CLISettings
 
 # ---------------------------------------------------------------------------

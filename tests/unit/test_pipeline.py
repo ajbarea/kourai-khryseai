@@ -231,7 +231,7 @@ class TestCLIHelpers:
 
     def test_extract_status_text(self):
         pytest.importorskip("asyncclick")
-        from hosts.cli.__main__ import _extract_status_text
+        from hosts.cli.events import _extract_status_text
 
         event = MagicMock()
         part = MagicMock()
@@ -241,7 +241,7 @@ class TestCLIHelpers:
 
     def test_extract_status_text_no_message(self):
         pytest.importorskip("asyncclick")
-        from hosts.cli.__main__ import _extract_status_text
+        from hosts.cli.events import _extract_status_text
 
         event = MagicMock()
         event.status.message = None
@@ -249,7 +249,7 @@ class TestCLIHelpers:
 
     def test_extract_artifact_text(self):
         pytest.importorskip("asyncclick")
-        from hosts.cli.__main__ import _extract_artifact_text
+        from hosts.cli.events import _extract_artifact_text
 
         event = MagicMock()
         part = MagicMock()
@@ -259,7 +259,7 @@ class TestCLIHelpers:
 
     def test_extract_artifact_text_empty(self):
         pytest.importorskip("asyncclick")
-        from hosts.cli.__main__ import _extract_artifact_text
+        from hosts.cli.events import _extract_artifact_text
 
         event = MagicMock()
         event.artifact = None
