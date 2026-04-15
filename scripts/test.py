@@ -157,6 +157,8 @@ def main() -> int:
                     "-m",
                     "pytest",
                     "tests/integration/",
+                    "-m",
+                    "integration",
                     "-v",
                     "--tb=short",
                     "--cov=.",

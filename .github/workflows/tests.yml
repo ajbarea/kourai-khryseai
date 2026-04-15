@@ -173,7 +173,7 @@ jobs:
         run: mkdir -p logs
 
       - name: Run integration tests
-        run: uv run pytest tests/integration/ -v --tb=short --cov=. --cov-report=xml:logs/coverage.xml --cov-report=term-missing --junitxml=logs/junit.xml
+        run: uv run pytest tests/integration/ -m integration -v --tb=short --cov=. --cov-report=xml:logs/coverage.xml --cov-report=term-missing --junitxml=logs/junit.xml
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v6.0.0
