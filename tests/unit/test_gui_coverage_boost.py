@@ -784,7 +784,7 @@ class TestMessageHistory:
 
 
 # ===================================================================
-# 10. constants.py — Theme.apply_palette and _load_font
+# 10. constants.py — Theme.apply_palette and _create_font
 # ===================================================================
 
 
@@ -826,9 +826,9 @@ class TestTheme:
         assert t.dark_bg == old_bg
 
     def test_load_font_fallback(self):
-        from hosts.gui.constants import _load_font
+        from hosts.gui.constants import _create_font
 
-        font = _load_font(["nonexistent_font_xyz"], 16)
+        font = _create_font(["nonexistent_font_xyz"], 16)
         assert font is not None
 
 
@@ -989,6 +989,53 @@ class TestGuiClientHelpers:
         gc._put({"type": "connected", "name": "Test"})
         event = recv_q.get_nowait()
         assert event["type"] == "connected"
+
+    def test_resolve_target_url_uses_default_host(self):
+        import queue as _queue
+
+        from hosts.gui.client import GuiClient
+
+        send_q: _queue.Queue = _queue.Queue()
+        recv_q: _queue.Queue = _queue.Queue()
+        gc = GuiClient(send_q, recv_q, "http://localhost:10000/")
+
+        assert gc._resolve_target_url("kallos") == "http://localhost:10004/"
+
+    def test_resolve_target_url_maps_all_agents_to_default_host(self):
+        import queue as _queue
+
+        from hosts.gui.client import GuiClient
+        from kourai_common.config import AGENT_PORTS
+
+        send_q: _queue.Queue = _queue.Queue()
+        recv_q: _queue.Queue = _queue.Queue()
+        gc = GuiClient(send_q, recv_q, "http://localhost:10000/")
+
+        for agent_name, port in AGENT_PORTS.items():
+            assert gc._resolve_target_url(agent_name) == f"http://localhost:{port}/"
+
+    def test_resolve_target_url_unknown_agent_falls_back_default(self):
+        import queue as _queue
+
+        from hosts.gui.client import GuiClient
+
+        send_q: _queue.Queue = _queue.Queue()
+        recv_q: _queue.Queue = _queue.Queue()
+        gc = GuiClient(send_q, recv_q, "http://localhost:10000/")
+
+        assert gc._resolve_target_url("not-a-real-agent") == "http://localhost:10000/"
+
+    def test_resolve_target_url_falls_back_to_config_resolver(self):
+        import queue as _queue
+
+        from hosts.gui.client import GuiClient
+
+        send_q: _queue.Queue = _queue.Queue()
+        recv_q: _queue.Queue = _queue.Queue()
+        gc = GuiClient(send_q, recv_q, "not-a-url")
+
+        with patch("hosts.gui.client.get_agent_url", return_value="http://kallos:10004/"):
+            assert gc._resolve_target_url("kallos") == "http://kallos:10004/"
 
     def test_extract_status_empty(self):
         from hosts.gui.client import GuiClient

@@ -9,6 +9,7 @@ Communicates with the pygame main thread via two queues:
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 from typing import TYPE_CHECKING
 from uuid import uuid4
@@ -29,12 +30,13 @@ from kourai_common.a2a_events import (
     extract_artifact_text,
     extract_status_text,
 )
-from kourai_common.config import get_agent_url
+from kourai_common.config import AGENT_PORTS, get_agent_url
 
 if TYPE_CHECKING:
     import queue as _queue
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
+logger = logging.getLogger(__name__)
 
 
 class GuiClient:
@@ -49,6 +51,28 @@ class GuiClient:
         self._send = send_q
         self._recv = recv_q
         self._default_url = agent_url or get_agent_url("hephaestus")
+
+    def _resolve_target_url(self, target_agent: str) -> str:
+        """Resolve host-reachable URL for the selected target agent."""
+        port = AGENT_PORTS.get(target_agent)
+        if port is None:
+            return self._default_url
+
+        try:
+            # Keep the same host as Hephaestus (localhost, remote host, or Docker DNS)
+            # and only swap to the selected agent's port.
+            return str(httpx.URL(self._default_url).copy_with(port=port))
+        except Exception:
+            logger.warning(
+                "Failed to resolve target URL from default_url=%s for agent=%s; "
+                "falling back to config resolver.",
+                self._default_url,
+                target_agent,
+            )
+            try:
+                return get_agent_url(target_agent)
+            except Exception:
+                return self._default_url
 
     def _put(self, event: dict) -> None:
         if "text" in event and isinstance(event["text"], str):
@@ -84,10 +108,8 @@ class GuiClient:
 
             target_agent, text = item
 
-            try:
-                target_url = get_agent_url(target_agent)
-            except Exception:
-                target_url = self._default_url
+            target_url = self._resolve_target_url(target_agent)
+            logger.debug("Routing GUI request to agent=%s via %s", target_agent, target_url)
 
             await self._send_message(target_url, text, context_id)
 
