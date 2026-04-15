@@ -16,7 +16,7 @@ dev = [
     "zensical>=0.0.24",
     "hypothesis>=6.151.9",
     "httpx>=0.27.0",
-    "mcp>=1.26.0",
+    "mcp>=1.26.0,<2",
     "testcontainers>=4.9.1",
 ]
 
@@ -113,7 +113,7 @@ log_level = "INFO"
 log_cli = true
 log_cli_level = "WARNING"
 markers = [
-    "integration: mark test as requiring real containers via testcontainers",
+    "integration: mark test as requiring real external boundaries (containers/network/protocols)",
 ]
 filterwarnings = [
     "ignore::UserWarning:torch.nn.modules.rnn",
