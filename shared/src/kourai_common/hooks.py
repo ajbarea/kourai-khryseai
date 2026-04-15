@@ -1,19 +1,4 @@
-"""Post-task hooks orchestrator — thin shim + run_post_task_hooks.
-
-All hook logic has been split into focused modules:
-
-    hooks_alignment.py   — alignment pattern scoring (score_alignment,
-                           score_gossip_response)
-    hooks_patterns.py    — time/work pattern detection (get_time_bucket,
-                           detect_time_pattern, record_session_pattern,
-                           get_session_greeting_hint, detect_work_patterns,
-                           get_work_pattern_summary)
-    hooks_interaction.py — affinity tracking + memory extraction
-                           (track_interaction, extract_memories_from_interaction)
-
-All public names are re-exported here for backwards compatibility.
-Callers importing from kourai_common.hooks continue to work unchanged.
-"""
+"""Post-task hook orchestration entrypoint."""
 
 from __future__ import annotations
 
@@ -21,42 +6,13 @@ from typing import Any
 
 from kourai_common.hooks_alignment import (
     score_alignment,
-    score_gossip_response,
 )
-from kourai_common.hooks_interaction import (
-    BASE_AFFINITY_DELTA,
-    NAME_BONUS,
-    extract_memories_from_interaction,
-    track_interaction,
-)
+from kourai_common.hooks_interaction import extract_memories_from_interaction, track_interaction
 from kourai_common.hooks_patterns import (
-    detect_time_pattern,
     detect_work_patterns,
-    get_session_greeting_hint,
-    get_time_bucket,
-    get_work_pattern_summary,
-    record_session_pattern,
 )
 
-__all__ = [
-    # interaction
-    "BASE_AFFINITY_DELTA",
-    "NAME_BONUS",
-    "detect_time_pattern",
-    "detect_work_patterns",
-    "extract_memories_from_interaction",
-    "get_session_greeting_hint",
-    # patterns
-    "get_time_bucket",
-    "get_work_pattern_summary",
-    "record_session_pattern",
-    # orchestrator
-    "run_post_task_hooks",
-    # alignment
-    "score_alignment",
-    "score_gossip_response",
-    "track_interaction",
-]
+__all__ = ["run_post_task_hooks"]
 
 
 def run_post_task_hooks(

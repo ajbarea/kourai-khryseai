@@ -58,7 +58,7 @@ def _isolate_db(tmp_path, monkeypatch):
 
 class TestAlignmentScoring:
     def test_sovereignty_strong_pattern(self):
-        from kourai_common.hooks import score_alignment
+        from kourai_common.hooks_alignment import score_alignment
 
         p = PlayerProfile(display_name="AJ", sovereignty=10, devotion=10)
         sov, dev = score_alignment("This isn't good enough, redo this!", p)
@@ -66,7 +66,7 @@ class TestAlignmentScoring:
         assert p.sovereignty > 10
 
     def test_devotion_strong_pattern(self):
-        from kourai_common.hooks import score_alignment
+        from kourai_common.hooks_alignment import score_alignment
 
         p = PlayerProfile(display_name="AJ", sovereignty=10, devotion=10)
         sov, dev = score_alignment("Great job! I believe in you!", p)
@@ -74,7 +74,7 @@ class TestAlignmentScoring:
         assert p.devotion > 10
 
     def test_flirty_gives_devotion(self):
-        from kourai_common.hooks import score_alignment
+        from kourai_common.hooks_alignment import score_alignment
 
         p = PlayerProfile(display_name="AJ", sovereignty=0, devotion=0)
         sov, dev = score_alignment("You're so gorgeous~", p)
@@ -82,7 +82,7 @@ class TestAlignmentScoring:
         assert p.devotion >= 2
 
     def test_neutral_text_no_change(self):
-        from kourai_common.hooks import score_alignment
+        from kourai_common.hooks_alignment import score_alignment
 
         p = PlayerProfile(display_name="AJ", sovereignty=50, devotion=50)
         sov, dev = score_alignment("Run the linter on src/main.py", p)
@@ -92,14 +92,14 @@ class TestAlignmentScoring:
         assert p.devotion == 50
 
     def test_empty_text_no_change(self):
-        from kourai_common.hooks import score_alignment
+        from kourai_common.hooks_alignment import score_alignment
 
         p = PlayerProfile(display_name="AJ", sovereignty=10, devotion=10)
         sov, dev = score_alignment("", p)
         assert sov == 0 and dev == 0
 
     def test_mixed_sovereignty_and_devotion(self):
-        from kourai_common.hooks import score_alignment
+        from kourai_common.hooks_alignment import score_alignment
 
         p = PlayerProfile(display_name="AJ", sovereignty=0, devotion=0)
         sov, dev = score_alignment("Fix this now, but thanks for trying", p)
@@ -107,7 +107,7 @@ class TestAlignmentScoring:
         assert dev > 0
 
     def test_gossip_context_amplifies(self):
-        from kourai_common.hooks import score_alignment
+        from kourai_common.hooks_alignment import score_alignment
 
         p1 = PlayerProfile(display_name="A", sovereignty=0, devotion=0)
         sov1, _ = score_alignment("Do it again, not acceptable!", p1, context="task")
@@ -118,14 +118,14 @@ class TestAlignmentScoring:
         assert sov2 > sov1
 
     def test_sovereignty_clamped_at_100(self):
-        from kourai_common.hooks import score_alignment
+        from kourai_common.hooks_alignment import score_alignment
 
         p = PlayerProfile(display_name="AJ", sovereignty=99, devotion=0)
         score_alignment("This isn't good enough! Not acceptable!", p)
         assert p.sovereignty == 100
 
     def test_devotion_clamped_at_100(self):
-        from kourai_common.hooks import score_alignment
+        from kourai_common.hooks_alignment import score_alignment
 
         p = PlayerProfile(display_name="AJ", sovereignty=0, devotion=99)
         score_alignment("Great job! You're the best! ❤", p)
@@ -134,7 +134,7 @@ class TestAlignmentScoring:
 
 class TestGossipScoring:
     def test_scold_in_gossip(self):
-        from kourai_common.hooks import score_gossip_response
+        from kourai_common.hooks_alignment import score_gossip_response
 
         p = PlayerProfile(display_name="AJ", sovereignty=0, devotion=0)
         sov, dev, affinity = score_gossip_response("Get back to work!", p, ["kallos", "metis"])
@@ -143,7 +143,7 @@ class TestGossipScoring:
         assert affinity["kallos"] < affinity.get("metis", 0.01) or affinity["kallos"] <= 0.01
 
     def test_flirt_in_gossip(self):
-        from kourai_common.hooks import score_gossip_response
+        from kourai_common.hooks_alignment import score_gossip_response
 
         p = PlayerProfile(display_name="AJ", sovereignty=0, devotion=0)
         _sov, dev, affinity = score_gossip_response(
@@ -154,7 +154,7 @@ class TestGossipScoring:
         assert all(v > 0 for v in affinity.values())
 
     def test_warm_response_affinity(self):
-        from kourai_common.hooks import score_gossip_response
+        from kourai_common.hooks_alignment import score_gossip_response
 
         p = PlayerProfile(display_name="AJ", sovereignty=0, devotion=0)
         _sov, _dev, affinity = score_gossip_response(
@@ -163,7 +163,7 @@ class TestGossipScoring:
         assert all(v > 0 for v in affinity.values())
 
     def test_returns_per_agent_deltas(self):
-        from kourai_common.hooks import score_gossip_response
+        from kourai_common.hooks_alignment import score_gossip_response
 
         p = PlayerProfile(display_name="AJ")
         _, _, affinity = score_gossip_response("Hey there~", p, ["techne", "kallos", "metis"])
@@ -173,7 +173,7 @@ class TestGossipScoring:
 
 class TestPatternDetection:
     def test_get_time_bucket(self):
-        from kourai_common.hooks import get_time_bucket
+        from kourai_common.hooks_patterns import get_time_bucket
 
         assert get_time_bucket(2) == "late_night"
         assert get_time_bucket(7) == "early_morning"
@@ -183,7 +183,7 @@ class TestPatternDetection:
         assert get_time_bucket(23) == "night"
 
     def test_record_session_pattern(self):
-        from kourai_common.hooks import record_session_pattern
+        from kourai_common.hooks_patterns import record_session_pattern
 
         p = PlayerProfile(display_name="AJ")
         bucket = record_session_pattern(p.player_id, hour=23)
@@ -193,7 +193,7 @@ class TestPatternDetection:
         assert any("session_time:night" in m["content"] for m in mems)
 
     def test_record_session_pattern_dedup(self):
-        from kourai_common.hooks import record_session_pattern
+        from kourai_common.hooks_patterns import record_session_pattern
 
         p = PlayerProfile(display_name="AJ")
         bucket1 = record_session_pattern(p.player_id, hour=23)
@@ -202,7 +202,7 @@ class TestPatternDetection:
         assert bucket2 is None
 
     def test_detect_time_pattern_histogram(self):
-        from kourai_common.hooks import detect_time_pattern
+        from kourai_common.hooks_patterns import detect_time_pattern
 
         p = PlayerProfile(display_name="AJ")
 
@@ -221,7 +221,7 @@ class TestPatternDetection:
         assert hist.get("late_night", 0) == 5
 
     def test_session_greeting_hint(self):
-        from kourai_common.hooks import get_session_greeting_hint
+        from kourai_common.hooks_patterns import get_session_greeting_hint
         from kourai_common.player import add_player_memory
 
         p = PlayerProfile(display_name="AJ")
@@ -240,14 +240,14 @@ class TestPatternDetection:
         assert "night owl" in hint.lower()
 
     def test_session_greeting_no_data(self):
-        from kourai_common.hooks import get_session_greeting_hint
+        from kourai_common.hooks_patterns import get_session_greeting_hint
 
         p = PlayerProfile(display_name="AJ")
         hint = get_session_greeting_hint(p.player_id)
         assert hint is None
 
     def test_detect_work_patterns(self):
-        from kourai_common.hooks import detect_work_patterns
+        from kourai_common.hooks_patterns import detect_work_patterns
 
         p = PlayerProfile(display_name="AJ")
         detected = detect_work_patterns(p.player_id, "Write the tests first before coding")
@@ -257,7 +257,7 @@ class TestPatternDetection:
         assert any("work_habit:tests_first" in m["content"] for m in mems)
 
     def test_detect_work_patterns_dedup(self):
-        from kourai_common.hooks import detect_work_patterns
+        from kourai_common.hooks_patterns import detect_work_patterns
 
         p = PlayerProfile(display_name="AJ")
         detect_work_patterns(p.player_id, "refactor this module")
@@ -268,7 +268,10 @@ class TestPatternDetection:
         assert refactor_count == 1
 
     def test_work_pattern_summary(self):
-        from kourai_common.hooks import detect_work_patterns, get_work_pattern_summary
+        from kourai_common.hooks_patterns import (
+            detect_work_patterns,
+            get_work_pattern_summary,
+        )
 
         p = PlayerProfile(display_name="AJ")
         detect_work_patterns(p.player_id, "Write tests before implementation")
@@ -280,7 +283,7 @@ class TestPatternDetection:
         assert "refactor" in summary.lower()
 
     def test_work_pattern_summary_empty(self):
-        from kourai_common.hooks import get_work_pattern_summary
+        from kourai_common.hooks_patterns import get_work_pattern_summary
 
         p = PlayerProfile(display_name="AJ")
         assert get_work_pattern_summary(p.player_id) is None
@@ -326,14 +329,14 @@ class TestRunPostTaskHooks:
 
 class TestGossipPairSelection:
     def test_select_gossip_pair_excludes_busy(self):
-        from kourai_common.gossip import select_gossip_pair
+        from kourai_common.gossip_core import select_gossip_pair
 
         pair = select_gossip_pair("techne")
         assert pair is not None
         assert "techne" not in pair
 
     def test_select_gossip_pair_all_agents(self):
-        from kourai_common.gossip import select_gossip_pair
+        from kourai_common.gossip_core import select_gossip_pair
 
         pair = select_gossip_pair("techne", all_agents=["techne", "metis", "kallos"])
         assert pair is not None
@@ -342,26 +345,26 @@ class TestGossipPairSelection:
         assert {a, b} == {"metis", "kallos"}
 
     def test_select_gossip_pair_insufficient(self):
-        from kourai_common.gossip import select_gossip_pair
+        from kourai_common.gossip_core import select_gossip_pair
 
         pair = select_gossip_pair("techne", all_agents=["techne", "metis"])
         assert pair is None
 
     def test_pair_chemistry_known(self):
-        from kourai_common.gossip import get_pair_chemistry
+        from kourai_common.gossip_chemistry import get_pair_chemistry
 
         chem = get_pair_chemistry("metis", "kallos")
         assert "Strategist" in chem or "aesthete" in chem.lower() or len(chem) > 10
 
     def test_pair_chemistry_reversed(self):
-        from kourai_common.gossip import get_pair_chemistry
+        from kourai_common.gossip_chemistry import get_pair_chemistry
 
         chem1 = get_pair_chemistry("techne", "kallos")
         chem2 = get_pair_chemistry("kallos", "techne")
         assert chem1 == chem2
 
     def test_pair_chemistry_unknown(self):
-        from kourai_common.gossip import get_pair_chemistry
+        from kourai_common.gossip_chemistry import get_pair_chemistry
 
         chem = get_pair_chemistry("hephaestus", "kallos")
         assert "chat" in chem.lower() or len(chem) > 5
@@ -369,7 +372,7 @@ class TestGossipPairSelection:
 
 class TestGossipSession:
     def test_start_session(self):
-        from kourai_common.gossip import start_gossip_session
+        from kourai_common.gossip_core import start_gossip_session
 
         session = start_gossip_session("metis", "kallos")
         assert session.agent_a == "metis"
@@ -378,19 +381,19 @@ class TestGossipSession:
         assert not session.is_complete
 
     def test_start_session_with_profile(self):
-        from kourai_common.gossip import start_gossip_session
+        from kourai_common.gossip_core import start_gossip_session
 
         p = PlayerProfile(display_name="AJ")
         session = start_gossip_session("metis", "kallos", profile=p)
         assert session.topic is not None
 
     def test_generate_response_options(self):
-        from kourai_common.gossip import (
+        from kourai_common.gossip_core import generate_response_options
+        from kourai_common.gossip_models import (
             GossipMessage,
             GossipSession,
             GossipTopic,
             ResponseTone,
-            generate_response_options,
         )
 
         session = GossipSession(
@@ -407,10 +410,10 @@ class TestGossipSession:
         assert ResponseTone.JOIN in tones
 
     def test_alignment_gated_options(self):
-        from kourai_common.gossip import (
+        from kourai_common.gossip_core import generate_response_options
+        from kourai_common.gossip_models import (
             GossipSession,
             GossipTopic,
-            generate_response_options,
         )
 
         session = GossipSession(
@@ -428,10 +431,10 @@ class TestGossipSession:
         assert len(opts_sov) > len(opts_low)
 
     def test_commander_option(self):
-        from kourai_common.gossip import (
+        from kourai_common.gossip_core import generate_response_options
+        from kourai_common.gossip_models import (
             GossipSession,
             GossipTopic,
-            generate_response_options,
         )
 
         session = GossipSession(
@@ -448,7 +451,7 @@ class TestGossipSession:
 class TestGossipRound:
     @pytest.mark.asyncio
     async def test_generate_gossip_round(self):
-        from kourai_common.gossip import start_gossip_session
+        from kourai_common.gossip_core import start_gossip_session
 
         session = start_gossip_session("metis", "kallos")
 
@@ -463,7 +466,10 @@ class TestGossipRound:
 
     @pytest.mark.asyncio
     async def test_gossip_completes_after_max_rounds(self):
-        from kourai_common.gossip import generate_gossip_round, start_gossip_session
+        from kourai_common.gossip_core import (
+            generate_gossip_round,
+            start_gossip_session,
+        )
 
         session = start_gossip_session("metis", "kallos", max_rounds=2)
 
@@ -479,7 +485,10 @@ class TestGossipRound:
 
     @pytest.mark.asyncio
     async def test_gossip_handles_llm_failure(self):
-        from kourai_common.gossip import generate_gossip_round, start_gossip_session
+        from kourai_common.gossip_core import (
+            generate_gossip_round,
+            start_gossip_session,
+        )
 
         session = start_gossip_session("metis", "kallos")
 
@@ -495,12 +504,12 @@ class TestGossipRound:
 class TestGossipPlayerResponse:
     @pytest.mark.asyncio
     async def test_process_player_flirt(self):
-        from kourai_common.gossip import (
+        from kourai_common.gossip_core import process_player_response
+        from kourai_common.gossip_models import (
             GossipResponseOption,
             GossipSession,
             GossipTopic,
             ResponseTone,
-            process_player_response,
         )
 
         session = GossipSession(
@@ -530,12 +539,12 @@ class TestGossipPlayerResponse:
 
     @pytest.mark.asyncio
     async def test_process_player_ignore(self):
-        from kourai_common.gossip import (
+        from kourai_common.gossip_core import process_player_response
+        from kourai_common.gossip_models import (
             GossipResponseOption,
             GossipSession,
             GossipTopic,
             ResponseTone,
-            process_player_response,
         )
 
         session = GossipSession(
@@ -554,10 +563,10 @@ class TestGossipPlayerResponse:
 
     @pytest.mark.asyncio
     async def test_process_custom_text(self):
-        from kourai_common.gossip import (
+        from kourai_common.gossip_core import process_player_response
+        from kourai_common.gossip_models import (
             GossipSession,
             GossipTopic,
-            process_player_response,
         )
 
         session = GossipSession(
@@ -574,12 +583,12 @@ class TestGossipPlayerResponse:
 
     @pytest.mark.asyncio
     async def test_player_response_extends_session(self):
-        from kourai_common.gossip import (
+        from kourai_common.gossip_core import process_player_response
+        from kourai_common.gossip_models import (
             GossipResponseOption,
             GossipSession,
             GossipTopic,
             ResponseTone,
-            process_player_response,
         )
 
         session = GossipSession(
@@ -602,10 +611,10 @@ class TestGossipPlayerResponse:
 
     @pytest.mark.asyncio
     async def test_complete_session_no_response(self):
-        from kourai_common.gossip import (
+        from kourai_common.gossip_core import process_player_response
+        from kourai_common.gossip_models import (
             GossipSession,
             GossipTopic,
-            process_player_response,
         )
 
         session = GossipSession(
@@ -620,11 +629,11 @@ class TestGossipPlayerResponse:
 
 class TestGossipSummary:
     def test_summarize_session(self):
-        from kourai_common.gossip import (
+        from kourai_common.gossip_core import summarize_gossip_session
+        from kourai_common.gossip_models import (
             GossipMessage,
             GossipSession,
             GossipTopic,
-            summarize_gossip_session,
         )
 
         session = GossipSession(
@@ -651,14 +660,15 @@ class TestGossipSummary:
 
 class TestGossipTopicSelection:
     def test_topic_with_profile(self):
-        from kourai_common.gossip import select_gossip_topic
+        from kourai_common.gossip_core import select_gossip_topic
 
         p = PlayerProfile(display_name="AJ")
         topic = select_gossip_topic(p, "metis", "kallos")
         assert topic is not None
 
     def test_topic_without_profile_favors_banter(self):
-        from kourai_common.gossip import GossipTopic, select_gossip_topic
+        from kourai_common.gossip_core import select_gossip_topic
+        from kourai_common.gossip_models import GossipTopic
 
         topics = [select_gossip_topic(None, "metis", "kallos") for _ in range(100)]
         banter_count = sum(1 for t in topics if t == GossipTopic.AGENT_BANTER)
@@ -667,7 +677,7 @@ class TestGossipTopicSelection:
 
 
 async def session_round(session):
-    from kourai_common.gossip import generate_gossip_round
+    from kourai_common.gossip_core import generate_gossip_round
 
     return await generate_gossip_round(session)
 
@@ -748,14 +758,17 @@ class TestCliGossip:
         assert "techne" not in (session.agent_a, session.agent_b)
 
     def test_maybe_start_gossip_no_idle(self):
-        from kourai_common.gossip import select_gossip_pair
+        from kourai_common.gossip_core import select_gossip_pair
 
         pair = select_gossip_pair("techne", all_agents=["techne"])
         assert pair is None
 
     def test_format_gossip_header(self):
         from hosts.cli.gossip_cli import _format_gossip_header
-        from kourai_common.gossip import GossipSession, GossipTopic
+        from kourai_common.gossip_models import (
+            GossipSession,
+            GossipTopic,
+        )
 
         session = GossipSession(agent_a="metis", agent_b="kallos", topic=GossipTopic.PLAYER_HABITS)
         header = _format_gossip_header(session)
@@ -772,7 +785,10 @@ class TestCliGossip:
 
     def test_format_response_options(self):
         from hosts.cli.gossip_cli import _format_response_options
-        from kourai_common.gossip import GossipResponseOption, ResponseTone
+        from kourai_common.gossip_models import (
+            GossipResponseOption,
+            ResponseTone,
+        )
 
         options = [
             GossipResponseOption(ResponseTone.FLIRT, "💬", "Flirt", "Hey there~"),
@@ -786,7 +802,7 @@ class TestCliGossip:
     @pytest.mark.asyncio
     async def test_run_gossip_session_cli(self):
         from hosts.cli.gossip_cli import run_gossip_session_cli
-        from kourai_common.gossip import start_gossip_session
+        from kourai_common.gossip_core import start_gossip_session
 
         session = start_gossip_session("metis", "kallos", max_rounds=1)
 
@@ -1114,11 +1130,9 @@ class TestJealousyTrigger:
             conn.commit()
 
     def test_no_trigger_without_romance(self):
-        from kourai_common.gossip import (
-            ResponseTone,
-            check_jealousy_trigger,
-            start_gossip_session,
-        )
+        from kourai_common.gossip_core import start_gossip_session
+        from kourai_common.gossip_jealousy import check_jealousy_trigger
+        from kourai_common.gossip_models import ResponseTone
 
         p = PlayerProfile(display_name="AJ")
         session = start_gossip_session("metis", "kallos")
@@ -1126,11 +1140,9 @@ class TestJealousyTrigger:
         assert result is None
 
     def test_no_trigger_with_single_romance(self):
-        from kourai_common.gossip import (
-            ResponseTone,
-            check_jealousy_trigger,
-            start_gossip_session,
-        )
+        from kourai_common.gossip_core import start_gossip_session
+        from kourai_common.gossip_jealousy import check_jealousy_trigger
+        from kourai_common.gossip_models import ResponseTone
 
         p = PlayerProfile(display_name="AJ", romance_targets=["metis"])
         self._setup_multi_romance(p, [("metis", "kindling")])
@@ -1139,11 +1151,9 @@ class TestJealousyTrigger:
         assert result is None
 
     def test_no_trigger_on_scold(self):
-        from kourai_common.gossip import (
-            ResponseTone,
-            check_jealousy_trigger,
-            start_gossip_session,
-        )
+        from kourai_common.gossip_core import start_gossip_session
+        from kourai_common.gossip_jealousy import check_jealousy_trigger
+        from kourai_common.gossip_models import ResponseTone
 
         p = PlayerProfile(display_name="AJ", romance_targets=["metis", "kallos", "dokimasia"])
         self._setup_multi_romance(
@@ -1159,11 +1169,9 @@ class TestJealousyTrigger:
         assert result is None
 
     def test_trigger_on_flirt_with_absent_rival(self):
-        from kourai_common.gossip import (
-            ResponseTone,
-            check_jealousy_trigger,
-            start_gossip_session,
-        )
+        from kourai_common.gossip_core import start_gossip_session
+        from kourai_common.gossip_jealousy import check_jealousy_trigger
+        from kourai_common.gossip_models import ResponseTone
 
         p = PlayerProfile(display_name="AJ", romance_targets=["metis", "kallos", "dokimasia"])
         self._setup_multi_romance(
@@ -1184,11 +1192,9 @@ class TestJealousyTrigger:
         assert len(result.response_options) >= 2
 
     def test_no_trigger_when_absent_romance_is_spark_only(self):
-        from kourai_common.gossip import (
-            ResponseTone,
-            check_jealousy_trigger,
-            start_gossip_session,
-        )
+        from kourai_common.gossip_core import start_gossip_session
+        from kourai_common.gossip_jealousy import check_jealousy_trigger
+        from kourai_common.gossip_models import ResponseTone
 
         p = PlayerProfile(display_name="AJ", romance_targets=["metis", "dokimasia"])
         self._setup_multi_romance(
@@ -1205,7 +1211,7 @@ class TestJealousyTrigger:
 
 class TestJealousyResponses:
     def test_response_options_basic(self):
-        from kourai_common.gossip import _generate_jealousy_responses
+        from kourai_common.gossip_jealousy import _generate_jealousy_responses
 
         p = PlayerProfile(display_name="AJ", sovereignty=0, devotion=0)
         options = _generate_jealousy_responses(p, "metis")
@@ -1217,7 +1223,7 @@ class TestJealousyResponses:
         assert "Cherish" not in labels
 
     def test_response_options_sovereignty_gated(self):
-        from kourai_common.gossip import _generate_jealousy_responses
+        from kourai_common.gossip_jealousy import _generate_jealousy_responses
 
         p = PlayerProfile(display_name="AJ", sovereignty=65, devotion=0)
         options = _generate_jealousy_responses(p, "metis")
@@ -1225,7 +1231,7 @@ class TestJealousyResponses:
         assert "Assert" in labels
 
     def test_response_options_devotion_gated(self):
-        from kourai_common.gossip import _generate_jealousy_responses
+        from kourai_common.gossip_jealousy import _generate_jealousy_responses
 
         p = PlayerProfile(display_name="AJ", sovereignty=0, devotion=65)
         options = _generate_jealousy_responses(p, "metis")
@@ -1233,7 +1239,7 @@ class TestJealousyResponses:
         assert "Cherish" in labels
 
     def test_response_options_commander_gated(self):
-        from kourai_common.gossip import _generate_jealousy_responses
+        from kourai_common.gossip_jealousy import _generate_jealousy_responses
 
         p = PlayerProfile(display_name="AJ", sovereignty=85, devotion=85)
         options = _generate_jealousy_responses(p, "metis")
@@ -1243,7 +1249,7 @@ class TestJealousyResponses:
 
 class TestResolveJealousy:
     def _make_event(self, agent="metis"):
-        from kourai_common.gossip import JealousyEvent
+        from kourai_common.gossip_models import JealousyEvent
 
         return JealousyEvent(
             jealous_agent=agent,
@@ -1253,10 +1259,10 @@ class TestResolveJealousy:
         )
 
     def test_reassure_positive_affinity(self, tmp_path, monkeypatch):
-        from kourai_common.gossip import (
+        from kourai_common.gossip_jealousy import resolve_jealousy
+        from kourai_common.gossip_models import (
             GossipResponseOption,
             ResponseTone,
-            resolve_jealousy,
         )
 
         monkeypatch.setattr("kourai_common.player.PLAYER_DIR", tmp_path)
@@ -1279,10 +1285,10 @@ class TestResolveJealousy:
         assert event.resolution_text != ""
 
     def test_assert_authority_sovereignty_agent(self, tmp_path, monkeypatch):
-        from kourai_common.gossip import (
+        from kourai_common.gossip_jealousy import resolve_jealousy
+        from kourai_common.gossip_models import (
             GossipResponseOption,
             ResponseTone,
-            resolve_jealousy,
         )
 
         monkeypatch.setattr("kourai_common.player.PLAYER_DIR", tmp_path)
@@ -1303,10 +1309,10 @@ class TestResolveJealousy:
         assert result["affinity_delta"] > 0
 
     def test_assert_authority_devotion_agent_negative(self, tmp_path, monkeypatch):
-        from kourai_common.gossip import (
+        from kourai_common.gossip_jealousy import resolve_jealousy
+        from kourai_common.gossip_models import (
             GossipResponseOption,
             ResponseTone,
-            resolve_jealousy,
         )
 
         monkeypatch.setattr("kourai_common.player.PLAYER_DIR", tmp_path)
@@ -1326,10 +1332,10 @@ class TestResolveJealousy:
         assert result["affinity_delta"] < 0
 
     def test_deflect_mixed_results(self, tmp_path, monkeypatch):
-        from kourai_common.gossip import (
+        from kourai_common.gossip_jealousy import resolve_jealousy
+        from kourai_common.gossip_models import (
             GossipResponseOption,
             ResponseTone,
-            resolve_jealousy,
         )
 
         monkeypatch.setattr("kourai_common.player.PLAYER_DIR", tmp_path)

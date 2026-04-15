@@ -154,7 +154,7 @@ class TestOnboarding:
 
 class TestAffinityTracking:
     def test_track_interaction_updates_affinity(self):
-        from kourai_common.hooks import track_interaction
+        from kourai_common.hooks_interaction import track_interaction
 
         profile = PlayerProfile(display_name="AJ", sovereignty=50, devotion=50)
         track_interaction(profile.player_id, "metis", profile=profile, success=True)
@@ -164,7 +164,7 @@ class TestAffinityTracking:
         assert aff["interaction_count"] == 1
 
     def test_track_failure_gives_less_affinity(self):
-        from kourai_common.hooks import track_interaction
+        from kourai_common.hooks_interaction import track_interaction
 
         profile = PlayerProfile(display_name="AJ")
         track_interaction(profile.player_id, "techne", profile=profile, success=True)
@@ -177,7 +177,7 @@ class TestAffinityTracking:
         assert success_score > fail_score
 
     def test_track_noop_without_player_id(self):
-        from kourai_common.hooks import track_interaction
+        from kourai_common.hooks_interaction import track_interaction
 
         # Should not raise
         track_interaction("", "metis")
@@ -199,7 +199,7 @@ class TestAffinityTracking:
         assert aff["interaction_count"] == 0
 
     def test_alignment_multiplier_applied(self):
-        from kourai_common.hooks import track_interaction
+        from kourai_common.hooks_interaction import track_interaction
 
         # Kallos prefers devotion
         profile_devoted = PlayerProfile(display_name="A", sovereignty=0, devotion=100)
@@ -219,7 +219,7 @@ class TestAffinityTracking:
 
 class TestMemoryExtraction:
     def test_extracts_preference_from_user_input(self):
-        from kourai_common.hooks import extract_memories_from_interaction
+        from kourai_common.hooks_interaction import extract_memories_from_interaction
 
         profile = PlayerProfile(display_name="AJ")
         mids = extract_memories_from_interaction(
@@ -233,7 +233,7 @@ class TestMemoryExtraction:
         assert any("dark mode" in m["content"] for m in mems)
 
     def test_extracts_achievement_from_output(self):
-        from kourai_common.hooks import extract_memories_from_interaction
+        from kourai_common.hooks_interaction import extract_memories_from_interaction
 
         profile = PlayerProfile(display_name="AJ")
         mids = extract_memories_from_interaction(
@@ -247,13 +247,13 @@ class TestMemoryExtraction:
         assert any(m["category"] == "achievement" for m in mems)
 
     def test_no_extraction_from_empty_input(self):
-        from kourai_common.hooks import extract_memories_from_interaction
+        from kourai_common.hooks_interaction import extract_memories_from_interaction
 
         mids = extract_memories_from_interaction("pid", "metis", "", "output")
         assert mids == []
 
     def test_no_extraction_without_player_id(self):
-        from kourai_common.hooks import extract_memories_from_interaction
+        from kourai_common.hooks_interaction import extract_memories_from_interaction
 
         mids = extract_memories_from_interaction("", "metis", "I like X", "ok")
         assert mids == []

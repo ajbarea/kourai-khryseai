@@ -16,16 +16,18 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING, Any
 
-from kourai_common.gossip import (
-    GossipResponseOption,
-    GossipSession,
-    ResponseTone,
+from kourai_common.gossip_core import (
     generate_gossip_round,
     generate_response_options,
     process_player_response,
     select_gossip_pair,
     start_gossip_session,
     summarize_gossip_session,
+)
+from kourai_common.gossip_models import (
+    GossipResponseOption,
+    GossipSession,
+    ResponseTone,
 )
 
 if TYPE_CHECKING:

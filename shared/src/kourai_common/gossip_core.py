@@ -447,7 +447,7 @@ async def process_player_response(
     if session.is_complete:
         return []
 
-    from kourai_common.hooks import score_gossip_response
+    from kourai_common.hooks_alignment import score_gossip_response
     from kourai_common.llm import chat
 
     # Determine the player's text
