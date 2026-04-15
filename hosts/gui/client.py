@@ -25,6 +25,10 @@ from a2a.types import (
     TextPart,
 )
 
+from kourai_common.a2a_events import (
+    extract_artifact_text,
+    extract_status_text,
+)
 from kourai_common.config import get_agent_url
 
 if TYPE_CHECKING:
@@ -153,13 +157,8 @@ class GuiClient:
 
     @staticmethod
     def _extract_status(event: TaskStatusUpdateEvent) -> str:
-        if event.status.message and hasattr(event.status.message, "parts"):
-            parts = [p.root.text for p in event.status.message.parts if hasattr(p.root, "text")]
-            return "\n".join(parts)
-        return ""
+        return extract_status_text(event)
 
     @staticmethod
     def _extract_artifact(event: TaskArtifactUpdateEvent) -> str:
-        if event.artifact and event.artifact.parts:
-            return "\n".join(p.root.text for p in event.artifact.parts if hasattr(p.root, "text"))
-        return ""
+        return extract_artifact_text(event)

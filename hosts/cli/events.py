@@ -17,6 +17,10 @@ from hosts.cli.maidens import (
     _VICTORY_LINES,
 )
 from hosts.cli.rendering import _comms_window, _echo
+from kourai_common.a2a_events import (
+    extract_artifact_text as _extract_artifact_text_shared,
+    extract_status_text as _extract_status_text_shared,
+)
 
 if TYPE_CHECKING:
     from a2a.types import TaskArtifactUpdateEvent, TaskStatusUpdateEvent
@@ -50,18 +54,12 @@ def set_pipeline_chatter_enabled(enabled: bool) -> None:
 # ---------------------------------------------------------------------------
 def _extract_status_text(event: TaskStatusUpdateEvent) -> str:
     """Pull display text from a status update event."""
-    if event.status.message and hasattr(event.status.message, "parts"):
-        parts = [p.root.text for p in event.status.message.parts if hasattr(p.root, "text")]
-        if parts:
-            return "\n".join(parts)
-    return ""
+    return _extract_status_text_shared(event)
 
 
 def _extract_artifact_text(event: TaskArtifactUpdateEvent) -> str:
     """Pull display text from an artifact update event."""
-    if event.artifact and event.artifact.parts:
-        return "\n".join(p.root.text for p in event.artifact.parts if hasattr(p.root, "text"))
-    return ""
+    return _extract_artifact_text_shared(event)
 
 
 def _handoff_chatter(from_agent: str, to_agent: str) -> str | None:
