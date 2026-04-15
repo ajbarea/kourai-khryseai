@@ -1,6 +1,7 @@
 # Ecosystem Roadmap
 
 This page tracks the dependency versions Kourai Khryseai relies on, why each version is pinned where it is, and what breaking changes are expected in upcoming major releases. It is the canonical reference for upgrade planning.
+Last web validation: **2026-04-15**.
 
 ---
 
@@ -8,12 +9,12 @@ This page tracks the dependency versions Kourai Khryseai relies on, why each ver
 
 | Dependency | Pinned Range | Current Stable | Next Major | Status |
 |---|---|---|---|---|
-| `a2a-sdk` | `>=0.3.0,<1.0` | 0.3.25 | 1.0.0 (alpha) | ⚠️ Breaking changes documented |
-| `mcp` | `>=1.26.0,<2` | 1.26.0 | 2.0 (pre-alpha) | ⚠️ Transport rework pending |
-| `litellm` | unpinned | 1.82.x | — | ✅ Safe to track latest |
-| `starlette` | unpinned | 0.46.x | — | ✅ Safe to track latest |
-| `uvicorn` | unpinned | 0.34.x | — | ✅ Safe to track latest |
-| `httpx` | unpinned | 0.28.x | — | ✅ Safe to track latest |
+| `a2a-sdk` | `>=0.3.0,<1.0` | 0.3.26 | 1.0.0-alpha.1 | ⚠️ Keep `<1.0` pin until 1.0 GA |
+| `mcp` | `>=1.26.0,<2` | 1.27.0 | 2.x (not published on PyPI) | ✅ 1.x stable, keep `<2` guard |
+| `litellm` | unpinned | 1.83.x | — | ✅ Safe to track latest |
+| `starlette` | unpinned | 1.0.0 | 2.x (not announced) | ⚠️ Major jump landed; monitor release notes |
+| `uvicorn` | unpinned | 0.44.x | 1.0 (not announced) | ✅ Safe to track latest |
+| `httpx` | unpinned | 0.28.1 | 1.0 (not announced) | ✅ Safe to track latest |
 
 ---
 
@@ -21,7 +22,7 @@ This page tracks the dependency versions Kourai Khryseai relies on, why each ver
 
 ### Current State (0.3.x)
 
-The Agent-to-Agent protocol is under the Linux Foundation's **AAIF** governance umbrella (since June 2025, 150+ member organisations). The Python SDK is stable at `0.3.25`.
+The **A2A protocol spec latest release is `1.0.0`**, while the Python SDK stable line remains `0.3.x` (currently `0.3.26`). The SDK's `1.0` track is still pre-release (`1.0.0-alpha.1`).
 
 Key patterns we rely on:
 
@@ -33,36 +34,34 @@ Key patterns we rely on:
 
 ### What Changes in 1.0
 
-`1.0.0a0` was published 2026-03-17. It is **alpha** — the upper-bound pin `<1.0` excludes it automatically. Confirmed breaking changes:
+`1.0.0-alpha.1` was published 2026-04-10. It is still **pre-release** — the upper-bound pin `<1.0` correctly excludes it.
 
 | Area | 0.3.x | 1.0 |
 |---|---|---|
 | `kind` field | present on all types | **removed** |
 | Push notifications | `callback` parameter | renamed to `push_notification_config` |
 | Types | Python dataclasses | **proto-based** generated types |
-| Backward compat | — | Helpers for 0.3 ↔ 1.0 interop included in SDK |
-| gRPC transport | optional | First-class alongside HTTP+SSE |
-
-The `async with` client lifecycle pattern (added in 0.3.23) carries forward unchanged.
+| Server wiring | application wrappers in 0.3.x examples | route-based endpoints in 1.0 alpha track |
+| Client API | prior `ClientFactory` shape | reorganized in alpha track |
 
 ### Migration Checklist (when 1.0 stabilises)
 
 - [ ] Remove `kind` field references from all `agent_executor.py` files
 - [ ] Rename `callback` → `push_notification_config` in any push notification config
 - [ ] Audit proto-based type imports — replace dataclass-style construction where needed
+- [ ] Review `ClientFactory` usage against 1.0 alpha API changes
+- [ ] Plan migration from wrapper-style server setup to route-based endpoints when moving to 1.0
 - [ ] Run test suite against `1.0.0` before removing the upper-bound pin
 - [ ] Update the pin to `>=1.0,<2.0`
-
-!!! note "Joint A2A + MCP interoperability spec expected Q3 2026"
-    Google ADK already provides a `to_a2a(root_agent)` helper and an `MCPToolset` for building agents that speak both protocols natively.
 
 ---
 
 ## 🔌 MCP SDK
 
-### Current State (1.26.x)
+### Current State (1.27.x)
 
-The Model Context Protocol is under the Linux Foundation's **AAIF** governance umbrella (since December 2025). The Python SDK is stable at `1.26.0`.
+The Python MCP SDK is currently `1.27.0`.
+The spec latest protocol line is `2025-11-25`.
 
 Key patterns we rely on:
 
@@ -70,26 +69,20 @@ Key patterns we rely on:
 - Stdio transport — recommended for local and subprocess MCP connections
 - `ClientSession` — the main client class; manage one session per server manually (no built-in `MultiServerSession`)
 
-The MCP spec shifted to **Streamable HTTP** as the primary transport on 2026-03-26, replacing SSE. SSE is deprecated but still functional throughout 1.x.
+Transport status in latest spec:
+
+- Two standard transports are defined: **stdio** and **Streamable HTTP**
+- Under Streamable HTTP, servers can return either `application/json` or `text/event-stream`
+- SSE remains a supported mechanism within Streamable HTTP workflows (including resumability and polling guidance)
 
 ### What Changes in 2.0
 
-v2.0 is pre-alpha. The upper-bound pin `<2` excludes all pre-releases. The `main` branch of the SDK repo is v2 development; `v1.x` is maintenance-only.
-
-Confirmed scope of breaking changes:
-
-| Area | 1.x | 2.0 |
-|---|---|---|
-| Primary transport | SSE (deprecated in spec) | Streamable HTTP |
-| Server class | `FastMCP` | `McpServer` (rename) |
-| SDK branching | stable | `v1.x` maintenance, `main` = v2 |
-| `.well-known` discovery | not in spec | Planned for next spec release (est. June 2026) |
-| Stateless scaling | not supported | Planned |
+As of 2026-04-15, **no 2.x MCP SDK releases are published on PyPI**. Keep the `<2` upper bound and treat 2.0 migration items as watchlist work until concrete release notes are published.
 
 ### Migration Checklist (when 2.0 stabilises)
 
-- [ ] Replace all `FastMCP` imports with `McpServer` across agent and MCP server files
-- [ ] Migrate any SSE transport configuration to Streamable HTTP
+- [ ] Re-check MCP 2.0 release notes for concrete API renames before making code changes
+- [ ] Re-validate transport behavior for Streamable HTTP and SSE compatibility
 - [ ] Update `memory-mcp-server.js` sidecar transport if applicable
 - [ ] Re-verify all MCP server healthchecks in `docker-compose.yml`
 - [ ] Update the pin to `>=2.0,<3.0`
@@ -103,15 +96,15 @@ Confirmed scope of breaking changes:
 
 LiteLLM is **not upper-bound pinned** — it releases near-daily and rarely introduces breaking changes to the interface we use (`litellm.acompletion`).
 
-### Current State (1.82.x)
+### Current State (1.83.x)
 
-Notable additions in 2026:
+Current stable on PyPI is `1.83.8`.
 
-- 6.5× faster SDK initialization
-- Dynamic Rate Limiter v3
-- Built-in guardrails (zero additional cost)
-- MCP proxy support
-- New models: Gemini 2.5 Flash/Pro, Grok Code Fast, GPT-5, GPT-5.3-Codex, DeepSeek-v3.1
+Notable ecosystem capabilities reflected in current docs:
+
+- Unified OpenAI-format gateway for 100+ providers
+- Native A2A gateway surface (`/a2a`) and A2A client helpers
+- MCP bridge/gateway support in both SDK and proxy workflows
 
 ### Provider Selection
 
@@ -129,7 +122,7 @@ Controlled by `KOURAI_PROVIDER` and `KOURAI_MODEL_TIER` in `.env`:
 
 | Engine | Version | Licence | Notes |
 |---|---|---|---|
-| `edge-tts` | 7.2.7 | MIT | Microsoft Edge voices, no API key, 40K weekly downloads |
+| `edge-tts` | 7.2.8 | LGPLv3 | Microsoft Edge voices, no API key |
 | Kokoro | latest | Apache 2.0 | CPU-capable, self-hosted, competitive with commercial APIs |
 | Coqui XTTS v2.5 | — | CPML | Voice cloning |
 | Piper | — | MIT | Edge / real-time, lowest latency |
@@ -138,14 +131,13 @@ Controlled by `KOURAI_PROVIDER` and `KOURAI_MODEL_TIER` in `.env`:
 
 ## 🏛️ Protocol Governance
 
-Both A2A and MCP are under the **AI Alliance Infrastructure Foundation (AAIF)**, a Linux Foundation project. This means:
+A2A and MCP are both open, versioned specifications with public release notes and reference SDKs. In practice this gives us:
 
 - Stable, vendor-neutral governance
 - Long deprecation windows before breaking changes ship
-- Public roadmaps and RFCs
-- No single company can unilaterally break the protocol
-
-The joint A2A + MCP interoperability specification is expected **Q3 2026** and will define how agents that speak both protocols discover and communicate with each other natively.
+- Public roadmaps and spec repositories
+- Explicit version negotiation and compatibility notes in the specs
+- Multi-SDK ecosystems that reduce vendor lock-in
 
 ---
 
@@ -155,8 +147,9 @@ The joint A2A + MCP interoperability specification is expected **Q3 2026** and w
 |---|---|
 | A2A Python SDK | [github.com/a2aproject/a2a-python](https://github.com/a2aproject/a2a-python) |
 | A2A Protocol Spec | [a2a-protocol.org](https://a2a-protocol.org/latest) |
-| A2A Changelog | [CHANGELOG.md](https://github.com/a2aproject/a2a-python/blob/main/CHANGELOG.md) |
+| A2A Releases | [github.com/a2aproject/a2a-python/releases](https://github.com/a2aproject/a2a-python/releases) |
 | MCP Python SDK | [github.com/modelcontextprotocol/python-sdk](https://github.com/modelcontextprotocol/python-sdk) |
 | MCP Spec | [modelcontextprotocol.io](https://modelcontextprotocol.io/) |
 | LiteLLM | [github.com/BerriAI/litellm](https://github.com/BerriAI/litellm) |
-| AAIF Governance | [lfaidata.foundation](https://lfaidata.foundation/) |
+| PyPI (a2a-sdk) | [pypi.org/project/a2a-sdk](https://pypi.org/project/a2a-sdk/) |
+| PyPI (mcp) | [pypi.org/project/mcp](https://pypi.org/project/mcp/) |
