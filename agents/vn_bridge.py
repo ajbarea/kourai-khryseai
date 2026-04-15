@@ -33,6 +33,11 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, StreamingResponse
 from starlette.routing import Route
 
+from kourai_common.a2a_events import (
+    extract_artifact_text,
+    extract_message_text,
+    extract_status_text,
+)
 from kourai_common.companion import infer_portrait_state
 from kourai_common.config import get_agent_url
 from kourai_common.facts import process_agent_output
@@ -330,7 +335,7 @@ async def handle_message(request: Request) -> StreamingResponse:
         try:
             async for event in client.send_message(message):
                 if isinstance(event, Message):
-                    text = "\n".join(p.root.text for p in event.parts if hasattr(p.root, "text"))
+                    text = extract_message_text(event)
                     if text:
                         portrait_state = infer_portrait_state(current_agent, text)
                         for beat in _paginate(text):
@@ -349,13 +354,7 @@ async def handle_message(request: Request) -> StreamingResponse:
                 if isinstance(event, tuple):
                     task, update = event
                     if isinstance(update, TaskStatusUpdateEvent):
-                        status_msg = ""
-                        if update.status.message and hasattr(update.status.message, "parts"):
-                            status_msg = "\n".join(
-                                p.root.text
-                                for p in update.status.message.parts
-                                if hasattr(p.root, "text")
-                            )
+                        status_msg = extract_status_text(update)
                         if not status_msg:
                             continue
                         lower = status_msg.lower()
@@ -397,11 +396,7 @@ async def handle_message(request: Request) -> StreamingResponse:
                                             )
                                             + "\n"
                                         )
-                            text = "\n".join(
-                                p.root.text
-                                for p in update.artifact.parts
-                                if hasattr(p.root, "text")
-                            )
+                            text = extract_artifact_text(update)
                             if text:
                                 log.info(f"Artifact ({current_agent}): {text[:80]}")
                                 text = process_agent_output(

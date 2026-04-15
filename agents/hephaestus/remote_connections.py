@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from typing import TYPE_CHECKING
 from uuid import uuid4
@@ -23,6 +22,12 @@ from a2a.types import (
     TextPart,
 )
 
+from kourai_common.a2a_events import (
+    extract_message_text,
+    extract_parts_text,
+    extract_status_text,
+    extract_task_text,
+)
 from kourai_common.tracing import create_span, get_trace_context
 
 if TYPE_CHECKING:
@@ -161,53 +166,25 @@ class RemoteAgentConnection:
 
     def _extract_message_text(self, message: Message) -> str:
         """Pull text from a direct Message response."""
-        return self._extract_parts_text(message.parts)
+        return extract_message_text(message)
 
     def _extract_status_message(self, event: TaskStatusUpdateEvent) -> str:
         """Pull text from a status update's message."""
-        if event.status.message and hasattr(event.status.message, "parts"):
-            return self._extract_parts_text(event.status.message.parts)
-        return ""
+        return extract_status_text(event)
 
     def _extract_task_text(self, task: Task) -> str:
         """Pull text from a completed task's artifacts or status."""
-        if task.artifacts:
-            artifact_text = "\n".join(
-                self._extract_parts_text(artifact.parts)
-                for artifact in task.artifacts
-                if hasattr(artifact, "parts")
-            )
-            if artifact_text:
-                return artifact_text
-        if task.status.message and hasattr(task.status.message, "parts"):
-            return self._extract_parts_text(task.status.message.parts)
-        return ""
+        return extract_task_text(task)
 
     def _extract_artifact_text(self, artifact: object) -> str:
         """Pull text from a task artifact."""
         if hasattr(artifact, "parts"):
-            return self._extract_parts_text(artifact.parts)
+            return extract_parts_text(artifact.parts)
         return ""
 
     def _extract_parts_text(self, parts: object) -> str:
         """Extract text/data payloads from A2A parts."""
-        if not isinstance(parts, list):
-            return ""
-        extracted: list[str] = []
-        for part in parts:
-            root = getattr(part, "root", None)
-            text = getattr(root, "text", None)
-            if isinstance(text, str) and text:
-                extracted.append(text)
-                continue
-
-            data = getattr(root, "data", None)
-            if data is not None:
-                try:
-                    extracted.append(json.dumps(data, sort_keys=True))
-                except TypeError:
-                    extracted.append(str(data))
-        return "\n".join(extracted)
+        return extract_parts_text(parts)
 
     async def close(self) -> None:
         """Close the HTTP client."""
