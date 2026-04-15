@@ -97,6 +97,9 @@ combine-as-imports = true
 quote-style = "double"
 indent-style = "space"
 
+[tool.coverage.run]
+omit = ["tests/*"]
+
 [tool.coverage.report]
 exclude_also = [
     "def main\\(\\):",

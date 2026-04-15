@@ -47,7 +47,7 @@ def setup_tracing(
     try:
         exporter = OTLPSpanExporter(endpoint=f"{endpoint}/v1/traces")
         provider.add_span_processor(BatchSpanProcessor(exporter))
-    except Exception as e:
+    except Exception as e:  # pragma: no cover
         # Jaeger may not be running — tracing is optional
         import logging
 

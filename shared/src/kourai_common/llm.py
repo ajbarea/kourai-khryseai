@@ -129,7 +129,7 @@ async def _manage_memory(context_id: str, agent_name: str) -> None:
                     agent_name,
                     context_id,
                 )
-        except Exception as e:
+        except Exception as e:  # pragma: no cover
             log.warning("Failed to summarize memory for %s: %s", agent_name, e)
 
 
