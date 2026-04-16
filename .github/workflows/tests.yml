@@ -141,6 +141,8 @@ jobs:
     name: Integration Tests
     runs-on: ubuntu-latest
     needs: unit-tests
+    env:
+      DOCKER_HUB_USERNAME: ajb6289
     steps:
       - uses: actions/checkout@v6.0.2
 
@@ -168,6 +170,11 @@ jobs:
           ENVIRONMENT=ci
           SERVICE_VERSION=0.1.0
           EOF
+
+      - name: Build MCP sidecar images for integration tests
+        run: |
+          docker build -f docker/context7-mcp.Dockerfile -t ${DOCKER_HUB_USERNAME}/kourai-khryseai:context7-mcp .
+          docker build -f docker/memory-mcp.Dockerfile -t ${DOCKER_HUB_USERNAME}/kourai-khryseai:memory-mcp .
 
       - name: Create logs directory
         run: mkdir -p logs
