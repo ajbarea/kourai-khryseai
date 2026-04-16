@@ -143,6 +143,7 @@ jobs:
     needs: unit-tests
     env:
       DOCKER_HUB_USERNAME: ajb6289
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
     steps:
       - uses: actions/checkout@v6.0.2
 
