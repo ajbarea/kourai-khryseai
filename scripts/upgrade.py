@@ -15,26 +15,13 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-try:
-    from scripts.logging_utils import setup_logger
-except ModuleNotFoundError:
-    from logging_utils import setup_logger
-
-logger = setup_logger(__name__, "upgrade.log")
+from kourai_common.dev_log import LOG
 
 
-def run_step(cmd: list[str], description: str) -> bool:
-    """Execute an upgrade step, printing progress and logging to file.
-
-    Args:
-        cmd: Command and arguments as a list of strings.
-        description: Human-readable description for display and logging.
-
-    Returns:
-        True if the step succeeded, False on failure.
-    """
+def run_upgrade_step(cmd: list[str], description: str) -> bool:
+    """Execute an upgrade step, printing progress and logging to file."""
     print(f"  > {description}...")
-    logger.info(f"Running: {description}")
+    LOG.event("INFO", f"Running: {description}")
     try:
         result = subprocess.run(  # noqa: S603
             cmd,
@@ -44,48 +31,40 @@ def run_step(cmd: list[str], description: str) -> bool:
             encoding="utf-8",
         )
         print(f"  + {description}")
-        logger.info(f"+ {description} completed")
+        LOG.event("INFO", f"{description} completed")
         if result.stdout:
-            logger.debug(result.stdout.strip())
+            LOG.raw(result.stdout.strip())
         return True
     except subprocess.CalledProcessError as e:
         print(f"  x {description} failed (exit code {e.returncode})")
-        logger.error(f"Failed: {description} (exit code {e.returncode})")
+        LOG.event("ERROR", f"Failed: {description} (exit code {e.returncode})")
         if e.stdout:
-            logger.debug(f"stdout: {e.stdout.strip()}")
+            LOG.raw(e.stdout.strip())
         if e.stderr:
-            logger.debug(f"stderr: {e.stderr.strip()}")
+            LOG.raw(e.stderr.strip())
         return False
 
 
-def main() -> int:
-    """Update lockfile and sync all dependencies.
-
-    Returns:
-        0 on success, 1 on failure.
-    """
+def _run_upgrade() -> int:
     print("\n  Kourai Upgrade")
     print("=" * 60)
-    logger.info("Starting dependency upgrade...")
+    LOG.event("INFO", "Starting dependency upgrade...")
 
     repo_root = Path(__file__).parent.parent
     lock_file = repo_root / "uv.lock"
 
-    # Check for uv
     if not shutil.which("uv"):
         print("  x uv not found. Install: curl -LsSf https://astral.sh/uv/install.sh | sh")
-        logger.error("uv not found")
+        LOG.event("ERROR", "uv not found")
         return 1
 
-    # Backup uv.lock
     if lock_file.exists():
         timestamp = str(int(datetime.now().timestamp()))
         backup_file = repo_root / f"uv.lock.backup.{timestamp}"
         shutil.copy(lock_file, backup_file)
         print(f"  + Backed up to {backup_file.name}")
-        logger.info(f"Backed up to {backup_file.name}")
+        LOG.event("INFO", f"Backed up to {backup_file.name}")
 
-        # Keep only the last 3 backups
         backups = sorted(repo_root.glob("uv.lock.backup.*"))
         for old_backup in backups[:-3]:
             old_backup.unlink()
@@ -96,11 +75,11 @@ def main() -> int:
     ]
 
     for cmd, description in steps:
-        if not run_step(cmd, description):
+        if not run_upgrade_step(cmd, description):
             print("\n" + "=" * 60)
             print("x Upgrade failed")
             print("=" * 60 + "\n")
-            logger.error("Upgrade failed")
+            LOG.event("ERROR", "Upgrade failed")
             return 1
 
     print("\n" + "=" * 60)
@@ -113,8 +92,19 @@ def main() -> int:
     else:
         print("  Restore: cp $(ls -t uv.lock.backup.* | head -n1) uv.lock && uv sync")
     print()
-    logger.info("Upgrade completed successfully")
+    LOG.event("INFO", "Upgrade completed successfully")
     return 0
+
+
+def main() -> int:
+    LOG.open("upgrade")
+    LOG.session_header("upgrade", sys.argv[1:])
+    rc = 1
+    try:
+        rc = _run_upgrade()
+    finally:
+        LOG.session_footer(rc)
+    return rc
 
 
 if __name__ == "__main__":

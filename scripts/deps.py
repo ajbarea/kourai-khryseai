@@ -13,12 +13,7 @@ import re
 import subprocess
 import sys
 
-try:
-    from scripts.logging_utils import setup_logger
-except ModuleNotFoundError:
-    from logging_utils import setup_logger
-
-logger = setup_logger(__name__, "deps.log")
+from kourai_common.dev_log import LOG
 
 
 def extract_package_count(output: str) -> int:
@@ -48,15 +43,13 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def main() -> int:
-    """Display dependency tree with summary."""
-    args = _parse_args(sys.argv[1:])
+def _run_deps(args: argparse.Namespace) -> int:
     print("\n  Dependency Tree")
     print("=" * 60)
-    logger.info("Starting dependency tree analysis...")
+    LOG.event("INFO", "Starting dependency tree analysis...")
 
     try:
-        logger.info("Running: uv tree")
+        LOG.event("INFO", "Running: uv tree")
         result = subprocess.run(
             ["uv", "tree"],
             capture_output=True,
@@ -67,17 +60,17 @@ def main() -> int:
     except subprocess.CalledProcessError as e:
         error_msg = f"Failed to run uv tree: {e}"
         print(f"x {error_msg}")
-        logger.error(error_msg)
+        LOG.event("ERROR", error_msg)
         if e.stdout:
-            logger.debug(f"stdout: {e.stdout}")
+            LOG.raw(e.stdout)
         if e.stderr:
-            logger.debug(f"stderr: {e.stderr}")
+            LOG.raw(e.stderr)
         print("=" * 60)
         return 1
     except FileNotFoundError:
         error_msg = "uv not found. Install uv from https://docs.astral.sh/uv/"
         print(f"x {error_msg}")
-        logger.error(error_msg)
+        LOG.event("ERROR", error_msg)
         print("=" * 60)
         return 1
 
@@ -88,7 +81,7 @@ def main() -> int:
     main_packages = max(total_packages - dev_packages, 0)
 
     if stderr:
-        logger.debug(f"stderr: {stderr}")
+        LOG.raw(stderr)
 
     print(f"Total packages: {total_packages} (resolved)")
     print(f"  Main packages: {main_packages}")
@@ -98,8 +91,7 @@ def main() -> int:
     print("=" * 60)
 
     tree_lines = [line for line in output.splitlines() if line.strip()]
-    for line in tree_lines:
-        logger.debug(line)
+    LOG.raw("\n".join(tree_lines))
 
     if args.full:
         for line in tree_lines:
@@ -117,9 +109,21 @@ def main() -> int:
 
     print("=" * 60)
     print("+ Dependency tree generated")
-    print("  Full details: logs/deps.log\n")
-    logger.info("Dependency tree analysis complete")
+    print("  Full details: logs/dev-latest.log\n")
+    LOG.event("INFO", "Dependency tree analysis complete")
     return 0
+
+
+def main() -> int:
+    args = _parse_args(sys.argv[1:])
+    LOG.open("deps")
+    LOG.session_header("deps", sys.argv[1:])
+    rc = 1
+    try:
+        rc = _run_deps(args)
+    finally:
+        LOG.session_footer(rc)
+    return rc
 
 
 if __name__ == "__main__":

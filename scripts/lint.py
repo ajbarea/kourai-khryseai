@@ -1,115 +1,124 @@
 """Code quality checks and formatting.
 
-Runs ruff format, ruff check, and type checking with ty.
-Provides clear output with progress counters and exits with appropriate status codes.
+Fix-first, then check: every tool runs its auto-fixer, then a final check pass
+reports only what the tooling could not auto-resolve. Output streams live to
+the terminal and to ``logs/dev-latest.log`` (see scripts/dev_log.py).
 
 Usage:
-    python scripts/lint.py
+    uv run kourai-dev lint
+    python scripts/lint.py [--check-only | --fix-only]
 """
 
 from __future__ import annotations
 
-import subprocess
+import argparse
 import sys
 
-try:
-    from scripts.logging_utils import setup_logger
-except ModuleNotFoundError:
-    from logging_utils import setup_logger
+from kourai_common.dev_log import (
+    C_GREEN,
+    C_RED,
+    C_RESET,
+    LOG,
+    StepFailedError,
+    print_header,
+    run_step,
+)
 
-logger = setup_logger(__name__, "lint.log")
-
-
-def run_command(cmd: list[str], description: str) -> bool:
-    """Execute a command and report results.
-
-    Args:
-        cmd: Command and arguments as a list.
-        description: Human-readable description for logging.
-
-    Returns:
-        True if successful, False otherwise.
-    """
-    logger.info(f"Running: {description}")
-    try:
-        result = subprocess.run(  # noqa: S603
-            cmd,
-            check=True,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-        )
-        logger.info(f"+ {description} passed")
-        if result.stdout:
-            logger.debug(f"Output: {result.stdout}")
-        return True
-    except subprocess.CalledProcessError as e:
-        logger.error(f"x {description} failed (exit code: {e.returncode})")
-        if e.stdout:
-            logger.error(f"STDOUT:\n{e.stdout}")
-        if e.stderr:
-            logger.error(f"STDERR:\n{e.stderr}")
-        return False
-    except FileNotFoundError:
-        logger.error(f"x {description} - command not found")
-        return False
+TY_PATHS = (
+    "agents",
+    "hosts/cli",
+    "hosts/gui",
+    "mcp_servers",
+    "scripts",
+    "shared/src",
+    "tests",
+)
 
 
-def main() -> int:
-    """Run all linting checks.
+def fix_pass() -> None:
+    """Run every auto-fixer. Failures here are real tool errors, not lint findings."""
+    print_header("Fix pass")
+    run_step(["ruff", "format", "."], label="ruff-format")
+    run_step(
+        ["ruff", "check", "--fix", "--unsafe-fixes", "--show-fixes", "."],
+        label="ruff-fix",
+        check=False,
+    )
 
-    Returns:
-        0 if all checks pass, 1 if any fail.
-    """
-    print("\n  Code Quality Checks")
-    print("=" * 60)
-    logger.info("Starting code quality checks...")
 
-    checks: list[tuple[list[str], str]] = [
-        (["ruff", "format", "."], "Ruff format"),
-        (["ruff", "check", "--fix", "--unsafe-fixes", "--show-fixes", "."], "Ruff check"),
+def check_pass() -> int:
+    """Run each check. Returns non-zero if anything fails; does not raise."""
+    print_header("Check pass")
+    rcs: list[tuple[str, int]] = []
+    rcs.append(
         (
-            [
-                "ty",
-                "check",
-                "agents",
-                "hosts/cli",
-                "hosts/gui",
-                "mcp_servers",
-                "shared/src",
-                "tests",
-            ],
-            "Type checking (ty)",
-        ),
-    ]
+            "ruff-format --check",
+            run_step(["ruff", "format", "--check", "."], label="ruff-format-check", check=False),
+        )
+    )
+    rcs.append(
+        (
+            "ruff-check",
+            run_step(["ruff", "check", "."], label="ruff-check", check=False),
+        )
+    )
+    rcs.append(
+        (
+            "ty",
+            run_step(["ty", "check", *TY_PATHS], label="ty-check", check=False),
+        )
+    )
 
-    results: list[bool] = []
-    for i, (cmd, description) in enumerate(checks, 1):
-        print(f"\n[{i}/{len(checks)}] {description}...")
-        results.append(run_command(cmd, description))
-
-    # Summary
-    passed = sum(results)
-    total = len(results)
-
-    print("\n" + "=" * 60)
+    print()
     print("  Summary")
     print("=" * 60)
-    for (_, description), result in zip(checks, results, strict=False):
-        status = "+" if result else "x"
-        print(f"  {status} {description}")
-
+    overall = 0
+    for name, rc in rcs:
+        mark = f"{C_GREEN}+{C_RESET}" if rc == 0 else f"{C_RED}x{C_RESET}"
+        print(f"  {mark} {name} (rc={rc})")
+        if rc != 0:
+            overall = rc
     print("=" * 60)
-    if passed == total:
-        print(f"+ All checks passed ({passed}/{total})\n")
-        logger.info("All checks passed")
-        return 0
+    if overall == 0:
+        print(f"{C_GREEN}+ All checks passed{C_RESET}\n")
     else:
-        failed = total - passed
-        print(f"x Some checks failed ({failed} failed, {passed} passed)")
-        print("  Full details: logs/lint.log\n")
-        logger.error(f"Some checks failed ({failed} failed, {passed} passed)")
-        return 1
+        print(f"{C_RED}x Some checks failed. Full details: logs/dev-latest.log{C_RESET}\n")
+    return overall
+
+
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(prog="lint", description=__doc__)
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
+        "--fix-only",
+        action="store_true",
+        help="Run auto-fixers only; skip the check pass.",
+    )
+    group.add_argument(
+        "--check-only",
+        action="store_true",
+        help="Run the check pass only; skip auto-fixers.",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv or sys.argv[1:])
+    LOG.open("lint")
+    LOG.session_header("lint", sys.argv[1:])
+
+    overall = 0
+    try:
+        if not args.check_only:
+            fix_pass()
+        if not args.fix_only:
+            overall = check_pass()
+    except StepFailedError as exc:
+        LOG.event("ERROR", f"step raised: {exc}")
+        overall = exc.returncode
+    finally:
+        LOG.session_footer(overall)
+    return overall
 
 
 if __name__ == "__main__":

@@ -6,6 +6,12 @@ The canonical local workflow is:
 
 The Makefile remains available as a thin compatibility wrapper, but this
 module is the single source of truth for supported developer commands.
+
+Output captured by ``DevLog`` (see ``kourai_common.dev_log``) lands in
+``logs/dev-latest.log`` plus a timestamped archive. Tasks marked ``tee=True``
+stream through ``run_step``; ``tee=False`` tasks (interactive GUIs, docker
+attaches, the HF setup prompt) pass through directly so stdin/TTY behavior is
+preserved.
 """
 
 from __future__ import annotations
@@ -21,8 +27,9 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from kourai_common.dev_log import LOG, SESSION_ENV, run_step
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
-# Load .env at the root of the project
 load_dotenv(PROJECT_ROOT / ".env")
 
 DEFAULT_ENV = {
@@ -42,6 +49,10 @@ class Task:
     command_factory: CommandFactory
     timed: bool = True
     cwd: Path = PROJECT_ROOT
+    # tee=True -> stream through DevLog.run_step (captured to log + console).
+    # tee=False -> direct passthrough so stdin/TTY behavior is preserved
+    # (GUIs, docker attaches, interactive prompts).
+    tee: bool = True
 
 
 def _default_project_renpy_exe() -> Path:
@@ -67,7 +78,6 @@ def resolve_renpy_executable() -> str:
         if exe.exists():
             return str(exe)
 
-    # Fall back to the historical in-repo location so failure remains explicit.
     return str(_default_project_renpy_exe())
 
 
@@ -88,7 +98,10 @@ def build_env() -> dict[str, str]:
     for key, value in DEFAULT_ENV.items():
         env.setdefault(key, value)
 
-    # Isolate platform-specific virtual environments to prevent binary conflicts.
+    # Tell child scripts a parent dev session owns the log file so their
+    # DevLog.open() becomes a no-op (no truncation, no duplicate header).
+    env[SESSION_ENV] = "1"
+
     wsl = os.environ.get("WSL_DISTRO_NAME")
     if sys.platform == "win32":
         expected_env = ".venv-wsl" if wsl else ".venv-win"
@@ -96,10 +109,7 @@ def build_env() -> dict[str, str]:
         expected_env = ".venv"
 
     configured_env = env.get("UV_PROJECT_ENVIRONMENT")
-    if not configured_env:
-        env["UV_PROJECT_ENVIRONMENT"] = expected_env
-    elif sys.platform == "win32" and configured_env == ".venv":
-        # Auto-correct stale/global shell settings that defeat split-env isolation.
+    if not configured_env or (sys.platform == "win32" and configured_env == ".venv"):
         env["UV_PROJECT_ENVIRONMENT"] = expected_env
 
     return env
@@ -113,11 +123,7 @@ def strip_passthrough_marker(args: list[str]) -> list[str]:
 
 
 def python_script(*parts: str) -> list[str]:
-    """Build a command for a repository Python script.
-
-    Uses ``uv run`` so the selected interpreter always matches
-    ``UV_PROJECT_ENVIRONMENT`` (important for split-env Windows/WSL setups).
-    """
+    """Build a command for a repository Python script."""
     return ["uv", "run", "--no-active", "python", str(PROJECT_ROOT.joinpath(*parts))]
 
 
@@ -142,6 +148,8 @@ TASK_GROUPS: tuple[tuple[str, tuple[tuple[str, Task], ...]], ...] = (
                 Task(
                     description="Install all Python dependencies + optional HF Storage Buckets",
                     command_factory=lambda: python_script("scripts", "setup.py"),
+                    # HF bucket setup may prompt for input — keep stdin attached.
+                    tee=False,
                 ),
             ),
             (
@@ -149,6 +157,7 @@ TASK_GROUPS: tuple[tuple[str, tuple[tuple[str, Task], ...]], ...] = (
                 Task(
                     description="Create HF Storage Bucket for agent artifacts",
                     command_factory=lambda: python_script("scripts", "setup_buckets.py"),
+                    tee=False,
                 ),
             ),
             (
@@ -163,6 +172,7 @@ TASK_GROUPS: tuple[tuple[str, tuple[tuple[str, Task], ...]], ...] = (
                 Task(
                     description="Nuke and rebuild: clean -> down -> setup -> upgrade -> clean",
                     command_factory=list,
+                    tee=False,
                 ),
             ),
         ),
@@ -175,6 +185,7 @@ TASK_GROUPS: tuple[tuple[str, tuple[tuple[str, Task], ...]], ...] = (
                 Task(
                     description="Start all agents + infrastructure (fast: reuses containers)",
                     command_factory=lambda: ["docker", "compose", "up", "-d", "--wait"],
+                    tee=False,
                 ),
             ),
             (
@@ -182,6 +193,7 @@ TASK_GROUPS: tuple[tuple[str, tuple[tuple[str, Task], ...]], ...] = (
                 Task(
                     description="Stop all services and remove containers",
                     command_factory=lambda: ["docker", "compose", "down", "--remove-orphans"],
+                    tee=False,
                 ),
             ),
             (
@@ -189,6 +201,7 @@ TASK_GROUPS: tuple[tuple[str, tuple[tuple[str, Task], ...]], ...] = (
                 Task(
                     description="Restart all services (down + up)",
                     command_factory=list,
+                    tee=False,
                 ),
             ),
             (
@@ -205,6 +218,7 @@ TASK_GROUPS: tuple[tuple[str, tuple[tuple[str, Task], ...]], ...] = (
                         "missing",
                         "--wait",
                     ],
+                    tee=False,
                 ),
             ),
             (
@@ -213,6 +227,7 @@ TASK_GROUPS: tuple[tuple[str, tuple[tuple[str, Task], ...]], ...] = (
                     description="Show current service status and health",
                     command_factory=lambda: ["docker", "compose", "ps"],
                     timed=False,
+                    tee=False,
                 ),
             ),
             (
@@ -220,6 +235,7 @@ TASK_GROUPS: tuple[tuple[str, tuple[tuple[str, Task], ...]], ...] = (
                 Task(
                     description="Start services + GUI (full development stack)",
                     command_factory=list,
+                    tee=False,
                 ),
             ),
             (
@@ -227,6 +243,7 @@ TASK_GROUPS: tuple[tuple[str, tuple[tuple[str, Task], ...]], ...] = (
                 Task(
                     description="Start services + Ren'Py VN (visual novel stack)",
                     command_factory=list,
+                    tee=False,
                 ),
             ),
         ),
@@ -245,6 +262,7 @@ TASK_GROUPS: tuple[tuple[str, tuple[tuple[str, Task], ...]], ...] = (
                         "--agent",
                         "http://localhost:10000/",
                     ],
+                    tee=False,
                 ),
             ),
             (
@@ -252,6 +270,7 @@ TASK_GROUPS: tuple[tuple[str, tuple[tuple[str, Task], ...]], ...] = (
                 Task(
                     description="Launch terminal CLI client (runs on host machine)",
                     command_factory=lambda: [sys.executable, "-m", "hosts.cli", "--voice"],
+                    tee=False,
                 ),
             ),
             (
@@ -262,6 +281,7 @@ TASK_GROUPS: tuple[tuple[str, tuple[tuple[str, Task], ...]], ...] = (
                         resolve_renpy_executable(),
                         str(PROJECT_ROOT / "hosts" / "vn" / "kourai_vn"),
                     ],
+                    tee=False,
                 ),
             ),
         ),
@@ -269,6 +289,13 @@ TASK_GROUPS: tuple[tuple[str, tuple[tuple[str, Task], ...]], ...] = (
     (
         "Quality Gates",
         (
+            (
+                "fix",
+                Task(
+                    description="Run every auto-fixer; skip the check pass",
+                    command_factory=lambda: [*python_script("scripts", "lint.py"), "--fix-only"],
+                ),
+            ),
             (
                 "lint",
                 Task(
@@ -328,6 +355,7 @@ TASK_GROUPS: tuple[tuple[str, tuple[tuple[str, Task], ...]], ...] = (
                 Task(
                     description="Serve project documentation (Zensical on http://localhost:8000)",
                     command_factory=lambda: ["zensical", "serve"],
+                    tee=False,
                 ),
             ),
         ),
@@ -372,6 +400,7 @@ TASK_GROUPS: tuple[tuple[str, tuple[tuple[str, Task], ...]], ...] = (
                 Task(
                     description="Remove stopped containers, dangling images, unused build cache",
                     command_factory=lambda: ["docker", "system", "prune", "-f"],
+                    tee=False,
                 ),
             ),
         ),
@@ -380,7 +409,6 @@ TASK_GROUPS: tuple[tuple[str, tuple[tuple[str, Task], ...]], ...] = (
 
 TASKS = {name: task for _, group in TASK_GROUPS for name, task in group}
 
-# Composite tasks that chain other tasks
 COMPOSITE_TASKS: dict[str, list[str]] = {
     "yolo": ["clean", "down", "setup", "upgrade", "clean"],
     "restart": ["down", "up"],
@@ -406,13 +434,20 @@ def print_help() -> None:
 
 
 def run_process(command: list[str], *, cwd: Path) -> int:
-    """Run a subprocess and return its exit code."""
+    """Direct passthrough for tee=False tasks (preserves stdin/TTY)."""
     try:
         result = subprocess.run(command, cwd=cwd, env=build_env(), check=False)
     except FileNotFoundError:
         print(f"Command not found: {command[0]}", file=sys.stderr)
         return 127
     return result.returncode
+
+
+def _execute_task(task: Task, command: list[str], *, label: str) -> int:
+    """Dispatch a leaf task by tee mode."""
+    if task.tee:
+        return run_step(command, check=False, label=label, cwd=task.cwd, env=build_env())
+    return run_process(command, cwd=task.cwd)
 
 
 def run_task(name: str, extra_args: list[str] | None = None) -> int:
@@ -423,7 +458,6 @@ def run_task(name: str, extra_args: list[str] | None = None) -> int:
         print_help()
         return 0
 
-    # Composite tasks: chain subtasks
     if COMPOSITE_TASKS.get(name):
         start = time.perf_counter()
         for task_name in COMPOSITE_TASKS[name]:
@@ -436,7 +470,6 @@ def run_task(name: str, extra_args: list[str] | None = None) -> int:
         print(f"[TIMER] Target {name} completed in {elapsed} seconds")
         return 0
 
-    # Rebuild is a special composite: prune + clean + docker build
     if name == "rebuild":
         start = time.perf_counter()
         for task_name in ("down", "prune", "clean"):
@@ -445,11 +478,9 @@ def run_task(name: str, extra_args: list[str] | None = None) -> int:
                 elapsed = round(time.perf_counter() - start)
                 print(f"[TIMER] Target rebuild completed in {elapsed} seconds")
                 return result
-        # Now run the actual docker build
         task = TASKS[name]
-        result = run_process(task.command_factory() + extra_args, cwd=task.cwd)
+        result = _execute_task(task, task.command_factory() + extra_args, label=name)
         if result == 0:
-            # Show status after rebuild
             run_process(["docker", "compose", "ps"], cwd=task.cwd)
         elapsed = round(time.perf_counter() - start)
         print(f"[TIMER] Target rebuild completed in {elapsed} seconds")
@@ -458,7 +489,7 @@ def run_task(name: str, extra_args: list[str] | None = None) -> int:
     task = TASKS[name]
     command = task.command_factory() + extra_args
     start = time.perf_counter()
-    result = run_process(command, cwd=task.cwd)
+    result = _execute_task(task, command, label=name)
     if task.timed:
         elapsed = round(time.perf_counter() - start)
         print(f"[TIMER] Target {name} completed in {elapsed} seconds")
@@ -486,11 +517,19 @@ def main(argv: list[str] | None = None) -> int:
         print_help()
         return 2
 
+    # Open one DevLog session for the whole orchestration. Child scripts see
+    # KOURAI_DEV_SESSION=1 in their env (set by build_env) and short-circuit.
+    LOG.open(parsed.command)
+    LOG.session_header(parsed.command, parsed.args or [])
+    rc = 1
     try:
-        return run_task(parsed.command, parsed.args)
+        rc = run_task(parsed.command, parsed.args)
     except KeyboardInterrupt:
         print("\n[INTERRUPT] Operation cancelled by user", file=sys.stderr)
-        return 130
+        rc = 130
+    finally:
+        LOG.session_footer(rc)
+    return rc
 
 
 if __name__ == "__main__":

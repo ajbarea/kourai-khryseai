@@ -46,7 +46,13 @@ def test_yolo_runs_clean_down_setup_upgrade_clean(monkeypatch) -> None:
         assert cwd == dev_cli.PROJECT_ROOT
         return 0
 
+    def fake_run_step(command, *, check=False, label=None, cwd=None, env=None) -> int:  # type: ignore[no-untyped-def]
+        commands.append(list(command))
+        assert cwd == dev_cli.PROJECT_ROOT
+        return 0
+
     monkeypatch.setattr(dev_cli, "run_process", fake_run_process)
+    monkeypatch.setattr(dev_cli, "run_step", fake_run_step)
 
     assert dev_cli.run_task("yolo") == 0
 
@@ -113,7 +119,12 @@ def test_passthrough_args_forwarded(monkeypatch) -> None:
         captured["command"] = command
         return 0
 
+    def fake_run_step(command, *, check=False, label=None, cwd=None, env=None) -> int:  # type: ignore[no-untyped-def]
+        captured["command"] = list(command)
+        return 0
+
     monkeypatch.setattr(dev_cli, "run_process", fake_run_process)
+    monkeypatch.setattr(dev_cli, "run_step", fake_run_step)
 
     dev_cli.run_task("clean", ["--", "--cache-only"])
     cmd = captured["command"]

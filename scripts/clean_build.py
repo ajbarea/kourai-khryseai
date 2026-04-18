@@ -3,6 +3,9 @@
 Removes build artifacts, test caches, and temporary files to maintain a clean
 development environment. Supports selective cleanup via --cache-only and --tests-only.
 
+When invoked from a parent dev session (``KOURAI_DEV_SESSION=1``), the
+``logs/`` directory is preserved so the parent's open log handle survives.
+
 Usage:
     python scripts/clean_build.py
     python scripts/clean_build.py --cache-only
@@ -12,25 +15,24 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
 import shutil
 import sys
 from pathlib import Path
 
-try:
-    from scripts.logging_utils import setup_logger
-except ModuleNotFoundError:
-    from logging_utils import setup_logger
+from kourai_common.dev_log import LOG, SESSION_ENV
 
-logger = setup_logger(__name__, "clean_build.log")
+
+def _filter_logs(dirs: list[str]) -> list[str]:
+    """Strip ``logs`` from the cleanup list when a parent session owns the file."""
+    if os.environ.get(SESSION_ENV) == "1" and "logs" in dirs:
+        LOG.event("INFO", "skipping logs/ — parent dev session owns the log file")
+        return [d for d in dirs if d != "logs"]
+    return dirs
 
 
 def clean_build(cache_only: bool = False, tests_only: bool = False) -> None:
-    """Remove build artifacts and cache directories.
-
-    Args:
-        cache_only: If True, only clean cache directories.
-        tests_only: If True, only clean test artifacts.
-    """
+    """Remove build artifacts and cache directories."""
     if cache_only:
         print("\n  Kourai Cleanup (cache only)")
     elif tests_only:
@@ -38,22 +40,17 @@ def clean_build(cache_only: bool = False, tests_only: bool = False) -> None:
     else:
         print("\n  Kourai Cleanup")
     print("=" * 60)
-    logger.info("Starting cleanup...")
+    LOG.event("INFO", "Starting cleanup...")
 
     root = Path()
     skip_dirs = {".venv", ".venv-win", ".venv-wsl", "venv", "node_modules"}
-
-    # Close logger handlers before cleaning logs directory
-    for handler in logger.handlers[:]:
-        handler.close()
-        logger.removeHandler(handler)
 
     if tests_only:
         _clean_patterns(
             root, [".pytest_cache", "__pycache__", ".hypothesis", "MagicMock"], skip_dirs
         )
         _clean_files(root, [".coverage"])
-        _clean_dirs(root, ["logs", "htmlcov"])
+        _clean_dirs(root, _filter_logs(["logs", "htmlcov"]))
         _print_done()
         return
 
@@ -62,22 +59,23 @@ def clean_build(cache_only: bool = False, tests_only: bool = False) -> None:
         _print_done()
         return
 
-    # Full clean
     _clean_dirs(
         root,
-        [
-            "logs",
-            ".pytest_cache",
-            ".ty_cache",
-            ".mypy_cache",
-            ".ruff_cache",
-            ".hypothesis",
-            ".playwright-mcp",
-            "site",
-            "dist",
-            "build",
-            "htmlcov",
-        ],
+        _filter_logs(
+            [
+                "logs",
+                ".pytest_cache",
+                ".ty_cache",
+                ".mypy_cache",
+                ".ruff_cache",
+                ".hypothesis",
+                ".playwright-mcp",
+                "site",
+                "dist",
+                "build",
+                "htmlcov",
+            ]
+        ),
     )
     _clean_patterns(root, ["__pycache__", ".egg-info", "MagicMock"], skip_dirs)
     _clean_files(root, [".coverage", "docker-debug.log"])
@@ -152,19 +150,30 @@ def _clean_globs(root: Path, patterns: list[str]) -> None:
 
 
 def _print_done() -> None:
-    """Print completion message."""
     print("\n" + "=" * 60)
     print("+ Cleanup completed successfully")
     print("=" * 60 + "\n")
 
 
-if __name__ == "__main__":
+def main() -> int:
     parser = argparse.ArgumentParser(description="Clean build artifacts.")
     parser.add_argument("--cache-only", action="store_true", help="Only clean cache directories")
     parser.add_argument("--tests-only", action="store_true", help="Only clean test artifacts")
     args = parser.parse_args()
+
+    LOG.open("clean")
+    LOG.session_header("clean", sys.argv[1:])
+    rc = 0
     try:
         clean_build(cache_only=args.cache_only, tests_only=args.tests_only)
-    except Exception as e:
+    except (OSError, RuntimeError) as e:
         print(f"x Cleanup failed: {e}")
-        sys.exit(1)
+        LOG.event("ERROR", f"Cleanup failed: {e}")
+        rc = 1
+    finally:
+        LOG.session_footer(rc)
+    return rc
+
+
+if __name__ == "__main__":
+    sys.exit(main())

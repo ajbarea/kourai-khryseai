@@ -16,56 +16,35 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    import logging
-
-try:
-    from scripts.logging_utils import setup_logger
-except ModuleNotFoundError:
-    from logging_utils import setup_logger
+from kourai_common.dev_log import LOG
 
 
-def run_suite(cmd: list[str], description: str, suite_logger: logging.Logger) -> tuple[bool, str]:
-    """Execute a test suite and return (passed, output).
-
-    Args:
-        cmd: Command and arguments as a list.
-        description: Human-readable description for logging.
-        suite_logger: Logger to use for this suite.
-
-    Returns:
-        (True if successful, False otherwise), combined stdout+stderr.
-    """
-    suite_logger.info(f"Running: {description}")
+def run_suite(cmd: list[str], description: str) -> tuple[bool, str]:
+    """Execute a test suite and return (passed, output)."""
+    LOG.event("INFO", f"Running: {description}")
     try:
-        result = subprocess.run(cmd, check=True, capture_output=True, text=True, encoding="utf-8")  # noqa: S603
+        result = subprocess.run(  # noqa: S603
+            cmd, check=True, capture_output=True, text=True, encoding="utf-8"
+        )
         output = (result.stdout + result.stderr).strip()
-        suite_logger.info(f"+ {description} passed")
+        LOG.event("INFO", f"{description} passed")
         if output:
-            suite_logger.debug(output)
+            LOG.raw(output)
         return True, output
     except subprocess.CalledProcessError as e:
         output = (e.stdout + e.stderr).strip()
-        suite_logger.error(f"x {description} failed (exit code: {e.returncode})")
+        LOG.event("ERROR", f"{description} failed (exit code: {e.returncode})")
         if output:
-            suite_logger.error(output)
+            LOG.raw(output)
         return False, output
     except FileNotFoundError:
-        suite_logger.error(f"x {description} - command not found")
+        LOG.event("ERROR", f"{description} - command not found")
         return False, ""
 
 
 def parse_pytest_summary(output: str) -> str:
-    """Extract the short result line from pytest output.
-
-    Args:
-        output: Combined pytest stdout/stderr.
-
-    Returns:
-        Summary string like '2155 passed, 2 skipped in 48.98s'.
-    """
+    """Extract the short result line from pytest output."""
     matches = re.findall(r"=+ (.+?) =+\s*$", output, re.MULTILINE)
     if matches:
         return matches[-1].strip()
@@ -75,32 +54,15 @@ def parse_pytest_summary(output: str) -> str:
     return ""
 
 
-def main() -> int:
-    """Run test suite with coverage.
-
-    Returns:
-        0 if all tests pass, 1 if any fail.
-    """
-    args = sys.argv[1:]
-    run_unit = "--unit" in args
-    run_integration = "--integration" in args
-    run_performance = "--performance" in args
-    run_all = not (run_unit or run_integration or run_performance)
-
+def _build_suites(
+    *, run_all: bool, run_unit: bool, run_integration: bool, run_performance: bool
+) -> list[tuple[list[str], str]]:
     log_dir = Path("logs")
     log_dir.mkdir(parents=True, exist_ok=True)
     coverage_xml = log_dir / "coverage.xml"
-
-    # Per-suite loggers so each suite writes its own log file. General info
-    # (lint pre-flight, overall summary) is routed to the first selected
-    # suite's logger.
-    primary_logger: logging.Logger | None = None
-
-    suites: list[tuple[list[str], str, logging.Logger]] = []
+    suites: list[tuple[list[str], str]] = []
 
     if run_all or run_unit:
-        unit_logger = setup_logger("unit_test", "unit_test.log")
-        primary_logger = unit_logger
         suites.append(
             (
                 [
@@ -117,14 +79,10 @@ def main() -> int:
                     "--cov-report=term-missing",
                 ],
                 "Unit tests",
-                unit_logger,
             )
         )
 
     if run_all or run_performance:
-        perf_logger = setup_logger("performance_test", "performance_test.log")
-        if primary_logger is None:
-            primary_logger = perf_logger
         cov_args = ["--cov-append"] if (run_all or run_unit) else []
         suites.append(
             (
@@ -141,14 +99,10 @@ def main() -> int:
                     "--cov-report=term-missing",
                 ],
                 "Performance tests",
-                perf_logger,
             )
         )
 
     if run_all or run_integration:
-        int_logger = setup_logger("integration_test", "integration_test.log")
-        if primary_logger is None:
-            primary_logger = int_logger
         cov_args = ["--cov-append"] if (run_all or run_unit or run_performance) else []
         suites.append(
             (
@@ -167,22 +121,34 @@ def main() -> int:
                     "--cov-report=term-missing",
                 ],
                 "Integration tests",
-                int_logger,
             )
         )
 
-    # Fallback only if absolutely no suites selected
-    if primary_logger is None:
-        primary_logger = setup_logger(__name__, "test.log")
+    return suites
+
+
+def _run_tests() -> int:
+    args = sys.argv[1:]
+    run_unit = "--unit" in args
+    run_integration = "--integration" in args
+    run_performance = "--performance" in args
+    run_all = not (run_unit or run_integration or run_performance)
+
+    suites = _build_suites(
+        run_all=run_all,
+        run_unit=run_unit,
+        run_integration=run_integration,
+        run_performance=run_performance,
+    )
+    coverage_xml = Path("logs") / "coverage.xml"
 
     print("\n  Test Suite")
     print("=" * 60)
-    primary_logger.info("Starting test suite...")
+    LOG.event("INFO", "Starting test suite...")
 
-    # If running all, run lint first. Log lint to the primary suite logger.
     if run_all:
         print(f"\n[0/{len(suites)}] Lint (pre-flight)...")
-        primary_logger.info("Running: Lint (pre-flight)")
+        LOG.event("INFO", "Running: Lint (pre-flight)")
         lint_result = subprocess.run(  # noqa: S603
             [sys.executable, str(Path(__file__).with_name("lint.py"))],
             check=False,
@@ -192,23 +158,22 @@ def main() -> int:
         )
         if lint_result.returncode != 0:
             print("\nx Lint failed — fix issues before running tests\n")
-            primary_logger.error("Lint failed")
+            LOG.event("ERROR", "Lint failed")
             if lint_result.stdout or lint_result.stderr:
-                primary_logger.debug(lint_result.stdout + lint_result.stderr)
+                LOG.raw(lint_result.stdout + lint_result.stderr)
             return 1
-        primary_logger.info("+ Lint passed")
+        LOG.event("INFO", "Lint passed")
 
     results: list[tuple[str, bool, str]] = []
     try:
-        for i, (cmd, description, sl) in enumerate(suites, 1):
+        for i, (cmd, description) in enumerate(suites, 1):
             print(f"\n[{i}/{len(suites)}] {description}...")
-            passed, output = run_suite(cmd, description, sl)
+            passed, output = run_suite(cmd, description)
             results.append((description, passed, output))
     except KeyboardInterrupt:
         print("\n[INTERRUPT] Test run cancelled by user", file=sys.stderr)
         return 130
 
-    # Summary
     passed_count = sum(1 for _, p, _ in results if p)
     total = len(results)
 
@@ -226,14 +191,24 @@ def main() -> int:
 
     if passed_count == total:
         print(f"+ All tests passed ({passed_count}/{total})\n")
-        primary_logger.info(f"All tests passed ({passed_count}/{total})")
+        LOG.event("INFO", f"All tests passed ({passed_count}/{total})")
         return 0
-    else:
-        failed = total - passed_count
-        print(f"x {failed}/{total} suites failed")
-        print("  See logs/*_test.log for details\n")
-        primary_logger.error(f"{failed}/{total} suites failed")
-        return 1
+    failed = total - passed_count
+    print(f"x {failed}/{total} suites failed")
+    print("  See logs/dev-latest.log for details\n")
+    LOG.event("ERROR", f"{failed}/{total} suites failed")
+    return 1
+
+
+def main() -> int:
+    LOG.open("test")
+    LOG.session_header("test", sys.argv[1:])
+    rc = 1
+    try:
+        rc = _run_tests()
+    finally:
+        LOG.session_footer(rc)
+    return rc
 
 
 if __name__ == "__main__":

@@ -11,32 +11,22 @@ import subprocess
 import sys
 from pathlib import Path
 
-try:
-    from scripts.logging_utils import setup_logger
-except ModuleNotFoundError:
-    from logging_utils import setup_logger
+from kourai_common.dev_log import LOG
 
-logger = setup_logger(__name__, "validate.log")
 LINT_SCRIPT = Path(__file__).with_name("lint.py")
 
 
-def run_step(cmd: list[str], description: str) -> tuple[bool, str]:
-    """Run a validation step and return (passed, output).
-
-    Args:
-        cmd: Command and arguments.
-        description: Human-readable label for display and logging.
-
-    Returns:
-        (True if passed, False on failure), combined stdout+stderr.
-    """
+def run_validate_step(cmd: list[str], description: str) -> tuple[bool, str]:
+    """Run a validation step and return (passed, output)."""
     print(f"  > {description}...")
-    logger.info(f"Running: {description}")
-    result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")  # noqa: S603
+    LOG.event("INFO", f"Running: {description}")
+    result = subprocess.run(  # noqa: S603
+        cmd, capture_output=True, text=True, encoding="utf-8", check=False
+    )
     output = (result.stdout + result.stderr).strip()
     passed = result.returncode == 0
     if output:
-        logger.debug(output)
+        LOG.raw(output)
     return passed, output
 
 
@@ -58,20 +48,14 @@ def parse_pytest_summary(output: str) -> str:
     return ""
 
 
-def main() -> int:
-    """Run lint and unit tests, report combined result.
-
-    Returns:
-        0 if all checks pass, 1 if any fail.
-    """
+def _run_validate() -> int:
     print("\n  Kourai Validate")
     print("=" * 60)
-    logger.info("Starting validation...")
+    LOG.event("INFO", "Starting validation...")
 
     results: list[tuple[str, bool, str]] = []
 
-    # Step 1: Lint
-    passed, output = run_step(
+    passed, output = run_validate_step(
         [sys.executable, str(LINT_SCRIPT)],
         "Lint",
     )
@@ -84,11 +68,10 @@ def main() -> int:
             for line in output.splitlines():
                 print(f"    {line}")
             print()
-    logger.info(f"Lint: {'passed' if passed else 'FAILED'}")
+    LOG.event("INFO", f"Lint: {'passed' if passed else 'FAILED'}")
     results.append(("Lint", passed, output))
 
-    # Step 2: Unit tests
-    passed, output = run_step(
+    passed, output = run_validate_step(
         [
             sys.executable,
             "-m",
@@ -113,10 +96,9 @@ def main() -> int:
                 in_failure = True
             if in_failure:
                 print(f"    {line}")
-    logger.info(f"Unit tests: {'passed' if passed else 'FAILED'} -- {summary}")
+    LOG.event("INFO", f"Unit tests: {'passed' if passed else 'FAILED'} -- {summary}")
     results.append(("Unit tests", passed, output))
 
-    # Summary
     all_passed = all(p for _, p, _ in results)
     passed_count = sum(1 for _, p, _ in results if p)
     total = len(results)
@@ -126,11 +108,22 @@ def main() -> int:
         print(f"+ All checks passed ({passed_count}/{total})")
     else:
         print(f"x {total - passed_count}/{total} checks failed")
-        print("  Full details: logs/validate.log")
+        print("  Full details: logs/dev-latest.log")
     print("=" * 60 + "\n")
 
-    logger.info(f"Validation complete -- {passed_count}/{total} passed")
+    LOG.event("INFO", f"Validation complete -- {passed_count}/{total} passed")
     return 0 if all_passed else 1
+
+
+def main() -> int:
+    LOG.open("validate")
+    LOG.session_header("validate", sys.argv[1:])
+    rc = 1
+    try:
+        rc = _run_validate()
+    finally:
+        LOG.session_footer(rc)
+    return rc
 
 
 if __name__ == "__main__":

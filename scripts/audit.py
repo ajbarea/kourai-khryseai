@@ -13,12 +13,7 @@ import re
 import subprocess
 import sys
 
-try:
-    from scripts.logging_utils import setup_logger
-except ModuleNotFoundError:
-    from logging_utils import setup_logger
-
-logger = setup_logger(__name__, "audit.log")
+from kourai_common.dev_log import LOG
 
 
 def parse_skipped(output: str) -> list[str]:
@@ -53,7 +48,7 @@ def run_audit(cmd: list[str], label: str) -> tuple[bool | None, str]:
         None: command unavailable in this environment.
     """
     print(f"  > Running {label}...")
-    logger.info(f"Running: {label}")
+    LOG.event("INFO", f"Running: {label}")
     try:
         result = subprocess.run(  # noqa: S603
             cmd,
@@ -63,11 +58,12 @@ def run_audit(cmd: list[str], label: str) -> tuple[bool | None, str]:
             encoding="utf-8",
         )
     except FileNotFoundError:
-        logger.debug(f"{label} not found")
+        LOG.event("INFO", f"{label} not found")
         return None, ""
 
     output = (result.stdout or "") + (result.stderr or "")
-    logger.debug(output.strip())
+    if output.strip():
+        LOG.raw(output.strip())
 
     # Older uv versions may not support "audit"; treat as unavailable.
     lowered = output.lower()
@@ -76,7 +72,7 @@ def run_audit(cmd: list[str], label: str) -> tuple[bool | None, str]:
         and "uv audit" in label
         and ("no such command" in lowered or "unrecognized" in lowered)
     ):
-        logger.debug("uv audit unsupported by this uv version")
+        LOG.event("INFO", "uv audit unsupported by this uv version")
         return None, output
 
     return result.returncode == 0, output
@@ -106,11 +102,10 @@ def extract_advisory_preview(output: str, limit: int = 3) -> list[str]:
     return lines
 
 
-def main() -> int:
-    """Run a security audit on project dependencies."""
+def _run_audit() -> int:
     print("\n  Security Audit")
     print("=" * 60)
-    logger.info("Starting security audit...")
+    LOG.event("INFO", "Starting security audit...")
 
     tools = [
         (["pip-audit"], "pip-audit"),
@@ -129,10 +124,10 @@ def main() -> int:
         print(f"  > Backend: {label}")
         if passed:
             print("  + No vulnerabilities found")
-            logger.info("Audit passed")
+            LOG.event("INFO", "Audit passed")
         else:
             print("  x Vulnerabilities found")
-            logger.error("Audit failed")
+            LOG.event("ERROR", "Audit failed")
             if vuln_count is not None:
                 print(f"  ! Vulnerability count: {vuln_count}")
             if advisory_preview:
@@ -142,22 +137,33 @@ def main() -> int:
 
         if skipped:
             print(f"  ! Skipped packages ({len(skipped)}): {', '.join(skipped)}")
-            logger.info(f"Skipped packages: {', '.join(skipped)}")
+            LOG.event("INFO", f"Skipped packages: {', '.join(skipped)}")
 
         print("\n" + "=" * 60)
         print("+ Audit passed" if passed else "x Audit failed")
-        print("  Full details: logs/audit.log")
+        print("  Full details: logs/dev-latest.log")
         print("=" * 60 + "\n")
         return 0 if passed else 1
 
     print("  ! No audit backend available (pip-audit or uv audit)")
     print("    Install pip-audit with: uv add --dev pip-audit")
-    logger.warning("No audit backend available")
+    LOG.event("WARN", "No audit backend available")
     print("\n" + "=" * 60)
     print("+ Audit skipped")
-    print("  Full details: logs/audit.log")
+    print("  Full details: logs/dev-latest.log")
     print("=" * 60 + "\n")
     return 0
+
+
+def main() -> int:
+    LOG.open("audit")
+    LOG.session_header("audit", sys.argv[1:])
+    rc = 1
+    try:
+        rc = _run_audit()
+    finally:
+        LOG.session_footer(rc)
+    return rc
 
 
 if __name__ == "__main__":
