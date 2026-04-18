@@ -1,0 +1,32 @@
+:root {
+  /* Metallic Gold Palette */
+  --gold-light: #F1D2A1;
+  --gold-mid: #C9944A;
+  --gold-dark: #AA771C;
+  --gold-deep: #8A6623;
+  --gold-metallic: #D4AF37;
+  --gold-gradient: linear-gradient(135deg, #CF995F 0%, #F1D2A1 25%, #E2B07E 50%, #F1D2A1 75%, #CF995F 100%);
+
+  /* Obsidian & Shadow */
+  --obsidian: #010201;
+  --glass-bg: color-mix(in srgb, #fff 3%, transparent);
+  --glass-border: color-mix(in srgb, var(--gold-metallic) 20%, transparent);
+
+  /* Assets */
+  --hero-bg-image: url('../../assets/golden-maidens.png');
+
+  /* Zensical Overrides */
+  --md-primary-fg-color: var(--gold-light);
+  --md-accent-fg-color: var(--gold-light);
+}
+
+/* Color swatches (Art Direction) */
+.swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  vertical-align: middle;
+  margin-right: 6px;
+  border: 1px solid color-mix(in srgb, #fff 15%, transparent);
+}

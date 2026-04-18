@@ -1,0 +1,234 @@
+/* Hide footer on homepage — JS adds .hero-page class to body */
+body.hero-page .md-footer {
+  display: none !important;
+}
+
+html.hero-page,
+body.hero-page {
+  overflow-x: hidden !important;
+}
+
+body.hero-page .md-main__inner,
+body.hero-page .md-content__inner {
+  padding-top: 0 !important;
+  margin-top: 0 !important;
+}
+
+.hero {
+  position: relative;
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  text-align: center;
+  background:
+    radial-gradient(ellipse at center, transparent 20%, color-mix(in srgb, var(--obsidian) 20%, transparent) 60%, color-mix(in srgb, var(--obsidian) 60%, transparent) 100%),
+    linear-gradient(to bottom,
+      color-mix(in srgb, var(--obsidian) 40%, transparent) 0%,
+      color-mix(in srgb, var(--obsidian) 10%, transparent) 40%,
+      color-mix(in srgb, var(--obsidian) 80%, transparent) 80%,
+      var(--obsidian) 100%),
+    var(--hero-bg-image) center 48px / contain no-repeat;
+  color: var(--gold-light);
+  margin: -1.2rem -0.8rem 0;
+  padding: 1rem 2rem 5rem;
+  overflow: hidden;
+}
+
+.hero-particles {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.hero>*:not(.hero-particles) {
+  position: relative;
+  z-index: 1;
+}
+
+.md-typeset .hero h1,
+.hero h1 {
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  font-weight: 900;
+  margin-top: 0;
+  padding-top: 0;
+  margin-bottom: 0.3rem;
+  letter-spacing: -0.04em;
+  background: var(--gold-gradient) !important;
+  background-clip: text !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  color: transparent !important;
+  filter: drop-shadow(0 0 1px color-mix(in srgb, #000 90%, transparent))
+    drop-shadow(0 0 3px color-mix(in srgb, #000 70%, transparent))
+    drop-shadow(0 2px 8px color-mix(in srgb, var(--gold-metallic) 40%, transparent));
+  animation: shimmer 3s ease-in-out infinite alternate;
+}
+
+@keyframes shimmer {
+  0% {
+    filter: drop-shadow(0 0 1px color-mix(in srgb, #000 90%, transparent))
+      drop-shadow(0 0 3px color-mix(in srgb, #000 70%, transparent))
+      drop-shadow(0 2px 8px color-mix(in srgb, var(--gold-metallic) 30%, transparent));
+  }
+  100% {
+    filter: drop-shadow(0 0 1px color-mix(in srgb, #000 90%, transparent))
+      drop-shadow(0 0 3px color-mix(in srgb, #000 60%, transparent))
+      drop-shadow(0 2px 16px color-mix(in srgb, var(--gold-metallic) 60%, transparent));
+  }
+}
+
+.hero-subtitle {
+  font-size: clamp(0.85rem, 1.5vw, 1.1rem);
+  font-weight: 300;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--gold-light);
+  opacity: 0.8;
+  margin-bottom: 1rem;
+  text-shadow: 0 0 4px color-mix(in srgb, #000 90%, transparent), 0 0 8px color-mix(in srgb, #000 60%, transparent);
+  max-width: 700px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.hero-buttons {
+  margin-top: 0.5rem;
+  display: flex;
+  justify-content: center;
+}
+
+.hero-buttons > p {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  column-gap: 0.85rem;
+  row-gap: 0.85rem;
+  margin: 0;
+}
+
+.hero-buttons .md-button {
+  min-width: 200px;
+  padding: 0.7rem 1.8rem !important;
+  font-size: 0.85rem !important;
+  text-align: center;
+  margin: 0 !important;
+  border-radius: 3rem !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.1em !important;
+  box-shadow: none !important;
+}
+
+.hero .md-button:not(.md-button--primary) {
+  border-color: var(--glass-border) !important;
+  color: var(--gold-light) !important;
+  backdrop-filter: blur(8px);
+  transition: all 0.3s ease;
+}
+
+.hero .md-button:not(.md-button--primary):hover {
+  border-color: var(--gold-light) !important;
+  background: color-mix(in srgb, var(--gold-light) 10%, transparent) !important;
+}
+
+.hero-experiences {
+  margin-top: 1.2rem;
+  margin-bottom: 0.5rem;
+}
+
+.hero-modes {
+  font-size: clamp(0.7rem, 1.2vw, 0.85rem);
+  font-weight: 400;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  opacity: 0.7;
+  margin: 0;
+}
+
+.hero-modes .twemoji,
+.hero-modes .octicon {
+  vertical-align: -0.1em;
+  margin: 0 0.15em;
+}
+
+@media (max-width: 768px) {
+  .hero {
+    background:
+      radial-gradient(ellipse at center, transparent 15%, color-mix(in srgb, var(--obsidian) 25%, transparent) 55%, color-mix(in srgb, var(--obsidian) 70%, transparent) 100%),
+      linear-gradient(to bottom,
+        color-mix(in srgb, var(--obsidian) 50%, transparent) 0%,
+        color-mix(in srgb, var(--obsidian) 15%, transparent) 25%,
+        color-mix(in srgb, var(--obsidian) 60%, transparent) 60%,
+        color-mix(in srgb, var(--obsidian) 90%, transparent) 80%,
+        var(--obsidian) 95%),
+      var(--hero-bg-image) center 48px / contain no-repeat;
+    padding: 1rem 1.2rem 2rem;
+    height: 100vh;
+    height: 100dvh;
+  }
+  .md-typeset .hero h1, .hero h1 {
+    font-size: clamp(1.6rem, 8vw, 2.4rem);
+    margin-bottom: 0.2rem;
+  }
+  .hero-subtitle {
+    font-size: clamp(0.65rem, 2.5vw, 0.85rem);
+    margin-bottom: 0.6rem;
+    padding: 0 0.5rem;
+  }
+  .hero-buttons {
+    width: 100%;
+    align-items: center;
+  }
+  .hero-buttons > p {
+    flex-direction: column;
+    row-gap: 0.5rem;
+    column-gap: 0;
+    width: 100%;
+    align-items: center;
+  }
+  .hero-buttons .md-button {
+    min-width: 0;
+    width: 70%;
+    max-width: 260px;
+    padding: 0.6rem 1.2rem !important;
+    font-size: 0.78rem !important;
+  }
+  .hero-experiences { margin-top: 0.8rem; }
+  .hero-modes { font-size: 0.65rem; letter-spacing: 0.12em; }
+}
+
+@media (max-width: 480px) {
+  .hero { padding: 0.5rem 0.8rem 1.5rem; }
+  .md-typeset .hero h1, .hero h1 { font-size: clamp(1.4rem, 9vw, 2rem); }
+  .hero-subtitle { font-size: 0.62rem; margin-bottom: 0.5rem; }
+  .hero-buttons .md-button { width: 80%; max-width: 220px; padding: 0.5rem 1rem !important; font-size: 0.72rem !important; }
+  .hero-modes { font-size: 0.58rem; }
+}
+
+@media (max-width: 360px) {
+  .hero { padding: 0.3rem 0.6rem 1.2rem; }
+  .hero-buttons .md-button { width: 90%; font-size: 0.68rem !important; padding: 0.45rem 0.8rem !important; }
+  .hero-modes { font-size: 0.52rem; letter-spacing: 0.08em; }
+}
+
+@media (min-width: 1440px) {
+  .hero { padding-bottom: 6rem; }
+  .md-typeset .hero h1, .hero h1 { font-size: 4rem; }
+  .hero-subtitle { font-size: 1.2rem; max-width: 800px; }
+  .hero-buttons .md-button { min-width: 240px; padding: 0.85rem 2.2rem !important; font-size: 0.9rem !important; }
+  .hero-modes { font-size: 0.9rem; }
+}
+
+@media (min-width: 1920px) {
+  .hero { padding-bottom: 8rem; }
+  .md-typeset .hero h1, .hero h1 { font-size: 4.5rem; }
+  .hero-subtitle { font-size: 1.3rem; }
+}

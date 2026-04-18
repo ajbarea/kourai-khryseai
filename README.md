@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/assets/golden-maidens.png" width="800" alt="Kourai Khryseai Hero Image">
+
 # 🏛️ Κοῦραι Χρύσεαι
 
 ### **Kourai Khryseai** — *The Golden Maidens*

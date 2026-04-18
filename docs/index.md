@@ -116,16 +116,14 @@ hide:
 
 <section class="landing-section">
   <div class="section-inner">
-    <h2 class="section-title">One Request, Full Pipeline</h2>
+    <h2 class="section-title">A Living Group Chat</h2>
     <div class="pipeline-flow">
-      <div class="pipeline-step"><img src="assets/avatars/hephaestus_neutral.png" class="avatar-mini" alt="Hephaestus"><span class="step-label" style="color:#FF9500">Route</span></div>
-      <div class="pipeline-step"><img src="assets/avatars/metis_neutral.png" class="avatar-mini" alt="Metis"><span class="step-label" style="color:#4C6EF5">Plan</span></div>
-      <div class="pipeline-step"><img src="assets/avatars/techne_neutral.png" class="avatar-mini" alt="Techne"><span class="step-label" style="color:#17A2B8">Code</span></div>
-      <div class="pipeline-step"><img src="assets/avatars/dokimasia_neutral.png" class="avatar-mini" alt="Dokimasia"><span class="step-label" style="color:#6C757D">Test</span></div>
-      <div class="pipeline-step"><img src="assets/avatars/kallos_neutral.png" class="avatar-mini" alt="Kallos"><span class="step-label" style="color:#D946EF">Review</span></div>
-      <div class="pipeline-step"><img src="assets/avatars/mneme_neutral.png" class="avatar-mini" alt="Mneme"><span class="step-label" style="color:#B73E1D">Commit</span></div>
+      <div class="pipeline-step"><img src="assets/avatars/hephaestus_neutral.png" class="avatar-mini" alt="Hephaestus"><span class="step-label" style="color:#FF9500">Moderating</span></div>
+      <div class="pipeline-step"><img src="assets/avatars/metis_neutral.png" class="avatar-mini" alt="Metis"><span class="step-label" style="color:#4C6EF5">Listening</span></div>
+      <div class="pipeline-step"><img src="assets/avatars/techne_neutral.png" class="avatar-mini" alt="Techne"><span class="step-label" style="color:#17A2B8">Speaking</span></div>
+      <div class="pipeline-step"><img src="assets/avatars/kallos_neutral.png" class="avatar-mini" alt="Kallos"><span class="step-label" style="color:#D946EF">Listening</span></div>
     </div>
-    <p class="pipeline-caption">"Add authentication to /api/users" &mdash; planned, coded, tested, reviewed, committed</p>
+    <p class="pipeline-caption">Forget isolated hand-offs. The Forge is a shared group chat where every agent receives the full transcript. They listen, they reason together, and they talk to you in real-time.</p>
   </div>
 </section>
 

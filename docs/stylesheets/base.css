@@ -1,0 +1,198 @@
+/* Make the entire page background obsidian on the homepage */
+[data-md-color-scheme="slate"] .md-main,
+.md-main {
+  background: var(--obsidian);
+  background-image: radial-gradient(circle at 50% top, color-mix(in srgb, var(--gold-dark) 5%, transparent), transparent 70%);
+}
+
+/* Navigation */
+.md-header {
+  background-color: color-mix(in srgb, var(--obsidian) 90%, transparent) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid color-mix(in srgb, var(--gold-metallic) 10%, transparent) !important;
+  box-shadow: 0 1px 20px color-mix(in srgb, #000 50%, transparent);
+}
+
+body.hero-page .md-header {
+  position: fixed !important;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+}
+
+.md-nav__link--active {
+  color: var(--gold-light) !important;
+  font-weight: 700 !important;
+}
+
+/* Buttons */
+.md-button--primary {
+  background: var(--gold-gradient) !important;
+  color: var(--obsidian) !important;
+  border: none !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.1em !important;
+  padding: 0.8rem 2rem !important;
+  border-radius: 3rem !important;
+  box-shadow: 0 4px 15px color-mix(in srgb, var(--gold-light) 30%, transparent) !important;
+  transition: all 0.3s ease;
+}
+
+.md-button--primary:hover {
+  filter: brightness(1.1);
+  transform: scale(1.05);
+  box-shadow: 0 8px 25px color-mix(in srgb, var(--gold-light) 50%, transparent) !important;
+}
+
+/* Typography */
+.md-typeset h1:not(.hero h1),
+.md-typeset h2 {
+  font-weight: 800;
+  background: var(--gold-gradient);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  filter: drop-shadow(0 2px 4px color-mix(in srgb, var(--gold-metallic) 15%, transparent));
+}
+
+.md-typeset h3 {
+  color: var(--gold-light);
+  font-weight: 800;
+}
+
+.md-typeset p,
+.md-typeset li {
+  max-width: 65ch;
+  line-height: 1.75;
+}
+
+.md-typeset a {
+  color: var(--gold-light);
+  transition: color 0.2s ease;
+}
+
+.md-typeset a:hover {
+  color: #fff;
+}
+
+.md-typeset hr {
+  border-bottom: 1px solid var(--glass-border);
+}
+
+/* Tables */
+.md-typeset table:not([class]) {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.82rem;
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 4px 15px color-mix(in srgb, #000 40%, transparent);
+}
+
+.md-typeset table:not([class]) th {
+  background: color-mix(in srgb, var(--gold-mid) 12%, transparent);
+  color: var(--gold-light);
+  font-weight: 700;
+  padding: 0.6rem 0.8rem;
+  border-bottom: 2px solid var(--gold-dark);
+}
+
+.md-typeset table:not([class]) td {
+  padding: 0.5rem 0.8rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--gold-dark) 20%, transparent);
+}
+
+.md-typeset table:not([class]) tr:hover td {
+  background: color-mix(in srgb, var(--gold-mid) 5%, transparent);
+}
+
+/* Code blocks */
+.md-typeset code {
+  color: var(--gold-light);
+  background: color-mix(in srgb, var(--gold-mid) 8%, transparent);
+  border-radius: 3px;
+  padding: 0.1em 0.3em;
+}
+
+.md-typeset pre {
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 4px 15px color-mix(in srgb, #000 40%, transparent);
+}
+
+/* Grid cards */
+.md-typeset .grid.cards > ul > li:hover,
+.md-typeset .grid > .card:hover {
+  border-color: var(--gold-dark);
+  box-shadow: 0 4px 20px color-mix(in srgb, var(--gold-metallic) 15%, transparent);
+}
+
+/* Admonitions */
+.md-typeset .admonition,
+.md-typeset details {
+  border-color: var(--gold-dark);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--obsidian);
+}
+
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--gold-light) 30%, transparent);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--gold-light);
+}
+
+/* Responsive tables and grid */
+@media (max-width: 768px) {
+  .md-typeset table:not([class]) {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    font-size: 0.78rem;
+  }
+  .md-typeset .grid.cards > ul > li {
+    padding: 0.8rem;
+  }
+  .md-footer-meta__inner {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+  }
+  .md-footer-meta__inner .md-copyright {
+    padding: 0 !important;
+  }
+  .md-footer-meta__inner .md-social {
+    margin-top: 0 !important;
+    padding: 0 !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .md-typeset h1:not(.hero h1) {
+    font-size: 1.4rem;
+  }
+  .md-typeset h2 {
+    font-size: 1.15rem;
+  }
+  .md-typeset h3 {
+    font-size: 1rem;
+  }
+  .md-typeset pre > code {
+    font-size: 0.75rem;
+  }
+}

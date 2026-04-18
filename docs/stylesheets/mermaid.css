@@ -1,0 +1,122 @@
+/* Node styling */
+.mermaid .node rect,
+.mermaid .node circle,
+.mermaid .node polygon {
+  fill: color-mix(in srgb, var(--gold-mid) 15%, transparent) !important;
+  stroke: var(--gold-mid) !important;
+  stroke-width: 2px !important;
+}
+
+.mermaid .node .label,
+.mermaid .nodeLabel {
+  color: var(--gold-light) !important;
+  fill: var(--gold-light) !important;
+}
+
+/* Edge lines and arrows */
+.mermaid .edgePath .path,
+.mermaid .flowchart-link {
+  stroke: var(--gold-dark) !important;
+  stroke-width: 2px !important;
+}
+
+.mermaid .arrowheadPath,
+.mermaid marker path {
+  fill: var(--gold-dark) !important;
+  stroke: var(--gold-dark) !important;
+}
+
+/* Edge labels */
+.mermaid .edgeLabel {
+  background-color: var(--obsidian) !important;
+  color: var(--gold-light) !important;
+}
+
+.mermaid .edgeLabel rect {
+  fill: var(--obsidian) !important;
+  opacity: 0.9 !important;
+}
+
+.mermaid .edgeLabel span {
+  color: var(--gold-light) !important;
+  fill: var(--gold-light) !important;
+}
+
+/* Diamond / decision nodes */
+.mermaid .node .label-container {
+  fill: color-mix(in srgb, var(--gold-mid) 15%, transparent) !important;
+  stroke: var(--gold-mid) !important;
+}
+
+/* Sequence diagram */
+.mermaid .actor {
+  fill: color-mix(in srgb, var(--gold-mid) 15%, transparent) !important;
+  stroke: var(--gold-mid) !important;
+}
+
+.mermaid .actor-line {
+  stroke: var(--gold-dark) !important;
+}
+
+.mermaid text.actor,
+.mermaid .actor text {
+  fill: var(--gold-light) !important;
+}
+
+.mermaid .messageLine0,
+.mermaid .messageLine1 {
+  stroke: var(--gold-dark) !important;
+}
+
+.mermaid .messageText {
+  fill: var(--gold-light) !important;
+}
+
+.mermaid .loopText,
+.mermaid .loopText>tspan {
+  fill: var(--gold-light) !important;
+}
+
+.mermaid .loopLine {
+  stroke: var(--gold-mid) !important;
+}
+
+.mermaid .labelBox {
+  fill: var(--obsidian) !important;
+  stroke: var(--gold-mid) !important;
+}
+
+.mermaid .labelText,
+.mermaid .labelText>tspan {
+  fill: var(--gold-light) !important;
+}
+
+.mermaid .noteText {
+  fill: var(--gold-light) !important;
+}
+
+.mermaid .note {
+  fill: color-mix(in srgb, var(--gold-mid) 10%, transparent) !important;
+  stroke: var(--gold-mid) !important;
+}
+
+/* Cluster / subgraph backgrounds */
+.mermaid .cluster rect {
+  fill: color-mix(in srgb, var(--gold-mid) 5%, transparent) !important;
+  stroke: var(--gold-dark) !important;
+}
+
+/* Responsive Mermaid containers */
+.mermaid {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+@media (max-width: 768px) {
+  /* Mermaid diagrams scroll on mobile */
+  .mermaid {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}

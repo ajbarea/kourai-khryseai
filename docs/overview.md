@@ -53,87 +53,89 @@ Each agent is an independent HTTP server communicating via the open [A2A (Agent-
 
 This isn't a simple sequential pipeline where each agent hands off a single output to the next. Hephaestus acts as a **Forge Master** — a live moderator who maintains a running **Forge Transcript** of everything said by everyone. Before each specialist is called, Hephaestus narrates an in-character handoff line. Each specialist then receives the **full transcript** (not just the previous agent's output), so every agent has group awareness of all prior reasoning, decisions, and work.
 
-```mermaid
-sequenceDiagram
-    actor You
-    participant UI as CLI / GUI / VN
-    participant Hep as 🔥 Hephaestus<br/>(Forge Master)
-    participant Spec as Specialists
+??? info "Deep Dive: The Sequence Flow"
 
-    You->>UI: "add user authentication"
-    UI->>Hep: A2A stream (SSE)
-    Hep->>Hep: Select pipeline · init transcript<br/>[User] + [Hephaestus] entries
+    ```mermaid
+    sequenceDiagram
+        actor You
+        participant UI as CLI / GUI / VN
+        participant Hep as 🔥 Hephaestus<br/>(Forge Master)
+        participant Spec as Specialists
 
-    Note over Hep: 🔥 Narrates handoff in character
-    Hep-->>UI: Forge narration (streamed)
-    Hep->>Spec: Full transcript → Metis
-    Note over Spec: 📐 Reads all context · analyzes
-    Spec-->>UI: "JWT or sessions?"
-    UI-->>You: Prompt for decision
-    You->>UI: "JWT with refresh tokens"
-    Hep->>Hep: Append [User] reply to transcript
+        You->>UI: "add user authentication"
+        UI->>Hep: A2A stream (SSE)
+        Hep->>Hep: Select pipeline · init transcript<br/>[User] + [Hephaestus] entries
 
-    loop Each specialist in sequence
-        Hep->>Hep: Append [Hephaestus] narration to transcript
-        Note over Hep: 🔥 Narrates next handoff
+        Note over Hep: 🔥 Narrates handoff in character
         Hep-->>UI: Forge narration (streamed)
-        Hep->>Spec: Full transcript → next agent
-        Spec-->>UI: Status + findings (streamed)
-        Hep->>Hep: Append [Agent] output to transcript
-        UI-->>You: Live updates
-    end
+        Hep->>Spec: Full transcript → Metis
+        Note over Spec: 📐 Reads all context · analyzes
+        Spec-->>UI: "JWT or sessions?"
+        UI-->>You: Prompt for decision
+        You->>UI: "JWT with refresh tokens"
+        Hep->>Hep: Append [User] reply to transcript
 
-    Note over Spec: Kallos finds issues → Techne fixes → Kallos re-checks (max 3×)
-    Hep-->>UI: Final summary
-    UI-->>You: Done
-```
+        loop Each specialist in sequence
+            Hep->>Hep: Append [Hephaestus] narration to transcript
+            Note over Hep: 🔥 Narrates next handoff
+            Hep-->>UI: Forge narration (streamed)
+            Hep->>Spec: Full transcript → next agent
+            Spec-->>UI: Status + findings (streamed)
+            Hep->>Hep: Append [Agent] output to transcript
+            UI-->>You: Live updates
+        end
 
-**Real conversation example:**
+        Note over Spec: Kallos finds issues → Techne fixes → Kallos re-checks (max 3×)
+        Hep-->>UI: Final summary
+        UI-->>You: Done
+    ```
 
-```
-❯ add authentication to /api/users
+    **Real conversation example:**
 
-🔥 Hephaestus: Analyzing request...
-   → Route: Metis → Techne → Dokimasia → Kallos → Mneme
+    ```
+    ❯ add authentication to /api/users
 
-🔥 Hephaestus: "Metis! Lay out the path. What does this forge need?"
+    🔥 Hephaestus: Analyzing request...
+       → Route: Metis → Techne → Dokimasia → Kallos → Mneme
 
-📐 Metis: Spec in progress...
-   • Found existing session middleware
-   • Should we extend it or use JWT?
+    🔥 Hephaestus: "Metis! Lay out the path. What does this forge need?"
 
-❯ JWT with refresh tokens
+    📐 Metis: Spec in progress...
+       • Found existing session middleware
+       • Should we extend it or use JWT?
 
-📐 Metis: Got it. Specification:
-   - JWT tokens (15min expiry)
-   - Refresh token rotation
-   - Rate limiting on token refresh
-   ✅ Ready
+    ❯ JWT with refresh tokens
 
-🔥 Hephaestus: "Well forged, Metis. Techne! Take what she's built and make it real."
+    📐 Metis: Got it. Specification:
+       - JWT tokens (15min expiry)
+       - Refresh token rotation
+       - Rate limiting on token refresh
+       ✅ Ready
 
-⚙️ Techne: Implementing...
-   • src/auth/tokens.py — JWT utilities
-   • src/api/users.py — Auth middleware
-   ✅ Complete
+    🔥 Hephaestus: "Well forged, Metis. Techne! Take what she's built and make it real."
 
-🔥 Hephaestus: "Dokimasia — put it through the fire."
+    ⚙️ Techne: Implementing...
+       • src/auth/tokens.py — JWT utilities
+       • src/api/users.py — Auth middleware
+       ✅ Complete
 
-🧪 Dokimasia: Testing... 8 tests, 92% coverage ✅
+    🔥 Hephaestus: "Dokimasia — put it through the fire."
 
-🔥 Hephaestus: "Kallos. Standards."
+    🧪 Dokimasia: Testing... 8 tests, 92% coverage ✅
 
-✨ Kallos: Code review... all clear ✅
-🪞 Aidos: Language check... no slop ✅
+    🔥 Hephaestus: "Kallos. Standards."
 
-🔥 Hephaestus: "Mneme — seal the work."
+    ✨ Kallos: Code review... all clear ✅
+    🪞 Aidos: Language check... no slop ✅
 
-📜 Mneme: Commits ready:
-   feat(auth): implement JWT authentication
-   - Added JWT token generation and validation
-   - Added refresh token rotation
-   Files: src/auth/tokens.py, src/api/users.py, tests/...
-```
+    🔥 Hephaestus: "Mneme — seal the work."
+
+    📜 Mneme: Commits ready:
+       feat(auth): implement JWT authentication
+       - Added JWT token generation and validation
+       - Added refresh token rotation
+       Files: src/auth/tokens.py, src/api/users.py, tests/...
+    ```
 
 ---
 
