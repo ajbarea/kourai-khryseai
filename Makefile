@@ -8,8 +8,12 @@
 ## This Makefile delegates every target to the cross-platform Python CLI,
 ## so `make <target>` and `uv run kourai-dev <target>` are equivalent.
 ##
+## Quality gates are fix-first: `make fix` runs every auto-fixer (ruff format,
+## ruff check --fix) without the check pass, so subsequent `make lint` runs
+## measure intent, not trivial formatting noise.
+##
 
-.PHONY: help check-env setup setup-artifacts upgrade yolo dev dev-vn up down restart rebuild status gui cli vn docs lint validate test test-unit test-integration test-performance audit deps clean clean-cache clean-tests prune
+.PHONY: help check-env setup setup-artifacts upgrade yolo dev dev-vn up down restart rebuild status gui cli vn docs fix lint validate test test-unit test-integration test-performance audit deps clean clean-cache clean-tests prune logs logs-tail
 .DEFAULT_GOAL := help
 
 UV_DEV := uv run --no-active --package kourai-common kourai-dev
@@ -86,6 +90,9 @@ docs:                      ## Serve project documentation (Zensical on http://lo
 # Quality Gates
 # ---------------------------------------------------------------------------
 
+fix:                       ## Run every auto-fixer (ruff format, ruff check --fix); skip check pass
+	@$(UV_DEV) fix
+
 lint:                      ## Run code quality checks (ruff format, ruff check, ty)
 	@$(UV_DEV) lint
 
@@ -125,6 +132,18 @@ clean-tests:               ## Remove test artifacts only
 
 prune:                     ## Remove stopped containers, dangling images, unused build cache
 	@$(UV_DEV) prune
+
+# ---------------------------------------------------------------------------
+# Logs
+#   These do NOT go through kourai-dev — scripts truncate dev-latest.log when
+#   they open, which would erase what we're trying to read.
+# ---------------------------------------------------------------------------
+
+logs:                      ## Show the last 200 lines of logs/dev-latest.log
+	@tail -n 200 logs/dev-latest.log 2>/dev/null || echo "no logs yet — run any make target first"
+
+logs-tail:                 ## Follow logs/dev-latest.log (Ctrl-C to exit)
+	@tail -f logs/dev-latest.log
 
 # ---------------------------------------------------------------------------
 # Help
