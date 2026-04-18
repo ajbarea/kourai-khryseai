@@ -7,7 +7,7 @@ dependencies = []
 
 [dependency-groups]
 dev = [
-    "pytest>=8.0,<9",
+    "pytest>=8.0",
     "pytest-asyncio>=0.24",
     "pytest-cov>=6.0.0",
     "pytest-xdist>=3.6.1",
@@ -22,9 +22,8 @@ dev = [
 
 [tool.uv]
 package = false
-# Pin transitive deps broken on Python 3.13.12 (unterminated regex character classes)
 override-dependencies = [
-    "jinja2<3.1.6",
+    "aiohttp>=3.13.4",
 ]
 
 [tool.uv.workspace]
@@ -87,6 +86,7 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "E402"]  # Assert + importorskip-before-import pattern
 "shared/src/kourai_common/dev_cli.py" = ["T201", "S603"]  # CLI tool: intentional print output and safe subprocess calls
+"shared/src/kourai_common/dev_log.py" = ["T201"]  # Dev runner: intentional console echo alongside the log file
 "scripts/*.py" = ["T201", "S607"]  # CLI scripts: intentional terminal output + uv/commands in PATH
 
 [tool.ruff.lint.isort]
