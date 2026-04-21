@@ -9,7 +9,7 @@ from a2a.types import DataPart, Part, Task, TextPart, UnsupportedOperationError
 from a2a.utils.errors import ServerError
 
 from agents.techne.agent import (
-    generate_code_stream,
+    apply_code_changes,
     get_git_context,
     parse_file_paths,
     read_files,
@@ -20,9 +20,10 @@ from kourai_common.decorators import executor_error_handler
 from kourai_common.messaging import send_working_status
 from kourai_common.player import PlayerProfile
 from kourai_common.stack import looks_like_scaffolding
-from kourai_common.subprocess import parse_and_apply_fixes
 from kourai_common.tracing import create_span
 from kourai_common.virtues import update_virtue
+
+_MUTATING_TOOLS = frozenset({"write_file", "edit_file", "delete_file"})
 
 if TYPE_CHECKING:
     from a2a.server.agent_execution import RequestContext
@@ -107,29 +108,29 @@ class TechneAgentExecutor(BaseAgentExecutor):
                 "Generating code changes...",
             )
 
-            # Step 4: Stream code generation with inner-thought updates
-            with create_span("techne.generate", {"task": user_input[:100]}):
-                result = ""
-                chunk_count = 0
-                async for chunk in generate_code_stream(
+            async def _on_tool(name: str, args: dict, result: str) -> None:
+                target = args.get("path", "")
+                ok = "ok" if not result.startswith("ERROR:") else "fail"
+                await send_working_status(updater, task, f"{name} {target} ({ok})", emoji="🔧")
+
+            # Step 4: Drive the agentic tool-use loop. Each tool call writes
+            # directly to disk via FORGE_TOOL_HANDLERS — no regex parse.
+            with create_span("techne.tool_loop", {"task": user_input[:100]}):
+                result, tool_log = await apply_code_changes(
                     task_description=user_input,
+                    project_root=project_root,
                     file_contents=file_contents,
                     git_context=git_context,
                     image_parts=extract_image_parts(context) or None,
                     context_id=task.context_id,
-                ):
-                    result += chunk
-                    chunk_count += 1
-                    if chunk_count % 5 == 0:
-                        lines = result.strip().split("\n")
-                        latest = lines[-1] if lines else ""
-                        if len(latest) > 60:
-                            latest = latest[:57] + "..."
-                        if latest.strip():
-                            await send_working_status(updater, task, f"Coding: {latest}")
+                    on_tool_call=_on_tool,
+                )
 
-            with create_span("techne.apply_fixes"):
-                fixes_applied = parse_and_apply_fixes(result, project_root=project_root)
+            fixes_applied = sum(
+                1
+                for entry in tool_log
+                if entry["name"] in _MUTATING_TOOLS and not entry["result"].startswith("ERROR:")
+            )
 
             await send_working_status(
                 updater,
@@ -147,6 +148,9 @@ class TechneAgentExecutor(BaseAgentExecutor):
                                 "files_read": len(file_contents),
                                 "files_changed": fixes_applied,
                                 "file_paths": file_paths,
+                                "tool_calls": [
+                                    {"name": e["name"], "args": e["args"]} for e in tool_log
+                                ],
                             }
                         )
                     ),
@@ -154,7 +158,11 @@ class TechneAgentExecutor(BaseAgentExecutor):
                 name="code_changes",
             )
             await updater.complete()
-            log.info("Techne completed — applied %d fixes to disk", fixes_applied)
+            log.info(
+                "Techne completed — %d tool calls, %d successful writes",
+                len(tool_log),
+                fixes_applied,
+            )
 
             # Virtue update: successful code writes → arete (excellence-seeking)
             if fixes_applied > 0:

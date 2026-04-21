@@ -118,35 +118,31 @@ class DokimasiaAgentExecutor(BaseAgentExecutor):
 
             elif is_run_request:
                 from agents.dokimasia.agent import (
-                    fix_test_issues,
+                    apply_test_fixes,
                     run_pytest,
                 )
                 from kourai_common.fix_loop import DOKIMASIA_MESSAGES, run_fix_loop
-                from kourai_common.subprocess import (
-                    extract_files_from_output,
-                    parse_and_apply_fixes,
-                )
+                from kourai_common.subprocess import extract_files_from_output
 
-                # Callback streams each pytest output line to the player scratchpad.
                 async def _pytest_status(line: str) -> None:
                     await send_working_status(updater, task, line, emoji="🧪")
 
-                # Wrapper to adapt run_pytest to fix_loop interface
                 async def _run_pytest_wrapper() -> tuple[bool, str]:
                     result = await run_pytest(cwd=str(project_root), status_callback=_pytest_status)
                     return result.success, result.output
 
-                def _apply_fixes_with_validation(llm_output: str) -> int:
-                    """Apply fixes with path safety validation."""
-                    return parse_and_apply_fixes(llm_output, project_root=project_root)
+                async def _apply_fixes(
+                    pytest_output: str,
+                    files: set[str],
+                    ctx_id: str | None,
+                ) -> int:
+                    return await apply_test_fixes(pytest_output, files, project_root, ctx_id)
 
-                # Run iterative test-fix loop with personality messages
                 all_passed, test_output, result = await run_fix_loop(
                     tool_name="pytest",
                     run_tool=_run_pytest_wrapper,
                     extract_files=extract_files_from_output,
-                    fix_issues=fix_test_issues,
-                    apply_fixes=_apply_fixes_with_validation,
+                    apply_fixes=_apply_fixes,
                     updater=updater,
                     task=task,
                     emoji="🧪",

@@ -23,21 +23,62 @@ if TYPE_CHECKING:
 # ── Project root extraction ───────────────────────────────────────────
 
 
-def parse_project_root(text: str) -> Path:
-    """Parse the 'Project root: /path' line injected by Hephaestus into accumulated context.
+_PROJECT_ROOT_PATTERNS = (
+    re.compile(r"^Project root:\s*(.+)$", re.MULTILINE),
+    re.compile(r"\[project_root:\s*([^\]]+)\]", re.IGNORECASE),
+    re.compile(r"\[Project Settings\]:\s*root=([^\s\]]+)", re.IGNORECASE),
+)
+# The CLI runs as the host user (/home/<host_user>/.kourai_khryseai/...)
+# while specialists run inside containers that bind-mount the same dir at
+# /home/kourai/.kourai_khryseai. _translate_to_container rewrites any host
+# path pointing into .kourai_khryseai to the container-local form.
+_PROJECTS_MARKER = ".kourai_khryseai"
 
-    Specialist agents (Kallos, Dokimasia, Techne) call this to get the player's
-    project directory so they can run subprocesses and write files there instead
-    of defaulting to the Kourai codebase working directory.
 
-    Falls back to Path.cwd() when no project root is present (e.g., internal tasks)
-    or when the parsed path no longer exists on disk.
+def _translate_to_container(path: Path) -> Path:
+    """Remap host-side .kourai_khryseai paths into this process's $HOME mirror.
+
+    On the host, the CLI emits paths like /home/ajbar/.kourai_khryseai/projects/...
+    Inside a specialist container the same tree is mounted at
+    /home/kourai/.kourai_khryseai, so the host prefix must be rewritten before
+    the path can be opened.
     """
-    match = re.search(r"^Project root:\s*(.+)$", text, re.MULTILINE)
-    if match:
-        path = Path(match.group(1).strip())
-        if path.is_dir():
-            return path
+    parts = path.parts
+    for i, segment in enumerate(parts):
+        if segment == _PROJECTS_MARKER:
+            local = Path.home() / _PROJECTS_MARKER
+            return local.joinpath(*parts[i + 1 :]) if i + 1 < len(parts) else local
+    return path
+
+
+def parse_project_root(text: str) -> Path:
+    """Recover the player's project directory from any context-injection format.
+
+    Specialist agents (Kallos, Dokimasia, Techne) call this to get the worktree
+    path so subprocesses and file writes land in the forge session directory
+    instead of the Kourai codebase's cwd.
+
+    Accepts all historical/current injection shapes defensively:
+      * ``Project root: /path`` — canonical form injected by Hephaestus into the
+        forge transcript.
+      * ``[project_root: /path]`` — bracket tag the CLI prepends on the outbound
+        prompt before Hephaestus strips it.
+      * ``[Project Settings]: root=/path`` — legacy transcript key.
+
+    Paths under ``.kourai_khryseai`` are translated from the host user's home
+    to this process's home so the same path works from the CLI (host) and
+    from specialist containers (bind-mounted at ``/home/kourai``).
+
+    Falls back to ``Path.cwd()`` when no tag is present (internal tasks) or the
+    parsed path no longer exists on disk.
+    """
+    for pattern in _PROJECT_ROOT_PATTERNS:
+        match = pattern.search(text)
+        if match:
+            raw = Path(match.group(1).strip())
+            candidate = _translate_to_container(raw)
+            if candidate.is_dir():
+                return candidate
     return Path.cwd()
 
 

@@ -87,8 +87,7 @@ async def run_fix_loop(
     tool_name: str,
     run_tool: Callable[[], Awaitable[tuple[bool, str]]],
     extract_files: Callable[[str], set[str]],
-    fix_issues: Callable[[str, set[str], str], Awaitable[str]],
-    apply_fixes: Callable[[str], int],
+    apply_fixes: Callable[[str, set[str], str | None], Awaitable[int]],
     updater: TaskUpdater,
     task: Task,
     emoji: str = "✨",
@@ -101,8 +100,10 @@ async def run_fix_loop(
         tool_name: Display name for the tool (e.g., "make lint", "pytest")
         run_tool: Async function that runs the tool and returns (success, output)
         extract_files: Function that extracts file paths from tool output
-        fix_issues: Async function that generates fixes via LLM
-        apply_fixes: Function that applies fixes to disk
+        apply_fixes: Async function that drives the LLM fix step and writes
+            changes to disk via the forge tool loop. Receives
+            ``(tool_output, files_with_issues, context_id)`` and returns the
+            count of successful disk writes.
         updater: TaskUpdater for status messages
         task: Current task being executed
         emoji: Emoji prefix for status messages
@@ -142,7 +143,6 @@ async def run_fix_loop(
             )
             break
 
-        # Extract files with issues
         files_with_issues = extract_files(output)
         result.files_with_issues = sorted(files_with_issues)
         if not files_with_issues:
@@ -156,9 +156,7 @@ async def run_fix_loop(
             emoji=emoji,
         )
 
-        # Ask LLM to fix
-        llm_fixes = await fix_issues(output, files_with_issues, task.context_id)
-        fixes_applied = apply_fixes(llm_fixes)
+        fixes_applied = await apply_fixes(output, files_with_issues, task.context_id)
         result.total_fixes_applied += fixes_applied
 
         await send_working_status(
@@ -168,7 +166,6 @@ async def run_fix_loop(
             emoji=emoji,
         )
 
-        # Break if LLM couldn't generate valid fixes
         if fixes_applied == 0:
             log.warning(
                 "LLM could not generate valid fixes for %s (iteration %d/%d). "

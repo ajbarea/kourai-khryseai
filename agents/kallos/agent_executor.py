@@ -43,34 +43,30 @@ class KallosAgentExecutor(BaseAgentExecutor):
     ) -> None:
         """Kallos-specific: run linting and auto-fix issues."""
         with create_span("kallos.execute", {"a2a.method": "execute"}):
-            from agents.kallos.agent import fix_lint_issues, run_make_lint
+            from agents.kallos.agent import apply_lint_fixes, run_make_lint
             from kourai_common.fix_loop import KALLOS_MESSAGES, run_fix_loop
-            from kourai_common.subprocess import (
-                extract_files_from_output,
-                parse_and_apply_fixes,
-            )
+            from kourai_common.subprocess import extract_files_from_output
 
-            # Callback streams each tool output line to the player scratchpad.
             async def _lint_status(line: str) -> None:
                 await send_working_status(updater, task, line, emoji="💻")
 
-            # Resolve player's project root (falls back to CWD for internal Kourai tasks)
             project_root = parse_project_root(context.get_user_input())
 
             async def _run_lint_with_status() -> tuple[bool, str]:
                 return await run_make_lint(cwd=str(project_root), status_callback=_lint_status)
 
-            def _apply_fixes_with_validation(llm_output: str) -> int:
-                """Apply fixes with path safety validation."""
-                return parse_and_apply_fixes(llm_output, project_root=project_root)
+            async def _apply_fixes(
+                lint_output: str,
+                files: set[str],
+                ctx_id: str | None,
+            ) -> int:
+                return await apply_lint_fixes(lint_output, files, project_root, ctx_id)
 
-            # Run iterative lint-fix loop with personality messages
             all_clean, final_output, result = await run_fix_loop(
                 tool_name="make lint",
                 run_tool=_run_lint_with_status,
                 extract_files=extract_files_from_output,
-                fix_issues=fix_lint_issues,
-                apply_fixes=_apply_fixes_with_validation,
+                apply_fixes=_apply_fixes,
                 updater=updater,
                 task=task,
                 emoji="✨",

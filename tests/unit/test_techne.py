@@ -39,10 +39,17 @@ class TestTechneSystemPrompt:
     def test_forbids_git_commit(self):
         assert "NEVER run git commit" in SYSTEM_PROMPT
 
-    def test_includes_output_format(self):
-        assert "ACTION:" in SYSTEM_PROMPT
-        assert "FILE:" in SYSTEM_PROMPT
-        assert "CONTENT:" in SYSTEM_PROMPT
+    def test_documents_tool_use(self):
+        # ACTION/FILE/CONTENT prose format was retired in M1 — Techne now
+        # drives changes through the `write_file`/`edit_file`/`delete_file`
+        # tools. The system prompt should advertise that.
+        assert "write_file" in SYSTEM_PROMPT
+        assert "edit_file" in SYSTEM_PROMPT
+        assert "PROJECT-RELATIVE" in SYSTEM_PROMPT
+        # The legacy keywords MUST be gone, otherwise the LLM will output
+        # them as prose and we'll silently lose writes.
+        assert "ACTION: CREATE" not in SYSTEM_PROMPT
+        assert "ACTION: DELETE" not in SYSTEM_PROMPT
 
     def test_no_marketing_language(self):
         assert "No marketing language" in SYSTEM_PROMPT
@@ -128,35 +135,87 @@ class TestFileOperations:
             assert result[p2] == "b = 2"
 
 
-class TestGenerateCode:
-    """Test code generation with mocked LLM."""
+class TestApplyCodeChanges:
+    """Test the tool-loop driver that replaced generate_code/generate_code_stream."""
 
     @pytest.mark.asyncio
-    async def test_generate_calls_llm(self):
-        mock_response = "ACTION: EDIT\nFILE: auth.py\nCONTENT:\n```python\nx = 1\n```"
-        with patch("agents.techne.agent.chat", new_callable=AsyncMock) as mock_chat:
-            mock_chat.return_value = mock_response
-            from agents.techne.agent import generate_code
-
-            result = await generate_code("fix the bug in auth.py")
-            assert result == mock_response
-            assert mock_chat.call_args[0][0] == "techne"
-
-    @pytest.mark.asyncio
-    async def test_generate_includes_file_context(self):
-        with patch("agents.techne.agent.chat", new_callable=AsyncMock) as mock_chat:
-            mock_chat.return_value = "done"
-            from agents.techne.agent import generate_code
-
-            await generate_code(
-                "fix auth.py",
-                file_contents={"auth.py": "def login(): pass"},
+    async def test_calls_chat_with_tools_with_forge_tools(self):
+        with patch("agents.techne.agent.chat_with_tools", new_callable=AsyncMock) as mock_loop:
+            mock_loop.return_value = ("done", [])
+            from agents.techne.agent import apply_code_changes
+            from kourai_common.forge_tools import (
+                FORGE_TOOL_HANDLERS,
+                FORGE_TOOL_SCHEMAS,
             )
-            # The file content should be in the prompt
-            call_messages = mock_chat.call_args[0][1]
-            user_msg = call_messages[-1]["content"]
-            assert "auth.py" in user_msg
-            assert "def login(): pass" in user_msg
+
+            text, log = await apply_code_changes("fix auth.py", project_root="/work")
+        assert text == "done"
+        assert log == []
+        kwargs = mock_loop.call_args.kwargs
+        assert mock_loop.call_args.args[0] == "techne"
+        assert kwargs["tools"] is FORGE_TOOL_SCHEMAS
+        assert kwargs["tool_handlers"] is FORGE_TOOL_HANDLERS
+        assert kwargs["handler_context"] == {"project_root": "/work"}
+
+    @pytest.mark.asyncio
+    async def test_includes_file_context_in_user_message(self):
+        captured: dict = {}
+
+        async def _fake(*args, **kwargs):
+            captured["messages"] = args[1]
+            return ("done", [])
+
+        with patch("agents.techne.agent.chat_with_tools", side_effect=_fake):
+            from agents.techne.agent import apply_code_changes
+
+            await apply_code_changes(
+                "fix auth.py",
+                project_root="/work",
+                file_contents={"auth.py": "def login(): pass"},
+                git_context="M auth.py",
+            )
+
+        user_msg = captured["messages"][-1]["content"]
+        assert isinstance(user_msg, str)
+        assert "auth.py" in user_msg
+        assert "def login(): pass" in user_msg
+        assert "M auth.py" in user_msg
+
+    @pytest.mark.asyncio
+    async def test_image_parts_are_attached(self):
+        captured: dict = {}
+
+        async def _fake(*args, **kwargs):
+            captured["messages"] = args[1]
+            return ("done", [])
+
+        img = {"type": "image_url", "image_url": {"url": "data:image/png;base64,xyz"}}
+        with patch("agents.techne.agent.chat_with_tools", side_effect=_fake):
+            from agents.techne.agent import apply_code_changes
+
+            await apply_code_changes("look at this", project_root="/work", image_parts=[img])
+
+        user_content = captured["messages"][-1]["content"]
+        assert isinstance(user_content, list)
+        assert user_content[0]["type"] == "text"
+        assert user_content[1] is img
+
+    @pytest.mark.asyncio
+    async def test_forwards_on_tool_call_callback(self):
+        captured: dict = {}
+
+        async def _fake(*args, **kwargs):
+            captured["on_tool_call"] = kwargs.get("on_tool_call")
+            return ("done", [])
+
+        async def _hook(name, args, result):
+            pass
+
+        with patch("agents.techne.agent.chat_with_tools", side_effect=_fake):
+            from agents.techne.agent import apply_code_changes
+
+            await apply_code_changes("x", project_root="/work", on_tool_call=_hook)
+        assert captured["on_tool_call"] is _hook
 
 
 class TestRunCommand:
@@ -189,46 +248,6 @@ class TestGetGitContext:
 
         result = await get_git_context()
         assert isinstance(result, str)
-
-
-class TestGenerateCodeStream:
-    """Test streaming code generation."""
-
-    @pytest.mark.asyncio
-    async def test_stream_yields_chunks(self):
-        async def mock_stream(*args, **kwargs):
-            for chunk in ["ACTION:", " EDIT", "\nFILE:"]:
-                yield chunk
-
-        with patch("agents.techne.agent.chat_stream", side_effect=mock_stream):
-            from agents.techne.agent import generate_code_stream
-
-            chunks = [chunk async for chunk in generate_code_stream("fix bug")]
-
-            assert len(chunks) == 3
-            assert "".join(chunks) == "ACTION: EDIT\nFILE:"
-
-    @pytest.mark.asyncio
-    async def test_stream_includes_file_context(self):
-        received_messages: list[object] = []
-
-        async def mock_stream(*args, **kwargs):
-            received_messages.extend(args)
-            yield "done"
-
-        with patch("agents.techne.agent.chat_stream", side_effect=mock_stream):
-            from agents.techne.agent import generate_code_stream
-
-            async for _ in generate_code_stream(
-                "fix auth",
-                file_contents={"auth.py": "code"},
-                git_context="M auth.py",
-            ):
-                pass
-
-        # Messages should include file content and git context
-        msg_str = str(received_messages)
-        assert "auth.py" in msg_str
 
 
 class TestDataclasses:

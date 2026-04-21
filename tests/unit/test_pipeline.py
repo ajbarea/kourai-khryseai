@@ -11,23 +11,38 @@ from agents.hephaestus.remote_connections import AgentInputRequired
 
 
 class TestKallosFoundIssues:
-    """Test the lint failure detection helper."""
+    """Test the lint failure detection helper.
 
-    def test_detects_fail(self):
-        assert _kallos_found_issues("### ruff check: FAIL\nE123 error") is True
+    Kallos's artifact starts with one of two deterministic headers; the helper
+    keys off those, not incidental substrings, so noisy tool output like
+    ``Failed to initialize cache`` doesn't trigger spurious retry loops.
+    """
 
-    def test_ignores_all_clean(self):
-        assert _kallos_found_issues("ALL CLEAN\nruff check: PASS") is False
+    def test_detects_issues_header(self):
+        assert (
+            _kallos_found_issues("✨ Linting completed with issues.\n\nE123 unused import") is True
+        )
 
-    def test_all_clean_overrides_fail(self):
-        # "all clean" takes priority even if "fail" appears elsewhere
-        assert _kallos_found_issues("Previously FAIL but now ALL CLEAN") is False
+    def test_detects_clean_header(self):
+        assert (
+            _kallos_found_issues("✨ All linting checks passed!\n\nruff format: no changes")
+            is False
+        )
 
-    def test_pass_only(self):
-        assert _kallos_found_issues("### ruff check: PASS\n### ruff format: PASS") is False
+    def test_clean_header_beats_tool_noise(self):
+        """Ruff warnings ('Failed to initialize cache') must not be read as a fail."""
+        output = (
+            "✨ All linting checks passed!\nwarning: Failed to initialize cache at /tmp/.ruff_cache"
+        )
+        assert _kallos_found_issues(output) is False
 
     def test_case_insensitive(self):
-        assert _kallos_found_issues("Ruff Check: Fail") is True
+        assert _kallos_found_issues("ALL LINTING CHECKS PASSED") is False
+        assert _kallos_found_issues("linting completed with issues") is True
+
+    def test_unknown_shape_defaults_to_clean(self):
+        """Conservative default: if neither header is present, don't loop."""
+        assert _kallos_found_issues("some other tool output") is False
 
     def test_empty_string(self):
         assert _kallos_found_issues("") is False
@@ -63,8 +78,8 @@ class TestExecutePipelineIterativeLoop:
             nonlocal kallos_send_count
             kallos_send_count += 1
             if kallos_send_count <= 1:
-                return "### ruff check: FAIL\nE123 error on line 5"
-            return "ALL CLEAN\n### ruff check: PASS"
+                return "✨ Linting completed with issues.\nE123 error on line 5"
+            return "✨ All linting checks passed!"
 
         async def techne_send(text, ctx_id):
             return "Fixed code output"
@@ -125,7 +140,9 @@ class TestExecutePipelineIterativeLoop:
             conn.connect = AsyncMock()
             conn.close = AsyncMock()
             if agent_name == "kallos":
-                conn.send = AsyncMock(return_value="### ruff check: FAIL\nE123 unfixable")
+                conn.send = AsyncMock(
+                    return_value="✨ Linting completed with issues.\nE123 unfixable"
+                )
             elif agent_name == "techne":
                 conn.send = AsyncMock(return_value="Attempted fix")
             else:
@@ -161,7 +178,7 @@ class TestExecutePipelineIterativeLoop:
             conn.card = mock_card
             conn.connect = AsyncMock()
             conn.close = AsyncMock()
-            conn.send = AsyncMock(return_value="### ruff check: FAIL\nE123")
+            conn.send = AsyncMock(return_value="✨ Linting completed with issues.\nE123")
             return conn
 
         with patch(
