@@ -129,7 +129,9 @@ function DemoSurface() {
   )
 
   const historyRef = React.useRef(history)
-  historyRef.current = history
+  React.useEffect(() => {
+    historyRef.current = history
+  }, [history])
   React.useEffect(() => {
     return () => {
       for (const g of historyRef.current) URL.revokeObjectURL(g.url)
