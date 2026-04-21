@@ -213,6 +213,9 @@ services:
       - ./shared:/app/shared
       - ./tests:/app/tests
       - kourai-artifacts-kallos:/agent-artifacts
+      # Forge worktrees live under ~/.kourai_khryseai/projects on the host;
+      # specialists need RW access so they can lint/fix files in a session.
+      - ~/.kourai_khryseai:/home/kourai/.kourai_khryseai
     develop:
       watch:
         - action: sync
@@ -258,6 +261,9 @@ services:
       - ./shared:/app/shared
       - ./tests:/app/tests
       - kourai-artifacts-techne:/agent-artifacts
+      # Forge worktrees live under ~/.kourai_khryseai/projects on the host;
+      # Techne writes generated code into the active session.
+      - ~/.kourai_khryseai:/home/kourai/.kourai_khryseai
     develop:
       watch:
         - action: sync
@@ -303,6 +309,9 @@ services:
       - ./shared:/app/shared
       - ./tests:/app/tests
       - kourai-artifacts-dokimasia:/agent-artifacts
+      # Forge worktrees live under ~/.kourai_khryseai/projects on the host;
+      # Dokimasia runs pytest inside the session and applies test fixes there.
+      - ~/.kourai_khryseai:/home/kourai/.kourai_khryseai
     develop:
       watch:
         - action: sync
@@ -350,6 +359,9 @@ services:
       - ./shared:/app/shared
       - ./tests:/app/tests
       - kourai-artifacts-metis:/agent-artifacts
+      # Forge worktrees live under ~/.kourai_khryseai/projects on the host;
+      # Metis inspects project config from the active session.
+      - ~/.kourai_khryseai:/home/kourai/.kourai_khryseai
     develop:
       watch:
         - action: sync

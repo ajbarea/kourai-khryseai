@@ -12,7 +12,7 @@
 [![Python](https://img.shields.io/badge/Python-3.12+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
 [![uv](https://img.shields.io/badge/uv-package_manager-DE5FE9?style=flat-square)](https://docs.astral.sh/uv/)
 [![codecov](https://codecov.io/gh/ajbarea/kourai-khryseai/graph/badge.svg?token=bNiUvETLLU)](https://codecov.io/gh/ajbarea/kourai-khryseai)
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE.md)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 ---
 
@@ -184,6 +184,31 @@ make gui
 ```
 
 See [Getting Started](docs/getting-started.md) for detailed setup and troubleshooting.
+
+### 4. Player Projects (optional)
+
+Create a real on-disk git project that the maidens forge into. Each player turn runs in a git worktree on a `forge/...` branch — accept to fast-forward into `main`, discard to throw it away.
+
+```bash
+make cli
+
+❯ /project new hello-forge --template python
+❯ /project use hello-forge
+❯ add a function that returns "hello world" with tests
+❯ /project status
+❯ /project accept <session_id>     # or /project discard <session_id>
+```
+
+Projects live under `~/.kourai_khryseai/projects/<player_id>/`. Templates: `empty`, `python`, `node`, `backend`, `frontend`.
+
+**Sandboxed execution (opt-in):** route every agent-issued command through a locked-down container.
+
+```bash
+make sandbox-image                    # one-time: build the kourai-sandbox image
+KOURAI_SANDBOX=container make cli     # pytest, ruff, etc. now run in --network=none containers
+```
+
+If `docker` isn't on your PATH, the CLI logs a warning and falls back to host execution — devs aren't blocked.
 
 ---
 
@@ -364,7 +389,7 @@ Full docs are available at [Kourai Khryseai](https://ajbarea.github.io/kourai-kh
 
 ## License
 
-[MIT](LICENSE)
+[Apache 2.0](LICENSE)
 
 ---
 
