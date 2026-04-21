@@ -47,86 +47,131 @@ class TestSetupLoggingBasic:
         logger = setup_logging("test_agent")
         assert isinstance(logger, logging.Logger)
         assert logger.name == "test_agent"
-        # File handler must be on the named logger, not root, so each agent
-        # writes only its own records to logs/<name>.log.
-        assert any(isinstance(h, RotatingFileHandler) for h in logger.handlers)
+        # File handler lives on root so records from third-party loggers
+        # (httpx, a2a.*, kourai_common.audio) also land in logs/<name>.log.
         root = logging.getLogger()
-        assert not any(isinstance(h, RotatingFileHandler) for h in root.handlers)
+        assert any(isinstance(h, RotatingFileHandler) for h in root.handlers)
 
     def test_respects_explicit_level(self):
-        """Test that explicit level parameter is used."""
-        logger = setup_logging("test_debug", level="DEBUG")
-        assert logger.level == logging.DEBUG
-
-        logger2 = setup_logging("test_warning", level="WARNING")
-        assert logger2.level == logging.WARNING
-
-
-class TestSetupLoggingConsoleGuard:
-    """Test the console handler guard.
-
-    The guard `if not root.handlers:` ensures the console handler is only
-    added on the first call, preventing duplicate console output.
-    """
-
-    def test_guard_blocks_when_handlers_exist(self):
-        """Test that guard prevents console setup when handlers already exist."""
-        from unittest.mock import MagicMock
-
-        with (
-            patch("logging.getLogger") as mock_get,
-            patch("kourai_common.log.RotatingFileHandler"),
-        ):
-            # Simulate: root already has handlers
-            mock_root = MagicMock()
-            mock_root.handlers = [MagicMock()]
-
-            mock_named_logger = MagicMock()
-            mock_named_logger.handlers = []
-            mock_get.side_effect = [mock_root, mock_named_logger]
-
-            setup_logging("agent")
-
-            # When handlers is not empty, root.setLevel should NOT be called
-            assert mock_root.setLevel.call_count == 0
-
-            # But the named logger should have received the file handler
-            assert mock_named_logger.addHandler.call_count == 1
-
-    def test_guard_allows_setup_when_empty(self):
-        """Test that guard allows console setup when handlers is empty."""
-        # Clear root logger to simulate clean state
+        """Explicit level is applied to the console handler (not the named logger,
+        which stays at DEBUG so records reach the file handler)."""
         root = logging.getLogger()
         for h in root.handlers[:]:
             root.removeHandler(h)
 
-        assert len(root.handlers) == 0
+        setup_logging("test_debug", level="DEBUG")
+        console = _first_console(root)
+        assert console.level == logging.DEBUG
 
-        # Setup should add console handler
+        for h in root.handlers[:]:
+            root.removeHandler(h)
+        setup_logging("test_warning", level="WARNING")
+        console = _first_console(root)
+        assert console.level == logging.WARNING
+
+
+class TestSetupLoggingHandlerGuards:
+    """Ensure handlers aren't duplicated across repeated setup_logging calls."""
+
+    def test_console_handler_not_duplicated(self):
+        """Console handler is added once regardless of how many times called."""
+        root = logging.getLogger()
+        for h in root.handlers[:]:
+            root.removeHandler(h)
+
+        setup_logging("test_once")
+        setup_logging("test_twice")
+
+        stream_handlers = [
+            h
+            for h in root.handlers
+            if isinstance(h, logging.StreamHandler) and not isinstance(h, RotatingFileHandler)
+        ]
+        assert len(stream_handlers) == 1
+
+    def test_file_handler_not_duplicated(self):
+        """File handler is added once even on repeated setup."""
+        root = logging.getLogger()
+        for h in root.handlers[:]:
+            root.removeHandler(h)
+
+        setup_logging("test_once")
+        setup_logging("test_twice")
+
+        file_handlers = [h for h in root.handlers if isinstance(h, RotatingFileHandler)]
+        assert len(file_handlers) == 1
+
+    def test_setup_on_empty_root_adds_both_handlers(self):
+        """Fresh root gets both console and file handlers."""
+        root = logging.getLogger()
+        for h in root.handlers[:]:
+            root.removeHandler(h)
+
         setup_logging("test_empty")
 
-        # Should have added a StreamHandler (console)
-        stream_handlers = [h for h in root.handlers if isinstance(h, logging.StreamHandler)]
-        assert len(stream_handlers) > 0
+        assert any(isinstance(h, RotatingFileHandler) for h in root.handlers)
+        assert any(
+            isinstance(h, logging.StreamHandler) and not isinstance(h, RotatingFileHandler)
+            for h in root.handlers
+        )
+
+
+def _first_console(root: logging.Logger) -> logging.StreamHandler:
+    for h in root.handlers:
+        if isinstance(h, logging.StreamHandler) and not isinstance(h, RotatingFileHandler):
+            return h
+    raise AssertionError("No console handler on root")
 
 
 class TestSetupLoggingLevel:
-    """Test log level resolution."""
+    """Console handler level is the user-visible one; file handler stays at DEBUG."""
+
+    def _reset_root(self) -> logging.Logger:
+        root = logging.getLogger()
+        for h in root.handlers[:]:
+            root.removeHandler(h)
+        return root
 
     def test_default_level_info(self):
-        """Test default level is INFO."""
         with patch.dict(os.environ, {}, clear=True):
-            logger = setup_logging("test_default")
-            assert logger.level == logging.INFO
+            root = self._reset_root()
+            setup_logging("test_default")
+            assert _first_console(root).level == logging.INFO
 
     def test_env_var_respected(self):
-        """Test KOURAI_LOG_LEVEL environment variable is used."""
         with patch.dict(os.environ, {"KOURAI_LOG_LEVEL": "DEBUG"}):
-            logger = setup_logging("test_env")
-            assert logger.level == logging.DEBUG
+            root = self._reset_root()
+            setup_logging("test_env")
+            assert _first_console(root).level == logging.DEBUG
 
     def test_explicit_overrides_env(self):
-        """Test explicit level parameter overrides environment variable."""
         with patch.dict(os.environ, {"KOURAI_LOG_LEVEL": "DEBUG"}):
-            logger = setup_logging("test_override", level="ERROR")
-            assert logger.level == logging.ERROR
+            root = self._reset_root()
+            setup_logging("test_override", level="ERROR")
+            assert _first_console(root).level == logging.ERROR
+
+    def test_noisy_libs_filtered_from_console_at_info(self):
+        """httpx INFO records should be blocked from console but reach the file."""
+        root = self._reset_root()
+        setup_logging("test_filter", level="INFO")
+        console = _first_console(root)
+        noisy_record = logging.LogRecord(
+            name="httpx",
+            level=logging.INFO,
+            pathname=__file__,
+            lineno=1,
+            msg="GET http://x",
+            args=(),
+            exc_info=None,
+        )
+        assert not all(f.filter(noisy_record) for f in console.filters)
+        app_record = logging.LogRecord(
+            name="hosts.cli",
+            level=logging.INFO,
+            pathname=__file__,
+            lineno=1,
+            msg="loaded",
+            args=(),
+            exc_info=None,
+        )
+        assert all(f.filter(app_record) for f in console.filters)
