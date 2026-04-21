@@ -1,4 +1,5 @@
 ---
+title: Documentation
 hide:
   - navigation
   - toc
