@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 from typing import TYPE_CHECKING, Any, cast
@@ -22,7 +23,7 @@ from kourai_common.memory import (
 from kourai_common.retry import with_retry
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterable, Sequence
+    from collections.abc import AsyncIterable, Awaitable, Callable, Sequence
 
 log = logging.getLogger(__name__)
 
@@ -316,3 +317,147 @@ async def chat_stream(
 
     if context_id:
         add_message(context_id, agent_name, "assistant", "".join(full_response))
+
+
+def _normalize_tool_calls(message: Any) -> list[dict[str, Any]]:
+    """Extract OpenAI-style tool_calls from a LiteLLM message, regardless of source provider."""
+    raw_calls = getattr(message, "tool_calls", None) or []
+    normalized: list[dict[str, Any]] = []
+    for tc in raw_calls:
+        tc_id = getattr(tc, "id", None) or (tc.get("id") if isinstance(tc, dict) else None)
+        fn = getattr(tc, "function", None) or (tc.get("function") if isinstance(tc, dict) else None)
+        if fn is None:
+            continue
+        name = getattr(fn, "name", None) or (fn.get("name") if isinstance(fn, dict) else None)
+        args = getattr(fn, "arguments", None)
+        if args is None and isinstance(fn, dict):
+            args = fn.get("arguments")
+        if not name:
+            continue
+        normalized.append({"id": tc_id, "name": name, "arguments": args or "{}"})
+    return normalized
+
+
+async def chat_with_tools(
+    agent_name: str,
+    messages: Sequence[dict[str, Any]],
+    tools: list[dict[str, Any]],
+    tool_handlers: dict[str, Callable[..., Awaitable[str]]],
+    *,
+    handler_context: dict[str, Any] | None = None,
+    temperature: float = 0.2,
+    max_tokens: int = 4096,
+    max_iters: int = 10,
+    context_id: str | None = None,
+    on_tool_call: Callable[[str, dict[str, Any], str], Awaitable[None]] | None = None,
+) -> tuple[str, list[dict[str, Any]]]:
+    """Drive an agentic tool-use loop until the model stops calling tools.
+
+    Returns (final_assistant_text, tool_call_log). Each log entry is
+    ``{"name": str, "args": dict, "result": str}``. ``handler_context`` is
+    merged into every handler call as keyword arguments and takes precedence
+    over model-supplied args (so the model can't override server-trusted
+    values like ``project_root``).
+    """
+    model = get_model(agent_name)
+    timeout = AGENT_TIMEOUTS.get(agent_name, 120.0)
+
+    working_messages = await _build_contextual_messages(agent_name, messages, context_id)
+    handler_ctx = handler_context or {}
+    tool_call_log: list[dict[str, Any]] = []
+    final_text = ""
+    finished_cleanly = False
+
+    for iteration in range(max_iters):
+        log.debug(
+            "LLM tool loop %s iter=%d (%d messages, %d tools)",
+            agent_name,
+            iteration,
+            len(working_messages),
+            len(tools),
+        )
+        try:
+            response = await _execute_completion(
+                timeout_seconds=timeout,
+                model=model,
+                messages=working_messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                tools=tools,
+                tool_choice="auto",
+            )
+        except TimeoutError:
+            raise LLMTimeoutError(agent_name, timeout) from None
+
+        choice = response.choices[0]
+        message = choice.message
+        text_content = _coerce_chunk_content(getattr(message, "content", None))
+        normalized = _normalize_tool_calls(message)
+
+        if text_content:
+            final_text = text_content
+
+        if not normalized:
+            finished_cleanly = True
+            break
+
+        working_messages.append(
+            {
+                "role": "assistant",
+                "content": text_content,
+                "tool_calls": [
+                    {
+                        "id": tc["id"],
+                        "type": "function",
+                        "function": {"name": tc["name"], "arguments": tc["arguments"]},
+                    }
+                    for tc in normalized
+                ],
+            }
+        )
+
+        for tc in normalized:
+            name = tc["name"]
+            raw_args = tc["arguments"]
+            args: dict[str, Any]
+            result: str
+            try:
+                args = json.loads(raw_args) if isinstance(raw_args, str) else dict(raw_args)
+            except (json.JSONDecodeError, TypeError, ValueError) as exc:
+                args = {}
+                result = f"ERROR: invalid tool arguments: {exc}"
+            else:
+                handler = tool_handlers.get(name)
+                if handler is None:
+                    result = f"ERROR: unknown tool {name!r}"
+                else:
+                    try:
+                        result = await handler(**{**args, **handler_ctx})
+                    except Exception as exc:
+                        log.warning("Tool %s failed for %s: %s", name, agent_name, exc)
+                        result = f"ERROR: {type(exc).__name__}: {exc}"
+
+            log.debug("tool_use %s args=%s result=%s", name, args, result[:200])
+            working_messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": tc["id"],
+                    "content": result,
+                }
+            )
+            tool_call_log.append({"name": name, "args": args, "result": result})
+
+            if on_tool_call is not None:
+                await on_tool_call(name, args, result)
+
+    if not finished_cleanly:
+        log.warning(
+            "chat_with_tools for %s hit max_iters=%d before model stopped calling tools",
+            agent_name,
+            max_iters,
+        )
+
+    if context_id and final_text:
+        add_message(context_id, agent_name, "assistant", final_text)
+
+    return final_text, tool_call_log
