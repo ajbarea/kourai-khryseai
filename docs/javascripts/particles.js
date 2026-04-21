@@ -134,16 +134,17 @@
   }
 })();
 
-// Avatar lightbox — click any .specialist-avatar to view full-size
+// Avatar lightbox — click any .specialist-avatar or .research-poster to view full-size
 (function () {
   let overlay = null;
 
-  function openLightbox(src, alt) {
+  function openLightbox(src, alt, variant) {
     overlay = document.createElement('div');
     overlay.className = 'avatar-lightbox';
+    if (variant) overlay.classList.add('avatar-lightbox--' + variant);
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
-    overlay.setAttribute('aria-label', alt || 'Avatar');
+    overlay.setAttribute('aria-label', alt || 'Image');
 
     const img = document.createElement('img');
     img.className = 'avatar-lightbox__img';
@@ -178,11 +179,12 @@
   }
 
   function init() {
-    document.querySelectorAll('.specialist-avatar').forEach(img => {
+    document.querySelectorAll('.specialist-avatar, .research-poster').forEach(img => {
       // Guard against double-binding on instant navigation re-runs
       if (img.dataset.lightboxBound) return;
       img.dataset.lightboxBound = '1';
-      img.addEventListener('click', () => openLightbox(img.src, img.alt));
+      const variant = img.classList.contains('research-poster') ? 'poster' : null;
+      img.addEventListener('click', () => openLightbox(img.src, img.alt, variant));
     });
   }
 
