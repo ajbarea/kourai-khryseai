@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useTexture } from "@react-three/drei"
 import { Canvas, useFrame, useThree } from "@react-three/fiber"
 import * as THREE from "three"
@@ -94,7 +94,7 @@ function Scene({
   const { gl } = useThree()
   const circleRef =
     useRef<THREE.Mesh<THREE.CircleGeometry, THREE.ShaderMaterial>>(null)
-  const initialColorsRef = useRef<[string, string]>(colors)
+  const [initialColors] = useState<[string, string]>(() => colors)
   const targetColor1Ref = useRef(new THREE.Color(colors[0]))
   const targetColor2Ref = useRef(new THREE.Color(colors[1]))
   const animSpeedRef = useRef(0.1)
@@ -129,9 +129,10 @@ function Scene({
     )
   }, [manualOutput, outputVolumeRef, getOutputVolume])
 
+  const [fallbackSeed] = useState(() => Math.floor(Math.random() * 2 ** 32))
   const random = useMemo(
-    () => splitmix32(seed ?? Math.floor(Math.random() * 2 ** 32)),
-    [seed]
+    () => splitmix32(seed ?? fallbackSeed),
+    [seed, fallbackSeed]
   )
   const offsets = useMemo(
     () =>
@@ -161,6 +162,10 @@ function Scene({
     return () => observer.disconnect()
   }, [])
 
+  // useFrame runs every frame outside of render — the mutations below are the
+  // standard react-three-fiber pattern, but the React Compiler's immutability
+  // rule can't distinguish effect-time mutations from render-time ones.
+  /* eslint-disable react-hooks/immutability */
   useFrame((_, delta: number) => {
     const mat = circleRef.current?.material
     if (!mat) return
@@ -216,6 +221,7 @@ function Scene({
     u.uColor1.value.lerp(targetColor1Ref.current, 0.08)
     u.uColor2.value.lerp(targetColor2Ref.current, 0.08)
   })
+  /* eslint-enable react-hooks/immutability */
 
   useEffect(() => {
     const canvas = gl.domElement
@@ -230,15 +236,22 @@ function Scene({
       canvas.removeEventListener("webglcontextlost", onContextLost, false)
   }, [gl])
 
-  const uniforms = useMemo(() => {
+  useEffect(() => {
+    // three.js textures are mutable by design; this is the canonical way to
+    // enable wrapping. The compiler's immutability rule can't see that we own
+    // this texture instance exclusively.
+    /* eslint-disable-next-line react-hooks/immutability */
     perlinNoiseTexture.wrapS = THREE.RepeatWrapping
     perlinNoiseTexture.wrapT = THREE.RepeatWrapping
+  }, [perlinNoiseTexture])
+
+  const uniforms = useMemo(() => {
     const isDark =
       typeof document !== "undefined" &&
       document.documentElement.classList.contains("dark")
     return {
-      uColor1: new THREE.Uniform(new THREE.Color(initialColorsRef.current[0])),
-      uColor2: new THREE.Uniform(new THREE.Color(initialColorsRef.current[1])),
+      uColor1: new THREE.Uniform(new THREE.Color(initialColors[0])),
+      uColor2: new THREE.Uniform(new THREE.Color(initialColors[1])),
       uOffsets: { value: offsets },
       uPerlinTexture: new THREE.Uniform(perlinNoiseTexture),
       uTime: new THREE.Uniform(0),
@@ -248,7 +261,7 @@ function Scene({
       uOutputVolume: new THREE.Uniform(0),
       uOpacity: new THREE.Uniform(0),
     }
-  }, [perlinNoiseTexture, offsets])
+  }, [perlinNoiseTexture, offsets, initialColors])
 
   return (
     <mesh ref={circleRef}>
