@@ -66,8 +66,10 @@ hosts/vn/kourai_vn/logs/
 .cache/
 .coverage.runsc.pid*
 
+# Node
+node_modules/
+
 # Voice Lab (Next.js tool)
-tools/voice-lab/node_modules/
 tools/voice-lab/.next/
 tools/voice-lab/tsconfig.tsbuildinfo
 tools/voice-lab/.playwright-mcp/
