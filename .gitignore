@@ -13,6 +13,8 @@ venv/
 
 # Environment
 .env
+.env.local
+.env.*.local
 .hf-buckets-configured
 
 # IDE
@@ -63,3 +65,11 @@ hosts/vn/kourai_vn/.ren'py_compiler_cache
 hosts/vn/kourai_vn/logs/
 .cache/
 .coverage.runsc.pid*
+
+# Node
+node_modules/
+
+# Voice Lab (Next.js tool)
+tools/voice-lab/.next/
+tools/voice-lab/tsconfig.tsbuildinfo
+tools/voice-lab/.playwright-mcp/
