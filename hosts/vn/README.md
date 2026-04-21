@@ -86,4 +86,4 @@ The VN Host communicates with the `@agents/**` backend via a **JSON-over-Subproc
 ---
 
 ## 📜 License
-This host is part of the Kourai Khryseai project. See [LICENSE.md](../../LICENSE.md) for details.
+This host is part of the Kourai Khryseai project. See [LICENSE](../../LICENSE) for details.
