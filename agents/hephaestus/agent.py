@@ -307,9 +307,21 @@ async def determine_pipeline(user_request: str, context_id: str | None = None) -
 
 
 def _kallos_found_issues(output: str) -> bool:
-    """Check if Kallos output indicates lint failures."""
+    """Check if Kallos output indicates lint failures.
+
+    Kallos brackets its artifact with a deterministic prefix:
+      * ``All linting checks passed`` on a clean run.
+      * ``Linting completed with issues`` when ruff/ty flagged something.
+    Preferring those over substring checks against ``fail`` avoids false
+    positives from tool-level noise (e.g. ruff's ``Failed to initialize
+    cache`` warning, which used to trigger spurious retry loops).
+    """
     lower = output.lower()
-    return "fail" in lower and "all clean" not in lower
+    if "all linting checks passed" in lower:
+        return False
+    # Older Kallos outputs or unexpected shapes fall through to False — stay
+    # conservative so we don't loop on noise; a false negative just skips the fixer.
+    return "linting completed with issues" in lower
 
 
 async def _iter_agent_events(
@@ -387,7 +399,10 @@ async def execute_pipeline(
     # Initialize the Forge Transcript
     transcript = f"[User]: {clean_request}"
     if project_root:
-        transcript += f"\n\n[Project Settings]: root={project_root}"
+        # Format matches parse_project_root() in a2a_utils so specialists
+        # (Dokimasia, Techne, Kallos) can recover the worktree path and run
+        # subprocesses there instead of Path.cwd() (the Kourai repo root).
+        transcript += f"\n\nProject root: {project_root}"
 
     # Metadata context (hidden from the transcript, injected into system prompts)
     # Each agent receives "Relationship tiers: techne: Tier 3 — Warm (affinity 0.72)"

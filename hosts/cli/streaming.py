@@ -42,7 +42,7 @@ if TYPE_CHECKING:
     from hosts.gui.tts_engine import TTSEngine
 
 # ---------------------------------------------------------------------------
-# Last result store — for :copy / :save
+# Last result store — for /copy / /save
 # ---------------------------------------------------------------------------
 _last_result: str = ""
 
@@ -145,7 +145,7 @@ async def send_and_stream(
     except httpx.ConnectError:
         _echo(
             f"{_RED}\U0001f525 Hephaestus lost the forge connection \u2014 "
-            f"try {_GOLD}:status{_RESET}{_RED} or {_GOLD}make up{_RESET}"
+            f"try {_GOLD}/status{_RESET}{_RED} or {_GOLD}make up{_RESET}"
         )
         return True, context_id, task_id
     except httpx.TimeoutException:
@@ -183,7 +183,7 @@ async def send_and_stream(
                     await tts.speak(victory, last_agent)
 
         # Post-output suggestions
-        _echo(f"{_DIM}:copy clipboard \u00b7 :save <file> \u00b7 :help commands{_RESET}")
+        _echo(f"{_DIM}/copy clipboard \u00b7 /save <file> \u00b7 /help commands{_RESET}")
 
     if verbose:
         _echo(f"{_DIM}[verbose] {event_count} events in {elapsed:.1f}s{_RESET}")
@@ -191,7 +191,7 @@ async def send_and_stream(
     # Handle input_required — prompt user for follow-up
     if final_state == TaskState.input_required:
         follow_up: str = await click.prompt(f"\n{_GOLD}\u21b3 Your response{_RESET}")
-        if follow_up.strip().lower() in (":q", "quit"):
+        if follow_up.strip().lower() in ("/q", "/quit", "quit"):
             return False, context_id, task_id
         return await send_and_stream(
             client,

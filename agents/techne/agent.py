@@ -14,13 +14,15 @@ from typing import TYPE_CHECKING, Any
 from anyio import Path as AnyioPath
 
 from kourai_common.file_ops import PathViolation, validate_file_path
-from kourai_common.llm import chat, chat_stream
+from kourai_common.forge_tools import FORGE_TOOL_HANDLERS, FORGE_TOOL_SCHEMAS
+from kourai_common.llm import chat_with_tools
 from kourai_common.player import get_enriched_system_prompt
 from kourai_common.prompts import CURRENT_DATE, build_system_prompt
 from kourai_common.subprocess import StatusCallback, run_command
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator
+    from collections.abc import Awaitable, Callable
+    from pathlib import Path
 
 log = logging.getLogger(__name__)
 
@@ -62,31 +64,17 @@ Universal Rules:
   `unittest.mock.Mock`, not raw `dict`s.
 - Add a brief personality touch at start/end (one line max)
 
-When generating code changes, output them in this format:
+TOOL USE:
+You have four file-op tools — `write_file`, `edit_file`, `delete_file`,
+`read_file`. Use them to make every change. Paths must be PROJECT-RELATIVE
+(e.g. `src/hello.py`, not `/home/.../hello.py`). Plan your work in one
+short paragraph BEFORE you call any tool, then call them in the order you
+need. After every change is on disk, end with one short sentence summarising
+what you did. Do NOT describe edits in prose — call the tool.
 
-ACTION: CREATE | EDIT | DELETE
-FILE: path/to/file.py
-CONTENT:
-```language
-<full file content for CREATE, or changed section for EDIT>
-```
-
-For EDIT actions, also include:
-ORIGINAL:
-```language
-<the exact lines being replaced>
-```
-REPLACEMENT:
-```language
-<the new lines>
-```
-
----
-
-Separate multiple file changes with ---
-
-IMPORTANT: Before outputting any code changes, briefly plan your
-implementation by writing a TODO list based on the requested task.
+If you are not certain of the exact text to match for `edit_file`, call
+`read_file` first. `edit_file` requires a unique match — extend
+`old_string` with surrounding lines if it appears more than once.
 
 PLAYER FACTS:
 Emit discoveries about the player in your responses using this format:
@@ -219,33 +207,40 @@ async def get_git_context(
     return "\n\n".join(parts) if parts else "No git context available."
 
 
-async def generate_code(
+async def apply_code_changes(
     task_description: str,
+    project_root: str | Path,
     file_contents: dict[str, str] | None = None,
     git_context: str = "",
     image_parts: list[dict] | None = None,
     context_id: str | None = None,
-) -> str:
-    """Generate code changes using the LLM.
+    on_tool_call: Callable[[str, dict[str, Any], str], Awaitable[None]] | None = None,
+) -> tuple[str, list[dict[str, Any]]]:
+    """Drive Techne's tool-use loop and apply changes via forge tools.
 
-    Queries Context7/Context Hub for relevant API docs before generation.
-    This helps Techne write code that's consistent with current library semantics.
+    Each file write happens inside the agentic loop via
+    :data:`FORGE_TOOL_HANDLERS`, so the model literally cannot finish without
+    emitting a schema-validated tool call.
 
     Args:
         task_description: What code to write/modify.
+        project_root: Project root for path validation. Required — handler
+            context injection prevents the model from overriding it.
         file_contents: Existing file contents for context.
         git_context: Git status/diff for additional context.
         image_parts: Optional LiteLLM image_url content blocks attached by the user.
         context_id: Context ID for conversational memory.
+        on_tool_call: Optional async callback invoked once per tool execution
+            with ``(name, args, result)`` for live UI updates.
 
     Returns:
-        Raw LLM response with code changes in structured format.
+        ``(assistant_text, tool_call_log)`` — the model's final summary
+        plus the full tool-call transcript for tracing.
     """
     from kourai_common.doc_lookup import lookup_documentation
 
     context_parts = []
 
-    # Fetch relevant documentation before generating code
     docs_context = await lookup_documentation(
         task_description,
         agent_name="techne",
@@ -266,7 +261,7 @@ async def generate_code(
     user_text = (
         f"Task: {task_description}\n\n"
         f"{context_block}\n\n"
-        "Generate the code changes needed. Use the ACTION/FILE/CONTENT format."
+        "Make every change by calling the file-op tools."
     )
     user_content: str | list[dict] = user_text
     if image_parts:
@@ -277,70 +272,19 @@ async def generate_code(
         {"role": "user", "content": user_content},
     ]
 
-    log.info("Generating code for: %.100s", task_description)
-    return await chat("techne", messages, temperature=0.2, max_tokens=8192, context_id=context_id)
-
-
-async def generate_code_stream(
-    task_description: str,
-    file_contents: dict[str, str] | None = None,
-    git_context: str = "",
-    image_parts: list[dict] | None = None,
-    context_id: str | None = None,
-) -> AsyncGenerator[str, None]:
-    """Stream code generation for real-time progress.
-
-    Args:
-        task_description: What code to write/modify.
-        file_contents: Existing file contents for context.
-        git_context: Git status/diff for additional context.
-        image_parts: Optional LiteLLM image_url content blocks attached by the user.
-        context_id: Context ID for conversational memory.
-
-    Yields:
-        Text chunks of the LLM response.
-    """
-    from kourai_common.doc_lookup import lookup_documentation
-
-    context_parts = []
-
-    # Fetch relevant documentation before streaming code
-    docs_context = await lookup_documentation(
-        task_description,
-        agent_name="techne",
-        max_results=3,
+    log.info("Driving Techne tool-use loop for: %.100s", task_description)
+    return await chat_with_tools(
+        "techne",
+        messages,
+        tools=FORGE_TOOL_SCHEMAS,
+        tool_handlers=FORGE_TOOL_HANDLERS,
+        handler_context={"project_root": project_root},
+        temperature=0.2,
+        max_tokens=8192,
+        max_iters=20,
+        context_id=context_id,
+        on_tool_call=on_tool_call,
     )
-    if docs_context:
-        context_parts.append(docs_context)
-
-    if file_contents:
-        context_parts.append("=== EXISTING FILES ===")
-        for path, content in file_contents.items():
-            context_parts.append(f"\n--- {path} ---\n{content}")
-
-    if git_context:
-        context_parts.append(f"\n=== GIT CONTEXT ===\n{git_context}")
-
-    context_block = "\n".join(context_parts)
-    user_text = (
-        f"Task: {task_description}\n\n"
-        f"{context_block}\n\n"
-        "Generate the code changes needed. Use the ACTION/FILE/CONTENT format."
-    )
-    user_content: str | list[dict] = user_text
-    if image_parts:
-        user_content = [{"type": "text", "text": user_text}, *image_parts]
-
-    messages: list[dict[str, Any]] = [
-        {"role": "system", "content": get_enriched_system_prompt(SYSTEM_PROMPT, "techne")},
-        {"role": "user", "content": user_content},
-    ]
-
-    log.info("Streaming code generation for: %.100s", task_description)
-    async for chunk in chat_stream(
-        "techne", messages, temperature=0.2, max_tokens=8192, context_id=context_id
-    ):
-        yield chunk
 
 
 def parse_file_paths(user_input: str) -> list[str]:

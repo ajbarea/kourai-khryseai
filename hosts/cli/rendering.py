@@ -234,7 +234,7 @@ def _maiden_card(name: str) -> str:
     if not m:
         return f"{_DIM}Unknown maiden: {name}{_RESET}"
 
-    quote = secrets.choice(m["quotes"])
+    quote = secrets.choice(m["quotes"]) if m.get("quotes") else ""
 
     # Load avatar (PNG/JPG anime portrait > kaomoji fallback)
     raw_art = _get_maiden_art(name, str(m["face"]), size="card")
@@ -249,8 +249,8 @@ def _maiden_card(name: str) -> str:
         f"  {_GOLD}\u2503{_RESET}\n"
         f"{art_section}\n"
         f"  {_GOLD}\u2503{_RESET}\n"
-        f'  {_GOLD}\u2503{_RESET}  {_ITALIC}"{quote}"{_RESET}\n'
-        f"  {_GOLD}\u2517\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501{_RESET}"
+        + (f'  {_GOLD}\u2503{_RESET}  {_ITALIC}"{quote}"{_RESET}\n' if quote else "")
+        + f"  {_GOLD}\u2517\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501{_RESET}"
     )
 
 
@@ -291,7 +291,7 @@ def _banner() -> str:
         f"\n"
         f"{_GOLD}Enter{_RESET} send  \u00b7  {_GOLD}Ctrl+V{_RESET} paste  \u00b7  "
         f"{_GOLD}Alt+V{_RESET} attach image\n"
-        f"{_GOLD}:help{_RESET} commands  \u00b7  {_GOLD}:q{_RESET} quit\n"
+        f"{_GOLD}/help{_RESET} commands  \u00b7  {_GOLD}/q{_RESET} quit\n"
     )
 
 

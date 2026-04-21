@@ -137,8 +137,8 @@ class TestIterativeLoopConvergence:
             kallos_call_count += 1
             agents_that_ran.append("kallos")
             if kallos_call_count <= 1:
-                return "### ruff check: FAIL\nE501 line too long on line 42"
-            return "ALL CLEAN\n### ruff check: PASS\n### ruff format: PASS"
+                return "✨ Linting completed with issues.\nE501 line too long on line 42"
+            return "✨ All linting checks passed!"
 
         async def techne_send(text: str, ctx_id: str) -> str:
             agents_that_ran.append("techne")

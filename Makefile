@@ -13,7 +13,7 @@
 ## measure intent, not trivial formatting noise.
 ##
 
-.PHONY: help check-env setup setup-artifacts upgrade yolo dev dev-vn up down restart rebuild status gui cli vn docs fix lint validate test test-unit test-integration test-performance audit deps clean clean-cache clean-tests prune logs logs-tail
+.PHONY: help check-env setup setup-artifacts upgrade yolo dev dev-vn up down restart rebuild status gui cli vn docs fix lint validate test test-unit test-integration test-performance audit deps clean clean-cache clean-tests prune logs logs-tail sandbox-image
 .DEFAULT_GOAL := help
 
 UV_DEV := uv run --no-active --package kourai-common kourai-dev
@@ -144,6 +144,13 @@ logs:                      ## Show the last 200 lines of logs/dev-latest.log
 
 logs-tail:                 ## Follow logs/dev-latest.log (Ctrl-C to exit)
 	@tail -f logs/dev-latest.log
+
+# ---------------------------------------------------------------------------
+# Sandbox (player project execution)
+# ---------------------------------------------------------------------------
+
+sandbox-image:             ## Build the kourai-sandbox image used when KOURAI_SANDBOX=container
+	@docker build -f docker/sandbox.Dockerfile -t kourai-sandbox:latest .
 
 # ---------------------------------------------------------------------------
 # Help

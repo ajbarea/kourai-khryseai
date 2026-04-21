@@ -14,13 +14,19 @@ from typing import TYPE_CHECKING, Any
 
 from anyio import Path as AnyioPath
 
-from kourai_common.llm import chat, chat_stream
+from kourai_common.forge_tools import (
+    FORGE_TOOL_HANDLERS,
+    FORGE_TOOL_SCHEMAS,
+    count_successful_writes,
+)
+from kourai_common.llm import chat, chat_stream, chat_with_tools
 from kourai_common.player import get_enriched_system_prompt
 from kourai_common.prompts import CURRENT_DATE, build_system_prompt
 from kourai_common.subprocess import StatusCallback, run_command
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterable
+    from pathlib import Path
 
 log = logging.getLogger(__name__)
 
@@ -117,10 +123,13 @@ class PytestRunResult:
     success: bool = False
 
 
-async def fix_test_issues(
-    pytest_output: str, file_paths: set[str], context_id: str | None = None
-) -> str:
-    """Use LLM to fix failing tests or code."""
+async def apply_test_fixes(
+    pytest_output: str,
+    file_paths: set[str],
+    project_root: str | Path,
+    context_id: str | None = None,
+) -> int:
+    """Drive the tool-use loop to fix failing tests and return the write count."""
     files_block = ""
     for file_path in file_paths:
         path = AnyioPath(file_path)
@@ -133,15 +142,10 @@ async def fix_test_issues(
             "role": "system",
             "content": (
                 get_enriched_system_prompt(SYSTEM_PROMPT, "dokimasia")
-                + "\n\nWhen fixing issues, you MUST provide the exact file changes in this"
-                " format:\n\n"
-                "FILE: path/to/file.py\nORIGINAL:\n```python\n<exact lines to replace,"
-                " must match file exactly>\n```\n"
-                "REPLACEMENT:\n```python\n<new lines>\n```\n\nSeparate multiple file"
-                " changes with ---\n"
-                "If no issues need fixing, output: ALL CLEAN\n\n"
-                "IMPORTANT: Before outputting any fixes, briefly plan your fixes by"
-                " writing a TODO list based on the test failures."
+                + "\n\nFix failing tests or the underlying code by calling the "
+                "file-op tools (`read_file`, `write_file`, `edit_file`). Paths "
+                "must be PROJECT-RELATIVE. Plan briefly in one short paragraph "
+                "before calling any tool."
             ),
         },
         {
@@ -149,12 +153,22 @@ async def fix_test_issues(
             "content": (
                 f"The test suite failed with this output:\n\n{pytest_output}\n\n"
                 f"Here are the relevant files:\n{files_block}\n\n"
-                "Please fix the failing tests or the underlying code "
-                "using the FILE/ORIGINAL/REPLACEMENT format."
+                "Fix the failures by calling the file-op tools."
             ),
         },
     ]
-    return await chat("dokimasia", messages, temperature=0.2, max_tokens=4096)
+    _, tool_log = await chat_with_tools(
+        "dokimasia",
+        messages,
+        tools=FORGE_TOOL_SCHEMAS,
+        tool_handlers=FORGE_TOOL_HANDLERS,
+        handler_context={"project_root": project_root},
+        temperature=0.2,
+        max_tokens=4096,
+        max_iters=10,
+        context_id=context_id,
+    )
+    return count_successful_writes(tool_log)
 
 
 async def run_pytest(
@@ -173,7 +187,20 @@ async def run_pytest(
             Each test result line (PASSED/FAILED/ERROR) is forwarded so the
             player can watch the test suite run in the scratchpad.
     """
-    cmd = [sys.executable, "-m", "pytest", target_path, "-v", "--tb=short"]
+    # -p no:cacheprovider keeps pytest from writing .pytest_cache into the
+    # forge worktree. Dokimasia runs inside a container as UID 1000 and pytest
+    # creates the cache dir with umask 022 (g-w). The host user then can't
+    # clean it up, leaving empty worktree stubs after accept/discard.
+    cmd = [
+        sys.executable,
+        "-m",
+        "pytest",
+        target_path,
+        "-v",
+        "--tb=short",
+        "-p",
+        "no:cacheprovider",
+    ]
     if extra_args:
         cmd.extend(extra_args)
 

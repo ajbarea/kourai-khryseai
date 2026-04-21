@@ -247,15 +247,28 @@ class TestDokimasiaExecutor:
 
 
 class TestTechneExecutor:
-    """Techne-specific tests (code generation)."""
+    """Techne-specific tests (code generation via tool-use loop)."""
 
     @pytest.mark.asyncio
-    async def test_valid_input_generates_code(self):
+    async def test_valid_input_drives_tool_loop_and_emits_artifact(self):
         from agents.techne.agent_executor import TechneAgentExecutor
 
         executor = TechneAgentExecutor()
         ctx = _make_context("fix auth.py null check")
         queue = _make_queue()
+
+        tool_log = [
+            {
+                "name": "write_file",
+                "args": {"path": "auth.py", "content": "x = 1\n"},
+                "result": "Wrote auth.py (6 chars).",
+            },
+            {
+                "name": "read_file",
+                "args": {"path": "auth.py"},
+                "result": "1: x = 1",
+            },
+        ]
 
         with (
             patch("agents.techne.agent_executor.create_span"),
@@ -269,28 +282,15 @@ class TestTechneExecutor:
             ),
             patch("agents.techne.agent_executor.get_git_context", return_value="M auth.py"),
             patch(
-                "agents.techne.agent_executor.generate_code_stream",
-                return_value=_async_gen(
-                    [
-                        "ACTION: EDIT\n...",
-                        "ACTION: EDIT\n...",
-                        "ACTION: EDIT\n...",
-                        "ACTION: EDIT\n...",
-                        "ACTION: EDIT\n...",
-                        "ACTION: EDIT\n...",
-                        "ACTION: EDIT\n...",
-                        "ACTION: EDIT\n...",
-                        "ACTION: EDIT\n...",
-                        "ACTION: EDIT\n...",
-                    ]
-                ),
+                "agents.techne.agent_executor.apply_code_changes",
+                new_callable=AsyncMock,
+                return_value=("Updated auth.py.", tool_log),
             ),
             patch("agents.techne.agent_executor.send_working_status"),
-            patch("agents.techne.agent_executor.parse_and_apply_fixes", return_value=1),
         ):
             await executor.execute(ctx, queue)
 
-        # Enqueue events: task creation + add_artifact + complete (send_working_status is mocked)
+        # Enqueue events: task creation + add_artifact + complete
         assert queue.enqueue_event.call_count >= 3
 
 

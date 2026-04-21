@@ -56,8 +56,11 @@ class KokoroBackend(TTSBackend):
 
         return self._pipelines[lang_code]
 
-    def _to_wav(self, audio: np.ndarray) -> bytes:
-        """Convert float32 [-1, 1] ndarray to 16-bit PCM WAV bytes."""
+    def _to_wav(self, audio: Any) -> bytes:
+        """Convert float32 [-1, 1] audio (numpy ndarray or torch tensor) to 16-bit PCM WAV bytes."""
+        # Newer kokoro releases yield torch.Tensor; coerce to numpy.
+        if hasattr(audio, "detach"):
+            audio = audio.detach().cpu().numpy()
         pcm_data = (audio * 32767).astype(np.int16)
         wav_buffer = io.BytesIO()
         with wave.open(wav_buffer, "wb") as wav:

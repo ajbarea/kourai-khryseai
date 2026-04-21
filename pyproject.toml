@@ -51,6 +51,7 @@ exclude = [
     ".pytest_cache",
     ".ruff_cache",
     ".hypothesis",
+    "node_modules",
 ]
 
 [tool.ruff.lint]
@@ -84,9 +85,12 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "E402"]  # Assert + importorskip-before-import pattern
+"tests/**" = ["S101", "E402", "S603", "S607", "ASYNC221"]  # Assert + importorskip + subprocess in test helpers
 "shared/src/kourai_common/dev_cli.py" = ["T201", "S603"]  # CLI tool: intentional print output and safe subprocess calls
 "shared/src/kourai_common/dev_log.py" = ["T201"]  # Dev runner: intentional console echo alongside the log file
+"shared/src/kourai_common/projects.py" = ["S603", "S607"]  # Invokes git on player-owned project paths
+"shared/src/kourai_common/forge_session.py" = ["S603", "S607"]  # Invokes git for worktree management
+"shared/src/kourai_common/sandbox.py" = ["S603", "S607"]  # Invokes docker / agent-allowlisted commands
 "scripts/*.py" = ["T201", "S607"]  # CLI scripts: intentional terminal output + uv/commands in PATH
 
 [tool.ruff.lint.isort]

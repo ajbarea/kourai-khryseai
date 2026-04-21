@@ -269,7 +269,14 @@ TASK_GROUPS: tuple[tuple[str, tuple[tuple[str, Task], ...]], ...] = (
                 "cli",
                 Task(
                     description="Launch terminal CLI client (runs on host machine)",
-                    command_factory=lambda: [sys.executable, "-m", "hosts.cli", "--voice"],
+                    command_factory=lambda: [
+                        sys.executable,
+                        "-m",
+                        "hosts.cli",
+                        "--agent",
+                        "http://localhost:10000/",
+                        "--voice",
+                    ],
                     tee=False,
                 ),
             ),

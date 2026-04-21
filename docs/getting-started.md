@@ -111,7 +111,7 @@ make cli
 ╔══════════════════════════════════════════╗
 ║     Kourai Khryseai — Golden Maidens     ║
 ╚══════════════════════════════════════════╝
-Type your request. Commands: :q (quit), :status (agent info)
+Type your request. Commands: /q (quit), /status (agent info)
 
 Connecting to Hephaestus at http://localhost:10000/...
 Connected to Hephaestus — Orchestrator v0.1.0

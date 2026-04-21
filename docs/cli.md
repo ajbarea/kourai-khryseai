@@ -42,16 +42,30 @@ uv run python -m hosts.cli -p "commit prep"
 
 ## REPL Commands
 
+Type `/` at an empty prompt to open the live-filtering slash menu — arrow keys
+navigate, `Tab` or `Enter` accepts the highlighted entry.
+
 | Command | Action |
 |---|---|
-| `:q` or `quit` or `exit` | Exit the CLI |
-| `:status` | Show agent name, version, URL, context ID, streaming status |
-| `:help` | Show command help |
-| `:maidens` | Meet the Golden Maidens (list all agents) |
-| `:maidens <name>` | Show a specific maiden by name |
-| `:copy` | Copy last result to clipboard |
-| `:save <file>` | Save last result to a file |
-| `:clear` | Clear the screen |
+| `/q`, `/quit`, `/exit` or `quit` | Exit the CLI |
+| `/status` | Show agent name, version, URL, context ID, streaming status |
+| `/help` | Show command help |
+| `/settings` (alias `/config`) | Toggle voice, music, romance, and game systems |
+| `/model_tier` | Show current provider, tier, and model |
+| `/metrics` | Show alignment, affinity, and virtue metrics |
+| `/maidens` | Meet the Golden Maidens (list all agents) |
+| `/maidens <name>` | Show a specific maiden by name |
+| `/project new <name> [--template …]` | Forge a new player project |
+| `/project list` | List all your player projects |
+| `/project use <name\|id>` | Select an active project |
+| `/project current` | Show the active project |
+| `/project clear` | Clear the active project |
+| `/project status` | Show pending forge sessions on active project |
+| `/project accept <session_id>` | Merge a forge session into main |
+| `/project discard <session_id>` | Discard a forge session |
+| `/copy` | Copy last result to clipboard |
+| `/save <file>` | Save last result to a file |
+| `/clear` | Clear the screen |
 | Any other text | Send as a request to Hephaestus |
 
 ---
@@ -73,7 +87,7 @@ When you type a request:
 ╔══════════════════════════════════════════╗
 ║     Kourai Khryseai — Golden Maidens     ║
 ╚══════════════════════════════════════════╝
-Type your request. Commands: :q (quit), :status (agent info)
+Type your request. Commands: /q (quit), /status (agent info)
 
 Connecting to Hephaestus at http://localhost:10000/...
 Connected to Hephaestus — Orchestrator v0.1.0
@@ -112,7 +126,7 @@ When an agent needs clarification, the CLI prompts you for a response:
 ↳ Your response: Which specific module? The ORM layer, the API clients, or the caching layer?
 ```
 
-Type your response and the pipeline continues. Type `:q` to abort.
+Type your response and the pipeline continues. Type `/q` to abort.
 
 ---
 

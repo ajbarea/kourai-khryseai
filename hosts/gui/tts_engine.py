@@ -268,7 +268,10 @@ class TTSEngine:
             )
 
         except Exception as e:
-            logger.error("TTS streaming playback error: %s: %s", type(e).__name__, e, exc_info=True)
+            # TTS is non-critical; keep the console line terse. Full traceback
+            # lands in logs/<host>.log via the file handler at DEBUG level.
+            logger.warning("TTS playback skipped (%s: %s)", type(e).__name__, e)
+            logger.debug("TTS playback error detail", exc_info=True)
         finally:
             self.is_playing = False
             if self._on_complete:

@@ -1,23 +1,33 @@
 """Shared subprocess utilities for Kourai Khryseai agents.
 
-Centralizes run_command, parse_and_apply_fixes, and file extraction
-so agents don't duplicate them.
+Centralizes run_command and file extraction so agents don't duplicate them.
+
+run_command delegates to a pluggable runner (see sandbox.py) chosen by the
+KOURAI_SANDBOX env var; agent code is unaware of host vs container mode.
 """
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
-import re
-from collections.abc import Awaitable, Callable
 from pathlib import Path
+
+from kourai_common.sandbox import StatusCallback, get_runner
 
 log = logging.getLogger(__name__)
 
 _CONTEXT_LINES = 10
 
-StatusCallback = Callable[[str], Awaitable[None]]
+# Re-export so existing `from kourai_common.subprocess import StatusCallback` keeps working.
+__all__ = [
+    "StatusCallback",
+    "extract_files_from_output",
+    "extract_files_from_ruff_json",
+    "get_diagnostic_line_ranges",
+    "parse_ruff_json",
+    "read_file_with_context",
+    "run_command",
+]
 
 
 async def run_command(
@@ -34,48 +44,7 @@ async def run_command(
             as it arrives. Also receives the invoked command on start and the
             exit code on failure. Skips blank lines to reduce noise.
     """
-    cmd_str = " ".join(cmd)
-    log.debug("Running: %s", cmd_str)
-
-    proc = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-        cwd=cwd,
-    )
-
-    if status_callback is None:
-        stdout, stderr = await proc.communicate()
-        return (
-            proc.returncode or 0,
-            stdout.decode("utf-8", errors="replace"),
-            stderr.decode("utf-8", errors="replace"),
-        )
-
-    await status_callback(f"$ {cmd_str}")
-
-    stdout_lines: list[str] = []
-
-    async def _drain_stdout() -> None:
-        assert proc.stdout is not None  # noqa: S101
-        async for raw in proc.stdout:
-            line = raw.decode("utf-8", errors="replace").rstrip()
-            stdout_lines.append(line)
-            if line.strip():
-                await status_callback(line)
-
-    async def _drain_stderr() -> bytes:
-        assert proc.stderr is not None  # noqa: S101
-        return await proc.stderr.read()
-
-    stderr_bytes, _ = await asyncio.gather(_drain_stderr(), _drain_stdout())
-    await proc.wait()
-
-    rc = proc.returncode or 0
-    if rc != 0:
-        await status_callback(f"exit {rc}")
-
-    return rc, "\n".join(stdout_lines), stderr_bytes.decode("utf-8", errors="replace")
+    return await get_runner().run(cmd, cwd=cwd, status_callback=status_callback)
 
 
 def parse_ruff_json(output: str) -> list[dict]:
@@ -160,64 +129,6 @@ def read_file_with_context(
         prev_idx = idx
 
     return "\n".join(result_lines)
-
-
-_PATCH_PATTERN = re.compile(
-    r"FILE:\s*(.*?)\n.*?ORIGINAL:\n```(?:python)?\n(.*?)\n```.*?REPLACEMENT:\n```(?:python)?\n(.*?)\n```",
-    re.DOTALL,
-)
-
-
-def parse_and_apply_fixes(
-    llm_output: str,
-    project_root: str | Path | None = None,
-) -> int:
-    """Parse FILE/ORIGINAL/REPLACEMENT blocks from LLM output and apply them to disk.
-
-    Args:
-        llm_output: LLM response containing FILE/ORIGINAL/REPLACEMENT blocks.
-        project_root: Optional project root for path validation (safety check).
-            If provided, all writes are validated to be inside this root.
-            If not provided, writes proceed with a warning.
-
-    Returns:
-        Number of fixes successfully applied.
-
-    Raises:
-        PathViolation: If project_root is provided and any path escapes it.
-    """
-    from kourai_common.file_ops import PathViolation, validate_file_path
-
-    fixes_applied = 0
-    for match in _PATCH_PATTERN.finditer(llm_output):
-        file_path = match.group(1).strip()
-        original = match.group(2)
-        replacement = match.group(3)
-
-        if project_root:
-            try:
-                validated_path = validate_file_path(project_root, file_path)
-            except PathViolation as e:
-                log.error("Path validation failed: %s", e)
-                continue
-            path = validated_path
-        else:
-            path = Path(file_path)
-            log.warning(
-                "parse_and_apply_fixes called without project_root validation. "
-                "This write may access files outside the intended project."
-            )
-
-        if path.exists():
-            content = path.read_text(encoding="utf-8")
-            if original in content:
-                new_content = content.replace(original, replacement, 1)
-                path.write_text(new_content, encoding="utf-8")
-                fixes_applied += 1
-                log.info("Applied fix to %s", file_path)
-            else:
-                log.warning("Could not find exact original block in %s", file_path)
-    return fixes_applied
 
 
 def extract_files_from_output(output: str) -> set[str]:

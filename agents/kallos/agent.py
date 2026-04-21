@@ -7,13 +7,22 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from anyio import Path as AnyioPath
 
-from kourai_common.llm import chat
+from kourai_common.forge_tools import (
+    FORGE_TOOL_HANDLERS,
+    FORGE_TOOL_SCHEMAS,
+    count_successful_writes,
+)
+from kourai_common.llm import chat_with_tools
 from kourai_common.player import get_enriched_system_prompt
 from kourai_common.prompts import CURRENT_DATE, build_system_prompt
 from kourai_common.subprocess import StatusCallback, run_command
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 log = logging.getLogger(__name__)
 
@@ -50,26 +59,16 @@ Your cleanup checklist:
 8. Proactively FIX issues, do not just report them when possible
 9. Avoid marketing language like "robust" and "comprehensive"
 
-When you fix issues, you MUST provide the exact file changes in this format:
+TOOL USE:
+Fix issues by calling the file-op tools: `read_file` to inspect, then
+`edit_file` (surgical) or `write_file` (full rewrite) to apply the fix.
+Paths must be PROJECT-RELATIVE. If nothing needs fixing, call no tools
+and just say so in one line.
 
-FILE: path/to/file.py
-ORIGINAL:
-```python
-<exact lines to replace, must match file exactly>
-```
-REPLACEMENT:
-```python
-<new lines>
-```
-
----
-
-Separate multiple file changes with ---
-If no issues need fixing, output: ALL CLEAN
-Add a brief personality touch at start/end (one line max)
-
-IMPORTANT: Before outputting any fixes, briefly plan your fixes by writing
-a TODO list based on the lint/type errors.
+For `edit_file`, `old_string` must match the file verbatim and uniquely —
+include surrounding context lines if the target appears more than once.
+End with a one-line summary of what you changed (or "nothing to fix").
+Add a brief personality touch at start/end (one line max).
 
 PLAYER FACTS:
 Emit discoveries about the player in your responses using this format:
@@ -129,9 +128,13 @@ async def run_make_lint(
     all_passed = True
     combined: list[str] = []
 
+    # --no-cache keeps ruff from writing .ruff_cache into the player's project.
+    # For a forge session worktree, the container user can't always create that
+    # directory and the resulting "Failed to initialize cache" noise also
+    # triggered Hephaestus's lint-failure heuristic, causing spurious retry loops.
     # ruff format
     code, stdout, stderr = await run_command(
-        [python, "-m", "ruff", "format", "."],
+        [python, "-m", "ruff", "format", "--no-cache", "."],
         cwd=cwd,
         status_callback=status_callback,
     )
@@ -141,7 +144,17 @@ async def run_make_lint(
 
     # ruff check --fix
     code, stdout, stderr = await run_command(
-        [python, "-m", "ruff", "check", "--fix", "--unsafe-fixes", "--show-fixes", "."],
+        [
+            python,
+            "-m",
+            "ruff",
+            "check",
+            "--fix",
+            "--unsafe-fixes",
+            "--show-fixes",
+            "--no-cache",
+            ".",
+        ],
         cwd=cwd,
         status_callback=status_callback,
     )
@@ -162,10 +175,13 @@ async def run_make_lint(
     return all_passed, "\n".join(combined)
 
 
-async def fix_lint_issues(
-    lint_output: str, file_paths: set[str], context_id: str | None = None
-) -> str:
-    """Use LLM to fix lint issues."""
+async def apply_lint_fixes(
+    lint_output: str,
+    file_paths: set[str],
+    project_root: str | Path,
+    context_id: str | None = None,
+) -> int:
+    """Drive the tool-use loop to fix lint errors and return the write count."""
     files_block = ""
     for file_path in file_paths:
         path = AnyioPath(file_path)
@@ -183,11 +199,22 @@ async def fix_lint_issues(
             "content": (
                 f"The build failed with these lint/type errors:\n\n{lint_output}\n\n"
                 f"Here are the relevant files:\n{files_block}\n\n"
-                "Please fix the errors using the FILE/ORIGINAL/REPLACEMENT format."
+                "Fix the errors by calling the file-op tools."
             ),
         },
     ]
-    return await chat("kallos", messages, temperature=0.2, max_tokens=4096)
+    _, tool_log = await chat_with_tools(
+        "kallos",
+        messages,
+        tools=FORGE_TOOL_SCHEMAS,
+        tool_handlers=FORGE_TOOL_HANDLERS,
+        handler_context={"project_root": project_root},
+        temperature=0.2,
+        max_tokens=4096,
+        max_iters=10,
+        context_id=context_id,
+    )
+    return count_successful_writes(tool_log)
 
 
 async def run_style_check(

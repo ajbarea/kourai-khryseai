@@ -23,8 +23,17 @@ from anyio import Path as AnyioPath
 from prompt_toolkit import PromptSession
 from prompt_toolkit.formatted_text import ANSI
 from prompt_toolkit.patch_stdout import patch_stdout
+from prompt_toolkit.styles import Style
 
-from hosts.cli.commands import _build_key_bindings, _copy_to_clipboard, _show_help, _show_settings
+from hosts.cli.commands import (
+    _active_project,
+    _build_key_bindings,
+    _copy_to_clipboard,
+    _handle_project_command,
+    _show_help,
+    _show_settings,
+)
+from hosts.cli.completer import SlashCommandCompleter
 from hosts.cli.headless import _headless
 from hosts.cli.maidens import _MAIDEN_FACES, _MAIDENS
 from hosts.cli.rendering import _banner, _echo, _maiden_card, _maiden_gallery, set_raw_out
@@ -34,9 +43,23 @@ from hosts.cli.styling import _DIM, _GOLD, _GOLD_BRIGHT, _ITALIC, _RED, _RESET
 from hosts.gui.tts_engine import TTSEngine
 from kourai_common.audio import AudioManager
 from kourai_common.config import MODEL_TIER, PROVIDER, get_agent_url, get_model
+from kourai_common.forge_session import ForgeSession, ForgeSessionError
 from kourai_common.log import setup_logging
 from kourai_common.player import PlayerProfile, get_all_affinities
 from kourai_common.virtues import FORGE_VIRTUES, get_virtue_deltas, get_virtue_scores
+
+_COMPLETER_STYLE = Style.from_dict(
+    {
+        "completion-menu.completion": "bg:#1a1a1a #d7af00",
+        "completion-menu.completion.current": "bg:#d7af00 #000000 bold",
+        "completion-menu.meta.completion": "bg:#1a1a1a #888888",
+        "completion-menu.meta.completion.current": "bg:#d7af00 #1a1a1a",
+        "scrollbar.background": "bg:#1a1a1a",
+        "scrollbar.button": "bg:#888888",
+        "slash-cmd": "#d7af00 bold",
+        "slash-arg-hint": "#888888 italic",
+    }
+)
 
 # Windows consoles default to cp1252 — force UTF-8 so emoji and box-drawing work.
 # Skip when imported under pytest — replacing streams breaks pytest's capture system.
@@ -327,10 +350,19 @@ async def main(
 
     # Random maiden greeting on startup — maidens flirt with the user,
     # Hephaestus is gruff but welcoming. user_quotes are the warm ones.
-    _greet_name = secrets.choice(list(_MAIDENS.keys()))
+    # Only consider maidens that actually have a non-empty quote pool for the
+    # active romance setting (puck/cupid have no quotes and would crash choice).
+    def _has_quotes(m: dict) -> bool:
+        pool = m.get("user_quotes") if settings.romance_enabled else m.get("quotes")
+        if pool:
+            return True
+        return bool(m.get("quotes"))
+
+    _greet_candidates = [n for n, m in _MAIDENS.items() if _has_quotes(m)]
+    _greet_name = secrets.choice(_greet_candidates)
     _greet_m = _MAIDENS[_greet_name]
     _greet_quotes = (
-        _greet_m.get("user_quotes", _greet_m["quotes"])
+        _greet_m.get("user_quotes") or _greet_m["quotes"]
         if settings.romance_enabled
         else _greet_m["quotes"]
     )
@@ -343,13 +375,20 @@ async def main(
     context_id: str = uuid4().hex
     pending_images: list[tuple[str, str]] = []  # (base64_bytes, mime_type)
     kb = _build_key_bindings(pending_images)
-    session: PromptSession[str] = PromptSession(key_bindings=kb, multiline=False)
+    session: PromptSession[str] = PromptSession(
+        key_bindings=kb,
+        multiline=False,
+        completer=SlashCommandCompleter(),
+        complete_while_typing=True,
+        enable_history_search=False,
+        style=_COMPLETER_STYLE,
+    )
 
     def _toolbar() -> str:
         img = f"  \U0001f4ce {len(pending_images)} image(s) queued" if pending_images else ""
         return (
             f"{PROVIDER}:{_tier_persona_name(MODEL_TIER)}"
-            "  ·  Enter send  ·  Alt+V attach image  ·  /help  ·  :q quit"
+            "  ·  Enter send  ·  Alt+V attach image  ·  /help  ·  /q quit"
             f"{img}"
         )
 
@@ -371,17 +410,22 @@ async def main(
 
                 prompt_text = prompt_text.strip()
 
-                if prompt_text.lower() in (":q", "quit", "exit"):
+                if prompt_text.lower() in ("/q", "/quit", "/exit", "quit", "exit"):
                     _echo(f"{_GOLD}Farewell from the forge! \u2728{_RESET}")
                     break
 
                 # --- Command dispatch ---
-                if prompt_text in (":help", "/help"):
+                if prompt_text == "/help":
                     _show_help()
                     continue
 
-                if prompt_text in (":settings", "/settings", ":config", "/config"):
-                    _show_settings()
+                if (
+                    prompt_text == "/settings"
+                    or prompt_text == "/config"
+                    or prompt_text.startswith(("/settings ", "/config "))
+                ):
+                    head, _, arg = prompt_text.partition(" ")
+                    _show_settings(arg.strip() or None)
                     settings = CLISettings.load()
                     _sync_profile_with_settings(settings)
                     tts = _apply_audio_settings(audio, settings, tts)
@@ -392,7 +436,7 @@ async def main(
                     )
                     continue
 
-                if prompt_text in (":model_tier", "/model_tier"):
+                if prompt_text == "/model_tier":
                     _echo(f"  {_GOLD}Provider:{_RESET}  {PROVIDER}")
                     _echo(
                         f"  {_GOLD}Tier:{_RESET}      {MODEL_TIER} ({_tier_persona_name(MODEL_TIER)})"
@@ -400,11 +444,11 @@ async def main(
                     _echo(f"  {_GOLD}Model:{_RESET}     {get_model('hephaestus')}")
                     continue
 
-                if prompt_text in (":metrics", "/metrics"):
+                if prompt_text == "/metrics":
                     _show_metrics_dashboard()
                     continue
 
-                if prompt_text.startswith((":maidens", "/maidens")):
+                if prompt_text.startswith("/maidens"):
                     _parts = prompt_text.split(maxsplit=1)
                     if len(_parts) > 1:
                         _mname = _parts[1].strip().lower()
@@ -419,7 +463,7 @@ async def main(
                         _echo(_maiden_gallery())
                     continue
 
-                if prompt_text in (":status", "/status"):
+                if prompt_text == "/status":
                     _echo(f"  {_GOLD}Agent:{_RESET}     {card.name} v{card.version}")
                     _echo(f"  {_GOLD}URL:{_RESET}       {agent}")
                     _echo(f"  {_GOLD}Model:{_RESET}     {model_label}")
@@ -432,17 +476,21 @@ async def main(
                     )
                     continue
 
-                if prompt_text in (":copy", "/copy"):
+                if prompt_text.startswith("/project"):
+                    _handle_project_command(prompt_text.lstrip("/"), settings)
+                    continue
+
+                if prompt_text == "/copy":
                     _last_result = get_last_result()
                     if not _last_result:
                         _echo(f"{_DIM}Nothing to copy yet \u2014 run a command first.{_RESET}")
                     elif _copy_to_clipboard(_last_result):
                         _echo(f"{_GOLD_BRIGHT}\u2728 Copied to clipboard!{_RESET}")
                     else:
-                        _echo(f"{_RED}Clipboard copy failed \u2014 try :save instead{_RESET}")
+                        _echo(f"{_RED}Clipboard copy failed \u2014 try /save instead{_RESET}")
                     continue
 
-                if prompt_text.startswith((":save", "/save")):
+                if prompt_text.startswith("/save"):
                     _last_result = get_last_result()
                     if not _last_result:
                         _echo(f"{_DIM}Nothing to save yet \u2014 run a command first.{_RESET}")
@@ -458,11 +506,11 @@ async def main(
                         _echo(f"{_RED}Save failed: {e}{_RESET}")
                     continue
 
-                if prompt_text in (":clear", "/clear"):
+                if prompt_text == "/clear":
                     click.clear()
                     continue
 
-                if prompt_text.startswith((":", "/")):
+                if prompt_text.startswith("/"):
                     _echo(
                         f"{_DIM}Unknown command: {prompt_text} \u2014 "
                         "type /help for available commands{_RESET}"
@@ -477,16 +525,44 @@ async def main(
                 pending_images.clear()
                 turn_counter += 1
 
+                # If a project is selected, wrap this turn in a forge worktree
+                # session and inject the worktree path as the project_root so
+                # specialists run there instead of the kourai source tree.
+                forge_msg = prompt_text
+                forge_session: ForgeSession | None = None
+                project = _active_project(settings)
+                if project is not None:
+                    try:
+                        forge_session = ForgeSession.start(project, label=prompt_text[:24])
+                        forge_msg = f"[project_root: {forge_session.workdir}]\n{prompt_text}"
+                        _echo(
+                            f"{_DIM}\u2692 Forging in {project.name}"
+                            f" \u00b7 session {forge_session.session_id[:8]}"
+                            f" \u00b7 branch {forge_session.branch}{_RESET}"
+                        )
+                    except ForgeSessionError as exc:
+                        _echo(
+                            f"{_RED}Could not start forge session: {exc}"
+                            f" \u2014 falling back to no-project mode.{_RESET}"
+                        )
+
                 _echo("")
                 keep_going, context_id, _ = await send_and_stream(
                     client,
-                    prompt_text,
+                    forge_msg,
                     context_id,
                     verbose=verbose,
                     attachments=attachments or None,
                     tts=tts,
                     gossip_enabled=settings.gossip_enabled,
                 )
+
+                if forge_session is not None:
+                    _echo(
+                        f"{_DIM}Session {forge_session.session_id[:8]} pending. "
+                        f"Resolve with /project accept {forge_session.session_id[:8]} "
+                        f"or /project discard {forge_session.session_id[:8]}.{_RESET}"
+                    )
 
                 # Progressive, reversible opt-ins for game mechanics.
                 last_romance_nudge_turn, changed, prompted = _maybe_offer_feature_opt_in(
