@@ -194,20 +194,15 @@ Option 1 is cleanest if it doesn't break agent-internal deps that assume UID 100
   which tier is active. Per-session running total + a break-down per agent
   (Hephaestus vs Techne vs Kallos etc.) would let players see where the
   spend is going.
-- **Kokoro-only cutover (or intentional dual-provider lock-in):** the
-  `edge-tts` dep in `hosts/gui` and `agents/hephaestus` carries a comment
-  "remove once Kokoro is stable" that has been on the plan long enough to
-  bake. Either commit to Kokoro (drop edge-tts, accept that Kokoro-only
-  failures surface as silent crashes rather than fallback audio) or
-  rewrite the comment to "intentional fallback — do not remove." Stale
-  aspirational cleanups accumulate entropy; decide either way.
-- **aiohttp override periodic re-verification:** `[tool.uv]
-  override-dependencies = ["aiohttp>=3.13.4"]` was added for a CVE in a
-  litellm transitive. Undocumented overrides fossilize; the
-  `pyproject.toml` comment now explains the verification recipe, but
-  someone has to actually run it. Add a quarterly calendar ping (or a CI
-  job) that removes the override, runs `uv lock`, and reports whether
-  the upstream pin has moved.
+- **ElevenLabs TTS migration (replaces Kokoro):** swap the GUI's TTS
+  stack from Kokoro + edge-tts to ElevenLabs, matching the sibling
+  `tools/voice` Next.js app. When it lands: drop `kokoro`,
+  `soundfile`, and `edge-tts` from `hosts/gui`; drop `edge-tts` from
+  `agents/hephaestus`; add an ElevenLabs SDK or hit their API via
+  `httpx`. The VN bridge's `PACKAGE_NAME=hephaestus` coupling
+  (see ECOSYSTEM.md "Cross-cutting quirks") still holds —
+  hephaestus stays the VN's voice package, but what it carries
+  shifts from `edge-tts` to the ElevenLabs surface.
 - **Agent-level README.md per `agents/*`:** today a contributor reading
   `agents/metis/pyproject.toml` learns nothing about what metis actually
   does, because each agent's `pyproject.toml` is a 10-line stub that
@@ -223,6 +218,17 @@ Option 1 is cleanest if it doesn't break agent-internal deps that assume UID 100
   discarded, error}. Property tests over randomised agent call graphs
   would catch coordination drift early. Start with one invariant
   (`HandoffMessage` round-trip) and expand from there.
+
+### Resolved (2026-04-22)
+
+- **aiohttp override — no recurring-process needed.** The override for
+  `aiohttp>=3.13.4` (CVE fix for a litellm transitive) now has an
+  inline comment in `pyproject.toml` with the verification recipe
+  (remove line, `uv lock`, check `uv pip audit`). Running the recipe
+  on a schedule is over-engineering for a single override; revisit in
+  ~6 months or whenever litellm's dep chain is next touched. If kourai
+  ever grows more overrides, consider switching to Renovate's
+  vulnerability alerts for the whole class.
 
 ---
 

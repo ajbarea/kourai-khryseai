@@ -216,11 +216,15 @@ numpy>=1.26
   community-maintained fork with a more active release cadence and
   better audio. Standard modern choice.
 - **`kokoro>=0.4.0`** — local neural TTS, 82M params, Apache 2.0. The
-  GUI speaks agent responses aloud; Kokoro is the default path.
-- **`edge-tts>=0.30.0`** — Microsoft's cloud TTS, used as fallback when
-  Kokoro can't load or lacks a voice. The comment
-  "remove once Kokoro is stable" is a genuine planned cleanup; until then
-  the redundancy is a deliberate safety net.
+  GUI speaks agent responses aloud; Kokoro is the default path today.
+  **Migration in progress:** Kokoro is being replaced by ElevenLabs
+  (matching the stack in the sibling `tools/voice` Next.js app). Once
+  the migration lands, both `kokoro` and `edge-tts` come out of the
+  dep tree; see ROADMAP.
+- **`edge-tts>=0.30.0`** — Microsoft's cloud TTS, currently the
+  fallback when Kokoro can't load a voice. Goes away with the
+  ElevenLabs migration — it was only ever there to cover Kokoro's
+  stability gaps.
 - **`soundfile>=0.13.0`** — WAV encode/decode for Kokoro's audio output.
 - **`emoji>=2.15.0`** — emoji rendering in agent messages.
 - **`numpy>=1.26`** — explicit dep for audio buffer math and some
