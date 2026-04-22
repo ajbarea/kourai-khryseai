@@ -69,8 +69,23 @@ Pour coffee. Open this file. Tell me you're starting and I'll guide each step.
 This validates the regex parser → provider tool-use swap in `chat_with_tools`.
 Re-runs Round 1's accept path and Round 2's discard path with the new wiring.
 
-- [ ] `make up` then `make cli` (host runner is fine; tool-use is provider-side
-      and runner-agnostic)
+### Pre-flight status (verified 2026-04-22)
+
+Remote prep complete — all non-interactive checks green. What's left is
+strictly the live REPL loop.
+
+- ✓ `parse_and_apply_fixes` has zero hits in source (`rg -n --type py`)
+- ✓ `tool_use` debug log wired at `shared/src/kourai_common/llm.py:440`
+  (`log.debug("tool_use %s args=%s result=%s", name, args, result[:200])`)
+- ✓ Unit suite: 2322 passed in 95s (matches IMPL.md Step 4 claim)
+- ✓ `kourai-sandbox:latest` image built (874 MB, 189 MB content)
+- ✓ `.env` has working `ANTHROPIC_API_KEY` and `GEMINI_API_KEY`
+- ✓ Working tree clean, main in sync with `origin/main`
+
+### Live loop (sit down at PC, paste commands)
+
+- [ ] **Terminal A:** `make up` — wait for "all agents ready", no red errors
+- [ ] **Terminal B:** `make cli` — wait for REPL prompt
 - [ ] `/project use hello-forge`
 - [ ] **Round 6a — accept**: send a fresh task, e.g. `add a function double(n) that
       returns n*2 and a passing test`
