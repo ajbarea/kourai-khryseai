@@ -50,6 +50,7 @@ nav = [
 [project.theme]
 name = "material" # Zensical uses 'material' as the foundation
 language = "en"
+custom_dir = "overrides"
 icon.logo = "material/robot"
 font.text = "Inter"
 font.code = "JetBrains Mono"

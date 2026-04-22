@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{#-
+  Open Graph / Twitter card overrides.
+
+  Zensical's social-cards plugin is still a stub as of April 2026, so we emit
+  the tags ourselves. Per-page title/description fall back to the site defaults
+  when page-level metadata is absent. The og:image is the square
+  `golden-maidens.png` brand asset — scrapers that want landscape (1200x630)
+  will crop, but the brand identity survives the crop either way.
+-#}
+{% block extrahead %}
+  {% set is_home = page.is_homepage or page.url == '' or page.url == '/' %}
+  {% set raw_title = (page.meta and page.meta.title) or page.title %}
+  {% set page_title = is_home and config.site_name or (raw_title ~ ' | ' ~ config.site_name) %}
+  {% set page_desc = (page.meta and page.meta.description) or config.site_description %}
+  {% set page_url = page.canonical_url or config.site_url %}
+  {# site_url already ends with a slash; duplicate slashes in URLs are harmless. #}
+  {% set og_image = config.site_url ~ 'assets/golden-maidens.png' %}
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="{{ config.site_name }}">
+  <meta property="og:title" content="{{ page_title }}">
+  <meta property="og:description" content="{{ page_desc }}">
+  <meta property="og:url" content="{{ page_url }}">
+  <meta property="og:image" content="{{ og_image }}">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ page_title }}">
+  <meta name="twitter:description" content="{{ page_desc }}">
+  <meta name="twitter:image" content="{{ og_image }}">
+{% endblock %}
