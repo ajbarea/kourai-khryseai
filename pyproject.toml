@@ -22,6 +22,12 @@ dev = [
 
 [tool.uv]
 package = false
+# override-dependencies: a transitive in the litellm provider chain
+# requests an older aiohttp with a known CVE; we force >=3.13.4 globally
+# to pull the fix. Revisit periodically — if the upstream culprit updates
+# its pin, this override becomes unnecessary and should be removed.
+# Verification recipe: remove the line, run `uv lock`, check the resolved
+# aiohttp version + `uv pip audit` for CVE status.
 override-dependencies = [
     "aiohttp>=3.13.4",
 ]
