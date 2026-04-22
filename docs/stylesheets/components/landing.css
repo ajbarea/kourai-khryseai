@@ -5,7 +5,6 @@
   padding-bottom: 1.5rem;
   position: relative;
   z-index: 2;
-  animation: hint-bounce 2s ease-in-out infinite;
 }
 .scroll-chevron {
   display: inline-block;
@@ -16,21 +15,22 @@
   transform: rotate(45deg);
   opacity: 0.35;
 }
-@keyframes hint-bounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(6px); }
+@media (prefers-reduced-motion: no-preference) {
+  .scroll-hint { animation: hint-bounce 2s ease-in-out infinite; }
+  @keyframes hint-bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(6px); }
+  }
 }
 
-/* Section containers — full bleed with scroll-reveal */
+/* Section containers — full bleed. Default visible so no-JS users see content;
+   JS opts in to the scroll-reveal by setting .js-ready on <html>. */
 .landing-section {
   width: 100vw;
   margin-left: calc(-50vw + 50%);
   padding: 5rem 2rem;
   background: var(--obsidian);
   text-align: center;
-  opacity: 0;
-  transform: translateY(24px);
-  transition: opacity 0.7s ease, transform 0.7s ease;
 }
 .landing-section p {
   margin-left: auto;
@@ -45,8 +45,31 @@
 }
 .landing-section--intro { padding-bottom: 14vh; }
 .landing-section--promise { padding-top: 14vh; }
-.landing-section.visible { opacity: 1; transform: translateY(0); }
 .landing-section:nth-of-type(even) { background: color-mix(in srgb, var(--gold-mid) 2%, var(--obsidian)); }
+
+@media (prefers-reduced-motion: no-preference) {
+  html.js-ready .landing-section {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 0.7s ease, transform 0.7s ease;
+  }
+  html.js-ready .landing-section.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---------- Per-agent accent colors (used by .agent-card--<name>) ---------- */
+.agent-card--hephaestus { --agent-accent: #FF9500; }
+.agent-card--metis      { --agent-accent: #4C6EF5; }
+.agent-card--techne     { --agent-accent: #17A2B8; }
+.agent-card--dokimasia  { --agent-accent: #6C757D; }
+.agent-card--kallos     { --agent-accent: #D946EF; }
+.agent-card--mneme      { --agent-accent: #B73E1D; }
+.agent-card--puck       { --agent-accent: #7FBC8C; }
+.agent-card--cupid      { --agent-accent: #E8728C; }
+.agent-card--aidos      { --agent-accent: #A0A0B0; }
+.agent-card--aletheia   { --agent-accent: #64B5F6; }
 
 .section-inner {
   max-width: 960px;

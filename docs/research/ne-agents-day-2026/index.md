@@ -2,7 +2,7 @@
 
 **Title:** Kourai Khryseai: Transparent Human-on-the-Loop Multi-Agent Software Development
 
-**Author:** Arnaldo Barea, Rochester Institute of Technology (`ajb6289@rit.edu`)
+**Author:** AJ Barea, Rochester Institute of Technology (`ajb6289@rit.edu`)
 
 **Advisor:** Dr. Leon Reznik
 

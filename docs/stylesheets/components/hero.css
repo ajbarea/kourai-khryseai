@@ -68,19 +68,24 @@ body.hero-page .md-content__inner {
   filter: drop-shadow(0 0 1px color-mix(in srgb, #000 90%, transparent))
     drop-shadow(0 0 3px color-mix(in srgb, #000 70%, transparent))
     drop-shadow(0 2px 8px color-mix(in srgb, var(--gold-metallic) 40%, transparent));
-  animation: shimmer 3s ease-in-out infinite alternate;
 }
 
-@keyframes shimmer {
-  0% {
-    filter: drop-shadow(0 0 1px color-mix(in srgb, #000 90%, transparent))
-      drop-shadow(0 0 3px color-mix(in srgb, #000 70%, transparent))
-      drop-shadow(0 2px 8px color-mix(in srgb, var(--gold-metallic) 30%, transparent));
+@media (prefers-reduced-motion: no-preference) {
+  .md-typeset .hero h1,
+  .hero h1 {
+    animation: shimmer 3s ease-in-out infinite alternate;
   }
-  100% {
-    filter: drop-shadow(0 0 1px color-mix(in srgb, #000 90%, transparent))
-      drop-shadow(0 0 3px color-mix(in srgb, #000 60%, transparent))
-      drop-shadow(0 2px 16px color-mix(in srgb, var(--gold-metallic) 60%, transparent));
+  @keyframes shimmer {
+    0% {
+      filter: drop-shadow(0 0 1px color-mix(in srgb, #000 90%, transparent))
+        drop-shadow(0 0 3px color-mix(in srgb, #000 70%, transparent))
+        drop-shadow(0 2px 8px color-mix(in srgb, var(--gold-metallic) 30%, transparent));
+    }
+    100% {
+      filter: drop-shadow(0 0 1px color-mix(in srgb, #000 90%, transparent))
+        drop-shadow(0 0 3px color-mix(in srgb, #000 60%, transparent))
+        drop-shadow(0 2px 16px color-mix(in srgb, var(--gold-metallic) 60%, transparent));
+    }
   }
 }
 

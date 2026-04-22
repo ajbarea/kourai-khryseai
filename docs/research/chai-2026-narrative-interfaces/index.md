@@ -2,7 +2,7 @@
 
 **Title:** Narrative Interfaces for Kourai Khryseai
 
-**Author:** AJ Barea (Arnaldo Barea), Rochester Institute of Technology
+**Author:** AJ Barea, Rochester Institute of Technology (`ajb6289@rit.edu`)
 
 **Venue:** CHAI Research Poster Session — RIT Center for Human-aware Artificial Intelligence
 
