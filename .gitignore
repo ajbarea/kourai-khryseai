@@ -37,7 +37,10 @@ htmlcov/
 Thumbs.db
 
 # Agent Config
-.claude/
+# Claude Code — canonical skills live at ~/.claude/skills/; only the per-repo
+# skill-context.md is team-shared (injected into canonical skills at runtime).
+.claude/*
+!.claude/skill-context.md
 .gemini/
 .kiro/
 
