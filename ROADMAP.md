@@ -187,6 +187,13 @@ Option 1 is cleanest if it doesn't break agent-internal deps that assume UID 100
 - **Anthropic Agent SDK:** evaluate when it stabilises; could replace some
   REPL plumbing in `hosts/cli/__main__.py`.
 - **Sandbox container UID alignment** (M5 implementation choice).
+- **`/usage` CLI command:** surface running token + dollar cost for the
+  current REPL session so long pipelines don't turn into a billing surprise.
+  Read from the provider response's `usage` block (input/output/cache tokens)
+  and multiply by per-tier price constants; `/model_tier` already knows
+  which tier is active. Per-session running total + a break-down per agent
+  (Hephaestus vs Techne vs Kallos etc.) would let players see where the
+  spend is going.
 
 ---
 
