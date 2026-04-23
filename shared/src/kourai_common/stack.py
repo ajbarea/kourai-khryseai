@@ -48,7 +48,7 @@ DEFAULT_BACKEND = ProjectStack(
         StackLayer("validation", "Pydantic", "2.10+", "BaseSettings for config"),
         StackLayer("testing", "pytest", "8.0+", "xdist, parametrize, hypothesis, asyncio"),
         StackLayer("linting", "ruff", "0.9+", "format + check + isort"),
-        StackLayer("type checking", "ty", "0.0.25+", "strict on src/, 10x faster than mypy"),
+        StackLayer("type checking", "ty", "0.0.25+", "strict on src/, faster than mypy"),
         StackLayer("packaging", "uv", "0.10+", "pyproject.toml + uv.lock"),
         StackLayer("containerization", "Docker", "", "multi-stage with uv"),
     ),

@@ -1,4 +1,4 @@
-"""Comprehensive tests for pygame-dependent GUI widget modules.
+"""Tests for pygame-dependent GUI widget modules.
 
 Covers:
 - hosts/gui/settings_widgets.py + hosts/gui/settings_overlay.py

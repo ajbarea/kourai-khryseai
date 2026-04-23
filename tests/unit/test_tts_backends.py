@@ -1,6 +1,6 @@
 """Unit tests for TTSBackend implementations (Kokoro + Edge-TTS).
 
-Comprehensive coverage for voice config validation, both backends, and fallback behavior.
+Covers voice config validation, both backends, and fallback behavior.
 """
 
 import pytest
