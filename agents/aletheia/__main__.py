@@ -8,10 +8,11 @@ import uvicorn
 from a2a.server.apps import A2AStarletteApplication
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore
-from a2a.types import AgentCapabilities, AgentCard, AgentSkill
+from a2a.types import AgentCard, AgentSkill
 
 from agents.aletheia.agent_executor import AletheiaAgentExecutor
-from kourai_common.config import AGENT_PORTS, OTEL_ENDPOINT, get_agent_url
+from kourai_common.agent_cards import build_card
+from kourai_common.config import AGENT_PORTS, OTEL_ENDPOINT
 from kourai_common.log import setup_logging
 from kourai_common.tracing import setup_tracing
 
@@ -36,19 +37,15 @@ def build_agent_card() -> AgentCard:
             "Verify the research references in this docstring",
         ],
     )
-    return AgentCard(
-        name="Aletheia — The Truth",
+    return build_card(
+        agent_name=AGENT_NAME,
+        display_name="Aletheia — The Truth",
         description=(
             "Research validator and citation enforcer. Finds unsubstantiated "
             "algorithmic claims, verifies Research: comment formats, and flags "
             "vague 'industry standard' references. Never fabricates citations. "
             "Serene, thorough, and gently implacable."
         ),
-        url=get_agent_url(AGENT_NAME),
-        version="0.1.0",
-        default_input_modes=["text"],
-        default_output_modes=["text"],
-        capabilities=AgentCapabilities(streaming=True),
         skills=[skill],
     )
 

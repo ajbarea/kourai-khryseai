@@ -11,10 +11,11 @@ import uvicorn
 from a2a.server.apps import A2AStarletteApplication
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore
-from a2a.types import AgentCapabilities, AgentCard, AgentSkill
+from a2a.types import AgentCard, AgentSkill
 
 from agents.techne.agent_executor import TechneAgentExecutor
-from kourai_common.config import AGENT_PORTS, OTEL_ENDPOINT, get_agent_url
+from kourai_common.agent_cards import build_card
+from kourai_common.config import AGENT_PORTS, OTEL_ENDPOINT
 from kourai_common.log import setup_logging
 from kourai_common.tracing import setup_tracing
 
@@ -40,19 +41,16 @@ def build_agent_card() -> AgentCard:
             "add the new API endpoint for /users",
         ],
     )
-    return AgentCard(
-        name="Techne — Coder",
+    return build_card(
+        agent_name=AGENT_NAME,
+        display_name="Techne — Coder",
         description=(
             "Coding specialist. Reads existing code, generates changes "
             "following AJ's standards, and applies them to disk. "
             "Emits structured artifacts for downstream agents."
         ),
-        url=get_agent_url(AGENT_NAME),
-        version="0.1.0",
-        default_input_modes=["text", "image"],
-        default_output_modes=["text"],
-        capabilities=AgentCapabilities(streaming=True),
         skills=[skill],
+        input_modes=["text", "image"],
     )
 
 
@@ -70,7 +68,7 @@ def main() -> None:
         http_handler=request_handler,
     )
 
-    log.info("\u2699\ufe0f Techne starting on %s:%d", HOST, PORT)
+    log.info("⚙️ Techne starting on %s:%d", HOST, PORT)
     uvicorn.run(server.build(), host=HOST, port=PORT)
 
 
