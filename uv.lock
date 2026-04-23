@@ -1183,7 +1183,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "a2a-sdk", specifier = ">=0.3.0,<1.0" },
+    { name = "a2a-sdk", specifier = ">=0.3.0,<2.0" },
     { name = "asyncclick", specifier = ">=8.0" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "kourai-common", editable = "shared" },
@@ -1210,7 +1210,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "a2a-sdk", extras = ["http-server"], specifier = ">=0.3.25,<1.0" },
+    { name = "a2a-sdk", extras = ["http-server"], specifier = ">=0.3.25,<2.0" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "huggingface-hub", specifier = ">=1.5.0" },
     { name = "litellm", specifier = ">=1.80.0" },
@@ -1269,7 +1269,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "a2a-sdk", specifier = ">=0.3.0,<1.0" },
+    { name = "a2a-sdk", specifier = ">=0.3.0,<2.0" },
     { name = "edge-tts", specifier = ">=0.30.0" },
     { name = "emoji", specifier = ">=2.15.0" },
     { name = "httpx", specifier = ">=0.27" },
