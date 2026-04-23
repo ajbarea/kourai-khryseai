@@ -80,6 +80,67 @@ class TestRemoteAgentConnectionConnect:
         assert conn.card is None
         assert conn.client is None
 
+    @pytest.mark.asyncio
+    async def test_connect_falls_back_to_manifest_when_live_fetch_fails(self):
+        """If A2ACardResolver raises, connect() uses the static manifest
+        fallback so Hephaestus isn't blocked when a specialist is slow
+        to come up during docker-compose boot."""
+        mock_resolver = MagicMock()
+        mock_resolver.get_agent_card = AsyncMock(
+            side_effect=TimeoutError("no response from specialist")
+        )
+
+        mock_client = MagicMock()
+        mock_factory = MagicMock()
+        mock_factory.create = MagicMock(return_value=mock_client)
+
+        with (
+            patch("agents.hephaestus.remote_connections.create_span"),
+            patch(
+                "agents.hephaestus.remote_connections.A2ACardResolver",
+                return_value=mock_resolver,
+            ),
+            patch(
+                "agents.hephaestus.remote_connections.ClientFactory",
+                return_value=mock_factory,
+            ),
+        ):
+            conn = RemoteAgentConnection("metis", "http://metis:10001/")
+            await conn.connect()
+
+        assert conn.card is not None
+        assert conn.card.url == "http://metis:10001/"
+        assert conn.client is mock_client
+        mock_factory.create.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_connect_prefers_live_card_over_manifest(self):
+        """When live fetch succeeds the fallback path is not used."""
+        live_card = MagicMock()
+        live_card.name = "Metis (live)"
+        mock_resolver = MagicMock()
+        mock_resolver.get_agent_card = AsyncMock(return_value=live_card)
+
+        mock_client = MagicMock()
+        mock_factory = MagicMock()
+        mock_factory.create = MagicMock(return_value=mock_client)
+
+        with (
+            patch("agents.hephaestus.remote_connections.create_span"),
+            patch(
+                "agents.hephaestus.remote_connections.A2ACardResolver",
+                return_value=mock_resolver,
+            ),
+            patch(
+                "agents.hephaestus.remote_connections.ClientFactory",
+                return_value=mock_factory,
+            ),
+        ):
+            conn = RemoteAgentConnection("metis", "http://metis:10001/")
+            await conn.connect()
+
+        assert conn.card is live_card
+
 
 def _make_artifact_part(text: str) -> MagicMock:
     """Create a mock Part with .root.text."""
