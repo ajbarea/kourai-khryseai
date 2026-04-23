@@ -127,8 +127,10 @@ it directly or depends on it transitively.
   any non-a2a HTTP calls (e.g., fetching resources, GitHub API).
 - **`mcp>=1.26.0,<2`** — Model Context Protocol SDK. Agents can act as
   MCP clients (consuming tool servers) or servers (exposing their own
-  tools). `<2` is a pre-emptive upper bound against the MCP 2.0 protocol
-  bump.
+  tools). FastMCP ships *inside* this package as `mcp.server.fastmcp` —
+  do **not** install the standalone `fastmcp` PyPI package, which is
+  Prefect's unrelated fork and will conflict on import. `<2` is a
+  pre-emptive upper bound against the MCP 2.0 protocol bump.
 - **`python-dotenv>=1.0.0`** — `.env` loading for API keys and local
   config. Standard across all three sisters.
 - **`huggingface-hub>=1.5.0`** — model-repo access for any agent that
@@ -284,6 +286,66 @@ host changes. Minor belt-and-suspenders cost; clearer upgrade semantics.
 `kourai-aidos`, `kourai-aletheia` — as `{ workspace = true }`. Other
 workspace members *could* need this but don't yet; the entries are
 added as cross-agent dep wiring grows.
+
+---
+
+## Major-version watchlist
+
+The dep-pinning rationale above explains *why each upper bound exists today*.
+This section is the upgrade-planning counterpart: what's coming in the next
+major, when to revisit the pin, and what concrete migration work that means.
+Originally tracked on GitHub issue #1; folded in here so the rationale and
+the watchlist live next to each other.
+
+### Version pin summary
+
+| Dependency | Pinned range | Current stable | Next major | Status |
+|---|---|---|---|---|
+| `a2a-sdk` | `>=0.3.0,<1.0` | 0.3.26 | 1.0.0-alpha.1 | Keep `<1.0` until 1.0 GA |
+| `mcp` | `>=1.26.0,<2` | 1.27.0 | 2.x (not on PyPI) | Keep `<2` guard; nothing actionable yet |
+| `litellm` | unpinned | 1.83.x | — | Safe to track latest |
+| `starlette` | unpinned | 1.0.0 | 2.x (not announced) | 1.0 already landed; monitor release notes |
+| `uvicorn` | unpinned | 0.44.x | 1.0 (not announced) | Safe to track latest |
+| `httpx` | unpinned | 0.28.1 | 1.0 (not announced) | Safe to track latest |
+
+### a2a-sdk 1.0 migration
+
+`1.0.0-alpha.1` is published but pre-release; the `<1.0` upper bound
+correctly excludes it. Differences vs the 0.3.x line we ship today:
+
+| Area | 0.3.x | 1.0 |
+|---|---|---|
+| `kind` field | present on all types | removed |
+| Push notifications | `callback` parameter | renamed to `push_notification_config` |
+| Types | Python dataclasses | proto-based generated types |
+| Server wiring | application wrappers (`A2AStarletteApplication`) | route-based endpoints |
+| Client API | prior `ClientFactory` shape | reorganised in alpha track |
+
+Concrete work when 1.0 stabilises:
+
+- Strip `kind` field references from every `agent_executor.py`
+- Rename `callback` → `push_notification_config` in any push-notification config
+- Audit proto-based type imports — replace dataclass-style construction
+- Re-check `ClientFactory` usage against 1.0's API
+- Plan the move from `A2AStarletteApplication` wrappers to route-based endpoints
+- Run the test suite against 1.0 GA before lifting the upper bound
+- Bump the pin to `>=1.0,<2.0`
+
+### mcp 2.0 watchlist
+
+No 2.x MCP SDK release is on PyPI yet. Keep the `<2` upper bound and treat
+2.0 migration items as pure watchlist work until concrete release notes
+exist. When they do:
+
+- Re-check release notes for concrete API renames before changing code
+- Re-validate Streamable HTTP and SSE compatibility — the latest spec
+  defines stdio + Streamable HTTP as the two standard transports, and
+  servers can return either `application/json` or `text/event-stream`
+  under Streamable HTTP (SSE remains supported within that workflow,
+  including resumability and polling)
+- Update the `memory-mcp-server.js` sidecar transport if applicable
+- Re-verify all MCP server healthchecks in `docker-compose.yml`
+- Bump the pin to `>=2.0,<3.0`
 
 ---
 
