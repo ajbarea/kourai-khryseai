@@ -123,6 +123,13 @@ def _first_console(root: logging.Logger) -> logging.StreamHandler:
     raise AssertionError("No console handler on root")
 
 
+def _apply_filter(f, record: logging.LogRecord) -> bool | logging.LogRecord:
+    """Handler.filters items may be Filter instances or plain callables; dispatch accordingly."""
+    if isinstance(f, logging.Filter):
+        return f.filter(record)
+    return f(record)
+
+
 class TestSetupLoggingLevel:
     """Console handler level is the user-visible one; file handler stays at DEBUG."""
 
@@ -164,7 +171,7 @@ class TestSetupLoggingLevel:
             args=(),
             exc_info=None,
         )
-        assert not all(f.filter(noisy_record) for f in console.filters)
+        assert not all(_apply_filter(f, noisy_record) for f in console.filters)
         app_record = logging.LogRecord(
             name="hosts.cli",
             level=logging.INFO,
@@ -174,4 +181,4 @@ class TestSetupLoggingLevel:
             args=(),
             exc_info=None,
         )
-        assert all(f.filter(app_record) for f in console.filters)
+        assert all(_apply_filter(f, app_record) for f in console.filters)

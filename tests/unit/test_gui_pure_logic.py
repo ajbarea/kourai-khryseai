@@ -1,4 +1,4 @@
-"""Comprehensive unit tests for GUI pure-logic modules.
+"""Unit tests for GUI pure-logic modules.
 
 Covers dialogue_pacing, emote_sfx, audio_utils, and maidens — all without
 requiring pygame or any GUI toolkit.
