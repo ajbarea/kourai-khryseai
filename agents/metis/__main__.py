@@ -11,10 +11,11 @@ import uvicorn
 from a2a.server.apps import A2AStarletteApplication
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore
-from a2a.types import AgentCapabilities, AgentCard, AgentSkill
+from a2a.types import AgentCard, AgentSkill
 
 from agents.metis.agent_executor import MetisAgentExecutor
-from kourai_common.config import AGENT_PORTS, OTEL_ENDPOINT, get_agent_url
+from kourai_common.agent_cards import build_card
+from kourai_common.config import AGENT_PORTS, OTEL_ENDPOINT
 from kourai_common.log import setup_logging
 from kourai_common.tracing import setup_tracing
 
@@ -40,19 +41,16 @@ def build_agent_card() -> AgentCard:
             "refactor the config loader to use pydantic",
         ],
     )
-    return AgentCard(
-        name="Metis — Planner",
+    return build_card(
+        agent_name=AGENT_NAME,
+        display_name="Metis — Planner",
         description=(
             "Planning specialist. Transforms rough ideas into structured "
             "implementation specs. Emits machine-readable metadata "
             "for downstream pipeline routing."
         ),
-        url=get_agent_url(AGENT_NAME),
-        version="0.1.0",
-        default_input_modes=["text", "image"],
-        default_output_modes=["text"],
-        capabilities=AgentCapabilities(streaming=True),
         skills=[skill],
+        input_modes=["text", "image"],
     )
 
 

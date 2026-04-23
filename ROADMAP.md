@@ -5,7 +5,7 @@ A public, living plan for where the forge is heading. Items here are either
 *currently working on* lives in [IMPL.md](./IMPL.md) — when it lands, the
 matching milestone here collapses to a single line under "Shipped".
 
-Last reviewed: 2026-04-20 (M1 code shipped, awaiting Round 6 live smoke)
+Last reviewed: 2026-04-23 (M1 code shipped, awaiting Round 6 live smoke; cross-cutting agent/MCP/A2A polish landed — see Shipped)
 
 ---
 
@@ -93,14 +93,15 @@ primitives. A fourth user makes the duplication unacceptable. MCP also gives:
 **Scope.**
 
 - Stdio transport server in `mcp_servers/forge/server.py` exposing the M1 tools.
-- `MCPToolkit` in `shared/src/kourai_common/mcp_client.py` upgraded from
-  the current stub-returning placeholder to a real client (the SDK is
-  already pinned at `mcp>=1.26.0`).
+- `MCPToolkit` is already a live registry as of 2026-04-23; M2 wires the
+  first real client users through it.
 - Specialists invoke MCP via the toolkit; LiteLLM tool-use bindings reflect
   the MCP-served schemas.
 
 References: [MCP architecture](https://modelcontextprotocol.io/docs/learn/architecture).
-Current MCP spec version: **2025-06-18**.
+Current MCP spec version: **2025-11-25**; 2026 roadmap prioritises streamable-HTTP
+scalability, Tasks lifecycle, and enterprise readiness
+([blog.modelcontextprotocol.io/posts/2026-mcp-roadmap](https://blog.modelcontextprotocol.io/posts/2026-mcp-roadmap/)).
 
 ---
 
@@ -176,6 +177,78 @@ Option 1 is cleanest if it doesn't break agent-internal deps that assume UID 100
 
 ---
 
+## M7 — A2A v1.0 migration
+
+> Status: planned · Cheap-once-SDK-is-stable
+
+`a2a-sdk` shipped 1.0.1 in March 2026 with a stable v1.0 on
+[a2a-protocol.org](https://a2a-protocol.org/latest/announcing-1.0/) targeted
+for May-June 2026. Pyproject pins already permit `a2a-sdk<2.0` (2026-04-23),
+so `uv lock` will auto-adopt 1.0.x when resolution prefers it.
+
+**Scope.**
+
+- When `uv lock` starts pulling 1.0.x, walk the ``_is_file_part`` /
+  ``_get_file_bytes`` firewall in ``shared/src/kourai_common/a2a_utils.py``
+  (already dual-shaped as of 2026-04-23 for forward compat).
+- Verify unified Part roundtrip in ``remote_connections.py:send()`` —
+  ``TextPart``/``FilePart``/``DataPart`` unify into member-discriminated
+  ``Part`` in v1.0 (``"text" in part``, ``"url" in part``).
+- ``mimeType`` → ``mediaType`` field rename on file parts.
+- AgentCards are backward-compatible so specialists keep running
+  mid-migration; no coordinated re-deploy needed.
+
+**Optional follow-ons.**
+
+- **Signed Agent Cards** (A2A 1.0 flagship). Valuable if an agent endpoint
+  ever leaves the docker-compose network; skip until then — crypto-key
+  management is non-trivial and has no return inside a shared bridge network.
+- **`.well-known/agent-card` static manifest generation.** Hephaestus already
+  has a fallback AgentCard on live-fetch failure (``agents_manifest.py``, 2026-04-23);
+  a richer manifest synthesised via ``kourai-dev`` from each agent's
+  ``build_agent_card()`` would eliminate the boot-time HTTP fan-out entirely.
+
+---
+
+## M8 — MCP session pooling (upstream-blocked)
+
+> Status: blocked on upstream SDK fix · Discovered 2026-04-23
+
+We'd like repeated ``query_context7`` / ``search_memory_nodes`` calls to reuse
+one ``ClientSession`` rather than re-doing TLS + ``initialize()`` per call.
+Attempted on 2026-04-23 via ``AsyncExitStack``-based pool; reverted because
+the MCP SDK's ``streamable_http_client`` yields inside an
+``anyio.create_task_group()`` cancel scope. Cross-task teardown raises
+``RuntimeError: Attempted to exit cancel scope in a different task``.
+
+This is upstream — see
+[python-sdk#466](https://github.com/modelcontextprotocol/python-sdk/issues/466),
+[#713](https://github.com/modelcontextprotocol/python-sdk/issues/713),
+[#915](https://github.com/modelcontextprotocol/python-sdk/issues/915) and
+[PEP 789](https://peps.python.org/pep-0789/) (async-generators-inside-cancel-scopes).
+
+**When the upstream SDK exposes pool-safe primitives**, revisit pooling.
+Meanwhile OTEL spans around each call give us per-tool latency visibility
+(landed 2026-04-23), which was the other half of the win.
+
+---
+
+## M9 — Model-version refresh
+
+> Status: planned · One-file edit · No API changes
+
+``shared/src/kourai_common/config.py`` still names
+``anthropic/claude-opus-4-6`` in ``MODELS_SMART["metis"]``. Opus 4.7 is the
+current Anthropic flagship. Cheap bump: rename ``4-6`` → ``4-7`` once pricing
+and cache thresholds are confirmed equivalent (see M4 — Opus 4.7 caches at
+4096 tokens, same as 4.6).
+
+No metric-based rollout is needed for a Claude-family minor: behaviour is a
+super-set. Gate the bump on a Round 6 smoke that exercises Metis's planning
+loop and verifies the JSON-schema specs still come out clean.
+
+---
+
 ## M6 — Future / unprioritized
 
 - **MCP Tasks primitive (experimental):** when stable, replace our hand-rolled
@@ -236,6 +309,12 @@ Option 1 is cleanest if it doesn't break agent-internal deps that assume UID 100
 
 One-liner per item, newest first. Detail moves out of this file when work lands.
 
+- 2026-04-23 — OTEL spans around every MCP tool call (``mcp.context7.query``, ``mcp.memory.*``); per-call latency now lands in Jaeger alongside A2A hops
+- 2026-04-23 — ``mcp_servers/shell`` ``run_command`` advertises ``_meta["anthropic/maxResultSizeChars"] = 500000``; Claude Code-style clients stop truncating pytest / ruff tracebacks at the 25K default
+- 2026-04-23 — Hephaestus ``RemoteAgentConnection.connect()`` falls back to synthesized ``AgentCard`` when ``A2ACardResolver`` fails; docker-compose cold-start no longer blocks the orchestrator on slow specialists
+- 2026-04-23 — ``shared/src/kourai_common/agent_cards.py`` consolidates the ten copies of ``build_agent_card()`` that used to live in each ``agents/*/__main__.py``; one place to add signed cards / v1.0 extension fields when M7 lands
+- 2026-04-23 — ``a2a-sdk`` pins lifted from ``<1.0`` to ``<2.0`` across ``shared``, ``hosts/cli``, ``hosts/gui``; ``_is_file_part`` / ``_get_file_bytes`` firewall extended to handle v1.0 unified-Part shape for forward compat (``uv lock`` still resolves 0.3.26 today)
+- 2026-04-23 — ``MCPToolkit.get_tool`` stub + ``ToolStub`` class deleted; the registry is now pure data with no dead-code paths masking the real ``query_context7`` / ``search_memory_nodes`` functions
 - 2026-04-20 — `/project` REPL flow + forge-session worktrees end-to-end (Round 1 happy path + Round 2 discard, both smoked against live Hephaestus)
 - 2026-04-20 — `parse_and_apply_fixes` regex tolerates markdown-bold-wrapped headers and translates host paths to container paths
 - 2026-04-20 — `ForgeSession.accept()` auto-commits uncommitted pipeline writes before fast-forward merge

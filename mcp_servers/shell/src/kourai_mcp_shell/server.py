@@ -50,7 +50,10 @@ def _check_allowed(cmd: list[str]) -> None:
         )
 
 
-@mcp.tool()
+# anthropic/maxResultSizeChars tells Claude Code-style clients not to truncate
+# tool output below 500K chars — `pytest` / `ruff` tracebacks routinely exceed
+# the default 25K limit, and truncated output loses the actual failure.
+@mcp.tool(meta={"anthropic/maxResultSizeChars": 500_000})
 async def run_command(
     cmd: list[str],
     cwd: str | None = None,

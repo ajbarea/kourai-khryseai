@@ -2,11 +2,16 @@
 
 Centralizes common A2A message handling patterns used across multiple agents.
 
-# A2A Spec v1.0 migration notes
-# The v1.0 spec replaces TextPart/FilePart/DataPart with a unified Part
-# type using member-based discrimination ("text" in part, "url" in part, etc.)
-# and renames mimeType → mediaType. All Part inspection is funnelled through
-# _is_file_part() and _get_file_bytes() so migration is a single-function change.
+A2A v1.0 migration
+    The v1.0 spec unifies TextPart/FilePart/DataPart into a single Part
+    type with member-based discrimination (``"text" in part``, ``"url" in
+    part``) and renames ``mimeType`` → ``mediaType``. Card payloads are
+    also backward-compatible, so a single SDK upgrade won't break us.
+    All Part inspection in this repo funnels through ``_is_file_part()``
+    and ``_get_file_bytes()`` — those two helpers are the v1.0 migration
+    surface. Pyproject pins permit ``a2a-sdk<2.0`` so ``uv lock`` can
+    pull 1.0.x once the upstream stable drops (ETA May-June 2026 per the
+    a2a-protocol.org announcement).
 """
 
 from __future__ import annotations
@@ -88,20 +93,28 @@ def parse_project_root(text: str) -> Path:
 def _is_file_part(root: Any) -> bool:
     """Return True if the Part root contains embedded file bytes.
 
-    Currently checks SDK 0.3.x FilePart structure. When SDK reaches 1.0,
-    update to check `"raw" in root` or `"url" in root` per the new spec.
+    Supports SDK 0.3.x (FilePart with ``root.file`` = FileWithBytes) today
+    and the v1.0 unified-Part shape (flat ``bytes`` + ``mediaType`` keys)
+    as a forward-compatibility stub — v1.0 is pinned-but-unused; live
+    traffic still travels the 0.3.x path.
     """
-    return hasattr(root, "file") and isinstance(root.file, FileWithBytes)
+    if hasattr(root, "file") and isinstance(root.file, FileWithBytes):
+        return True
+    # v1.0 unified Part forward-compat — activated when a2a-sdk ≥ 1.0 lands.
+    return hasattr(root, "bytes") and hasattr(root, "media_type")
 
 
 def _get_file_bytes(root: Any) -> tuple[str, str]:
     """Extract (base64_bytes, mime_type) from a file Part root.
 
-    Returns:
-        (bytes_str, mime_type) — mime defaults to 'image/png' if unset.
+    Returns ``(bytes_str, mime_type)`` for both SDK 0.3.x (``root.file.bytes``
+    + ``mime_type``) and the v1.0 unified Part (flat ``bytes`` +
+    ``media_type``). Mime defaults to ``image/png`` if unset.
     """
-    # SDK 0.3.x path
-    return root.file.bytes, root.file.mime_type or "image/png"  # type: ignore[union-attr]
+    if hasattr(root, "file") and isinstance(root.file, FileWithBytes):
+        return root.file.bytes, root.file.mime_type or "image/png"
+    # v1.0 unified Part forward-compat.
+    return root.bytes, getattr(root, "media_type", None) or "image/png"
 
 
 # ── Public API ───────────────────────────────────────────────────────

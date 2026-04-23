@@ -28,6 +28,7 @@ from kourai_common.a2a_events import (
     extract_status_text,
     extract_task_text,
 )
+from kourai_common.agents_manifest import fallback_card_for
 from kourai_common.tracing import create_span, get_trace_context
 
 if TYPE_CHECKING:
@@ -60,10 +61,23 @@ class RemoteAgentConnection:
         self.card: AgentCard | None = None
 
     async def connect(self) -> None:
-        """Fetch agent card and initialize A2A client."""
+        """Fetch the agent card and initialize the A2A client.
+
+        If live ``.well-known/agent-card`` fetch fails (specialist not up yet,
+        network blip), fall back to a synthesized card so Hephaestus boot is
+        not blocked — the next ``send()`` will naturally retry discovery.
+        """
         with create_span(f"a2a.connect.{self.agent_name}", {"url": self.agent_url}):
             resolver = A2ACardResolver(self.http, self.agent_url)
-            self.card = await resolver.get_agent_card()
+            try:
+                self.card = await resolver.get_agent_card()
+            except Exception as exc:
+                log.warning(
+                    "Live agent card fetch failed for %s (%s); using manifest fallback",
+                    self.agent_name,
+                    exc,
+                )
+                self.card = fallback_card_for(self.agent_name, self.agent_url)
             if self.card:
                 self.card.url = self.agent_url
                 config = ClientConfig(

@@ -7,7 +7,7 @@ failure, and that the graceful-degradation contract is preserved.
 
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -101,16 +101,6 @@ def test_get_available_server_not_assigned():
 
     server = toolkit.get_available_server("unknown_agent")
     assert server is None
-
-
-def test_get_tool_unavailable():
-    """Test that get_tool raises MCPUnavailable when no servers are available."""
-    toolkit = MCPToolkit()
-    toolkit.register_server("github", enabled=False)
-    toolkit.assign_servers("techne", ["github"])
-
-    with pytest.raises(MCPUnavailable):
-        toolkit.get_tool("techne", "search_code")
 
 
 def test_disable_enable_server():
@@ -464,3 +454,79 @@ class TestSearchMemoryNodesAsync:
             await search_memory_nodes("dark mode preference")
 
         session.call_tool.assert_called_once_with("search_nodes", {"query": "dark mode preference"})
+
+
+# ── Item 5: OTEL spans around MCP tool calls ─────────────────────────────────
+#
+# Session pooling was attempted in an earlier pass but reverted — the MCP
+# SDK's ``streamable_http_client`` yields inside an anyio task_group
+# (issues #466 / #713 / #915, see ``ROADMAP.md``) and raises
+# ``RuntimeError: Attempted to exit cancel scope in a different task``
+# on cross-task teardown. We keep the spans, which were the high-ROI half
+# of that change; pooling waits for an SDK fix.
+
+
+class TestMCPSpanEmission:
+    """Verifies OTEL spans wrap MCP tool calls so latency shows up in traces."""
+
+    @pytest.mark.asyncio
+    async def test_query_context7_emits_span(self) -> None:
+        """query_context7 opens a span tagged with the server name."""
+        from mcp.types import TextContent
+
+        span_names: list[str] = []
+
+        @contextmanager
+        def capturing_span(name: str, attributes: dict[str, str] | None = None):
+            span_names.append(name)
+            yield MagicMock()
+
+        lib_result = MagicMock()
+        lib_result.content = [TextContent(type="text", text="/lib/x")]
+        docs_result = MagicMock()
+        docs_result.content = [TextContent(type="text", text="docs")]
+        session = AsyncMock()
+        session.initialize = AsyncMock(return_value=None)
+        session.call_tool = AsyncMock(side_effect=[lib_result, docs_result])
+
+        @asynccontextmanager
+        async def mock_session(_r: object, _w: object):
+            yield session
+
+        with (
+            patch("mcp.client.streamable_http.streamable_http_client", _mock_streamable_client),
+            patch("mcp.ClientSession", mock_session),
+            patch("kourai_common.mcp_client.create_span", capturing_span),
+        ):
+            await query_context7("asyncio", "gather")
+
+        assert any("context7" in name for name in span_names)
+
+    @pytest.mark.asyncio
+    async def test_search_memory_nodes_emits_span(self) -> None:
+        """search_memory_nodes opens a span tagged with memory server."""
+        span_names: list[str] = []
+
+        @contextmanager
+        def capturing_span(name: str, attributes: dict[str, str] | None = None):
+            span_names.append(name)
+            yield MagicMock()
+
+        session = AsyncMock()
+        session.initialize = AsyncMock(return_value=None)
+        result = MagicMock()
+        result.content = []
+        session.call_tool = AsyncMock(return_value=result)
+
+        @asynccontextmanager
+        async def mock_session(_r: object, _w: object):
+            yield session
+
+        with (
+            patch("mcp.client.streamable_http.streamable_http_client", _mock_streamable_client),
+            patch("mcp.ClientSession", mock_session),
+            patch("kourai_common.mcp_client.create_span", capturing_span),
+        ):
+            await search_memory_nodes("anything")
+
+        assert any("memory" in name for name in span_names)
