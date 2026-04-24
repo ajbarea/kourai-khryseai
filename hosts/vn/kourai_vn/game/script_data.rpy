@@ -4,6 +4,17 @@
 ## Loaded automatically by Ren'Py.  All symbols (bridge, AGENT_CHARS, AGENT_COLORS, etc.)
 ## are globally visible to every other .rpy file once init completes.
 
+# ── PERSISTENT DEFAULTS ──────────────────────────────────────────────────
+# Ensure codex state is always a usable collection — the Codex screen can be
+# opened straight from the main menu (before `start` runs), so lazy init in
+# `start` / `unlock_codex_entry` isn't enough. Without these defaults,
+# is_codex_entry_unlocked() hits ``None in persistent.codex_unlocked`` and
+# TypeErrors. Default statements only set the value when it's unset on
+# disk, so existing saves are preserved.
+default persistent.codex_unlocked = set()
+default persistent.codex_read = set()
+default persistent.codex_new_notifications = []
+
 # ── INITIALIZATION ───────────────────────────────────────────────────────
 
 init python hide:
@@ -30,15 +41,19 @@ init python:
     bridge = RenPyBridge(agent_script="agents/vn_bridge.py")
 
     # Character definitions — derived from AGENT_METADATA
-    # We still define short handles for script writing
-    h   = Character("Hephaestus", color=AGENT_METADATA["hephaestus"]["hex_color"], what_prefix='"', what_suffix='"')
-    t   = Character("Techne",     color=AGENT_METADATA["techne"]["hex_color"],     what_prefix='"', what_suffix='"')
-    k   = Character("Kallos",     color=AGENT_METADATA["kallos"]["hex_color"],     what_prefix='"', what_suffix='"')
-    m   = Character("Metis",      color=AGENT_METADATA["metis"]["hex_color"],      what_prefix='"', what_suffix='"')
-    d   = Character("Dokimasia",  color=AGENT_METADATA["dokimasia"]["hex_color"],  what_prefix='"', what_suffix='"')
-    mn  = Character("Mneme",      color=AGENT_METADATA["mneme"]["hex_color"],      what_prefix='"', what_suffix='"')
-    pck = Character("Puck",       color=AGENT_METADATA["puck"]["hex_color"],       what_prefix='"', what_suffix='"')
-    cpd = Character("Cupid",      color=AGENT_METADATA["cupid"]["hex_color"],      what_prefix='"', what_suffix='"')
+    # We still define short handles for script writing.
+    # Hades-style convention (per ROADMAP M10): the name plaque already
+    # signals the speaker, so dialogue is NOT auto-wrapped in literal
+    # quote marks. Agent outputs decide per-line whether a line is
+    # quoted, matching the CLI/GUI convention.
+    h   = Character("Hephaestus", color=AGENT_METADATA["hephaestus"]["hex_color"])
+    t   = Character("Techne",     color=AGENT_METADATA["techne"]["hex_color"])
+    k   = Character("Kallos",     color=AGENT_METADATA["kallos"]["hex_color"])
+    m   = Character("Metis",      color=AGENT_METADATA["metis"]["hex_color"])
+    d   = Character("Dokimasia",  color=AGENT_METADATA["dokimasia"]["hex_color"])
+    mn  = Character("Mneme",      color=AGENT_METADATA["mneme"]["hex_color"])
+    pck = Character("Puck",       color=AGENT_METADATA["puck"]["hex_color"])
+    cpd = Character("Cupid",      color=AGENT_METADATA["cupid"]["hex_color"])
     p   = Character("Player",     color="#E8E8E8")
 
     # Agent ID → (Character, epithet) for dynamic dialogue routing
@@ -61,6 +76,81 @@ init python:
 
     # Agent accent colors (mirrors AGENT_CHARS, used by HUD, gossip bubble, portrait frame)
     AGENT_COLORS = {name: meta["hex_color"] for name, meta in AGENT_METADATA.items()}
+
+    # Display-name → accent color lookup for the Hades-style name plaque in
+    # the say screen: the plaque's hairline border takes the current
+    # speaker's color so "Metis" reads indigo, "Hephaestus" amber, etc.
+    AGENT_ACCENT_BY_NAME = {meta["title"]: meta["hex_color"] for name, meta in AGENT_METADATA.items()}
+    for name, meta in AGENT_METADATA.items():
+        AGENT_ACCENT_BY_NAME[name.capitalize()] = meta["hex_color"]
+
+    # Some agents' canonical accent colors (Metis indigo #4C6EF5, Dokimasia
+    # gray #6C757D, Mneme brown-red #B73E1D) are too dark to read cleanly
+    # against the #14100AEE plaque fill and the parchment dialogue background.
+    # _bright_hex shifts HSL-lightness up to a legibility floor so the same
+    # color identity still reads, just with enough contrast to be scannable.
+    # Keep the original accent for HUD bars + plaque hairlines (solid shapes
+    # where the darker value works); use the brightened variant wherever the
+    # accent is rendered as *text*.
+    import colorsys as _colorsys
+
+    def _bright_hex(hex_color, min_l=0.70):
+        if not hex_color or not hex_color.startswith("#") or len(hex_color) < 7:
+            return hex_color
+        r = int(hex_color[1:3], 16) / 255.0
+        g = int(hex_color[3:5], 16) / 255.0
+        b = int(hex_color[5:7], 16) / 255.0
+        h, l, s = _colorsys.rgb_to_hls(r, g, b)
+        l = max(l, min_l)
+        # Pull saturation up slightly too — pure lightness alone can wash out.
+        s = min(1.0, s + 0.05)
+        r, g, b = _colorsys.hls_to_rgb(h, l, s)
+        return "#{:02X}{:02X}{:02X}".format(int(r * 255), int(g * 255), int(b * 255))
+
+    AGENT_ACCENT_BRIGHT_BY_NAME = {
+        name: _bright_hex(hex_color)
+        for name, hex_color in AGENT_ACCENT_BY_NAME.items()
+    }
+
+    # ──────────────────────────────────────────────────────────────────────
+    # Inline agent-name colorization in dialogue — when Hephaestus says
+    # "Metis — draw up the plans," *Metis* renders in her indigo accent
+    # color while the rest stays default parchment. Reinforces the sense
+    # that agents are people you're collaborating with, and gives the
+    # viewer's eye a second anchor beyond the name plaque for who's on
+    # stage.
+    #
+    # Hook: ``config.say_menu_text_filter`` (Ren'Py 8.5) runs on say and
+    # menu text only — the plaque, HUD, namebox, and UI chrome all use
+    # direct screen-level ``text`` displayables and are not filtered.
+    # See renpy.org/doc/html/config.html#var-say_menu_text_filter.
+    # ──────────────────────────────────────────────────────────────────────
+    import re as _re
+
+    # Longest names first so "Hephaestus" matches before a (hypothetical)
+    # shorter name that is a prefix. \b word boundaries keep possessives
+    # (``Metis'``) and punctuation (``Metis,``) from breaking the match.
+    _agent_name_pattern = _re.compile(
+        r"\b(" + "|".join(
+            _re.escape(name)
+            for name in sorted(AGENT_ACCENT_BY_NAME.keys(), key=len, reverse=True)
+        ) + r")\b"
+    )
+
+    def _colorize_agent_names(s):
+        if not s:
+            return s
+        def _repl(match):
+            name = match.group(1)
+            # Use the brightened variant so "Metis" in Hephaestus's line
+            # actually stands out on the parchment dialogue fill; the
+            # original darker accent is reserved for plaque hairlines and
+            # HUD bars where solid-color shapes have room to breathe.
+            color = AGENT_ACCENT_BRIGHT_BY_NAME.get(name, "#F5F0E1")
+            return "{color=" + color + "}" + name + "{/color}"
+        return _agent_name_pattern.sub(_repl, s)
+
+    config.say_menu_text_filter = _colorize_agent_names
 
     # Canonical display order for the affinity HUD (6 maidens only — spirits are sidebar)
     AGENT_ORDER = ["hephaestus", "techne", "kallos", "metis", "dokimasia", "mneme"]
@@ -117,6 +207,87 @@ init python:
             return Image(neutral_path)
         return Null()
 
+    # ──────────────────────────────────────────────────────────────────────
+    # Multi-slot portrait helpers — left/center/right, with active-speaker
+    # tracking. Lets the Forge Master and a Specialist stand on screen
+    # together during a handoff instead of one replacing the other.
+    # ──────────────────────────────────────────────────────────────────────
+    _VN_SLOT_TAGS = {"left": "portrait_left", "right": "portrait_right", "center": "portrait_center"}
+
+    def kourai_show_agent(agent_id, slot="center", state="neutral"):
+        """Show ``agent_id`` in the named slot (``left`` / ``right`` / ``center``).
+
+        Each slot has its own screen tag, so multiple slots can hold
+        different agents at once. Calling this again with the same slot
+        swaps the occupant in place.
+        """
+        tag = _VN_SLOT_TAGS.get(slot, "portrait_center")
+        renpy.show_screen(
+            "agent_portrait",
+            agent_id=agent_id,
+            state=state,
+            slot=slot,
+            _tag=tag,
+        )
+
+    def kourai_hide_agent(slot):
+        """Hide whoever is standing in the named slot."""
+        tag = _VN_SLOT_TAGS.get(slot)
+        if tag:
+            renpy.hide_screen(tag)
+
+    def kourai_set_speaker(agent_id):
+        """Mark ``agent_id`` as the current speaker. Other slots dim."""
+        store.current_speaker_id = agent_id
+        # Force a re-render so the dim/bright transforms swap immediately
+        # rather than waiting for the next player interaction.
+        renpy.restart_interaction()
+
+    def kourai_clear_stage():
+        """Hide every slot and clear the current speaker — back to a blank stage."""
+        for _slot_tag in _VN_SLOT_TAGS.values():
+            renpy.hide_screen(_slot_tag)
+        store.current_speaker_id = None
+
+    def kourai_present_agent(agent_id, state="neutral"):
+        """Smart entrypoint used by the pipeline loop.
+
+        Keeps up to two agents visible (left + right) and alternates slots
+        on handoff. If the agent is already on-screen the existing slot is
+        reused and the speaker marker is just updated; if both slots are
+        full, the non-speaking occupant is evicted to make room.
+        """
+        slots = getattr(store, "_vn_slots", None)
+        if slots is None:
+            slots = {}
+            store._vn_slots = slots
+
+        # Already on stage — just refresh state and mark as speaker.
+        for slot, aid in list(slots.items()):
+            if aid == agent_id:
+                kourai_show_agent(agent_id, slot=slot, state=state)
+                kourai_set_speaker(agent_id)
+                return
+
+        # Pick a slot — prefer left for the first agent, right for the second,
+        # evict the non-speaker if both are already occupied.
+        if "left" not in slots:
+            slot = "left"
+        elif "right" not in slots:
+            slot = "right"
+        else:
+            evict = next(
+                (s for s, a in slots.items() if a != store.current_speaker_id),
+                "right",
+            )
+            kourai_hide_agent(evict)
+            slots.pop(evict, None)
+            slot = evict
+
+        slots[slot] = agent_id
+        kourai_show_agent(agent_id, slot=slot, state=state)
+        kourai_set_speaker(agent_id)
+
     def get_tier(score):
         """Map affinity 0.0-1.0 → tier 1-4 (matches RELATIONSHIP_SYSTEMS.md)."""
         if score < 0.3: return 1
@@ -130,10 +301,24 @@ init python:
         Returns dict with virtue scores, session deltas, and discoveries.
         Queries the python agent subprocess via the bridge to avoid sqlite3 dependency issues.
         """
+        # Fast path: no player_id means we're outside a live session
+        # (demo mode, pre-onboarding, main menu before Start). That's a
+        # *normal* state — not an error — so return the fallback dict
+        # silently instead of spamming tracebacks once per frame.
+        if not getattr(persistent, "player_id", None):
+            return {
+                "arete": 0.5,
+                "sophia": 0.5,
+                "synergy": 0.5,
+                "techne_v": 0.5,
+                "mneia": 0.5,
+                "eros": 0.5,
+                "session_summary": "The forge is quiet. No session data available.",
+                "recent_facts": [],
+            }
+
         try:
             player_id = persistent.player_id
-            if not player_id:
-                raise ValueError("No player ID")
 
             bridge.send_message({"action": "get_virtue_context", "player_id": player_id})
 

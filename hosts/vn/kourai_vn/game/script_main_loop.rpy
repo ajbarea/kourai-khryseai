@@ -120,13 +120,20 @@ label main_loop:
                 # ═══════════════════════════════════════════════════════
                 $ unlock_codex_entry(f"char_{agent_id}", silent=False)
 
-                # Show/update portrait for speaking agent
+                # Show/update portrait for speaking agent — multi-slot aware:
+                # kourai_present_agent alternates between the left/right slots
+                # so the Forge Master stays visible when he hands off to a
+                # specialist, and the current speaker brightens while the
+                # other portrait dims. See script_data.rpy for the helper.
                 python:
                     resolved_state = validate_portrait_state(agent_id, portrait_state)
                     if resolved_state is not None:
-                        renpy.show_screen("agent_portrait", agent_id=agent_id, state=resolved_state)
+                        kourai_present_agent(agent_id, resolved_state)
                     else:
-                        renpy.hide_screen("agent_portrait")
+                        # No sprite asset for this agent — just mark them as
+                        # the current speaker so any other portraits still on
+                        # stage dim correctly.
+                        kourai_set_speaker(agent_id)
 
                 # TTS — request voice audio before say statement
                 if persistent.tts_enabled:
@@ -143,8 +150,11 @@ label main_loop:
 
                 $ _beat_idx += 1
 
-            # Hide portrait after the last beat in this turn
-            $ renpy.hide_screen("agent_portrait")
+            # End of turn — leave portraits on stage. With multi-slot support
+            # the last two speakers persist across turns so players can see
+            # the ongoing handoff ("Hephaestus is still present, Metis just
+            # stepped in"). Portraits get evicted naturally when a third
+            # agent speaks (FIFO in kourai_present_agent).
 
             # ── Affinity update (client-side) ─────────────────────────────
             # Capture tier before bump so we can detect crossing a threshold.

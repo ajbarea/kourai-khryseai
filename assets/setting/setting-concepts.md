@@ -1,33 +1,96 @@
-Generated image: "A beautifully illustrated 2d video game background for a visual novel. The setting is Hephaestus's magical forge from Greek mythology. A cavernous but ethereal workshop with floating golden gears, glowing celestial astrolabes, and pools of shimmering molten gold. Whimsical floating embers that look like fireflies. Painterly, vibrant, highly detailed, gorgeous atmospheric lighting, warm forge aesthetic with dark charcoal shadows and rich gold accents. Serene and magical. No characters, empty space for visual novel sprites."
-Generated image: "A beautifully illustrated 2d video game background for a visual novel. The setting is Hephaestus's divine forge as an ethereal workshop courtyard. Towering white marble pillars overgrown with glowing copper and gold metallic vines. Crystal anvils radiating soft light. Shafts of sunlight streaming down from high above. Magical, whimsical, stylized painterly art style. Beautiful, gorgeous enough to stare at for hours. Rich, harmonious warm colors, gold and cream and dark brown. Serene and majestic. No characters, empty space for visual novel sprites."
+# Setting Concepts — Background Generation Prompts
 
-Here are some ideas for a breathtaking background that fits the setting of **Hephaestus’s Forge** for your visual novel, while matching the high-quality, vibrant aesthetic of Jen Zee’s character art!
+Generation prompts for the VN's background art. Keep these alongside the
+PNGs so a future regeneration pass can reproduce or iterate on the look.
 
-From reading the documentation, the visual novel's `warm forge aesthetic` relies heavily on dark charcoal (`#1A1A1A`), warm cream (`#F5F0E1`), text (`#3A2E1F`), and gold accents (`#D4AF37`). Each of your characters also has a distinct, vibrant accent color (Teal, Magenta, Indigo, Burgundy, Amber). 
+The VN's `warm forge aesthetic` relies on deep charcoal (`#1A1A1A`), warm
+cream (`#F5F0E1`), and gold accents — canonical gold is `#C9944A` with
+highlight `#F1D2A1` and shadow `#AA771C`. Each agent has a distinct accent
+color (Amber, Indigo, Magenta, Teal, Ember, Gray) that must pop against
+the background, so the background itself stays warm-dominant and limited.
 
-Because players will be staring at this for hours, you want to avoid a stereotypical "grimy, sooty blacksmith forge with harsh orange lava." Instead, it should feel **divine, ethereal, and magical**—a place worthy of Greek gods and advanced automaton agents.
+Because players stare at this for hours, avoid the stereotypical "grimy,
+sooty blacksmith forge with harsh orange lava." The target feel is
+**divine, ethereal, and magical** — a place worthy of Greek gods and
+advanced automaton agents.
 
-I've generated two visual mockups that you can use as inspiration or style references:
+## Current — Divine Forge-Atelier (`forge_hades.png`)
 
-### Concept 1: The Celestial Workshop
-This direction leans into the "magical" and "whimsical" side of the forge, blending celestial elements with divine craftsmanship.
-- **The Setting:** A vast, cavernous hall made of pristine, dark obsidian or charcoal-colored stone, lit by pools of shimmering, liquid starlight or clean molten gold (instead of aggressive red magma).
-- **The Details:** Floating, glowing golden gears and massive celestial astrolabes slowly turning in the background. 
-- **Atmosphere:** The air is filled with whimsical floating embers that look like fireflies. The lighting is soft and atmospheric, which provides a beautiful depth-of-field effect so the sharp, vibrant character sprites pop against the background.
+The shipped background. Asymmetric composition with warm forge upper-left
+and cool indigo window upper-right — the warm/cool tension visually
+echoes the Hephaestus ↔ Metis handoff without depicting either. Empty
+center-bottom flagstones reserve space for standing sprites.
 
-![Celestial Workshop Background Mockup](/C:/Users/ajbar/.gemini/antigravity/brain/e232f805-84f0-4514-9f67-c01e03df9210/forge_celestial_1774364148942.png)
+**Prompt:**
 
-### Concept 2: The Ethereal Foundry
-This direction leans into the "beautiful" and "gorgeous" aspect, making the forge look more like an ancient, overgrown palace of creation.
-- **The Setting:** An open-air or high-ceilinged marble courtyard lined with towering white pillars, overgrown with glowing, metallic climbing vines (leaves made of polished bronze and copper).
-- **The Details:** A central crystal anvil or glowing workbench that radiates a soft, pulsing light. 
-- **Atmosphere:** Shafts of serene sunlight stream down from high above, catching dust motes and magical mist. The colors harmonize perfectly with the UI's cream, gold, and charcoal palette, creating a majestic and incredibly serene environment for long conversations.
+> A wide 16:9 cinematic visual-novel background depicting the interior of
+> a divine forge-atelier carved into the side of a moonlit mountaintop.
+> **Upper-left:** a great stone forge with a contained, warm golden fire
+> — soft spill-light bathes the left wall and flagstones in honey-gold.
+> **Upper-right:** a tall arched window of leaded copper and obsidian
+> frames a deep indigo starry sky with slowly drifting constellations and
+> a single pale moon; moonlight streams diagonally down-and-left, meeting
+> the forge glow near the center. **Midground left:** an oak drafting
+> table half-lit by firelight, scattered with unrolled parchment
+> blueprints, brass calipers, a gleaming astrolabe. **Midground right:**
+> leatherbound tomes and labeled bronze jars on deep-shadowed shelves,
+> receding into soft focus. Ancient Greek iconography — Doric column
+> edges, laurel friezes, faint relief carvings of craftsmen-gods — hints
+> along the stone walls. Flagstone floor in the foreground kept visually
+> quiet — empty, waiting for standing characters. **Style:** stylized
+> painterly 2D illustration, digital painting with confident thick
+> brushwork, bold clean silhouettes, high-contrast shadow shapes, warm
+> atmospheric volumetric light rays, slight depth-of-field blur on
+> background elements so foreground sprites will pop. Inspired by classic
+> animated feature backgrounds and high-end graphic-novel interior
+> painting. **Palette:** deep charcoal, honeyed amber-gold (#C9944A),
+> warm cream highlights (#F1D2A1), with cool indigo and soft teal only
+> as accent in the window and deep shadows — warm-dominant, limited,
+> harmonious. **Mood:** serene, magical, lived-in — as if the owners
+> have just stepped away for a moment. No people, no figures, no text,
+> no UI. Editorial game-background quality, cinematic, high detail,
+> 16:9, 1920×1080 native.
 
-![Ethereal Foundry Background Mockup](/C:/Users/ajbar/.gemini/antigravity/brain/e232f805-84f0-4514-9f67-c01e03df9210/forge_ethereal_1774364163788.png)
+**Negative prompt:**
 
-### Why these concepts work well with Jen Zee's style:
-1. **Painterly Contrast:** Jen Zee's art uses very crisp, stark black shadows and vivid, saturated highlights. A softer, slightly out-of-focus background with atmospheric lighting (like glowing mist or light rays) prevents the screen from becoming too visually "noisy" and keeps the focus absolutely on the characters.
-2. **Color Harmony:** By sticking to a base of deep darks (charcoal/obsidian) and warm glowing lights (gold/sunlight), you create a neutral but magical canvas. When a character like **Techne** (with Teal accents) or **Kallos** (with Magenta accents) appears, their specific colors will beautifully pop against the gold and dark background.
-3. **Whimsy:** Greek myth allows for magic. Replacing mundane tools with floating schematics, enchanted crystal, and celestial mechanics makes the forge feel like a place where true creation happens.
+> characters, people, figures, humans, gods, silhouettes, portraits,
+> text, watermark, logo, signature, UI, HUD, dialogue box, borders,
+> picture frames, bright red, harsh orange lava, symmetrical centered
+> composition, cluttered foreground, busy center-bottom, square aspect
+> ratio, grimy industrial blacksmith, cartoon, anime, photorealistic,
+> 3D render, CGI.
 
-What do you think of these directions? Do you prefer the cavernous, starry mechanic vibe, or the majestic, sunlit marble vibe? We can refine the prompt and try generating some iterations if you want to explore a specific idea further!
+### Why this composition works
+
+1. **Asymmetric warm/cool balance.** Forge upper-left (amber) vs window
+   upper-right (indigo) mirrors the two lead agents without literally
+   depicting them. Accent colors in agent sprites pop against the
+   complementary quadrant.
+2. **Negative space reserved for sprites.** Center-bottom is deliberately
+   quiet flagstone — the dramatic moonlight shaft acts as a natural
+   divider between left and right sprite slots.
+3. **Lived-in props.** Drafting table with blueprints, tomes, bronze
+   jars — communicates "the gods just stepped out" rather than reading
+   as an empty stage set.
+4. **Palette-locked to our tokens.** `#C9944A` and `#F1D2A1` are called
+   out by hex so gen tools with color conditioning lean our amber, not
+   generic Hollywood-bronze.
+5. **Depth-of-field blur.** Background elements intentionally soft so
+   crisp sprites pop against them without fighting for attention.
+
+### Avoid third-party-content guardrails
+
+Earlier iterations named a specific studio / artist / game franchise for
+the style reference. Some gen tools refuse those on IP grounds. The
+formal descriptors in the prompt above (*"stylized painterly 2D
+illustration, digital painting with confident thick brushwork, bold
+clean silhouettes, high-contrast shadow shapes"*) achieve the same
+aesthetic without tripping filters.
+
+## Deprecated drafts
+
+Two earlier concepts (`forge_celestial.png` — cavernous stone hall with
+floating gears; `forge_ethereal.png` — marble courtyard with sunlit
+pillars) were generated and deleted on 2026-04-24. Both were
+symmetrical, square-aspect, and put visual density exactly where
+character sprites stand. Superseded by `forge_hades.png`.
