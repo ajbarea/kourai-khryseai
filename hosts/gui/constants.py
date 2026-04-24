@@ -6,8 +6,13 @@ the theme centralized and DRY.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pygame
 import pygame.freetype
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 # ---------------------------------------------------------------------------
 # Layout constants
@@ -136,7 +141,7 @@ _font_proxy_registry: list[FontProxy] = []  # type: ignore[name-defined]  # defi
 # message_history_integration, etc.) must be told when fonts change so they
 # can bust their own caches — invalidating the underlying FontProxy isn't
 # enough if a pre-rendered pygame.Surface still holds the old glyphs.
-_font_scale_listeners: list[object] = []  # callables: () -> None
+_font_scale_listeners: list[Callable[[], None]] = []
 
 
 def get_font_scale() -> float:
@@ -144,7 +149,7 @@ def get_font_scale() -> float:
     return _font_scale
 
 
-def on_font_scale_change(callback: object) -> None:
+def on_font_scale_change(callback: Callable[[], None]) -> None:
     """Register a callback (no args) to run after the font scale changes.
 
     Intended for dialogue-history / message-history widgets that cache
@@ -168,7 +173,7 @@ def set_font_scale(scale: float) -> None:
         proxy.invalidate()
     for cb in _font_scale_listeners:
         try:
-            cb()  # type: ignore[operator]
+            cb()
         except Exception:
             # Deliberately broad — a broken listener must not prevent other
             # caches from being busted.

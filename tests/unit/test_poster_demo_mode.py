@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 if TYPE_CHECKING:
+    from hosts.gui.demo_client import DemoGuiClient
     from hosts.gui.dialogue import DialogueEntry
 
 # ---------------------------------------------------------------------------
@@ -55,7 +56,7 @@ class TestGuiDemoClientScriptedSequence:
     no one notices, ``make gui-demo`` silently renders the wrong scene.
     """
 
-    def _fresh_client(self) -> tuple[_queue.Queue, _queue.Queue, object]:
+    def _fresh_client(self) -> tuple[_queue.Queue, _queue.Queue, DemoGuiClient]:
         from hosts.gui.demo_client import DemoGuiClient
 
         send_q: _queue.Queue = _queue.Queue()
