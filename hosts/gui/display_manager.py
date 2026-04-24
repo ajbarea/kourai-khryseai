@@ -122,44 +122,76 @@ class DisplayManager:
             logger.debug("Set window position to x=%s y=%s", position[0], position[1])
 
     @staticmethod
-    def _set_mode_with_vsync(size: tuple[int, int], flags: int) -> pygame.Surface:
+    def _set_mode_with_vsync(
+        size: tuple[int, int],
+        flags: int,
+        display: int | None = None,
+    ) -> pygame.Surface:
+        """Create the display surface, preferring vsync=1.
+
+        ``display`` selects which monitor the mode binds to (pygame-ce 2.0+
+        supports the kwarg; older builds are tolerated via TypeError
+        fallback). ``None`` lets SDL pick, which usually means the window's
+        current display or primary on first launch.
+        """
+
+        def _try(size_, flags_, **extra):
+            try:
+                return pygame.display.set_mode(size_, flags_, vsync=1, **extra)
+            except TypeError:
+                # Older pygame builds don't accept `display` — drop and retry.
+                extra.pop("display", None)
+                return pygame.display.set_mode(size_, flags_, vsync=1, **extra)
+
+        kwargs: dict = {}
+        if display is not None:
+            kwargs["display"] = display
+
         try:
-            surface = pygame.display.set_mode(size, flags, vsync=1)
+            surface = _try(size, flags, **kwargs)
             logger.debug(
-                "Created display surface with vsync: %sx%s flags=%s actual=%sx%s",
+                "Created display surface with vsync: %sx%s flags=%s display=%s actual=%sx%s",
                 size[0],
                 size[1],
                 flags,
+                display,
                 surface.get_width(),
                 surface.get_height(),
             )
             return surface
         except pygame.error as exc:
             logger.debug(
-                "Vsync failed for %sx%s flags=%s; retrying without (%s)",
+                "Vsync failed for %sx%s flags=%s display=%s; retrying without (%s)",
                 size[0],
                 size[1],
                 flags,
+                display,
                 exc,
             )
-            return pygame.display.set_mode(size, flags)
+            try:
+                return pygame.display.set_mode(size, flags, **kwargs)
+            except TypeError:
+                kwargs.pop("display", None)
+                return pygame.display.set_mode(size, flags, **kwargs)
 
     def _set_screen_mode(self, mode: str) -> pygame.Surface:
         spec = build_display_mode_spec(mode, self.windowed_size)
         logger.debug("Applying display mode request: %s", spec)
 
         try:
-            surface = self._set_mode_with_vsync(spec.size, spec.flags)
+            surface = self._set_mode_with_vsync(spec.size, spec.flags, display=spec.display_index)
         except pygame.error as exc:
             if spec.mode != "Fullscreen":
                 logger.exception("Failed to create display surface for mode %s", spec.mode)
                 raise
             logger.debug(
-                "Fullscreen %sx%s failed; retrying with auto desktop (%s)",
+                "Fullscreen %sx%s (display=%s) failed; retrying with auto desktop (%s)",
                 spec.size[0],
                 spec.size[1],
+                spec.display_index,
                 exc,
             )
+            # Fall back to SDL's default size + display selection.
             surface = self._set_mode_with_vsync((0, 0), spec.flags)
 
         self._set_window_position(spec.position)

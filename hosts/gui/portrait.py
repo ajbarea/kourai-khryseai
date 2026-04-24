@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import textwrap
 
 import pygame
 from PIL import Image as PILImage
@@ -17,6 +16,7 @@ from .constants import (
     GOLD_DIM,
     PANEL_BG,
     PORTRAIT_W,
+    get_font_scale,
 )
 from .maidens import AGENTS, get_avatar_path
 
@@ -153,9 +153,24 @@ class PortraitPanel:
         sep_w = 120
         pygame.draw.line(surf, GOLD_DIM, (cx - sep_w // 2, sep_y), (cx + sep_w // 2, sep_y), 1)
 
-        # Quote at bottom of panel
+        # Quote at bottom of panel — pixel-measured wrap so lines stay
+        # inside the portrait panel at any font scale (the old char-count
+        # wrap overflowed the panel at higher zoom levels).
         if self.current_quote:
-            wrapped = textwrap.wrap(self.current_quote, width=28)
+            max_quote_w = PORTRAIT_W - 24
+            line_h = max(14, int(18 * get_font_scale()))
+            wrapped: list[str] = []
+            current = ""
+            for word in self.current_quote.split(" "):
+                candidate = word if not current else f"{current} {word}"
+                if FONT_BANNER.get_rect(candidate).width <= max_quote_w:
+                    current = candidate
+                else:
+                    if current:
+                        wrapped.append(current)
+                    current = word
+            if current:
+                wrapped.append(current)
             q_y = sep_y + 12
             for line in wrapped[:6]:
                 r = FONT_BANNER.get_rect(line)
@@ -165,4 +180,4 @@ class PortraitPanel:
                     line,
                     DIM_WHITE,
                 )
-                q_y += 18
+                q_y += line_h

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-import textwrap
 import time
 
 import pygame
@@ -90,8 +89,16 @@ class DialogueEntry:
 class DialogueHistory:
     PAD = 14
     BUBBLE_MAX_W = constants.DIALOGUE_W - 40
-    LINE_H = 20
-    AGENT_LINE_H = 14
+    _LINE_H_BASE = 20
+    _AGENT_LINE_H_BASE = 14
+
+    @property
+    def line_h(self) -> int:
+        return max(16, round(self._LINE_H_BASE * constants.get_font_scale()))
+
+    @property
+    def agent_line_h(self) -> int:
+        return max(12, round(self._AGENT_LINE_H_BASE * constants.get_font_scale()))
 
     def __init__(self) -> None:
         self._entries: list[DialogueEntry] = []
@@ -104,6 +111,13 @@ class DialogueHistory:
         self.show_timestamps = True
         self.show_metadata = True
         self.timestamp_format = "24h"
+        # Re-rasterise the cached transcript surface whenever the font
+        # scale changes — otherwise zoom updates the FontProxy glyphs
+        # but this surface still holds pre-zoom text.
+        constants.on_font_scale_change(self._mark_dirty_from_font_scale)
+
+    def _mark_dirty_from_font_scale(self) -> None:
+        self._dirty = True
 
     def add(self, entry: DialogueEntry) -> None:
         self._entries.append(entry)
@@ -198,18 +212,48 @@ class DialogueHistory:
             return 24  # compact single-line height
         h = 0
         if not e.is_user:
-            h += self.AGENT_LINE_H + 4
+            h += self.agent_line_h + 4
         bubble_max_w = dest_w - 40
         lines = self._wrap_text(e.text, bubble_max_w - self.PAD * 2)
-        h += len(lines) * self.LINE_H + self.PAD * 2
+        h += len(lines) * self.line_h + self.PAD * 2
         return h
 
     def _wrap_text(self, text: str, max_w: int) -> list[str]:
+        # Measure against the actual scaled font instead of estimating 9px/char.
+        # The old char-count estimate over-packed lines once zoom scaled glyphs
+        # wider than 9px, so messages overflowed the bubble at higher zoom.
+        max_w = max(1, max_w)
         lines: list[str] = []
         for paragraph in text.split("\n"):
-            wrapped = textwrap.wrap(paragraph or " ", width=max(1, max_w // 9))
-            lines.extend(wrapped or [" "])
-        return lines
+            if not paragraph:
+                lines.append(" ")
+                continue
+            current = ""
+            for word in paragraph.split(" "):
+                candidate = word if not current else f"{current} {word}"
+                if constants.FONT_BODY.get_rect(candidate).width <= max_w:
+                    current = candidate
+                    continue
+                if current:
+                    lines.append(current)
+                    current = ""
+                if constants.FONT_BODY.get_rect(word).width > max_w:
+                    # single word overflows — fall back to character-level break
+                    chunk = ""
+                    for ch in word:
+                        probe = chunk + ch
+                        if constants.FONT_BODY.get_rect(probe).width <= max_w:
+                            chunk = probe
+                        else:
+                            if chunk:
+                                lines.append(chunk)
+                            chunk = ch
+                    current = chunk
+                else:
+                    current = word
+            if current:
+                lines.append(current)
+        return lines or [" "]
 
     def _draw_entry(
         self, surf: pygame.Surface, e: DialogueEntry, y: int, dest_w: int
@@ -217,8 +261,8 @@ class DialogueHistory:
         pad = self.PAD
         bubble_max_w = dest_w - 40
         lines = self._wrap_text(e.text, bubble_max_w - pad * 2)
-        body_h = len(lines) * self.LINE_H + pad * 2
-        header_h = 0 if e.is_user else (self.AGENT_LINE_H + 4)
+        body_h = len(lines) * self.line_h + pad * 2
+        header_h = 0 if e.is_user else (self.agent_line_h + 4)
         total_h = body_h + header_h
 
         drawn_rect = None
@@ -233,8 +277,18 @@ class DialogueHistory:
             constants.FONT_AGENT.render_to(surf, (16, y + 4), f"⋯ {e.text}", col)
             drawn_rect = pygame.Rect(8, y, dest_w - 16, 24)
         elif e.is_user:
-            # User bubble — right-aligned, dim gold border
-            bubble_w = min(bubble_max_w, max(200, len(e.text) * 9 + pad * 2))
+            # User bubble — right-aligned, dim gold border.
+            # Pre-measure the timestamp and reserve horizontal room for it in
+            # the bubble width, otherwise it paints on top of the message in
+            # tight single-line bubbles (no agent-header strip to clear).
+            ts_text = (
+                self.get_timestamp_text(e, self.timestamp_format) if self.show_timestamps else ""
+            )
+            ts_rect = constants.FONT_TITLE.get_rect(ts_text) if ts_text else pygame.Rect(0, 0, 0, 0)
+            ts_reserved = ts_rect.width + 8 if ts_text else 0
+
+            text_px_w = constants.FONT_BODY.get_rect(e.text).width
+            bubble_w = min(bubble_max_w, max(200, text_px_w + pad * 2 + ts_reserved))
             bx = dest_w - bubble_w - 8
             bubble = pygame.Surface((bubble_w, body_h), pygame.SRCALPHA)
             pygame.draw.rect(bubble, (30, 22, 10, 200), bubble.get_rect(), border_radius=8)
@@ -242,14 +296,14 @@ class DialogueHistory:
                 bubble, (*constants.GOLD_DIM, 180), bubble.get_rect(), 1, border_radius=8
             )
 
-            # Timestamp if enabled
-            if self.show_timestamps:
-                ts = self.get_timestamp_text(e, self.timestamp_format)
-                constants.FONT_TITLE.render_to(bubble, (bubble_w - 60, 4), ts, constants.GOLD_DIM)
+            if ts_text:
+                constants.FONT_TITLE.render_to(
+                    bubble, (bubble_w - ts_rect.width - 8, 4), ts_text, constants.GOLD_DIM
+                )
 
             for i, line in enumerate(lines):
                 constants.FONT_BODY.render_to(
-                    bubble, (pad, pad + i * self.LINE_H), line, constants.WHITE
+                    bubble, (pad, pad + i * self.line_h), line, constants.WHITE
                 )
             surf.blit(bubble, (bx, y))
             drawn_rect = pygame.Rect(bx, y, bubble_w, body_h)
@@ -264,18 +318,26 @@ class DialogueHistory:
             hdr = f"* {e.agent.upper()} — {info.get('title', '')}"
             constants.FONT_AGENT.render_to(bubble, (pad + 4, 4), hdr, constants.GOLD)
 
-            # Metadata and Timestamp
-            meta_x = dest_w - 150
+            # Metadata and timestamp — right-aligned with measured widths so
+            # both stay on-screen when the font scales up at higher zoom.
+            bubble_inner_right = (dest_w - 16) - pad
+            right_x = bubble_inner_right
             if self.show_timestamps:
                 ts = self.get_timestamp_text(e, self.timestamp_format)
-                constants.FONT_TITLE.render_to(bubble, (meta_x + 80, 4), ts, constants.GOLD_DIM)
+                ts_rect = constants.FONT_TITLE.get_rect(ts)
+                right_x -= ts_rect.width
+                constants.FONT_TITLE.render_to(bubble, (right_x, 4), ts, constants.GOLD_DIM)
+                right_x -= 8  # gap between ts and metadata
             if self.show_metadata and e.metadata_visible:
                 meta = self.get_metadata_text(e)
-                constants.FONT_TITLE.render_to(bubble, (meta_x, 4), meta, constants.GOLD_DIM)
+                meta_rect = constants.FONT_TITLE.get_rect(meta)
+                constants.FONT_TITLE.render_to(
+                    bubble, (right_x - meta_rect.width, 4), meta, constants.GOLD_DIM
+                )
 
             for i, line in enumerate(lines):
                 constants.FONT_BODY.render_to(
-                    bubble, (pad + 4, header_h + pad + i * self.LINE_H), line, constants.WHITE
+                    bubble, (pad + 4, header_h + pad + i * self.line_h), line, constants.WHITE
                 )
             surf.blit(bubble, (8, y))
             drawn_rect = pygame.Rect(8, y, dest_w - 16, total_h)
@@ -287,7 +349,7 @@ class DialogueHistory:
             )
             for i, line in enumerate(lines):
                 constants.FONT_BODY.render_to(
-                    bubble, (pad, pad + i * self.LINE_H), line, (220, 100, 80)
+                    bubble, (pad, pad + i * self.line_h), line, (220, 100, 80)
                 )
             surf.blit(bubble, (8, y))
             drawn_rect = pygame.Rect(8, y, dest_w - 16, total_h)
@@ -301,20 +363,28 @@ class DialogueHistory:
             hdr = f"{e.agent.upper()} — {info.get('title', '')}"
             constants.FONT_AGENT.render_to(bubble, (pad, 3), hdr, agent_color)
 
-            # Metadata and Timestamp
-            meta_x = dest_w - 150
+            # Metadata and timestamp — right-aligned with measured widths so
+            # both stay on-screen when the font scales up at higher zoom.
+            bubble_inner_right = (dest_w - 16) - pad
+            right_x = bubble_inner_right
             if self.show_timestamps:
                 ts = self.get_timestamp_text(e, self.timestamp_format)
-                constants.FONT_TITLE.render_to(bubble, (meta_x + 80, 4), ts, constants.GOLD_DIM)
+                ts_rect = constants.FONT_TITLE.get_rect(ts)
+                right_x -= ts_rect.width
+                constants.FONT_TITLE.render_to(bubble, (right_x, 4), ts, constants.GOLD_DIM)
+                right_x -= 8  # gap between ts and metadata
             if self.show_metadata and e.metadata_visible:
                 meta = self.get_metadata_text(e)
-                constants.FONT_TITLE.render_to(bubble, (meta_x, 4), meta, constants.GOLD_DIM)
+                meta_rect = constants.FONT_TITLE.get_rect(meta)
+                constants.FONT_TITLE.render_to(
+                    bubble, (right_x - meta_rect.width, 4), meta, constants.GOLD_DIM
+                )
 
             for i, line in enumerate(lines):
                 dim = min(i * 8, 40)
                 base_col = tuple(max(0, c - dim) for c in constants.WHITE)
                 self._draw_line_with_emotes(
-                    bubble, pad, header_h + pad + i * self.LINE_H, line, base_col
+                    bubble, pad, header_h + pad + i * self.line_h, line, base_col
                 )
             surf.blit(bubble, (8, y))
             drawn_rect = pygame.Rect(8, y, dest_w - 16, total_h)

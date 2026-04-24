@@ -39,6 +39,10 @@ class DisplayModeSpec:
     size: tuple[int, int]
     flags: int
     position: tuple[int, int] | None = None
+    # Which display the mode should bind to. None lets SDL pick (primary).
+    # Populated for fullscreen so the window claims whichever monitor it was
+    # sitting on in windowed mode — "fullscreen where I already was".
+    display_index: int | None = None
 
 
 def normalize_display_mode(mode: str | None) -> str:
@@ -71,6 +75,66 @@ def get_primary_desktop_size() -> tuple[int, int]:
     height = int(getattr(info, "current_h", 0) or H)
     logger.debug("Resolved primary desktop size from pygame.display.Info(): %sx%s", width, height)
     return max(width, 1), max(height, 1)
+
+
+def get_current_display_index() -> int:
+    """Best-effort: which display is the pygame window currently on?
+
+    Strategy: fetch the window's top-left position (pygame 2.0+ exposes
+    ``get_window_position``), then walk the enumerated display sizes
+    assuming a left-to-right horizontal layout (the common case on
+    Windows/Linux). Returns 0 on single-monitor setups or if anything
+    about the enumeration looks off — safe default.
+    """
+    getter = getattr(pygame.display, "get_window_position", None)
+    if not callable(getter):
+        return 0
+    try:
+        pos = getter()
+    except Exception:
+        return 0
+
+    get_sizes = getattr(pygame.display, "get_desktop_sizes", None)
+    if not callable(get_sizes):
+        return 0
+    try:
+        sizes = list(get_sizes() or [])
+    except Exception:
+        sizes = []
+    if len(sizes) <= 1:
+        return 0
+
+    # Use the window's left edge; assumes horizontal layout from x=0.
+    # This is the layout Windows gives WSLg and the common Linux default.
+    # Atypical vertical/mixed layouts fall back to display 0.
+    x_cursor = 0
+    window_x = int(pos[0]) if pos else 0
+    for idx, raw_size in enumerate(sizes):
+        w, _h = _sanitize_size(raw_size)
+        if window_x < x_cursor + w:
+            logger.debug(
+                "Current display index: %s (window x=%s falls in %s..%s)",
+                idx,
+                window_x,
+                x_cursor,
+                x_cursor + w,
+            )
+            return idx
+        x_cursor += w
+    return len(sizes) - 1
+
+
+def get_display_size(index: int) -> tuple[int, int]:
+    """Return (w, h) for the given display index, clamped to valid values."""
+    get_sizes = getattr(pygame.display, "get_desktop_sizes", None)
+    if callable(get_sizes):
+        try:
+            sizes = list(get_sizes() or [])
+        except Exception:
+            sizes = []
+        if 0 <= index < len(sizes):
+            return _sanitize_size(sizes[index])
+    return get_primary_desktop_size()
 
 
 def get_preferred_windowed_size(desktop_size: tuple[int, int]) -> tuple[int, int]:
@@ -154,11 +218,24 @@ def build_display_mode_spec(
     resolved_desktop = desktop_size or get_primary_desktop_size()
 
     if normalized == DISPLAY_MODE_FULLSCREEN:
+        # FULLSCREEN | SCALED is SDL2's recommended fullscreen path — claims
+        # the display, uses the native desktop resolution with SDL's own
+        # scaling pipeline, and plays nice with alt-tab + multi-monitor.
+        # The previous NOFRAME flag was just a borderless window — taskbar
+        # stayed visible and the OS never treated it as fullscreen.
+        #
+        # Fullscreen binds to the display the window is currently sitting
+        # on — matching VLC / Chrome / most desktop apps: "fullscreen here,
+        # not 'primary'".  We pass display_index to set_mode so SDL2
+        # doesn't fall back to display 0 when the window lives elsewhere.
+        current_idx = get_current_display_index()
+        current_size = get_display_size(current_idx)
         spec = DisplayModeSpec(
             mode=normalized,
-            size=_sanitize_size(resolved_desktop),
-            flags=pygame.NOFRAME,
+            size=current_size,
+            flags=pygame.FULLSCREEN | pygame.SCALED,
             position=(0, 0),
+            display_index=current_idx,
         )
         logger.debug("Built display mode spec: %s", spec)
         return spec

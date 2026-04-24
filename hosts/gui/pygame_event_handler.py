@@ -90,6 +90,10 @@ class PygameEventDispatcher:
         self.resize_events = resize_events
         self.on_quit = on_quit
         self.sync_layout = sync_layout
+        # Alt+V image-paste holds captured clipboard images until the GUI's
+        # send path can carry attachments.  Shape mirrors the CLI:
+        # list[(base64_png, mime_type)].
+        self._pending_images: list[tuple[str, str]] = []
 
     # -- public entry point --------------------------------------------------
 
@@ -171,6 +175,43 @@ class PygameEventDispatcher:
     # -- keyboard ------------------------------------------------------------
 
     def _handle_keydown(self, event: pygame.event.Event) -> None:
+        mod = getattr(event, "mod", 0)
+        ctrl = bool(mod & pygame.KMOD_CTRL)
+        shift = bool(mod & pygame.KMOD_SHIFT)
+        alt = bool(mod & pygame.KMOD_ALT)
+
+        # Zoom shortcuts — Ctrl + / - / 0 match browser conventions.  Use
+        # the existing FontScaler so values persist via settings.json.
+        if ctrl and not shift and not alt:
+            if event.key in (pygame.K_EQUALS, pygame.K_PLUS, pygame.K_KP_PLUS):
+                self._adjust_font_scale(+0.1)
+                return
+            if event.key in (pygame.K_MINUS, pygame.K_KP_MINUS):
+                self._adjust_font_scale(-0.1)
+                return
+            if event.key == pygame.K_0:
+                self._set_font_scale(1.0)
+                return
+
+        # Ctrl+Shift+C — copy the dialogue entry under the mouse (or the
+        # most recent one if the cursor is off the history panel) to the
+        # system clipboard.  Mirrors the existing right-click semantics
+        # but keyboard-driven.
+        if ctrl and shift and not alt and event.key == pygame.K_c:
+            self._copy_hovered_to_clipboard()
+            return
+
+        # Ctrl+V — paste clipboard text into the input bar.
+        if ctrl and not shift and not alt and event.key == pygame.K_v:
+            self._paste_text_from_clipboard()
+            return
+
+        # Alt+V — grab clipboard *image*, queue it as an attachment.
+        # Mirrors the CLI's escape+v binding in hosts/cli/commands.py.
+        if alt and not ctrl and not shift and event.key == pygame.K_v:
+            self._paste_image_from_clipboard()
+            return
+
         if event.key == pygame.K_ESCAPE:
             self.settings_overlay.toggle()
         elif event.key == pygame.K_TAB:
@@ -194,6 +235,13 @@ class PygameEventDispatcher:
                 self._submit_text(submitted)
 
     def _handle_textinput(self, event: pygame.event.Event) -> None:
+        # SDL sometimes fires TEXTINPUT alongside KEYDOWN for Ctrl combos
+        # (notably on X11 / WSLg), which would leak characters like "="
+        # into the input bar when the user presses Ctrl+= to zoom.
+        # Swallow any TEXTINPUT that arrives while Ctrl is held — the
+        # KEYDOWN handler owns those shortcuts.
+        if pygame.key.get_mods() & pygame.KMOD_CTRL:
+            return
         if not self.input_bar.processing:
             self.input_bar.handle_textinput(event)
 
@@ -220,6 +268,15 @@ class PygameEventDispatcher:
     # -- mouse ---------------------------------------------------------------
 
     def _handle_mousewheel(self, event: pygame.event.Event) -> None:
+        # Ctrl + wheel = zoom (matches browser convention). Check this before
+        # any panel-specific scroll routing so zoom works anywhere in the window.
+        if pygame.key.get_mods() & pygame.KMOD_CTRL:
+            if event.y > 0:
+                self._adjust_font_scale(+0.1)
+            elif event.y < 0:
+                self._adjust_font_scale(-0.1)
+            return
+
         # Route scroll to debug log if it's visible and mouse is near it
         if self.gui_integration.settings.get("show_debug_logs", False):
             mx, my = pygame.mouse.get_pos()
@@ -281,6 +338,143 @@ class PygameEventDispatcher:
                 logger.warning("Clipboard error: %s", e)
 
     # -- resize --------------------------------------------------------------
+
+    # -- clipboard helpers ---------------------------------------------------
+
+    def _copy_hovered_to_clipboard(self) -> None:
+        """Ctrl+Shift+C — copy the dialogue entry under the cursor to the
+        system clipboard.  If the cursor isn't over any entry, copy the
+        most recent one as a fallback (most useful for screenshotting the
+        latest agent speech).
+        """
+        mouse_pos = pygame.mouse.get_pos()
+        text = self.history.handle_right_click(mouse_pos, self.dialogue_rect)
+
+        if not text:
+            # Fallback: most recent entry.  `_entries` is the private
+            # list the history keeps; grabbing [-1] is cheap and always
+            # the last thing the player saw.
+            entries = getattr(self.history, "_entries", None)
+            if entries:
+                text = entries[-1].text
+
+        if not text:
+            return
+
+        try:
+            pygame.scrap.put_text(text)
+            self.audio_manager.play_sfx()
+            self.history.add(
+                DialogueEntry(agent="system", text="Copied to clipboard.", is_system=True)
+            )
+            logger.debug("Ctrl+Shift+C copied %d chars to clipboard", len(text))
+        except Exception as e:
+            logger.warning("Clipboard error on Ctrl+Shift+C: %s", e)
+
+    def _paste_text_from_clipboard(self) -> None:
+        """Ctrl+V — pull text from the clipboard into the input bar.
+
+        SDL's TEXTINPUT leak (see _handle_textinput) is already blocked
+        when Ctrl is held, so this keydown handler owns the paste path.
+        """
+        if self.input_bar.processing:
+            return
+        try:
+            text = pygame.scrap.get_text()
+        except Exception as e:
+            logger.warning("Clipboard read failed on Ctrl+V: %s", e)
+            return
+
+        if not text:
+            return
+
+        # Normalise line endings and strip trailing newline (most users
+        # don't want the literal \n after a paste).
+        cleaned = text.replace("\r\n", "\n").replace("\r", "\n")
+        cleaned = cleaned.removesuffix("\n")
+
+        self.input_bar.text += cleaned
+        logger.debug("Ctrl+V inserted %d chars from clipboard", len(cleaned))
+
+    def _paste_image_from_clipboard(self) -> None:
+        """Alt+V — grab a clipboard image and queue it as an attachment.
+
+        Uses PIL.ImageGrab.grabclipboard() — the same path the CLI uses
+        in hosts/cli/commands.py::_capture_image.  On success, the image
+        is base64-encoded and appended to `self._pending_images`; an
+        input-bar placeholder ``[📎 image #N queued]`` confirms capture.
+
+        NOTE: the GUI's send path in ``_submit_text`` currently only
+        emits ``(target, text)`` tuples — attachment plumbing into
+        send_q is not yet wired (tracked separately).  For now the
+        image data is captured and held on the handler so a future
+        refactor can pick it up without re-soliciting the user.
+        """
+        try:
+            from PIL import ImageGrab  # type: ignore[import-untyped]
+        except ImportError:
+            logger.warning("Alt+V failed: Pillow not installed (uv add Pillow)")
+            self.input_bar.text += "[Pillow not installed]"
+            return
+
+        try:
+            img = ImageGrab.grabclipboard()
+        except Exception as e:
+            logger.warning("Alt+V image grab failed: %s", e)
+            self.input_bar.text += f"[image capture failed: {e}]"
+            return
+
+        if img is None:
+            logger.debug("Alt+V: clipboard has no image.")
+            self.input_bar.text += "[no image in clipboard]"
+            return
+        if isinstance(img, list):
+            # On some platforms the clipboard contains file *paths*
+            # rather than pixel data.  Mirror the CLI's behaviour.
+            logger.debug("Alt+V: clipboard contains file paths, not pixel data.")
+            self.input_bar.text += "[clipboard contains files, not an image]"
+            return
+
+        import base64
+        import io as _io
+
+        buf = _io.BytesIO()
+        img.save(buf, format="PNG")
+        b64 = base64.b64encode(buf.getvalue()).decode()
+
+        self._pending_images.append((b64, "image/png"))
+        n = len(self._pending_images)
+        placeholder = f"[\U0001f4ce image #{n} queued]"
+        self.input_bar.text += placeholder
+        logger.debug("Alt+V queued image #%d (%d base64 chars)", n, len(b64))
+
+    # -- zoom helpers --------------------------------------------------------
+    # VSCode-style: content scales, window stays fixed.  The FontScaler
+    # value is read by the main loop in __main__.py, which renders to a
+    # virtual surface sized ``screen_size / scale`` and smoothscales it up
+    # to the real screen — Ctrl+= → virtual shrinks → upscale grows text.
+
+    def _adjust_font_scale(self, delta: float) -> None:
+        """Step the zoom factor (persists via settings; main loop reads it)."""
+        scaler = self.gui_integration.get_font_scaler()
+        self._set_font_scale(scaler.scale + delta)
+
+    def _set_font_scale(self, scale: float) -> None:
+        """Set absolute zoom factor.  Range clamped by FontScaler (0.8-2.0x).
+
+        Pushes the new value through to the FontProxy registry in
+        constants.py so every cached pygame.freetype.Font is dropped and
+        the next frame re-rasterises at the new size — crisp, not scaled.
+        """
+        from .constants import set_font_scale as push_font_scale
+
+        scaler = self.gui_integration.get_font_scaler()
+        old = scaler.scale
+        scaler.set_scale(scale)
+        if scaler.scale != old:
+            push_font_scale(scaler.scale)
+            self.gui_integration.save_all_settings()
+            logger.info("Zoom → %.2fx (was %.2fx)", scaler.scale, old)
 
     def _handle_resize(self, event: pygame.event.Event) -> None:
         screen_w, screen_h = self.display.handle_resize(
