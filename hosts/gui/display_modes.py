@@ -228,8 +228,15 @@ def build_display_mode_spec(
         # on — matching VLC / Chrome / most desktop apps: "fullscreen here,
         # not 'primary'".  We pass display_index to set_mode so SDL2
         # doesn't fall back to display 0 when the window lives elsewhere.
+        #
+        # If the caller hands us an explicit ``desktop_size`` we honour it —
+        # otherwise we query the display pygame is currently driving.  This
+        # makes the function testable without mocking pygame (CI runners
+        # default to 1024×768 on the SDL dummy driver) while keeping real
+        # callers on the live desktop resolution, since display_manager.py
+        # never passes an explicit size.
         current_idx = get_current_display_index()
-        current_size = get_display_size(current_idx)
+        current_size = desktop_size if desktop_size is not None else get_display_size(current_idx)
         spec = DisplayModeSpec(
             mode=normalized,
             size=current_size,
