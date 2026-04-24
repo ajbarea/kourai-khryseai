@@ -10,7 +10,9 @@
 
 **Location:** Student Innovation Hall 1600 Atrium, RIT — Rochester, NY
 
-**Download:** [narrative-interfaces-poster.pdf](narrative-interfaces-poster.pdf) (36 × 24 in, print quality)
+**Downloads:**
+
+- [narrative-interfaces-poster.pdf](narrative-interfaces-poster.pdf) — conference poster (36 × 24 in, print quality)
 
 <img src="narrative-interfaces-poster.jpg" class="research-poster" alt="Narrative Interfaces poster — Kourai Khryseai">
 

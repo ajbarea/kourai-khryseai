@@ -1,4 +1,4 @@
-# North-East AI Agents Day 2026
+# NE Agents Day 2026 — Kourai Khryseai
 
 **Title:** Kourai Khryseai: Transparent Human-on-the-Loop Multi-Agent Software Development
 
@@ -6,11 +6,18 @@
 
 **Advisor:** Dr. Leon Reznik
 
-**Venue:** North-East AI Agents Day 2026 — Jane Street, New York City
+**Venue:** North-East AI Agents Day 2026
 
-**Date:** May 8, 2026
+**Date:** Friday, May 8, 2026
 
-**Artifact:** [kourai-khryseai-extended-abstract.pdf](kourai-khryseai-extended-abstract.pdf) (accepted extended abstract)
+**Location:** Jane Street, New York, NY
+
+**Downloads:**
+
+- [kourai-khryseai-poster.pdf](kourai-khryseai-poster.pdf) — conference poster (48 × 36 in, print quality)
+- [kourai-khryseai-extended-abstract.pdf](kourai-khryseai-extended-abstract.pdf) — accepted extended abstract
+
+<img src="kourai-khryseai-poster.jpg" class="research-poster" alt="Kourai Khryseai conference poster — Transparent Human-on-the-Loop Multi-Agent Software Development, showing the orchestrated specialist pipeline, routing by intent, one-backend-three-hosts screenshots, artifact evaluation, and end-to-end tracing">
 
 ## Abstract
 
