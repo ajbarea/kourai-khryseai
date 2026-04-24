@@ -13,9 +13,9 @@ from kourai_common.player import PlayerProfile, set_active_profile
 
 logger = logging.getLogger(__name__)
 
-# Reuse CLI color palette
-_GOLD = "\033[38;2;218;165;32m"
-_GOLD_BRIGHT = "\033[38;2;255;215;0m"
+# Reuse CLI color palette (keep in sync with hosts/cli/styling.py)
+_GOLD = "\033[38;2;201;148;74m"
+_GOLD_BRIGHT = "\033[38;2;241;210;161m"
 _CYAN = "\033[1;36m"
 _DIM = "\033[2m"
 _BOLD = "\033[1m"

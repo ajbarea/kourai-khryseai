@@ -27,14 +27,17 @@ SCROLL_CHROME_H = 60  # vertical chrome eaten by banner + padding in scroll math
 # Color palette — deep black + molten gold (defaults)
 # ---------------------------------------------------------------------------
 BLACK = (5, 5, 5)
-GOLD_GLOW = (255, 200, 60)
+GOLD_GLOW = (241, 210, 161)  # #F1D2A1 — champagne highlight for embers/glow
 
 # Default values — kept as constants for non-themed contexts (loading screen, etc.)
+# Warm amber palette matches docs/stylesheets/variables.css tiers
+# (gold-light #F1D2A1, gold-mid #C9944A, gold-dark #AA771C) so GUI, CLI,
+# docs site, and poster share one canonical gold.
 _DEFAULT_DARK_BG = (12, 10, 8)
 _DEFAULT_PANEL_BG = (18, 14, 10)
-_DEFAULT_GOLD = (218, 165, 32)
-_DEFAULT_GOLD_BRIGHT = (255, 215, 0)
-_DEFAULT_GOLD_DIM = (140, 105, 20)
+_DEFAULT_GOLD = (201, 148, 74)  # #C9944A — warm amber (gold-mid)
+_DEFAULT_GOLD_BRIGHT = (241, 210, 161)  # #F1D2A1 — champagne (gold-light)
+_DEFAULT_GOLD_DIM = (170, 119, 28)  # #AA771C — bronze (gold-dark)
 _DEFAULT_WHITE = (240, 235, 225)
 _DEFAULT_DIM_WHITE = (160, 155, 145)
 _DEFAULT_INPUT_BG = (20, 16, 12)
@@ -113,21 +116,101 @@ def _create_font(names: list[str], size: int) -> pygame.freetype.Font:
     return pygame.freetype.SysFont("serif", size)
 
 
+# ---------------------------------------------------------------------------
+# Font scale — VSCode-style content zoom.
+# ---------------------------------------------------------------------------
+# FontProxy reads this multiplier when it creates its underlying
+# pygame.freetype.Font, so every text-rendering path gets the font
+# rasterised *at the target size* (not a post-scaled bitmap).  That's the
+# difference between crisp zoomed text and the blurry-smoothscale trap.
+#
+# Update via ``set_font_scale(x)`` in this module — that invalidates every
+# proxy so the next render rebuilds at the new size.  FontScaler lives in
+# hosts/gui/font_scaler.py for persistence / clamping; this is the
+# render-time reflection of its value.
+
+_font_scale: float = 1.0
+_font_proxy_registry: list[FontProxy] = []  # type: ignore[name-defined]  # defined below
+
+# Components that cache rendered-text *surfaces* (DialogueHistory,
+# message_history_integration, etc.) must be told when fonts change so they
+# can bust their own caches — invalidating the underlying FontProxy isn't
+# enough if a pre-rendered pygame.Surface still holds the old glyphs.
+_font_scale_listeners: list[object] = []  # callables: () -> None
+
+
+def get_font_scale() -> float:
+    """Return the current font scale multiplier (1.0 = default)."""
+    return _font_scale
+
+
+def on_font_scale_change(callback: object) -> None:
+    """Register a callback (no args) to run after the font scale changes.
+
+    Intended for dialogue-history / message-history widgets that cache
+    rendered text to a pygame.Surface and need to mark themselves dirty.
+    """
+    _font_scale_listeners.append(callback)
+
+
+def set_font_scale(scale: float) -> None:
+    """Set the font scale, invalidate every FontProxy, notify listeners.
+
+    Call after FontScaler.set_scale() in the event handler so the next
+    frame rebuilds every cached pygame.freetype.Font at the new size AND
+    every cached text surface is recomputed.
+    """
+    global _font_scale
+    if abs(scale - _font_scale) < 0.001:
+        return
+    _font_scale = scale
+    for proxy in _font_proxy_registry:
+        proxy.invalidate()
+    for cb in _font_scale_listeners:
+        try:
+            cb()  # type: ignore[operator]
+        except Exception:
+            # Deliberately broad — a broken listener must not prevent other
+            # caches from being busted.
+            import logging as _logging
+
+            _logging.getLogger(__name__).exception("font-scale listener failed")
+
+
+def _scaled_size(base: int) -> int:
+    """Apply the global font scale to a base point size, min 6."""
+    return max(6, round(base * _font_scale))
+
+
 class FontProxy:
-    """Lazily recreate fonts after pygame.freetype quit/reinit cycles."""
+    """Lazily recreate fonts after pygame.freetype quit/reinit cycles
+    or whenever the global font scale changes."""
 
     def __init__(self, names: list[str], size: int) -> None:
         self._names = names
-        self._size = size
+        self._size = size  # base (unscaled) point size
+        self._rendered_size = 0  # scale actually baked into _font
         self._font: pygame.freetype.Font | None = None
+        _font_proxy_registry.append(self)
+
+    def invalidate(self) -> None:
+        """Drop the cached font so the next access rebuilds at current scale."""
+        self._font = None
+
+    def _current_size(self) -> int:
+        return _scaled_size(self._size)
 
     def _get_font(self) -> pygame.freetype.Font:
-        if self._font is None:
-            self._font = _create_font(self._names, self._size)
+        target = self._current_size()
+        if self._font is None or self._rendered_size != target:
+            self._font = _create_font(self._names, target)
+            self._rendered_size = target
         return self._font
 
     def _recreate_font(self) -> pygame.freetype.Font:
-        self._font = _create_font(self._names, self._size)
+        target = self._current_size()
+        self._font = _create_font(self._names, target)
+        self._rendered_size = target
         return self._font
 
     def _call(self, method_name: str, *args: object, **kwargs: object) -> object:

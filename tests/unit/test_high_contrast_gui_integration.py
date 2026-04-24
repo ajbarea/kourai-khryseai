@@ -117,7 +117,10 @@ class TestHighContrastGUIIntegration:
         integration = HighContrastGUIIntegration(mock_gui, mock_settings)
         color = integration.get_color("gold")
 
-        assert color == (218, 165, 32)
+        # Canonical project gold (#C9944A) — matches the docs palette and the
+        # GUI / poster / CLI palette. High contrast mode overrides this to a
+        # brighter gold for WCAG compliance (see test_get_color_high_contrast).
+        assert color == (201, 148, 74)
 
     def test_get_color_high_contrast(self):
         """Test getting specific color in high contrast mode."""

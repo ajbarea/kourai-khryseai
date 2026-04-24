@@ -46,7 +46,7 @@ class TabButton:
 
     def draw(self, surf: pygame.Surface, font: pygame.freetype.Font, palette: dict) -> None:
         if self.active:
-            bg_color = palette.get("gold", (218, 165, 32))
+            bg_color = palette.get("gold", (201, 148, 74))
             text_color = palette.get("bubble_bg", (30, 22, 10))
         elif self.hovered:
             bg_color = (70, 65, 60)
@@ -100,7 +100,7 @@ class VolumeSlider:
         return max(0.0, min(1.0, rel / max(usable, 1)))
 
     def draw(self, surf: pygame.Surface, palette: dict) -> None:
-        gold = palette.get("gold", (218, 165, 32))
+        gold = palette.get("gold", (201, 148, 74))
         track_y = self.rect.centery
         # Track background
         pygame.draw.line(
@@ -166,7 +166,7 @@ class ToggleSwitch:
         self.anim_t += (target - self.anim_t) * min(dt * 15, 1.0)
 
     def draw(self, surf: pygame.Surface, palette: dict):
-        bg_color = palette.get("gold", (218, 165, 32)) if self.state else (50, 45, 40)
+        bg_color = palette.get("gold", (201, 148, 74)) if self.state else (50, 45, 40)
         pygame.draw.rect(surf, bg_color, self.rect, border_radius=self.rect.height // 2)
 
         # Knob
@@ -202,9 +202,9 @@ class Button:
 
     def draw(self, surf: pygame.Surface, font: pygame.freetype.Font, palette: dict) -> None:
         # Button background
-        bg_color = palette.get("gold", (218, 165, 32)) if self.hovered else (50, 45, 40)
+        bg_color = palette.get("gold", (201, 148, 74)) if self.hovered else (50, 45, 40)
         pygame.draw.rect(surf, bg_color, self.rect, border_radius=6)
-        pygame.draw.rect(surf, palette.get("gold", (218, 165, 32)), self.rect, 1, border_radius=6)
+        pygame.draw.rect(surf, palette.get("gold", (201, 148, 74)), self.rect, 1, border_radius=6)
 
         # Button text
         text_color = palette.get("text", (255, 255, 255))
@@ -256,7 +256,7 @@ class CycleButton:
 
     def draw(self, surf: pygame.Surface, font: pygame.freetype.Font, palette: dict) -> None:
         # Background
-        bg_color = palette.get("gold", (218, 165, 32)) if self.hovered else (50, 45, 40)
+        bg_color = palette.get("gold", (201, 148, 74)) if self.hovered else (50, 45, 40)
         pygame.draw.rect(surf, bg_color, self.rect, border_radius=6)
 
         # Text
