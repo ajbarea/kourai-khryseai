@@ -85,8 +85,8 @@ def _render_image_ansi(
     if pixels is None:
         return None
 
-    # Gold color for tinting (218, 165, 32)
-    gold_r, gold_g, gold_b = 218, 165, 32
+    # Warm amber gold for tinting — matches docs gold-mid (#C9944A)
+    gold_r, gold_g, gold_b = 201, 148, 74
 
     def _tint(r: int, g: int, b: int) -> tuple[int, int, int]:
         """Apply a subtle gold tint to make everything look like golden automata."""
@@ -272,16 +272,21 @@ def _banner() -> str:
     term_w, _ = shutil.get_terminal_size((80, 24))
 
     title_text = "Kourai Khryseai \u2014 Golden Maidens"
-    # min 44 to fit title, max 80 for reasonable banner size
+    # ``banner_w`` is the *interior* width \u2014 the space between the two \u2502 bars.
+    # Top/bottom bars and the title row must all render to exactly banner_w
+    # columns so the rounded box is a clean rectangle.
+    #   min 44 to fit title, max 80 for reasonable banner size.
     banner_w = max(44, min(80, term_w - 8))
 
     top_bar = "\u2500" * banner_w
 
-    # Center the title
-    title_padding = (banner_w - len(title_text)) // 2
-    title_row = (
-        f" {' ' * title_padding}{title_text}{' ' * (banner_w - len(title_text) - title_padding)} "
-    )
+    # Centre the title inside banner_w columns \u2014 no extra wrapper spaces.
+    # (The old formula wrapped title_row in ` ... ` which made it banner_w + 2
+    # columns wide, so the right bar always drifted 2 columns past the corner.)
+    title_len = len(title_text)
+    left_pad = max(0, (banner_w - title_len) // 2)
+    right_pad = max(0, banner_w - title_len - left_pad)
+    title_row = f"{' ' * left_pad}{title_text}{' ' * right_pad}"
 
     return (
         f"{_GOLD_BOLD}\u256d{top_bar}\u256e{_RESET}\n"

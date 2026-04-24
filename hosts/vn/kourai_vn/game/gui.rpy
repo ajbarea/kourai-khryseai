@@ -68,7 +68,10 @@ define gui.name_text_font = "DejaVuSans.ttf"
 define gui.interface_text_font = "DejaVuSans.ttf"
 
 ## The size of normal dialogue text.
-define gui.text_size = 33
+## Dialogue + interface text size. 28 is readable at 1920×1080 while
+## leaving room for ~4 lines in a 260-px-tall textbox — important for
+## longer technical clarifying questions from Metis / Techne.
+define gui.text_size = 28
 
 ## The size of character names.
 define gui.name_text_size = 45
@@ -99,18 +102,28 @@ define gui.game_menu_background = "gui/game_menu.png"
 ## time.
 
 ## The height of the textbox containing dialogue.
-## Taller than default to accommodate epithet subtitle below character name.
-define gui.textbox_height = 310
+## 240 fits ~5 lines of dialogue at 28pt inside a 1100px-wide textbox —
+## enough for the longest clarifying asks (CSV-streaming question in the
+## poster demo) without eating portrait real estate.
+define gui.textbox_height = 240
 
 ## The placement of the textbox vertically on the screen. 0.0 is the top, 0.5 is
 ## center, and 1.0 is the bottom.
 define gui.textbox_yalign = 1.0
 
+## Width + horizontal alignment of the textbox. Hades-style: narrow enough
+## that the bottom-left / bottom-right portraits flank it with visible
+## torsos, wide enough for 3-5 lines of wrapped prose. 1100 matches the
+## ~55-60%-of-screen width Supergiant uses for their dialogue plaques at
+## 1920×1080.
+define gui.textbox_width = 1100
+define gui.textbox_xalign = 0.5
+
 
 ## The placement of the speaking character's name, relative to the textbox.
 ## These can be a whole number of pixels from the left or top, or 0.5 to center.
-## Offset past the 760px portrait sprite so name plate never clips behind it.
-define gui.name_xpos = 730
+## Now window-relative (was screen-absolute 730 when textbox was full-width).
+define gui.name_xpos = 40
 define gui.name_ypos = 8
 
 ## The horizontal alignment of the character's name. This can be 0.0 for left-
@@ -133,15 +146,16 @@ define gui.namebox_tile = False
 
 ## The placement of dialogue relative to the textbox. These can be a whole
 ## number of pixels relative to the left or top side of the textbox, or 0.5 to
-## center.
-## Matches name_xpos so dialogue text aligns with the name plate.
-define gui.dialogue_xpos = 730
-## Below name + epithet subtitle (name ~54px + epithet ~26px + padding).
-define gui.dialogue_ypos = 110
+## center. Small left padding inside the centered textbox.
+define gui.dialogue_xpos = 40
+## Hades style lifts the name plaque *outside* the textbox (floating above),
+## so dialogue can start near the top of the textbox rather than needing to
+## leave vertical room inside for the nested namebox.
+define gui.dialogue_ypos = 30
 
-## The maximum width of dialogue text, in pixels.
-## Fills the space right of the 760px portrait (1920 - 780 - 80 margin ≈ 1060).
-define gui.dialogue_width = 1060
+## The maximum width of dialogue text, in pixels. Fits inside the 1100px
+## textbox with ~40px padding each side (1100 - 80 = 1020).
+define gui.dialogue_width = 1020
 
 ## The horizontal alignment of the dialogue text. This can be 0.0 for left-
 ## aligned, 0.5 for centered, and 1.0 for right-aligned.

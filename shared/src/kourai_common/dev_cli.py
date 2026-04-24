@@ -67,11 +67,29 @@ def _default_project_renpy_exe() -> Path:
 
 
 def resolve_renpy_executable() -> str:
-    """Resolve Ren'Py executable path across local repo/Windows installs."""
+    """Resolve the Ren'Py launcher across Linux/WSL, macOS, and Windows.
+
+    On Linux (including WSL) we prefer ``renpy.sh`` from the same SDK —
+    the Ren'Py 8.x SDK ships ``lib/py3-linux-x86_64/renpy`` alongside the
+    Windows binary, so there's no need to go through Windows interop. On
+    macOS we prefer the equivalent ``renpy.sh``. Native launchers give us
+    normal stdout/stderr capture and no path-translation shenanigans.
+    """
     env_override = os.environ.get("KOURAI_RENPY_EXE")
     candidates: list[Path] = []
     if env_override:
         candidates.append(Path(env_override))
+
+    # Native-for-this-platform launchers first. renpy.sh works on both
+    # Linux and macOS; .exe is the Windows path.
+    if sys.platform != "win32":
+        candidates.extend(
+            [
+                PROJECT_ROOT / "hosts" / "vn" / "renpy-8.5.2-sdk" / "renpy.sh",
+                Path("/mnt/c/Tools/renpy-8.5.2-sdk/renpy.sh"),
+                Path.home() / "renpy-8.5.2-sdk" / "renpy.sh",
+            ]
+        )
 
     candidates.extend(
         [
@@ -86,6 +104,46 @@ def resolve_renpy_executable() -> str:
             return str(exe)
 
     return str(_default_project_renpy_exe())
+
+
+def _adapt_path_for_renpy(renpy_exe: str, path: str) -> str:
+    """Translate a Linux path to a Windows path when handing it to renpy.exe.
+
+    When ``make vn`` runs from WSL the resolver finds a Windows-native
+    ``renpy.exe`` (the SDK is only installed on the Windows side for most
+    devs). WSL can invoke ``.exe`` binaries, but the argv we pass through is
+    Linux-rooted (``/home/<user>/ajsoftworks/...``), which Windows Ren'Py
+    can't open — it exits ~1s later with status 5 ("project not found").
+
+    ``wslpath -w`` converts the Linux path to the equivalent Windows UNC
+    path (``\\\\wsl.localhost\\Ubuntu\\home\\<user>\\...``), which Ren'Py
+    can load. We only do this conversion when (a) we're on Linux and (b)
+    the resolved Ren'Py executable ends in ``.exe`` — native Linux/macOS
+    SDKs don't need any translation.
+    """
+    if sys.platform != "linux" or not renpy_exe.lower().endswith(".exe"):
+        return path
+    wslpath_exe = shutil.which("wslpath")
+    if wslpath_exe is None:
+        return path
+    try:
+        result = subprocess.run(
+            [wslpath_exe, "-w", path],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        return result.stdout.strip() or path
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        return path
+
+
+def _build_vn_command() -> list[str]:
+    """Build the argv for launching the Ren'Py VN, adapting paths for WSL."""
+    exe = resolve_renpy_executable()
+    project = str(PROJECT_ROOT / "hosts" / "vn" / "kourai_vn")
+    return [exe, _adapt_path_for_renpy(exe, project)]
 
 
 def configure_stdio() -> None:
@@ -291,10 +349,7 @@ TASK_GROUPS: tuple[tuple[str, tuple[tuple[str, Task], ...]], ...] = (
                 "vn",
                 Task(
                     description="Launch Ren'Py Visual Novel GUI (runs on host machine)",
-                    command_factory=lambda: [
-                        resolve_renpy_executable(),
-                        str(PROJECT_ROOT / "hosts" / "vn" / "kourai_vn"),
-                    ],
+                    command_factory=_build_vn_command,
                     tee=False,
                 ),
             ),

@@ -34,6 +34,7 @@ from hosts.cli.commands import (
     _show_settings,
 )
 from hosts.cli.completer import SlashCommandCompleter
+from hosts.cli.demo import run_demo
 from hosts.cli.headless import _headless
 from hosts.cli.maidens import _MAIDEN_FACES, _MAIDENS
 from hosts.cli.rendering import _banner, _echo, _maiden_card, _maiden_gallery, set_raw_out
@@ -275,11 +276,31 @@ def _show_metrics_dashboard() -> None:
     default=None,  # None means use saved setting
     help="Enable text-to-speech for agent dialogue (overrides saved setting)",
 )
+@click.option(
+    "--demo",
+    "demo_mode",
+    is_flag=True,
+    default=False,
+    help="Play a scripted Hephaestus→Metis pause scene without touching the network "
+    "(for poster screenshots and recordings).",
+)
 async def main(
-    agent: str | None, timeout_seconds: int, verbose: bool, prompt: str | None, voice: bool | None
+    agent: str | None,
+    timeout_seconds: int,
+    verbose: bool,
+    prompt: str | None,
+    voice: bool | None,
+    demo_mode: bool,
 ) -> None:
     """Interactive CLI for Kourai Khryseai agent swarm."""
     setup_logging("cli", level="DEBUG" if verbose else "INFO")
+
+    # Demo mode — scripted pipeline, no network, no LLM. Exits after the
+    # user responds to the Metis clarification prompt (or Ctrl-C).
+    if demo_mode:
+        await run_demo(prompt)
+        return
+
     if not agent:
         agent = get_agent_url("hephaestus")
 

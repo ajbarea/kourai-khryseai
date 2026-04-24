@@ -28,6 +28,8 @@ screen navigation():
 
             textbutton _("Portrait Debug") action Start("portrait_debug")
 
+            textbutton _("Poster Demo") action Start("poster_demo")
+
         else:
 
             textbutton _("History") action ShowMenu("history")

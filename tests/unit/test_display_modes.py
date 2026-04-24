@@ -49,7 +49,11 @@ def test_build_display_mode_spec_fullscreen_uses_desktop_size() -> None:
 
     assert spec.mode == DISPLAY_MODE_FULLSCREEN
     assert spec.size == (1920, 1080)
-    assert spec.flags == pygame.NOFRAME
+    # FULLSCREEN | SCALED is SDL2's recommended fullscreen path — see the
+    # comment in build_display_mode_spec for rationale (NOFRAME was just a
+    # borderless window; SCALED | FULLSCREEN is true fullscreen with SDL's
+    # scaling pipeline).
+    assert spec.flags == pygame.FULLSCREEN | pygame.SCALED
     assert spec.position == (0, 0)
 
 

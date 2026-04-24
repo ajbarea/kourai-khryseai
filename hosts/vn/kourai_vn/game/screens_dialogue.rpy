@@ -100,41 +100,84 @@ style frame:
 
 screen say(who, what):
 
-    ## Gold accent line at the top edge of the dialogue box (Hades 1 warm-gold frame).
-    add Solid("#C8B88A50", xysize=(1920, 2)):
-        xalign 0.5
-        yalign 1.0
-        yoffset -(gui.textbox_height)
+    ## Resolve the speaker's accent color + epithet for the name plaque.
+    ## Non-agent speakers ("System", "Player") fall back to warm gold +
+    ## empty epithet so the plaque still renders in a sensible default.
+    $ _accent = AGENT_ACCENT_BY_NAME.get(who, "#C9944A") if who else "#C9944A"
+    $ _epithet = AGENT_EPITHETS.get(who, "") if who else ""
 
-    ## Subtle gold line at the bottom edge — frames the dialogue box.
-    add Solid("#C8B88A25", xysize=(1920, 1)):
-        xalign 0.5
-        yalign 1.0
+    ## Hades-style name plaque — floats just above the dialogue window,
+    ## centered over it, with a top hairline in the speaker's accent color
+    ## and a warm-gold bottom hairline. NAME in gold caps, EPITHET in
+    ## accent-color italic small-caps beneath — same plaque shape whether
+    ## Hephaestus (amber), Metis (indigo), Kallos (magenta) is talking.
+    if who is not None:
+        frame:
+            xalign gui.textbox_xalign
+            yalign 1.0
+            yoffset -(gui.textbox_height + 22)
+            xsize 440
+            ysize 92
+            background Solid("#14100AEE")
+            padding (0, 0, 0, 0)
+
+            ## Accent-color hairline along the top — speaker-tinted.
+            add Solid(_accent, xysize=(440, 2)):
+                yalign 0.0
+            ## Warm-gold hairline along the bottom — frame anchor.
+            add Solid("#C9944A", xysize=(440, 1)):
+                yalign 1.0
+
+            ## Decorative corner notches — small bright-gold studs inset
+            ## from each corner of the plaque. Sells a "crafted frame"
+            ## feel without adding real rendering cost. Hades-style.
+            add Solid("#F1D2A1", xysize=(4, 4)):
+                xalign 0.0
+                yalign 0.0
+                xoffset 5
+                yoffset 5
+            add Solid("#F1D2A1", xysize=(4, 4)):
+                xalign 1.0
+                yalign 0.0
+                xoffset -5
+                yoffset 5
+            add Solid("#F1D2A1", xysize=(4, 4)):
+                xalign 0.0
+                yalign 1.0
+                xoffset 5
+                yoffset -5
+            add Solid("#F1D2A1", xysize=(4, 4)):
+                xalign 1.0
+                yalign 1.0
+                xoffset -5
+                yoffset -5
+
+            vbox:
+                xalign 0.5
+                yalign 0.5
+                spacing 1
+
+                text who.upper():
+                    size 40
+                    color "#F1D2A1"
+                    bold True
+                    xalign 0.5
+                    id "who"
+
+                if _epithet:
+                    ## Warm-cream epithet for consistent readability across
+                    ## every agent — the accent color already rides the top
+                    ## hairline as a solid shape, where it has room to breathe.
+                    ## Tiny tracking bumps the small-caps' air-letter spacing.
+                    text _epithet.upper():
+                        size 18
+                        color "#C8B88A"
+                        italic True
+                        xalign 0.5
+                        kerning 2
 
     window:
         id "window"
-
-        if who is not None:
-
-            window:
-                id "namebox"
-                style "namebox"
-
-                ## Gold left accent bar (Hades-style name plate indicator)
-                add Solid("#C8B88A", xysize=(3, 200)):
-                    xpos -18
-                    ypos -8
-
-                vbox:
-                    spacing 2
-                    text who id "who"
-
-                    ## Hades-style epithet subtitle (e.g. "Artisan of Code")
-                    if who in AGENT_EPITHETS:
-                        text AGENT_EPITHETS[who]:
-                            size 22
-                            color "#C8B88A"
-                            italic True
 
         text what id "what"
 
@@ -145,41 +188,49 @@ screen say(who, what):
         add SideImage() xalign 0.0 yalign 1.0
 
 
-## Make the namebox available for styling through the Character object.
-init python:
-    config.character_id_prefixes.append('namebox')
+## Click-to-continue marker — a small pulsing warm-gold triangle that
+## appears at the bottom-right of the textbox once dialogue is ready
+## for the player to click through. The `ctc` screen is a Ren'Py 8.x
+## special screen: it renders whenever the engine wants to display the
+## "ready for next line" affordance, and we override it here to show
+## our own styled indicator. (In Ren'Py 6 this was `config.ctc`, but
+## that variable was removed — the screen override is the modern API.)
+image kourai_ctc:
+    Text("▾", size=26, color="#E8C87A")
+    pause 0.6
+    alpha 0.35
+    pause 0.4
+    alpha 1.0
+    repeat
+
+screen ctc(arg=None):
+    zorder 100
+    add "kourai_ctc":
+        ## Right-inside of the 1100px centered textbox on a 1920 stage:
+        ## (1920/2 + 1100/2 - 30px padding) / 1920 ≈ 0.77.
+        xalign 0.77
+        yalign 1.0
+        yoffset -28
 
 style window is default
 style say_label is default
 style say_dialogue is default
 style say_thought is say_dialogue
 
-style namebox is default
-style namebox_label is say_label
-
 
 style window:
-    xalign 0.5
-    xfill True
+    xalign gui.textbox_xalign
+    xsize gui.textbox_width
     yalign gui.textbox_yalign
     ysize gui.textbox_height
 
     ## Deep warm charcoal with a faint amber undertone — forge at night.
-    ## The gold border PNG (textbox.png) will replace this in the portrait pass.
-    background "#1A1610EE"
-    padding (50, 24, 50, 24)
-
-style namebox:
-    xpos gui.name_xpos
-    xanchor gui.name_xalign
-    xsize gui.namebox_width
-    ypos gui.name_ypos
-    ysize gui.namebox_height
-
-    ## Dark amber forge tab — reads as a distinct "speaker plate" against the window.
-    ## A gold-bordered namebox.png will replace this in the portrait pass.
-    background "#2A1800F2"
-    padding (20, 8, 20, 8)
+    ## Lower opacity (B0 = ~69%) so the portraits' silhouettes breathe
+    ## through the textbox instead of being sharply cut off. Makes the
+    ## panel feel like a UI layer on top of the scene rather than a chunk
+    ## of screen that vanishes the characters from the waist down.
+    background "#1A1610B0"
+    padding (50, 20, 50, 20)
 
 style say_label:
     properties gui.text_properties("name", accent=True)
@@ -193,6 +244,11 @@ style say_dialogue:
     xpos gui.dialogue_xpos
     xsize gui.dialogue_width
     ypos gui.dialogue_ypos
+
+    ## Thin dark outline so dialogue stays legible when the textbox is
+    ## partly transparent and a portrait's silhouette is visible behind
+    ## the text. Cheap, subtle, huge readability win.
+    outlines [ (1, "#00000099", 0, 0) ]
 
     adjust_spacing False
 
@@ -321,17 +377,34 @@ style choice_button is button
 style choice_button_text is button_text
 
 style choice_vbox:
+    ## Position the choice menu just above the floating name plaque so the
+    ## stack reads top-to-bottom as: choices → plaque (who's asking) →
+    ## dialogue (what they asked). textbox_height + 22px gap + 92px plaque
+    ## + 24px margin lifts the buttons clear of the plaque.
     xalign 0.5
-    ypos 405
-    yanchor 0.5
+    yalign 1.0
+    yoffset -(gui.textbox_height + 22 + 92 + 24)
 
-    spacing gui.choice_spacing
+    spacing 8
 
 style choice_button is default:
     properties gui.button_properties("choice_button")
+    ## Framed pill button — dark warm fill + dim-gold border so choices
+    ## read as clickable affordances instead of free-floating text that
+    ## blends into the scene / overlaps whoever's standing behind them.
+    background Frame("#1A1610E8", 12, 6)
+    hover_background Frame("#3A2A14F0", 12, 6)
+    padding (28, 10, 28, 10)
+    xminimum 420
+    xmaximum 720
+    xalign 0.5
 
 style choice_button_text is default:
     properties gui.text_properties("choice_button")
+    color "#C8B88A"
+    hover_color "#F1D2A1"
+    size 28
+    xalign 0.5
 
 
 ## Agent Portrait screen ########################################################
@@ -343,20 +416,77 @@ style choice_button_text is default:
 ## Call: renpy.show_screen("agent_portrait", agent_id="techne", state="neutral")
 ## Hide: renpy.hide_screen("agent_portrait")
 
-## Smooth entrance — fade in + slight slide from left (Hades-style reveal).
+## Multi-slot portrait system — left / center / right slots can all be
+## active at the same time so agent handoffs (Hephaestus → Metis, etc.)
+## stay visible on screen instead of replacing each other. The current
+## speaker is brightened while others dim, giving a visual read on who
+## holds the floor without relying solely on the text box.
+##
+## Callers:
+##   - Preferred:  kourai_show_agent(agent_id, slot, state)
+##                 kourai_hide_agent(slot)
+##                 kourai_set_speaker(agent_id)
+##   - Direct:     renpy.show_screen("agent_portrait",
+##                                    agent_id=..., state=..., slot="left",
+##                                    tag="portrait_left")
+##
+## The `slot` argument defaults to "center" so legacy one-agent callers
+## (``renpy.show_screen("agent_portrait", agent_id=..., state=...)``) keep
+## working unchanged — they still get a single bottom-left portrait.
+
+default current_speaker_id = None
+
+## Entrance animations — side slots slide in from the matching edge so the
+## motion reads as "they walked in from that side," while center keeps the
+## original Hades-style left-slide reveal for single-agent scenes.
 transform portrait_enter:
     alpha 0.0 xoffset -40
     ease 0.35 alpha 1.0 xoffset 0
 
-screen agent_portrait(agent_id="hephaestus", state="neutral"):
+transform portrait_enter_left:
+    alpha 0.0 xoffset -40
+    ease 0.35 alpha 1.0 xoffset 0
+
+transform portrait_enter_right:
+    alpha 0.0 xoffset 40
+    ease 0.35 alpha 1.0 xoffset 0
+
+## Speaker highlighting — the active speaker runs at full opacity, everyone
+## else fades to ~70% so the viewer's eye tracks who's talking without
+## making the non-speaker feel like a ghost. The plaque's accent-color
+## hairline is the second speaker cue; together they carry the signal
+## without needing a third (a backlight glow was tried and ripped — the
+## painted forge lighting swallowed it at readable alphas, and louder
+## alphas fought the scene).
+transform portrait_active:
+    ease 0.25 alpha 1.0
+
+transform portrait_inactive:
+    ease 0.25 alpha 0.7
+
+screen agent_portrait(agent_id="hephaestus", state="neutral", slot="center"):
     ## Below the say screen (zorder 0) so the textbox covers the character's
     ## lower body — same layering as Hades dialogue.
     zorder -1
 
-    ## 760×760 @ 1920×1080 ≈ 40% width × 70% height — Hades-scale presence.
-    ## Character rises above the textbox; lower portion hidden behind dialogue.
-    add _portrait_image(agent_id, state) at portrait_enter:
-        xalign 0.0
+    ## All slots render at the original 760² size — matches the presence
+    ## of the single-portrait scenes and is well within 1920×1080 (760+760
+    ## = 1520, leaving 400px of breathing room in the middle). Position is
+    ## the only thing that changes between slots.
+    $ _size = (760, 760)
+    $ _xalign = 1.0 if slot == "right" else 0.0
+    $ _enter_t = {
+        "left": portrait_enter_left,
+        "right": portrait_enter_right,
+        "center": portrait_enter,
+    }[slot]
+    $ _speaker_t = portrait_active if (
+        current_speaker_id is None or current_speaker_id == agent_id
+    ) else portrait_inactive
+
+    add _portrait_image(agent_id, state):
+        xalign _xalign
         yalign 1.0
         yoffset 160
-        size (760, 760)
+        size _size
+        at _enter_t, _speaker_t

@@ -22,8 +22,8 @@ if TYPE_CHECKING:
 # Layout constants (from __main__.py)
 DIALOGUE_W = 960
 DIALOGUE_H = 640
-GOLD = (218, 165, 32)
-GOLD_DIM = (140, 105, 20)
+GOLD = (201, 148, 74)
+GOLD_DIM = (170, 119, 28)
 WHITE = (240, 235, 225)
 DIM_WHITE = (160, 155, 145)
 SCROLLBAR = (50, 40, 25)
@@ -53,6 +53,16 @@ class DialogueHistoryWithAutoScroll:
 
         # Auto-scroll manager
         self._auto_scroll = AutoScrollManager()
+
+        # Zoom-aware cache bust — FontProxy invalidation alone doesn't
+        # touch `self._surf`, so without this hook a scale change leaves
+        # pre-zoom glyphs baked into the transcript surface.
+        from . import constants as _constants
+
+        _constants.on_font_scale_change(self._mark_dirty_from_font_scale)
+
+    def _mark_dirty_from_font_scale(self) -> None:
+        self._dirty = True
 
     def add(self, entry: DialogueEntry) -> None:
         """Add entry and auto-scroll if enabled."""

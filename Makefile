@@ -73,11 +73,20 @@ status:                    ## Show current service status and health
 gui:                       ## Launch Pygame GUI (runs on host machine)
 	@$(UV_DEV) gui
 
+gui-demo:                  ## Launch GUI in scripted demo mode (no network, no LLM — for poster screenshots)
+	@uv run --no-active --package kourai-common python -m hosts.gui --demo
+
 cli:                       ## Launch terminal CLI client (runs on host machine)
 	@$(UV_DEV) cli
 
+cli-demo:                  ## Launch CLI in scripted demo mode (no network, no LLM — for poster screenshots)
+	@uv run --no-active --package kourai-common python -m hosts.cli --demo
+
 vn:                        ## Launch Ren'Py Visual Novel GUI (runs on host machine)
 	@$(UV_DEV) vn
+
+vn-demo:                   ## Launch VN in scripted demo mode (no bridge, no Docker — for poster screenshots)
+	@KOURAI_POSTER_DEMO=1 $(UV_DEV) vn
 
 # ---------------------------------------------------------------------------
 # Documentation

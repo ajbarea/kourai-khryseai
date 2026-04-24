@@ -54,7 +54,7 @@ class InputBar:
                 self.text = action["text"]
                 return None
 
-        if event.key == pygame.K_RETURN and not event.mod & pygame.KMOD_SHIFT:
+        if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER) and not event.mod & pygame.KMOD_SHIFT:
             if self.text.strip() and not self.processing:
                 submitted = self.text.strip()
                 self.shortcuts.add_message(submitted)
@@ -125,8 +125,17 @@ class InputBar:
             if self._cursor_on:
                 pygame.draw.line(surf, GOLD_DIM, (text_x, text_y), (text_x, text_y + 18), 2)
 
-        # Send hint
+        # Send hint — right-aligned via measured width so it stays on-screen
+        # when FONT_TITLE scales up at higher zoom levels.
         hint = "[Enter] to send" if not (self.processing and not self.waiting_for_agent) else ""
-        FONT_TITLE.render_to(
-            surf, (screen_w - 100, screen_h - INPUT_H + (INPUT_H - 12) // 2), hint, GOLD_DIM
-        )
+        if hint:
+            hint_rect = FONT_TITLE.get_rect(hint)
+            FONT_TITLE.render_to(
+                surf,
+                (
+                    screen_w - hint_rect.width - 16,
+                    screen_h - INPUT_H + (INPUT_H - hint_rect.height) // 2,
+                ),
+                hint,
+                GOLD_DIM,
+            )

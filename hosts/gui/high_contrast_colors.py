@@ -1,19 +1,19 @@
 """High contrast color palette for WCAG 2.2 Level AA compliance."""
 
-# Standard colors (normal mode)
+# Standard colors (normal mode) — warm amber palette matching docs/poster
 STANDARD_COLORS = {
     "background": (18, 10, 8),
     "text": (255, 255, 255),
-    "gold": (218, 165, 32),
-    "gold_dim": (180, 140, 20),
+    "gold": (201, 148, 74),
+    "gold_dim": (170, 119, 28),
     "error_red": (220, 80, 80),
     "scrollbar": (100, 80, 60),
     "bubble_bg": (30, 22, 10),
-    "bubble_border": (218, 165, 32),
+    "bubble_border": (201, 148, 74),
     "user_bubble_bg": (30, 22, 10),
-    "user_bubble_border": (180, 140, 20),
+    "user_bubble_border": (170, 119, 28),
     "result_bubble_bg": (20, 18, 10),
-    "result_bubble_border": (218, 165, 32),
+    "result_bubble_border": (201, 148, 74),
     "error_bubble_bg": (40, 10, 10),
     "error_bubble_border": (220, 80, 80),
 }

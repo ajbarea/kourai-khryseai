@@ -420,10 +420,10 @@ class SettingsOverlay:
         # Panel
         palette = self.gui.high_contrast.get_color_palette()
         panel_color = (*palette.get("bubble_bg", (30, 22, 10)), int(self.alpha))
-        border_color = (*palette.get("bubble_border", (218, 165, 32)), int(self.alpha))
+        border_color = (*palette.get("bubble_border", (201, 148, 74)), int(self.alpha))
         text_color = (*palette.get("text", (255, 255, 255)), int(self.alpha))
         dim_color = (*palette.get("scrollbar", (160, 155, 145)), int(self.alpha))
-        palette.get("gold", (218, 165, 32))
+        palette.get("gold", (201, 148, 74))
 
         pygame.draw.rect(overlay, panel_color, self.panel_rect, border_radius=12)
         pygame.draw.rect(overlay, border_color, self.panel_rect, 1, border_radius=12)
@@ -476,7 +476,7 @@ class SettingsOverlay:
 
         # Draw controls key map
         if self.active_tab == "controls":
-            gold_color = (*palette.get("gold", (218, 165, 32)), int(self.alpha))
+            gold_color = (*palette.get("gold", (201, 148, 74)), int(self.alpha))
             km_y = self.panel_rect.y + 120
             row_h = 26
             key_col_x = self.panel_rect.x + 40

@@ -153,11 +153,15 @@ class OnboardingOverlay:
 
     def _handle_key(self, event: pygame.event.Event) -> bool:
         if self.step == STEP_PUCK_INTRO:
-            if event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER, pygame.K_SPACE):
                 self.step = STEP_MODE
             return True
 
-        if self.step == STEP_METRICS and event.key in (pygame.K_RETURN, pygame.K_SPACE):
+        if self.step == STEP_METRICS and event.key in (
+            pygame.K_RETURN,
+            pygame.K_KP_ENTER,
+            pygame.K_SPACE,
+        ):
             # Default recommendation:
             # Focused -> OFF, Gamified -> ON.
             self.metrics_tracking_enabled = self.experience_mode == "gamified"
@@ -165,7 +169,7 @@ class OnboardingOverlay:
             return True
 
         if self.step == STEP_NAME:
-            if event.key == pygame.K_RETURN and self.name_text.strip():
+            if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER) and self.name_text.strip():
                 self.tts_text = self.name_text  # Default TTS = display name
                 self.step = STEP_PRONUNCIATION
             elif event.key == pygame.K_BACKSPACE:
@@ -175,7 +179,7 @@ class OnboardingOverlay:
             return True
 
         if self.step == STEP_PRONUNCIATION:
-            if event.key == pygame.K_RETURN:
+            if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
                 self.step = STEP_TITLE
             elif event.key == pygame.K_BACKSPACE:
                 self.tts_text = self.tts_text[:-1]
@@ -184,7 +188,7 @@ class OnboardingOverlay:
             return True
 
         if self.step == STEP_WELCOME:
-            if event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER, pygame.K_SPACE):
                 self._finalize()
             return True
 

@@ -24,12 +24,12 @@ def _lerp_color(a: tuple[int, int, int], b: tuple[int, int, int], t: float) -> t
     )
 
 
-# Default palette (neutral/professional)
+# Default palette (neutral/professional) — warm amber matching docs/poster
 _NEUTRAL = {
     "background": (12, 10, 8),
     "bubble_bg": (18, 14, 10),
-    "gold": (218, 165, 32),
-    "gold_dim": (140, 105, 20),
+    "gold": (201, 148, 74),
+    "gold_dim": (170, 119, 28),
     "text": (240, 235, 225),
     "scrollbar": (160, 155, 145),
     "error_red": (200, 80, 60),

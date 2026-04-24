@@ -69,7 +69,7 @@ def _configure_gui_logging() -> None:
 # ---------------------------------------------------------------------------
 # Main GUI entry point
 # ---------------------------------------------------------------------------
-def main(agent_url: str | None = None) -> None:
+def main(agent_url: str | None = None, demo_mode: bool = False) -> None:
     _configure_gui_logging()
     configure_sdl_audio_driver()
 
@@ -132,6 +132,7 @@ def main(agent_url: str | None = None) -> None:
                 audio_manager,
                 agent_url,
                 _queues,
+                demo_mode=demo_mode,
             )
             logger.debug("Subsystem loader wrapper complete")
             _subsystems_box.append(result)
@@ -393,6 +394,7 @@ def main(agent_url: str | None = None) -> None:
 
         # --- Draw ---
         renderer.render(screen, state, dialogue_rect)
+        pygame.display.flip()
 
     # Cleanup (graceful shutdown on Ctrl+C)
     with contextlib.suppress(Exception):
@@ -412,5 +414,11 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Kourai Khryseai — Pygame GUI")
     parser.add_argument("--agent", default=None, help="Hephaestus agent URL")
+    parser.add_argument(
+        "--demo",
+        action="store_true",
+        help="Play a scripted Hephaestus→Metis pause scene without touching the "
+        "network (for poster screenshots and recordings).",
+    )
     args = parser.parse_args()
-    main(agent_url=args.agent)
+    main(agent_url=args.agent, demo_mode=args.demo)

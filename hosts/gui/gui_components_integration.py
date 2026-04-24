@@ -45,9 +45,13 @@ class GUIComponentsIntegration:
 
     def _load_settings(self) -> None:
         """Load all settings from settings manager."""
-        # Font scaling
+        # Font scaling — also push into constants.FontProxy registry so every
+        # cached font rebuilds at the saved size on next render.
+        from .constants import set_font_scale as _push_font_scale
+
         font_scale = self.settings.get("font_scale", 1.0)
         self.font_scaler.set_scale(font_scale)
+        _push_font_scale(self.font_scaler.scale)
 
         # High contrast
         high_contrast = self.settings.get("high_contrast", False)
