@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 from .alignment_gauges import AlignmentGaugePanel
 from .client import GuiClient
 from .debug_log import DebugLog
+from .demo_client import DemoGuiClient
 from .dialogue import DialogueHistory
 from .dialogue_pacing import PacingMode
 from .flash_effect import FlashEffect
@@ -71,6 +72,7 @@ def load_subsystems(
     audio_manager: AudioManager,
     agent_url: str | None,
     queues_hook: dict,
+    demo_mode: bool = False,
 ) -> Generator[tuple[float, str], None, Subsystems]:
     """Generator that initializes all GUI subsystems one step at a time.
 
@@ -230,7 +232,11 @@ def load_subsystems(
         send_q: queue.Queue[tuple[str, str] | None] = queue.Queue()
         recv_q: queue.Queue[dict] = queue.Queue()
         queues_hook["send_q"] = send_q
-        client = GuiClient(send_q, recv_q, agent_url)
+        if demo_mode:
+            logger.info("Demo mode — using DemoGuiClient (no network, scripted events).")
+            client = DemoGuiClient(send_q, recv_q, agent_url)
+        else:
+            client = GuiClient(send_q, recv_q, agent_url)
 
         def _run_client() -> None:
             loop = asyncio.new_event_loop()

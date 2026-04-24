@@ -88,6 +88,12 @@ class QueueEventHandler:
             self._handle_complete(q_event)
         elif etype == "error":
             self._handle_error(q_event)
+        elif etype == "user":
+            # Scripted-demo affordance — real user input is injected by
+            # pygame_event_handler when the player types into the input bar,
+            # so a "user" event never arrives from the real A2A client.
+            # Harmless for production.
+            self._handle_user(q_event)
 
     # -- private handlers ----------------------------------------------------
 
@@ -197,6 +203,19 @@ class QueueEventHandler:
         logger.error("Pipeline error: %s", event.get("text", "unknown"))
         self.history.add(DialogueEntry("hephaestus", event["text"], is_error=True))
         self.input_bar.processing = False
+        self.history.scroll_to_bottom()
+
+    def _handle_user(self, event: dict) -> None:
+        """Append a user-attributed dialogue entry.
+
+        Only the scripted demo client emits this — the real A2A stream
+        never puts `user` events on recv_q (user text enters via send_q
+        and is rendered directly by the pygame event handler).
+        """
+        text = event.get("text", "")
+        if not text:
+            return
+        self.history.add(DialogueEntry("user", text, is_user=True))
         self.history.scroll_to_bottom()
 
     # -- typewriter helper ---------------------------------------------------
