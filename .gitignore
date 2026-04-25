@@ -45,6 +45,8 @@ Thumbs.db
 .kiro/
 # Superpowers brainstorming companion — local mockups + session state
 .superpowers/
+# Local git worktrees for isolated subagent-driven development
+.worktrees/
 
 # Logs
 logs/
