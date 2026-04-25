@@ -41,6 +41,7 @@ nav = [
       { "Overview" = "research/index.md" },
       { "CHAI 2026 — Narrative Interfaces" = "research/chai-2026-narrative-interfaces/index.md" },
       { "NE Agents Day 2026" = "research/ne-agents-day-2026/index.md" },
+      { "Federated Forge — Design Spec" = "research/federated-forge/index.md" },
   ]},
 ]
 
