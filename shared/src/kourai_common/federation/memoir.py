@@ -11,6 +11,7 @@ cross-process coordination is provided in this iteration.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -40,3 +41,24 @@ class Memoir:
         with self.path.open("a", encoding="utf-8") as f:
             f.write(entry.model_dump_json())
             f.write("\n")
+
+    def entries(self) -> Iterator[MemoirEntry]:
+        """Yield each entry from the on-disk file in append order.
+
+        Returns an empty iterator if the file does not exist yet.
+        """
+        from kourai_common.federation.memoir_schema import MemoirEntry
+
+        if not self.path.exists():
+            return
+        with self.path.open("r", encoding="utf-8") as f:
+            for line_number, line in enumerate(f, start=1):
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                try:
+                    yield MemoirEntry.model_validate_json(stripped)
+                except (json.JSONDecodeError, ValueError) as e:
+                    raise MemoirError(
+                        f"malformed entry on line {line_number}: {e}"
+                    ) from e
