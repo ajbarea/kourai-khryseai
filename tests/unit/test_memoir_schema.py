@@ -4,7 +4,14 @@ from __future__ import annotations
 
 import pytest
 
-from kourai_common.federation.memoir_schema import SplitDecision
+from kourai_common.federation.memoir_schema import (
+    EntrySource,
+    MemoirEntry,
+    PlayerResponse,
+    SplitDecision,
+    TrainingLabel,
+    decide_split,
+)
 
 
 class TestSplitDecision:
@@ -30,12 +37,6 @@ class TestSplitDecision:
     def test_both_true_is_rejected(self):
         with pytest.raises(ValueError, match="cannot both be true"):
             SplitDecision(shared_eligible=True, private_only=True)
-
-
-from kourai_common.federation.memoir_schema import (
-    EntrySource,
-    decide_split,
-)
 
 
 class TestDecideSplit:
@@ -98,13 +99,6 @@ class TestDecideSplit:
     def test_unknown_agent_for_interrupt_raises(self):
         with pytest.raises(ValueError, match="unknown agent"):
             decide_split(EntrySource.AGENT_INTERRUPT, agent="nobody")
-
-
-from kourai_common.federation.memoir_schema import (
-    MemoirEntry,
-    PlayerResponse,
-    TrainingLabel,
-)
 
 
 class TestMemoirEntry:

@@ -9,6 +9,9 @@ from `docs/research/federated-forge/index.md`.
 
 from __future__ import annotations
 
+from enum import StrEnum
+from typing import Any, Literal
+
 from pydantic import BaseModel, ConfigDict, model_validator
 
 
@@ -32,9 +35,6 @@ class SplitDecision(BaseModel):
                 "shared_eligible and private_only cannot both be true"
             )
         return self
-
-
-from enum import StrEnum
 
 
 class EntrySource(StrEnum):
@@ -103,9 +103,6 @@ def decide_split(source: EntrySource, *, agent: str | None) -> SplitDecision:
         return SplitDecision(shared_eligible=True, private_only=False)
 
     raise ValueError(f"unhandled EntrySource {source!r}")
-
-
-from typing import Any, Literal
 
 
 class PlayerResponse(BaseModel):
