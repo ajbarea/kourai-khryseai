@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import httpx
 import pytest
-from a2a.types import Message, Task, TaskState, TaskStatusUpdateEvent
+from a2a.types import Message, Task, TaskArtifactUpdateEvent, TaskState, TaskStatusUpdateEvent
 
 pytest.importorskip("asyncclick")
 
@@ -165,6 +165,80 @@ class TestSendAndStream:
 
         cont, ctx, tid = await send_and_stream(client, "hello", "ctx-1", verbose=True)
         assert cont is True
+
+    @pytest.mark.asyncio
+    async def test_writes_memoir_entry_on_success(self, monkeypatch, tmp_path):
+        from kourai_common.federation.memoir import Memoir
+        from kourai_common.federation.memoir_schema import EntrySource
+
+        # Pretend Kallos was the last agent seen during the run.
+        monkeypatch.setattr(
+            "hosts.cli.streaming.get_last_seen_agent",
+            lambda: "kallos",
+        )
+
+        client = MagicMock()
+        task = _make_task(TaskState.completed)
+        artifact_event = MagicMock(spec=TaskArtifactUpdateEvent)
+        # Patch artifact extraction to return a deterministic string.
+        monkeypatch.setattr(
+            "hosts.cli.streaming._extract_artifact_text",
+            lambda _: "final lint suggestion",
+        )
+
+        async def _events():
+            yield (task, artifact_event)
+            yield (task, None)
+
+        client.send_message = MagicMock(return_value=_events())
+
+        memoir = Memoir(tmp_path)
+        await send_and_stream(
+            client,
+            "hello",
+            "ctx-1",
+            memoir=memoir,
+            scene_id="session-abc12345.turn-1",
+        )
+
+        entries = list(memoir.entries())
+        assert len(entries) == 1
+        entry = entries[0]
+        assert entry.scene_id == "session-abc12345.turn-1"
+        assert entry.agent == "kallos"
+        assert entry.source is EntrySource.SPECIALIST_PROPOSED
+        assert entry.agent_proposed == "final lint suggestion"
+
+    @pytest.mark.asyncio
+    async def test_no_memoir_entry_when_memoir_none(self, monkeypatch, tmp_path):
+        # Sanity: backward-compatible default — no Memoir kwarg, no write.
+        from kourai_common.federation.memoir import Memoir
+
+        monkeypatch.setattr(
+            "hosts.cli.streaming.get_last_seen_agent",
+            lambda: "kallos",
+        )
+        monkeypatch.setattr(
+            "hosts.cli.streaming._extract_artifact_text",
+            lambda _: "final text",
+        )
+
+        client = MagicMock()
+        task = _make_task(TaskState.completed)
+        artifact_event = MagicMock(spec=TaskArtifactUpdateEvent)
+
+        async def _events():
+            yield (task, artifact_event)
+            yield (task, None)
+
+        client.send_message = MagicMock(return_value=_events())
+
+        await send_and_stream(client, "hello", "ctx-1")
+        # No exception, no Memoir written — there isn't one to check.
+        # Verify by creating a Memoir at tmp_path and confirming its file
+        # does not exist (proxy: nothing wrote to that directory).
+        memoir = Memoir(tmp_path)
+        assert not memoir.path.exists()
 
 
 class TestMainCommand:

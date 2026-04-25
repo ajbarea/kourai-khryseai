@@ -44,6 +44,8 @@ from hosts.cli.styling import _DIM, _GOLD, _GOLD_BRIGHT, _ITALIC, _RED, _RESET
 from hosts.gui.tts_engine import TTSEngine
 from kourai_common.audio import AudioManager
 from kourai_common.config import MODEL_TIER, PROVIDER, get_agent_url, get_model
+from kourai_common.federation.host_helpers import derive_scene_id
+from kourai_common.federation.memoir import Memoir
 from kourai_common.forge_session import ForgeSession, ForgeSessionError
 from kourai_common.log import setup_logging
 from kourai_common.player import PlayerProfile, get_all_affinities
@@ -551,10 +553,14 @@ async def main(
                 # specialists run there instead of the kourai source tree.
                 forge_msg = prompt_text
                 forge_session: ForgeSession | None = None
+                forge_memoir: Memoir | None = None
+                forge_turn_number: int = 0
                 project = _active_project(settings)
                 if project is not None:
                     try:
                         forge_session = ForgeSession.start(project, label=prompt_text[:24])
+                        forge_memoir = Memoir(forge_session.workdir)
+                        forge_turn_number = 0
                         forge_msg = f"[project_root: {forge_session.workdir}]\n{prompt_text}"
                         _echo(
                             f"{_DIM}\u2692 Forging in {project.name}"
@@ -568,6 +574,14 @@ async def main(
                         )
 
                 _echo("")
+                stream_kwargs: dict[str, object] = {}
+                if forge_session is not None and forge_memoir is not None:
+                    forge_turn_number += 1
+                    stream_kwargs["memoir"] = forge_memoir
+                    stream_kwargs["scene_id"] = derive_scene_id(
+                        forge_session.session_id,
+                        turn_number=forge_turn_number,
+                    )
                 keep_going, context_id, _ = await send_and_stream(
                     client,
                     forge_msg,
@@ -576,6 +590,7 @@ async def main(
                     attachments=attachments or None,
                     tts=tts,
                     gossip_enabled=settings.gossip_enabled,
+                    **stream_kwargs,
                 )
 
                 if forge_session is not None:
