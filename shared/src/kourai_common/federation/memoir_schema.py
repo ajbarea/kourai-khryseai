@@ -31,9 +31,7 @@ class SplitDecision(BaseModel):
     @model_validator(mode="after")
     def _at_most_one_true(self) -> SplitDecision:
         if self.shared_eligible and self.private_only:
-            raise ValueError(
-                "shared_eligible and private_only cannot both be true"
-            )
+            raise ValueError("shared_eligible and private_only cannot both be true")
         return self
 
 

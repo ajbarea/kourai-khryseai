@@ -130,9 +130,7 @@ class TestMemoirEntry:
             agent="kallos",
             source=EntrySource.SPECIALIST_PROPOSED,
             agent_proposed="lint fix",
-            player_response=PlayerResponse(
-                kind="modified", delta="player edits", felt="right"
-            ),
+            player_response=PlayerResponse(kind="modified", delta="player edits", felt="right"),
             training_label=TrainingLabel(
                 preference_pair=[
                     {"text": "lint fix", "score": 0},

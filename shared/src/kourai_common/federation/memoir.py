@@ -59,6 +59,4 @@ class Memoir:
                 try:
                     yield MemoirEntry.model_validate_json(stripped)
                 except (json.JSONDecodeError, ValueError) as e:
-                    raise MemoirError(
-                        f"malformed entry on line {line_number}: {e}"
-                    ) from e
+                    raise MemoirError(f"malformed entry on line {line_number}: {e}") from e
