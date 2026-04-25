@@ -35,11 +35,13 @@ from hosts.cli.events import (
 )
 from hosts.cli.rendering import _comms_window, _echo, _render_markdown
 from hosts.cli.styling import _DIM, _GOLD, _GOLD_BRIGHT, _RED, _RESET
+from kourai_common.federation.host_helpers import build_pipeline_turn_entry
 
 if TYPE_CHECKING:
     from a2a.client.client import Client
 
     from hosts.gui.tts_engine import TTSEngine
+    from kourai_common.federation.memoir import Memoir
 
 # ---------------------------------------------------------------------------
 # Last result store — for /copy / /save
@@ -64,6 +66,9 @@ async def send_and_stream(
     attachments: list[tuple[str, str]] | None = None,
     tts: TTSEngine | None = None,
     gossip_enabled: bool = True,
+    *,
+    memoir: Memoir | None = None,
+    scene_id: str | None = None,
 ) -> tuple[bool, str, str | None]:
     """Send a message and stream the response.
 
@@ -171,6 +176,24 @@ async def send_and_stream(
 
         # Always show elapsed time — the golden forge signature
         _echo(f"{_GOLD_BRIGHT}\u2728 Forged in {elapsed:.1f}s{_RESET}")
+
+        # Write a Memoir entry capturing this turn for FL training data.
+        if memoir is not None and scene_id is not None:
+            last_agent = get_last_seen_agent()
+            if last_agent:
+                try:
+                    entry = build_pipeline_turn_entry(
+                        scene_id=scene_id,
+                        agent=last_agent,
+                        agent_proposed=final_text,
+                    )
+                    memoir.append(entry)
+                except (ValueError, OSError) as e:
+                    # Memoir failures must not break the user's pipeline.
+                    # Log at debug; the user already saw their result.
+                    import logging
+
+                    logging.getLogger("cli.streaming").debug("Memoir append skipped: %s", e)
 
         # Victory chatter from the last maiden who worked on this
         last_agent = get_last_seen_agent()
