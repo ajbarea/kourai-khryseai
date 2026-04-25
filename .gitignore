@@ -43,6 +43,8 @@ Thumbs.db
 !.claude/skill-context.md
 .gemini/
 .kiro/
+# Superpowers brainstorming companion — local mockups + session state
+.superpowers/
 
 # Logs
 logs/

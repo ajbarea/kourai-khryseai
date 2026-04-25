@@ -33,3 +33,13 @@ Multi-agent coding systems that treat collaboration as a *supervised* problem �
 Poster on narrative interfaces for agentic systems — how embodiment, voice, and visual-novel framing affect the way users supervise and redirect multi-agent software. Motivates the three-host design (CLI, GUI, Ren'Py VN) shared across Kourai's orchestration layer.
 
 [View artifacts →](chai-2026-narrative-interfaces/index.md)
+
+---
+
+## [Federated Forge — Personalized Multi-Agent FL with Player-Anchored Privacy](federated-forge/index.md)
+
+**Design spec** · early draft, under active iteration
+
+A research direction connecting Kourai Khryseai to VelocityFL through a principled shared/personal parameter decomposition for multi-agent LLM systems with humans on the loop. Each forge runs council adapters that federate across deployments and bond adapters that never leave the player's machine. Federation is staged as gameplay — Sovereignty Moments, Council of Sisters scenes, Whisper Limit privacy budgets, and rogue-forge exile narratives. Cupid is bond-only by construction.
+
+[Read the spec →](federated-forge/index.md)
