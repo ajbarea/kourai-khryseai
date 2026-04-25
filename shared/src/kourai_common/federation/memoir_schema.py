@@ -103,3 +103,83 @@ def decide_split(source: EntrySource, *, agent: str | None) -> SplitDecision:
         return SplitDecision(shared_eligible=True, private_only=False)
 
     raise ValueError(f"unhandled EntrySource {source!r}")
+
+
+from typing import Any, Literal
+
+
+class PlayerResponse(BaseModel):
+    """How the player responded to an agent's proposal.
+
+    `kind` is the high-level reaction; `delta` carries free-form payload
+    (a diff, a comment, etc); `felt` is the optional Likert-style affect
+    tag the host may choose to gather.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    kind: Literal["accepted", "modified", "rejected", "deferred"]
+    delta: str | None = None
+    felt: Literal["right", "off", "unsure"] | None = None
+
+
+class TrainingLabel(BaseModel):
+    """The FL-pipeline view of an entry. `preference_pair` is two scored
+    candidates the trainer can consume as a DPO pair; `weight` lets the
+    host emphasize or downweight specific entries (e.g. interrupted turns
+    weigh less than fully-completed ones).
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    preference_pair: list[dict[str, Any]] | None = None
+    weight: float = 1.0
+
+
+class MemoirEntry(BaseModel):
+    """One Memoir entry on disk and on the wire.
+
+    Fields are split into:
+
+    - **identity / context** — `scene_id`, `agent`, `source`,
+      `narrative_beat`
+    - **narrative payload** — `agent_proposed`, `player_response`,
+      `affinity_delta`
+    - **training payload** — `training_label`
+    - **derived** — `split`, decided automatically from `source` + `agent`
+      via `decide_split()` if not provided
+
+    The dual-face contract: every entry can be replayed by the VN via
+    `narrative_beat`, AND consumed by the FL pipeline via `training_label`.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    scene_id: str
+    agent: str
+    source: EntrySource
+
+    context: dict[str, Any] | None = None
+
+    narrative_beat: str | None = None
+    agent_proposed: str | None = None
+    player_response: PlayerResponse | None = None
+    affinity_delta: float = 0.0
+    training_label: TrainingLabel | None = None
+
+    split: SplitDecision = SplitDecision()
+
+    @model_validator(mode="after")
+    def _validate_agent_known(self) -> MemoirEntry:
+        if self.agent not in ALL_AGENTS:
+            raise ValueError(f"unknown agent {self.agent!r}")
+        return self
+
+    @model_validator(mode="after")
+    def _populate_split(self) -> MemoirEntry:
+        if self.split.shared_eligible or self.split.private_only:
+            return self  # caller provided one explicitly; trust them
+        decided = decide_split(self.source, agent=self.agent)
+        # Pydantic frozen models need object.__setattr__ to mutate after init.
+        object.__setattr__(self, "split", decided)
+        return self

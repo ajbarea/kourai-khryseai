@@ -98,3 +98,93 @@ class TestDecideSplit:
     def test_unknown_agent_for_interrupt_raises(self):
         with pytest.raises(ValueError, match="unknown agent"):
             decide_split(EntrySource.AGENT_INTERRUPT, agent="nobody")
+
+
+from kourai_common.federation.memoir_schema import (
+    MemoirEntry,
+    PlayerResponse,
+    TrainingLabel,
+)
+
+
+class TestMemoirEntry:
+    """The on-disk schema. Each entry carries narrative + training payloads
+    and auto-populates its SplitDecision from EntrySource + agent."""
+
+    def test_minimal_specialist_proposal_is_shared(self):
+        entry = MemoirEntry(
+            scene_id="session-1.turn-1",
+            agent="kallos",
+            source=EntrySource.SPECIALIST_PROPOSED,
+            agent_proposed="some style edit",
+        )
+        assert entry.split.shared_eligible is True
+        assert entry.split.private_only is False
+
+    def test_cupid_scene_is_private(self):
+        entry = MemoirEntry(
+            scene_id="session-1.scene-cupid-7",
+            agent="cupid",
+            source=EntrySource.CUPID_SCENE,
+            narrative_beat="cupid_late_night_check_in",
+        )
+        assert entry.split.private_only is True
+
+    def test_pipeline_turn_with_player_response(self):
+        entry = MemoirEntry(
+            scene_id="session-1.turn-2",
+            agent="kallos",
+            source=EntrySource.SPECIALIST_PROPOSED,
+            agent_proposed="lint fix",
+            player_response=PlayerResponse(
+                kind="modified", delta="player edits", felt="right"
+            ),
+            training_label=TrainingLabel(
+                preference_pair=[
+                    {"text": "lint fix", "score": 0},
+                    {"text": "lint fix with player edits", "score": 1},
+                ],
+                weight=1.0,
+            ),
+        )
+        assert entry.player_response.kind == "modified"
+        assert entry.training_label.weight == 1.0
+
+    def test_unknown_agent_rejected(self):
+        with pytest.raises(ValueError, match="unknown agent"):
+            MemoirEntry(
+                scene_id="session-1.turn-3",
+                agent="nobody",
+                source=EntrySource.SPECIALIST_PROPOSED,
+                agent_proposed="x",
+            )
+
+    def test_round_trip_json(self):
+        original = MemoirEntry(
+            scene_id="session-1.turn-1",
+            agent="kallos",
+            source=EntrySource.SPECIALIST_PROPOSED,
+            agent_proposed="hello",
+        )
+        as_json = original.model_dump_json()
+        restored = MemoirEntry.model_validate_json(as_json)
+        assert restored == original
+
+    def test_optional_context_block_round_trips(self):
+        # Spec shows a `context` block with task_type, transcript_hash,
+        # preceding_agents. We accept any dict for forward compatibility;
+        # plan-02 will lock in the host-emitted shape.
+        original = MemoirEntry(
+            scene_id="session-1.turn-1",
+            agent="kallos",
+            source=EntrySource.SPECIALIST_PROPOSED,
+            agent_proposed="hello",
+            context={
+                "task_type": "style_review",
+                "transcript_hash": "sha256:abc",
+                "preceding_agents": ["techne"],
+            },
+        )
+        restored = MemoirEntry.model_validate_json(original.model_dump_json())
+        assert restored.context["task_type"] == "style_review"
+        assert restored.context["preceding_agents"] == ["techne"]
