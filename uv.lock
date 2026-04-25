@@ -24,7 +24,10 @@ members = [
     "kourai-puck",
     "kourai-techne",
 ]
-overrides = [{ name = "aiohttp", specifier = ">=3.13.4" }]
+overrides = [
+    { name = "aiohttp", specifier = ">=3.13.4" },
+    { name = "python-dotenv", specifier = ">=1.2.2" },
+]
 
 [[package]]
 name = "a2a-sdk"
@@ -1213,12 +1216,12 @@ requires-dist = [
     { name = "a2a-sdk", extras = ["http-server"], specifier = ">=0.3.25,<2.0" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "huggingface-hub", specifier = ">=1.5.0" },
-    { name = "litellm", specifier = ">=1.80.0" },
+    { name = "litellm", specifier = ">=1.83.7" },
     { name = "mcp", specifier = ">=1.26.0,<2" },
     { name = "opentelemetry-api", specifier = ">=1.20.0" },
     { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.20.0" },
     { name = "opentelemetry-sdk", specifier = ">=1.20.0" },
-    { name = "python-dotenv", specifier = ">=1.0.0" },
+    { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.34.0" },
 ]
 
@@ -1424,7 +1427,7 @@ wheels = [
 
 [[package]]
 name = "litellm"
-version = "1.83.11"
+version = "1.83.13"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -1440,9 +1443,9 @@ dependencies = [
     { name = "tiktoken" },
     { name = "tokenizers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c6/60/dd644f259aa1d0d7769bb5408737bd5e7ea73521523665e5c5a0f0be8024/litellm-1.83.11.tar.gz", hash = "sha256:c091d2254f1d17a6779dbc28c176bf918525495eff944bd0d5f9b8c357dd6077", size = 14750640, upload-time = "2026-04-22T02:02:45.478Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1f/ac/6cc660c476e1cb925055eb7d032b7774de71fce28b9dfec652fc277397f8/litellm-1.83.13.tar.gz", hash = "sha256:803b53077cd678bb78d40f1a971920a8cd06073520c756e3d2bcb5c4da7bd352", size = 14785817, upload-time = "2026-04-24T01:03:03.096Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/61/90/55095f450803ee7ea1b66961a33ba69e3c980e171d3cfad9eeec91c08f94/litellm-1.83.11-py3-none-any.whl", hash = "sha256:f1d508fb0ad5900796299fd20ec81e8a13111193473823236109739b43fda9ba", size = 16366401, upload-time = "2026-04-22T02:02:41.773Z" },
+    { url = "https://files.pythonhosted.org/packages/c5/57/99d553839018ba4c1b94fbe540f218fefb725fba79ecc2abf462cd39d719/litellm-1.83.13-py3-none-any.whl", hash = "sha256:14be9f3b4a9e207372f275d75e6f174a3e717352ccca6c63707c25fd6e23cac6", size = 16406883, upload-time = "2026-04-24T01:02:58.7Z" },
 ]
 
 [[package]]
@@ -2460,11 +2463,11 @@ wheels = [
 
 [[package]]
 name = "python-dotenv"
-version = "1.0.1"
+version = "1.2.2"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/bc/57/e84d88dfe0aec03b7a2d4327012c1627ab5f03652216c63d49846d7a6c58/python-dotenv-1.0.1.tar.gz", hash = "sha256:e324ee90a023d808f1959c46bcbc04446a10ced277783dc6ee09987c37ec10ca", size = 39115, upload-time = "2024-01-23T06:33:00.505Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/82/ed/0301aeeac3e5353ef3d94b6ec08bbcabd04a72018415dcb29e588514bba8/python_dotenv-1.2.2.tar.gz", hash = "sha256:2c371a91fbd7ba082c2c1dc1f8bf89ca22564a087c2c287cd9b662adde799cf3", size = 50135, upload-time = "2026-03-01T16:00:26.196Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6a/3e/b68c118422ec867fa7ab88444e1274aa40681c606d59ac27de5a5588f082/python_dotenv-1.0.1-py3-none-any.whl", hash = "sha256:f7b63ef50f1b690dddf550d03497b66d609393b40b564ed0d674909a68ebf16a", size = 19863, upload-time = "2024-01-23T06:32:58.246Z" },
+    { url = "https://files.pythonhosted.org/packages/0b/d7/1959b9648791274998a9c3526f6d0ec8fd2233e4d4acce81bbae76b44b2a/python_dotenv-1.2.2-py3-none-any.whl", hash = "sha256:1d8214789a24de455a8b8bd8ae6fe3c6b69a5e3d64aa8a8e5d68e694bbcb285a", size = 22101, upload-time = "2026-03-01T16:00:25.09Z" },
 ]
 
 [[package]]
