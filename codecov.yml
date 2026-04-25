@@ -13,12 +13,7 @@ coverage:
         target: 80%
         informational: true
 
-comment:
-  layout: "condensed_header, condensed_files, condensed_footer"
-  behavior: default
-  require_changes: true
-  require_base: false
-  require_head: true
+comment: false
 
 ignore:
   - "tests/**"
