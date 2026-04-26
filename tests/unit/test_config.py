@@ -75,7 +75,7 @@ class TestGetModel:
 
         # And the env's smart tier still resolves correctly without the kwarg.
         env_result = config.get_model("metis")
-        assert env_result == "anthropic/claude-opus-4-6"
+        assert env_result == "anthropic/claude-opus-4-7"
 
     def test_tier_kwarg_none_falls_back_to_env(self, monkeypatch):
         """Default ``tier=None`` reads ``KOURAI_MODEL_TIER`` (backward-compat)."""
@@ -111,6 +111,17 @@ class TestGetModel:
 
         result = config.get_model("metis", tier="cheap")
         assert result == "test/mock-model"
+
+    def test_metis_smart_tier_is_opus_4_7(self):
+        """M9 — Metis's smart tier resolves to the current Anthropic flagship.
+
+        Behaviour-equivalent to ``test_get_model_anthropic_standard`` but
+        named to make the M9 bump (Opus 4.6 → 4.7) intentional; if a future
+        edit accidentally rolls Metis back, this test names the regression.
+        """
+        from kourai_common.config import MODELS_SMART
+
+        assert MODELS_SMART["metis"] == "anthropic/claude-opus-4-7"
 
 
 class TestGetAgentUrl:

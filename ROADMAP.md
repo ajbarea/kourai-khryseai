@@ -180,22 +180,6 @@ Meanwhile OTEL spans around each call give us per-tool latency visibility
 
 ---
 
-## M9 — Model-version refresh
-
-> Status: planned · One-file edit · No API changes
-
-``shared/src/kourai_common/config.py`` still names
-``anthropic/claude-opus-4-6`` in ``MODELS_SMART["metis"]``. Opus 4.7 is the
-current Anthropic flagship. Cheap bump: rename ``4-6`` → ``4-7`` once pricing
-is confirmed equivalent. Cache thresholds match (Opus 4.7 = Opus 4.6 = 4096
-tokens minimum), so the M4 caching markers carry over without re-tuning.
-
-No metric-based rollout is needed for a Claude-family minor: behaviour is a
-super-set. Gate the bump on a Round 6 smoke that exercises Metis's planning
-loop and verifies the JSON-schema specs still come out clean.
-
----
-
 ## M12 — Dynamic sizing across the GUI
 
 > Status: planned · Blocked by: nothing (can land anytime)
@@ -479,6 +463,7 @@ One-liner per item, newest first. Detail moves out of this file when work lands.
 
 - 2026-04-26 — **M1 fully shipped — Round 6 live smoke validated end-to-end** (accept path 6a + discard path 6b, both clean). Provider tool-use loop replaces the `parse_and_apply_fixes` regex parser everywhere it ran. Validation: 22 `'type': 'tool_use'` frames in techne container logs (with `toolu_*` IDs proving real provider blocks); 11 `'type': 'tool_result'` frames closing the loop; **zero `parse_and_apply_fixes` hits** across all 6 agent containers (`techne`, `hephaestus`, `metis`, `dokimasia`, `kallos`, `mneme`). Wall-clock: 244.8s on 6a, 418.6s on 6b — both under the 462s v2 baseline; the provider tool-use loop is faster than the regex parser AND cleaner. Bonus emergent behavior: Aidos's slop-detection now actively *teaches* commit-message hygiene with `<FACT category="skill" confidence="medium">` markers tracking the player's improvement across runs (e.g., flagging "comprehensive" as repeated slop after the first run). M1 detail block removed from above; this is the canonical record
 - 2026-04-26 — `/clear` ANSI escape mangled by `prompt_toolkit.patch_stdout` (printed `?[2J?[1;1H` literally instead of clearing the viewport). Fix: new `hosts/cli/rendering._clear_screen()` helper writes the standard cursor-home + erase-screen sequence (`\x1b[H\x1b[2J`, matching Ubuntu's `clear`) directly to `_raw_out` (the pre-`patch_stdout` stream) — same pattern `_echo()` already uses to bypass the proxy. `hosts/cli/__main__.py` calls the new helper instead of `click.clear()`; click import retained for the rest of the CLI. Caught in AJ's REPL during M1 Round 6 smoke
+- 2026-04-26 — M9 shipped: `MODELS_SMART["metis"]` bumped from `anthropic/claude-opus-4-6` to `anthropic/claude-opus-4-7`. One-line config change; pricing was already in `ANTHROPIC_PRICING` for both at $5/$25, cache thresholds identical (4096 tokens minimum), Round 6 smoke at session start validated Metis's planning loop on 4.6 so the bump inherits that validation. No prompt change, no caching re-tune. New regression-guard test `test_metis_smart_tier_is_opus_4_7` so a future accidental rollback names itself in the failure message
 - 2026-04-26 — `tier` kwarg symmetry on `chat_stream` + `chat_with_tools` (additive completion of PR #30): both now accept the same `tier: str | None = None` kwarg `chat()` already had, forwarding to `get_model(agent_name, tier=tier)`. Pure additive — no callers updated, default `None` preserves env-driven `KOURAI_MODEL_TIER`. Future callers (e.g., a cheap-tier lint-fix loop for Kallos, a low-stakes test-generation call for Dokimasia) can pin without llm.py plumbing. 4 new unit tests in `TestChatTierKwarg`, each with its backward-compat regression-guard pair
 - 2026-04-26 — `/usage` per-(agent, model) keying shipped (caveat-fix from yesterday's tier-override PR): `SessionUsage.agents` switched from `dict[str, AgentUsage]` to `dict[tuple[str, str], AgentUsage]`. Removes the "first model wins per agent" masking that was hiding M14's cheap-tier discussion behind the smart-tier spec model. CLI `/usage` table grew a `tier` column (`haiku-4-5` / `sonnet-4-6` / `opus-4-7` short labels via `_short_model_label`) so multi-model agents render as two rows under the same agent name. 7 new unit tests across `TestRecordUsage` (1 — per-(agent, model) keying), `TestUsageSlashCommand` (1 — multi-model rendering with two costs + summed total), and `TestShortModelLabel` (5 — short-label edge cases). Full file 38 passed in 0.56s
 - 2026-04-26 — `chat()` per-call tier override shipped (M14 follow-on): `kourai_common.config.get_model(agent_name, tier=None)` and `kourai_common.llm.chat(..., tier=None)` accept a tier kwarg that overrides `KOURAI_MODEL_TIER` for that single call. Backward-compat preserved (default `None` reads env). Metis's `discuss_tradeoffs` pinned to `tier="cheap"` so the M14 parallel discussion runs on Haiku regardless of pipeline tier — drops ongoing token spend on every tier-1 confirmation where the discussion is dropped silently. 8 new unit tests across `test_config.py` (5), `test_llm.py` (2), `test_metis_parallel.py` (1). Caveat documented in IMPL: `/usage` accumulator keys on `agent_name` (not `(agent_name, model)`), so cheap-tier discussion now masks the smart-tier spec model in the per-agent display. Follow-up PR scoped

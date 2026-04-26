@@ -37,7 +37,7 @@ MODELS_STANDARD = {
 
 MODELS_SMART = {
     "hephaestus": "anthropic/claude-sonnet-4-6",
-    "metis": "anthropic/claude-opus-4-6",
+    "metis": "anthropic/claude-opus-4-7",
     "techne": "anthropic/claude-sonnet-4-6",
     "dokimasia": "anthropic/claude-sonnet-4-6",
     "kallos": "anthropic/claude-sonnet-4-6",
