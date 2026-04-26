@@ -18,6 +18,16 @@ import wave
 from pathlib import Path
 from typing import Any
 
+from kourai_common.audio_env import configure_sdl_audio_driver
+
+# Module-load side effect: pick a sensible SDL audio backend (e.g. WSLg
+# pulseaudio, or `dummy` on headless Linux) BEFORE pygame is imported,
+# so SDL's audio subsystem doesn't fall back to ALSA and flood stderr
+# with `cannot find card '0'` lines on first init. Player overrides via
+# ``SDL_AUDIODRIVER`` are always respected.
+configure_sdl_audio_driver()
+
+
 # Pygame is required for audio playback. If not available, audio is disabled.
 try:
     import pygame

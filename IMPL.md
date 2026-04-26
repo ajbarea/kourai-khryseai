@@ -5,85 +5,83 @@ milestone lands, the matching detail block in [ROADMAP.md](./ROADMAP.md)
 collapses to a one-liner under "Shipped" and this file gets reset to the
 next milestone.
 
-Updated: 2026-04-26 · Working on: **Round 6 bullet 3** (CLI greeting
-maiden-name attribution — third of the five M6-future bullets AJ
-flagged from live smoke)
+Updated: 2026-04-26 · Working on: **Round 6 bullet 4** (WSL audio
+noise suppression — `cannot find card '0'` cascade on every WSL2
+launch even though `AudioManager` handles the failure cleanly
+downstream)
 
 ---
 
 ## Plan-of-record
 
-End state: the random startup greeting line in the CLI tells the
-player who is speaking. Pre-fix it rendered just `( ◡‿◡)✧ Structure IS
-beauty.` — kaomoji + italic line, no name. Players had to memorize
-the emoji-to-name map to attribute the line; the gallery and the
-agent READMEs already do that work, but the very first interaction
-threw it away.
+End state: WSL2 launches no longer flood stderr with ALSA chatter
+on first init. The fix turned out smaller than the ROADMAP entry
+suggested: `kourai_common.audio_env.configure_sdl_audio_driver()`
+was already implemented (and unit-tested) — it just wasn't called
+anywhere. Defined-but-dead infrastructure. Wiring it into
+`kourai_common.audio` at module load (before `import pygame`)
+makes SDL pick up the env var on first init and skip ALSA
+entirely.
 
-### Change — `_format_greeting` helper ✅ 2026-04-26
+### Change — wire `configure_sdl_audio_driver()` into audio module load ✅ 2026-04-26
 
-- [x] `hosts/cli/__main__.py`: new `_format_greeting(name, face,
-      quote)` helper next to `_format_affinity_bar`. Capitalizes the
-      maiden name, renders it in `_GOLD_BOLD`, then face in `_GOLD`,
-      then quote wrapped in `"..."` and rendered `_ITALIC`. The
-      `"..."` wrap is load-bearing: M10's speech-vs-action convention
-      keys italic dialogue off a leading double-quote, so future
-      readers maintain the styling without bespoke flags.
-- [x] `_GOLD_BOLD` added to the styling import block.
-- [x] Greeting call-site replaced — was a one-line f-string with face
-      + quote; now an empty `_echo("")` followed by a call to the
-      helper. The leading newline that used to live inside the
-      f-string moved to its own `_echo("")` for legibility.
+- [x] `shared/src/kourai_common/audio.py`: import
+      `configure_sdl_audio_driver` and call it at module level
+      BEFORE `import pygame`. Player-set `SDL_AUDIODRIVER` is
+      respected (the helper checks first); WSLg with `PULSE_SERVER`
+      + libpulse → `pulseaudio`; headless Linux → `dummy`; non-WSL
+      with a display → unset (SDL default).
 
 ### Tests ✅ 2026-04-26
 
-- [x] `tests/unit/test_cli.py::TestGreetingFormat`: 5 tests covering
-      name-included, face-included, quote-wrapped-in-double-quotes,
-      lowercase-input-capitalizes-output, and reading-order
-      (name-precedes-face-precedes-quote with ANSI stripped). All
-      pass in 0.6 s.
+- [x] `tests/unit/test_audio_env.py::test_audio_module_import_triggers_sdl_configure`:
+      regression guard via `importlib.reload` + spy. The function
+      being defined-but-unwired was the original bug — this test
+      ensures a future refactor doesn't silently un-wire it again.
+- [x] 4 pre-existing audio_env unit tests still pass.
 
-### Live smoke (folded into next interactive `/project` session)
+### Live smoke
 
-- [ ] Launch CLI → confirm greeting line shows `<Name> <face>
-      "<quote>"` and that the italic styling lands on the quoted
-      text.
-- [ ] Confirm name-color (`_GOLD_BOLD`) reads as a brighter accent
-      than the rest of the line on AJ's terminal.
+- [x] Verified live in AJ's environment: `SDL_AUDIODRIVER=pulseaudio`
+      is set after `from kourai_common import audio`. No more ALSA
+      cascade on next CLI/GUI startup.
 
 ---
 
 ## Notes / open questions
 
-- **Why title-case (`Metis`) over uppercase (`METIS`)?** The
-  `_comms_window` callsign header uses `agent_name.upper()` because
-  it's a status-bar-style label sitting inside a styled box, denser
-  visual context. The greeting is the player's first-glance moment;
-  title-case reads as a personal introduction, uppercase reads as a
-  system label. Different surface, different convention.
+- **Why was the helper defined but never wired?** Best guess from
+  the file timestamp (`Apr 14 18:29` on `audio_env.py`) and the
+  empty grep for callers: it landed as part of an aborted
+  refactor or was meant to be wired in a follow-up that never
+  happened. Either way, the test coverage was already there —
+  the wiring was the missing piece.
 
-- **Why wrap in `"..."` instead of just leaving the italic style
-  flag?** Two reasons. (1) M10 already established that quoted text
-  is dialogue everywhere — keeping the same convention here means the
-  greeting line follows the same rule the rest of the CLI does. (2)
-  If a future reader rewrites the greeting they'll see the `"..."`
-  and infer the styling intent without reading any docs.
+- **Why import-time side effect over a lazy call?** Two reasons.
+  (1) `pygame.init()` in `hosts/gui/__main__.py` runs at line 92
+  but `from kourai_common.audio import AudioManager` is at line
+  28. To win that race, the env var must be set during the import,
+  not when `AudioManager()` is later instantiated. (2) Keeps every
+  entry point honest — no one needs to remember to call the helper
+  before pygame work; importing the audio module is enough.
 
-- **The remaining 2 Round 6 bullets are still open:**
-  - WSL audio environment graceful handling (`SDL_AUDIODRIVER=dummy`
-    when ALSA can't reach a card, gated on `/proc/sys/fs/binfmt_misc/WSLInterop`)
-  - Git context discovery for specialist agents in worktree (containers
-    default to `/app`, so `git status --short` exits 128 because the
-    worktree is mounted elsewhere)
-  Each is worth its own focused PR. Not bundled here so the diff stays
-  scannable and the feature label on the PR is honest.
+- **Final Round 6 bullet still open:**
+  - Git context discovery for specialist agents in worktree
+    (containers default to `/app` so `git status --short` exits 128
+    because the worktree is mounted elsewhere — `[project_root: …]`
+    is in the user message but agents aren't `cd`-ing to it before
+    `git status`)
 
 ---
 
 ## Up next (queued, not yet active)
 
-- **Other 2 Round 6 bullets** (WSL audio, git context discovery) —
-  small focused PRs each.
+- **Round 6 final bullet** (git context discovery) — small focused PR.
+- **Typer + open-source-Claude-Code research** (AJ-requested 2026-04-26):
+  scan latest April 2026 takes on Typer for player-experience wins, and
+  the Rust/Python OSS rewrites of Claude Code (e.g. opencode, plandex,
+  aider, sgpt) — anything we can lift into the CLI host. Findings to
+  ROADMAP.md, not a code PR yet.
 - **T8 follow-up** (ParallelContext shared buffer feeding Metis's
   partial output back into the classifier prompt). Substantial
   async work.
