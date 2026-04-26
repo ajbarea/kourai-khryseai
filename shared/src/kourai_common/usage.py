@@ -2,8 +2,17 @@
 
 Surfaces what every ``chat()`` / ``chat_with_tools()`` call costs
 without forcing each agent to bring its own counter. The CLI's
-``/usage`` slash command formats this into a per-agent breakdown
-plus an estimated dollar total via :mod:`kourai_common.pricing`.
+``/usage`` slash command formats this into a per-agent / per-model
+breakdown plus an estimated dollar total via
+:mod:`kourai_common.pricing`.
+
+Buckets are keyed on ``(agent_name, model)`` — one row per distinct
+agent/model combination seen in the session. This matters because
+M14's cheap-tier override means Metis's discussion runs on Haiku
+while her spec generation runs on whatever the pipeline tier
+resolves to (Haiku/Sonnet/Opus). With agent-only keying the first
+model would have masked the second; per-(agent, model) lets `/usage`
+attribute the cost honestly.
 
 Streaming responses don't expose a ``usage`` block per chunk
 (only LiteLLM's final aggregate, which we don't currently capture
@@ -24,7 +33,7 @@ log = logging.getLogger(__name__)
 
 @dataclass
 class AgentUsage:
-    """Token totals for one agent across the live session."""
+    """Token totals for one (agent, model) pair across the live session."""
 
     model: str = ""
     input_tokens: int = 0
@@ -36,9 +45,15 @@ class AgentUsage:
 
 @dataclass
 class SessionUsage:
-    """All usage for the live session, keyed by agent name."""
+    """All usage for the live session, keyed by ``(agent_name, model)``.
 
-    agents: dict[str, AgentUsage] = field(default_factory=dict)
+    The ``agents`` field is the dict the CLI iterates. Keys are tuples
+    so multi-model scenarios (e.g. Metis running Haiku for the M14
+    discussion AND Opus for the spec) get separate rows in ``/usage``
+    instead of the second model silently masking the first.
+    """
+
+    agents: dict[tuple[str, str], AgentUsage] = field(default_factory=dict)
 
 
 _SESSION = SessionUsage()
@@ -71,10 +86,10 @@ def record_usage(agent_name: str, response: Any, model: str = "") -> None:
     Args:
         agent_name: Identifier the CLI uses to group lines (e.g. ``"techne"``).
         response: The LiteLLM completion response with a ``usage`` attribute.
-        model: Optional model id for pricing lookup. The first non-empty
-            model wins per agent — we don't try to track per-call model
-            mixing because all of an agent's traffic uses the same model
-            id within a tier.
+        model: Model id for pricing lookup. Buckets are keyed on
+            ``(agent_name, model)``, so calls from the same agent that
+            resolve to different models (M14 cheap-tier discussion vs
+            smart-tier spec) each get their own row in ``/usage``.
     """
     usage = getattr(response, "usage", None)
     if usage is None:
@@ -93,9 +108,8 @@ def record_usage(agent_name: str, response: Any, model: str = "") -> None:
         return
 
     with _LOCK:
-        bucket = _SESSION.agents.setdefault(agent_name, AgentUsage())
-        if model and not bucket.model:
-            bucket.model = model
+        key = (agent_name, model or "")
+        bucket = _SESSION.agents.setdefault(key, AgentUsage(model=model or ""))
         bucket.input_tokens += input_tokens
         bucket.output_tokens += output_tokens
         bucket.cache_read_tokens += cache_read_tokens

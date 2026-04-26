@@ -206,11 +206,14 @@ def _format_affinity_bar(score: float, width: int = 14) -> str:
 
 
 def _show_usage_summary() -> None:
-    """Print per-agent token totals and estimated dollar cost for the live session.
+    """Print per-agent / per-model token totals + dollar cost for the session.
 
     Pulls from kourai_common.usage's session accumulator (populated by
-    record_usage hooks in chat() and chat_with_tools()). Streaming calls
-    via chat_stream() are not currently captured — final-chunk usage
+    record_usage hooks in chat() and chat_with_tools()). Buckets are
+    keyed on (agent_name, model) so M14's cheap-tier override is
+    visible as a separate row from Metis's smart-tier spec spend
+    rather than the second one masking the first. Streaming calls via
+    chat_stream() are not currently captured — final-chunk usage
     isn't surfaced through LiteLLM's iterator interface today.
     """
     from kourai_common.pricing import compute_cost
@@ -223,7 +226,7 @@ def _show_usage_summary() -> None:
 
     _echo(f"\n{_GOLD_BRIGHT}━━━ Session Usage ━━━{_RESET}")
     _echo(
-        f"  {_DIM}{'agent':<11} {'calls':>5} {'in':>10} {'out':>9} "
+        f"  {_DIM}{'agent':<11} {'tier':<8} {'calls':>5} {'in':>10} {'out':>9} "
         f"{'cache_r':>9} {'cache_w':>9} {'cost':>10}{_RESET}"
     )
 
@@ -234,18 +237,25 @@ def _show_usage_summary() -> None:
     total_cost = 0.0
     unknown_models: set[str] = set()
 
-    for agent_name in sorted(snapshot.agents):
-        u = snapshot.agents[agent_name]
+    # Sort by (agent_name, model) so multi-model agents render in a
+    # stable order — same agent name groups visually.
+    for key in sorted(snapshot.agents):
+        agent_name, model = key
+        u = snapshot.agents[key]
         cost = compute_cost(u.model, u) if u.model else None
         cost_str = f"${cost:>8.4f}" if cost is not None else f"{_DIM}    $—   {_RESET}"
         if cost is None and u.model:
             unknown_models.add(u.model)
         if cost is not None:
             total_cost += cost
+        # Show just the model's short name, not the full provider path,
+        # so the row stays narrow. "anthropic/claude-haiku-4-5-20251001"
+        # → "haiku-4-5".
+        tier_label = _short_model_label(model)
         _echo(
-            f"  {_GOLD}{agent_name:<11}{_RESET} {u.calls:>5} {u.input_tokens:>10,} "
-            f"{u.output_tokens:>9,} {u.cache_read_tokens:>9,} "
-            f"{u.cache_write_tokens:>9,} {cost_str}"
+            f"  {_GOLD}{agent_name:<11}{_RESET} {_DIM}{tier_label:<8}{_RESET} "
+            f"{u.calls:>5} {u.input_tokens:>10,} {u.output_tokens:>9,} "
+            f"{u.cache_read_tokens:>9,} {u.cache_write_tokens:>9,} {cost_str}"
         )
         total_input += u.input_tokens
         total_output += u.output_tokens
@@ -253,8 +263,8 @@ def _show_usage_summary() -> None:
         total_cache_write += u.cache_write_tokens
 
     _echo(
-        f"  {_DIM}{'─' * 71}{_RESET}\n"
-        f"  {_GOLD}{'TOTAL':<11}{_RESET}       {total_input:>10,} "
+        f"  {_DIM}{'─' * 80}{_RESET}\n"
+        f"  {_GOLD}{'TOTAL':<11}{_RESET}          {total_input:>10,} "
         f"{total_output:>9,} {total_cache_read:>9,} "
         f"{total_cache_write:>9,} {_GOLD}${total_cost:>8.4f}{_RESET}"
     )
@@ -264,6 +274,33 @@ def _show_usage_summary() -> None:
             f"  {_DIM}(no pricing for: {', '.join(sorted(unknown_models))} "
             f"— add to kourai_common.pricing.ANTHROPIC_PRICING){_RESET}"
         )
+
+
+def _short_model_label(model: str) -> str:
+    """Compress a model id to a column-friendly label.
+
+    ``anthropic/claude-haiku-4-5-20251001`` → ``haiku-4-5``.
+    ``anthropic/claude-sonnet-4-6`` → ``sonnet``.
+    ``anthropic/claude-opus-4-7`` → ``opus``.
+    ``gemini/gemini-2.5-pro`` → ``2.5-pro``.
+
+    Empty / unrecognised input returns ``"?"`` so the column never
+    overflows.
+    """
+    if not model:
+        return "?"
+    short = model.split("/", 1)[-1]
+    short = short.replace("claude-", "")
+    # Trim to fit the 8-char column without truncating mid-word.
+    if "-" in short:
+        head, sep, _ = short.partition("-")
+        # Single-segment model names ("opus", "sonnet") keep as-is;
+        # versioned ones keep head + first segment ("haiku-4-5").
+        if head in ("haiku", "sonnet", "opus"):
+            # Pull "haiku-4-5" out of "haiku-4-5-20251001".
+            chunks = short.split("-")
+            return "-".join(chunks[:3]) if len(chunks) >= 3 else short
+    return short[:8]
 
 
 def _show_metrics_dashboard() -> None:
