@@ -198,6 +198,67 @@ def _format_affinity_bar(score: float, width: int = 14) -> str:
     return ("█" * fill) + ("·" * (width - fill))
 
 
+def _show_usage_summary() -> None:
+    """Print per-agent token totals and estimated dollar cost for the live session.
+
+    Pulls from kourai_common.usage's session accumulator (populated by
+    record_usage hooks in chat() and chat_with_tools()). Streaming calls
+    via chat_stream() are not currently captured — final-chunk usage
+    isn't surfaced through LiteLLM's iterator interface today.
+    """
+    from kourai_common.pricing import compute_cost
+    from kourai_common.usage import get_session_usage
+
+    snapshot = get_session_usage()
+    if not snapshot.agents:
+        _echo(f"{_DIM}No usage recorded yet — issue a request first.{_RESET}")
+        return
+
+    _echo(f"\n{_GOLD_BRIGHT}━━━ Session Usage ━━━{_RESET}")
+    _echo(
+        f"  {_DIM}{'agent':<11} {'calls':>5} {'in':>10} {'out':>9} "
+        f"{'cache_r':>9} {'cache_w':>9} {'cost':>10}{_RESET}"
+    )
+
+    total_input = 0
+    total_output = 0
+    total_cache_read = 0
+    total_cache_write = 0
+    total_cost = 0.0
+    unknown_models: set[str] = set()
+
+    for agent_name in sorted(snapshot.agents):
+        u = snapshot.agents[agent_name]
+        cost = compute_cost(u.model, u) if u.model else None
+        cost_str = f"${cost:>8.4f}" if cost is not None else f"{_DIM}    $—   {_RESET}"
+        if cost is None and u.model:
+            unknown_models.add(u.model)
+        if cost is not None:
+            total_cost += cost
+        _echo(
+            f"  {_GOLD}{agent_name:<11}{_RESET} {u.calls:>5} {u.input_tokens:>10,} "
+            f"{u.output_tokens:>9,} {u.cache_read_tokens:>9,} "
+            f"{u.cache_write_tokens:>9,} {cost_str}"
+        )
+        total_input += u.input_tokens
+        total_output += u.output_tokens
+        total_cache_read += u.cache_read_tokens
+        total_cache_write += u.cache_write_tokens
+
+    _echo(
+        f"  {_DIM}{'─' * 71}{_RESET}\n"
+        f"  {_GOLD}{'TOTAL':<11}{_RESET}       {total_input:>10,} "
+        f"{total_output:>9,} {total_cache_read:>9,} "
+        f"{total_cache_write:>9,} {_GOLD}${total_cost:>8.4f}{_RESET}"
+    )
+
+    if unknown_models:
+        _echo(
+            f"  {_DIM}(no pricing for: {', '.join(sorted(unknown_models))} "
+            f"— add to kourai_common.pricing.ANTHROPIC_PRICING){_RESET}"
+        )
+
+
 def _show_metrics_dashboard() -> None:
     """Display transparent player metrics: alignment, affinity, and virtues."""
     profile = PlayerProfile.load()
@@ -465,6 +526,10 @@ async def main(
                         f"  {_GOLD}Tier:{_RESET}      {MODEL_TIER} ({_tier_persona_name(MODEL_TIER)})"
                     )
                     _echo(f"  {_GOLD}Model:{_RESET}     {get_model('hephaestus')}")
+                    continue
+
+                if prompt_text == "/usage":
+                    _show_usage_summary()
                     continue
 
                 if prompt_text == "/metrics":
