@@ -86,7 +86,7 @@ class TestRecordUsage:
             model="anthropic/claude-sonnet-4-6",
         )
 
-        bucket = get_session_usage().agents["techne"]
+        bucket = get_session_usage().agents[("techne", "anthropic/claude-sonnet-4-6")]
         assert bucket.input_tokens == 1500
         assert bucket.output_tokens == 400
         assert bucket.cache_read_tokens == 900
@@ -104,7 +104,7 @@ class TestRecordUsage:
                 model="anthropic/claude-haiku-4-5-20251001",
             )
 
-        bucket = get_session_usage().agents["kallos"]
+        bucket = get_session_usage().agents[("kallos", "anthropic/claude-haiku-4-5-20251001")]
         assert bucket.calls == 3
         assert bucket.input_tokens == 300
         assert bucket.output_tokens == 150
@@ -124,39 +124,47 @@ class TestRecordUsage:
         )
 
         agents = get_session_usage().agents
-        assert agents["techne"].input_tokens == 1000
-        assert agents["kallos"].input_tokens == 500
-        assert agents["techne"].model != agents["kallos"].model
+        assert agents[("techne", "anthropic/claude-sonnet-4-6")].input_tokens == 1000
+        assert agents[("kallos", "anthropic/claude-haiku-4-5-20251001")].input_tokens == 500
 
-    def test_first_model_wins_per_agent(self):
+    def test_per_agent_per_model_keying(self):
+        # M14 cheap-tier override means the same agent can ride two
+        # models in one session: discuss_tradeoffs on Haiku, create_spec
+        # on Opus. Both rows must stack — no first-wins masking.
         from kourai_common.usage import get_session_usage
 
         record_usage(
-            "techne",
-            _fake_response(prompt_tokens=100),
-            model="anthropic/claude-sonnet-4-6",
+            "metis",
+            _fake_response(prompt_tokens=200, completion_tokens=80),
+            model="anthropic/claude-haiku-4-5-20251001",  # discussion
         )
-        # Second call passes a different model id (e.g. tier swap mid-session) —
-        # the existing bucket keeps its first model so the cost row stays
-        # attributable. Mixed-model agents are out of scope.
         record_usage(
-            "techne",
-            _fake_response(prompt_tokens=50),
-            model="anthropic/claude-opus-4-7",
+            "metis",
+            _fake_response(prompt_tokens=2000, completion_tokens=4000),
+            model="anthropic/claude-opus-4-7",  # spec
         )
-        assert get_session_usage().agents["techne"].model == "anthropic/claude-sonnet-4-6"
+
+        agents = get_session_usage().agents
+        haiku_row = agents[("metis", "anthropic/claude-haiku-4-5-20251001")]
+        opus_row = agents[("metis", "anthropic/claude-opus-4-7")]
+        # Haiku totals stay distinct from Opus totals — no masking.
+        assert haiku_row.input_tokens == 200
+        assert opus_row.input_tokens == 2000
+        # Both rows have the right model id for their cost calc.
+        assert haiku_row.model == "anthropic/claude-haiku-4-5-20251001"
+        assert opus_row.model == "anthropic/claude-opus-4-7"
 
     def test_no_usage_attr_is_silent_noop(self):
         from kourai_common.usage import get_session_usage
 
         record_usage("techne", SimpleNamespace(), model="anthropic/claude-sonnet-4-6")
-        assert "techne" not in get_session_usage().agents
+        assert ("techne", "anthropic/claude-sonnet-4-6") not in get_session_usage().agents
 
     def test_all_zero_counts_does_not_create_bucket(self):
         from kourai_common.usage import get_session_usage
 
         record_usage("techne", _fake_response(), model="anthropic/claude-sonnet-4-6")
-        assert "techne" not in get_session_usage().agents
+        assert ("techne", "anthropic/claude-sonnet-4-6") not in get_session_usage().agents
 
     def test_magicmock_counts_are_silently_dropped(self):
         from unittest.mock import MagicMock
@@ -167,7 +175,7 @@ class TestRecordUsage:
         # The counter must not coerce it to a sentinel — otherwise unit tests
         # that mock out the LLM response would inflate session totals.
         record_usage("techne", MagicMock(), model="anthropic/claude-sonnet-4-6")
-        assert "techne" not in get_session_usage().agents
+        assert ("techne", "anthropic/claude-sonnet-4-6") not in get_session_usage().agents
 
 
 # ---------------------------------------------------------------------------
@@ -359,6 +367,36 @@ class TestUsageSlashCommand:
         assert "TOTAL" in out
         assert "13.0000" in out  # 12.0 + 1.0
 
+    def test_multi_model_agent_renders_two_rows(self, monkeypatch):
+        # M14 cheap-tier override + smart spec mean Metis can ride
+        # two models in a session — both must show as separate rows
+        # with their own cost calc, not stacked into one bucket.
+        from hosts.cli.__main__ import _show_usage_summary
+
+        record_usage(
+            "metis",
+            _fake_response(prompt_tokens=200_000, completion_tokens=80_000),
+            model="anthropic/claude-haiku-4-5-20251001",
+        )
+        record_usage(
+            "metis",
+            _fake_response(prompt_tokens=2_000_000, completion_tokens=4_000_000),
+            model="anthropic/claude-opus-4-7",
+        )
+
+        captured = self._patch_echo(monkeypatch)
+        _show_usage_summary()
+        out = "\n".join(captured)
+
+        # Two distinct cost rows for the same agent.
+        # Haiku: 0.2M*1 + 0.08M*5 = 0.2 + 0.4 = $0.60
+        # Opus:  2M*5 + 4M*25 = 10 + 100 = $110.00
+        assert "haiku" in out.lower()
+        assert "opus" in out.lower()
+        assert "0.6000" in out  # haiku row cost
+        assert "110.0000" in out  # opus row cost
+        assert "110.6000" in out  # TOTAL = 0.6 + 110.0
+
     def test_unknown_model_renders_dash_and_explains(self, monkeypatch):
         from hosts.cli.__main__ import _show_usage_summary
 
@@ -397,6 +435,46 @@ class TestUsageSlashCommand:
         # Real cost line, not the unknown-model placeholder.
         assert "0.1000" in out
         assert "$—" not in out
+
+
+class TestShortModelLabel:
+    """``_short_model_label`` keeps the /usage tier column readable."""
+
+    def test_haiku_keeps_version_segment(self):
+        from hosts.cli.__main__ import _short_model_label
+
+        assert _short_model_label("anthropic/claude-haiku-4-5-20251001") == "haiku-4-5"
+
+    def test_sonnet_keeps_version_segment(self):
+        from hosts.cli.__main__ import _short_model_label
+
+        assert _short_model_label("anthropic/claude-sonnet-4-6") == "sonnet-4-6"
+
+    def test_opus_keeps_version_segment(self):
+        from hosts.cli.__main__ import _short_model_label
+
+        assert _short_model_label("anthropic/claude-opus-4-7") == "opus-4-7"
+
+    def test_gemini_strips_provider_prefix(self):
+        from hosts.cli.__main__ import _short_model_label
+
+        # Gemini doesn't have the "claude-" prefix to strip; the
+        # path-strip handles the provider/.
+        assert _short_model_label("gemini/gemini-2.5-pro") == "gemini-2"
+
+    def test_empty_returns_question_mark(self):
+        from hosts.cli.__main__ import _short_model_label
+
+        assert _short_model_label("") == "?"
+
+    def test_unknown_format_truncated(self):
+        # Anything we haven't special-cased gets safely truncated to
+        # the column width so the table doesn't overflow.
+        from hosts.cli.__main__ import _short_model_label
+
+        # "test/some-very-long-model-name" → strips provider → some-… (8 chars)
+        result = _short_model_label("test/some-very-long-model-name")
+        assert len(result) <= 8
 
 
 class TestResetUsage:
