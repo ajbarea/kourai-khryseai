@@ -5,7 +5,7 @@ A public, living plan for where the forge is heading. Items here are either
 *currently working on* lives in [IMPL.md](./IMPL.md) — when it lands, the
 matching milestone here collapses to a single line under "Shipped".
 
-Last reviewed: 2026-04-23 (M1 code shipped, awaiting Round 6 live smoke; cross-cutting agent/MCP/A2A polish landed — see Shipped)
+Last reviewed: 2026-04-26 (M1 code shipped, awaiting Round 6 live smoke; M4 prompt caching shipped within-loop — see Shipped)
 
 ---
 
@@ -154,30 +154,6 @@ Reference: [A2A streaming & async](https://a2a-protocol.org/latest/topics/stream
 
 ---
 
-## M4 — Prompt caching on agent system prompts
-
-> Status: planned · Cheap polish · Can land alongside any M
-
-Agent system prompts (Techne, Kallos, Hephaestus) are 1-3 KB each and re-sent
-verbatim every call. Marking a `cache_control: {"type": "ephemeral"}`
-breakpoint at the end of the system block cuts that cost by ~10× on cache hits.
-
-**Scope.**
-
-- Pass `cache_control` block in system messages from `llm.py`.
-- Verify via `usage.cache_read_input_tokens` on the second call within 5 min.
-- Consider 1-hour TTL (`{"type": "ephemeral", "ttl": "1h"}`) for stable
-  prompts that survive long idle windows; the 2× write cost amortizes.
-
-**Threshold note.** Min cacheable tokens (April 2026): Opus 4.7 / 4.6 / 4.5 = 4096,
-Sonnet 4.6 = 2048. Techne's system prompt sits ~3500 tokens — caches on Sonnet,
-not yet on Opus. M1 has now stripped the format-instruction block (2026-04-20),
-so to land caching on Opus we need to bundle `get_enriched_system_prompt`'s
-persona enrichment into the cached prefix to cross the threshold. Kallos is
-similarly trimmed and will need the same treatment.
-
-Reference: [Anthropic prompt caching](https://docs.claude.com/en/docs/build-with-claude/prompt-caching).
-
 ---
 
 ## M5 — Permissions / UID alignment (forge worktree)
@@ -260,8 +236,8 @@ Meanwhile OTEL spans around each call give us per-tool latency visibility
 ``shared/src/kourai_common/config.py`` still names
 ``anthropic/claude-opus-4-6`` in ``MODELS_SMART["metis"]``. Opus 4.7 is the
 current Anthropic flagship. Cheap bump: rename ``4-6`` → ``4-7`` once pricing
-and cache thresholds are confirmed equivalent (see M4 — Opus 4.7 caches at
-4096 tokens, same as 4.6).
+is confirmed equivalent. Cache thresholds match (Opus 4.7 = Opus 4.6 = 4096
+tokens minimum), so the M4 caching markers carry over without re-tuning.
 
 No metric-based rollout is needed for a Claude-family minor: behaviour is a
 super-set. Gate the bump on a Round 6 smoke that exercises Metis's planning
@@ -567,6 +543,7 @@ widget that caches rendered surfaces.
 
 One-liner per item, newest first. Detail moves out of this file when work lands.
 
+- 2026-04-26 — M4 prompt caching landed in `chat_with_tools`: `cache_control: {"type": "ephemeral"}` on the system block, last tool definition, and initial user message; iterations 2–N of every Techne/Kallos/Dokimasia run hit the cache for the `[system + tools + initial-user]` prefix (which routinely carries 2K–10K tokens of `file_contents`/`git_context`/docs). `chat` and `chat_stream` mark the system block too — sub-threshold prefixes are silently ignored at no charge. `usage.cache_read_input_tokens` / `cache_creation_input_tokens` debug-logged after every call. Note: cross-call caching of just the agent system prompt does NOT pay today (Techne 1101 tokens vs 2048 Sonnet / 4096 Opus minimums); within-loop is the actual win
 - 2026-04-23 — OTEL spans around every MCP tool call (``mcp.context7.query``, ``mcp.memory.*``); per-call latency now lands in Jaeger alongside A2A hops
 - 2026-04-23 — ``mcp_servers/shell`` ``run_command`` advertises ``_meta["anthropic/maxResultSizeChars"] = 500000``; Claude Code-style clients stop truncating pytest / ruff tracebacks at the 25K default
 - 2026-04-23 — Hephaestus ``RemoteAgentConnection.connect()`` falls back to synthesized ``AgentCard`` when ``A2ACardResolver`` fails; docker-compose cold-start no longer blocks the orchestrator on slow specialists

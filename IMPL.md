@@ -141,12 +141,28 @@ sanity check is left.
   Round 6, also confirm `dev_log` sessions contain the assistant text plus
   the tool_call log so the full agentic round is replayable from disk.
 
-- **M4 hand-off:** the format-instruction block is gone from Techne's
-  system prompt as of M1 Step 3, which drops it under the Opus 4.7 cache
-  threshold (4096 tokens). When M4 lands, bundle
-  `get_enriched_system_prompt`'s persona enrichment into the cached prefix
-  so Techne (and Kallos, similarly trimmed in Step 4) cross the threshold
-  again. Sonnet 4.6 still caches today (2048 threshold).
+- **M4 (prompt caching) — shipped 2026-04-26, with a correction.** The
+  hand-off note above had the prompt sizes badly wrong: actual measurements
+  on 2026-04-26 came in at Techne 1101 tokens / Kallos 1022 / Dokimasia
+  1035 / Metis 913 / Hephaestus routing 632 — well below Sonnet 4.6 (2048)
+  and far below Opus 4.6/4.7 (4096). Persona enrichment only adds ~240
+  tokens in a typical mid-game profile, nowhere near closing the gap. So
+  cross-call caching of the system prompt isn't paying off today, and
+  bundling persona wouldn't have changed that.
+
+  What we *did* ship is **within-loop caching** in `chat_with_tools`: the
+  `[system + tools + initial-user]` prefix is reused across every
+  iteration of the agentic loop, and the initial user message routinely
+  carries 2K–10K tokens of `file_contents` + `git_context` + docs lookup.
+  That combined prefix easily crosses 2048 (Sonnet) and frequently
+  crosses 4096 (Opus), so iterations 2–N of every Techne / Kallos /
+  Dokimasia run pay 10% of input price for the prefix instead of 100%.
+  `chat` and `chat_stream` mark the system block too — sub-threshold
+  prefixes are silently ignored by Anthropic at no cost, so the marker
+  is free insurance once any agent's context grows.
+  `cache_read_input_tokens` / `cache_creation_input_tokens` get
+  debug-logged after every call so Round 6 can confirm hits in
+  `dev-latest.log`.
 
 ---
 
@@ -154,5 +170,3 @@ sanity check is left.
 
 - **M2** (`kourai-forge-mcp` server) — start once M1 ships and we've felt
   whether the toolset is right.
-- **M4** (prompt caching) — can sneak in as a one-line PR alongside any M1
-  step that touches `llm.py`.
