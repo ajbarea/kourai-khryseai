@@ -9,7 +9,7 @@ from a2a.types import DataPart, Part, Task, TextPart, UnsupportedOperationError
 from a2a.utils.errors import ServerError
 
 from agents.metis.agent import create_spec_stream, get_project_context
-from kourai_common.a2a_utils import extract_image_parts
+from kourai_common.a2a_utils import extract_image_parts, parse_project_root
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
 from kourai_common.messaging import send_working_status
@@ -43,6 +43,11 @@ class MetisAgentExecutor(BaseAgentExecutor):
         """Metis-specific: create implementation specs."""
         with create_span("metis.execute", {"a2a.method": "execute"}):
             user_input = context.get_user_input()
+            # Round 6 caught `git status --short` exiting 128 from the
+            # specialist container because the default cwd (`/app`) isn't
+            # the worktree. parse_project_root falls back to cwd when the
+            # tag is missing, so internal/test invocations are unaffected.
+            project_root = parse_project_root(user_input)
 
             # Step 1: Gather project context
             await send_working_status(
@@ -57,7 +62,9 @@ class MetisAgentExecutor(BaseAgentExecutor):
                 await send_working_status(updater, task, line, emoji="🔍")
 
             with create_span("metis.context"):
-                project_context = await get_project_context(status_callback=_git_status)
+                project_context = await get_project_context(
+                    project_root=str(project_root), status_callback=_git_status
+                )
 
             # Inject default tech stack when scaffolding a new project
             if looks_like_scaffolding(user_input):

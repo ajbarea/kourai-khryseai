@@ -198,6 +198,36 @@ class TestMetisExecutor:
         # Enqueue events: task creation + add_artifact + complete (send_working_status is mocked)
         assert queue.enqueue_event.call_count >= 3
 
+    @pytest.mark.asyncio
+    async def test_get_project_context_called_with_project_root(self):
+        """Round 6 caught `git status --short` exiting 128 from the
+        Metis container because the default cwd (`/app`) isn't the
+        worktree. The executor now parses [project_root: ...] and
+        threads it through to get_project_context."""
+        from agents.metis.agent_executor import MetisAgentExecutor
+
+        executor = MetisAgentExecutor()
+        ctx = _make_context("[project_root: /tmp/forge/abc123]\nimplement CSV export")
+        queue = _make_queue()
+
+        get_ctx_mock = AsyncMock(return_value="project ctx")
+
+        with (
+            patch("agents.metis.agent_executor.create_span"),
+            patch("agents.metis.agent_executor.get_project_context", get_ctx_mock),
+            patch(
+                "agents.metis.agent_executor.create_spec_stream",
+                return_value=_async_gen(["spec"]),
+            ),
+            patch("agents.metis.agent_executor.send_working_status"),
+        ):
+            await executor.execute(ctx, queue)
+
+        get_ctx_mock.assert_called_once()
+        call_kwargs = get_ctx_mock.call_args.kwargs
+        assert "project_root" in call_kwargs
+        assert call_kwargs["project_root"] is not None
+
 
 class TestDokimasiaExecutor:
     """Dokimasia-specific tests (testing, pytest runs)."""
@@ -292,6 +322,48 @@ class TestTechneExecutor:
 
         # Enqueue events: task creation + add_artifact + complete
         assert queue.enqueue_event.call_count >= 3
+
+    @pytest.mark.asyncio
+    async def test_get_git_context_called_with_project_root_cwd(self):
+        """Round 6 caught `git status --short` exiting 128 because the
+        Techne container's default cwd (`/app`) isn't the worktree.
+        Ensure get_git_context now receives the parsed project_root as
+        cwd so the call lands in the right repo."""
+        from agents.techne.agent_executor import TechneAgentExecutor
+
+        executor = TechneAgentExecutor()
+        ctx = _make_context("[project_root: /tmp/forge/abc123]\nfix auth.py null check")
+        queue = _make_queue()
+
+        git_context_mock = AsyncMock(return_value="M auth.py")
+
+        with (
+            patch("agents.techne.agent_executor.create_span"),
+            patch(
+                "agents.techne.agent_executor.parse_file_paths",
+                return_value=["auth.py"],
+            ),
+            patch(
+                "agents.techne.agent_executor.read_files",
+                return_value={"auth.py": "code"},
+            ),
+            patch("agents.techne.agent_executor.get_git_context", git_context_mock),
+            patch(
+                "agents.techne.agent_executor.apply_code_changes",
+                new_callable=AsyncMock,
+                return_value=("Updated auth.py.", []),
+            ),
+            patch("agents.techne.agent_executor.send_working_status"),
+        ):
+            await executor.execute(ctx, queue)
+
+        # parse_project_root falls back to cwd if the path doesn't exist
+        # on disk, so we just assert cwd was passed (not None) — the
+        # original bug was no cwd at all.
+        git_context_mock.assert_called_once()
+        call_kwargs = git_context_mock.call_args.kwargs
+        assert "cwd" in call_kwargs
+        assert call_kwargs["cwd"] is not None
 
 
 class TestHephaestusExecutor:
