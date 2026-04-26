@@ -125,6 +125,42 @@ async def get_project_context(
     return "\n\n".join(parts) if parts else "No project context available."
 
 
+async def discuss_tradeoffs(
+    user_request: str,
+    context_id: str | None = None,
+) -> str:
+    """Quick architectural take on a dev request — for the M14 dead-zone fix.
+
+    Hephaestus's executor invokes this in parallel with its routing
+    classifier. Output is 1-2 short paragraphs of architectural concerns,
+    edge cases, or tradeoffs the player should weigh before confirming —
+    NOT a full spec. Surfaced to the player on tier-2 (smart) and tier-3
+    (clarify) confirmations only; on tier-1 (clear) Metis stays silent
+    so the read-back-then-confirm beat is a beat, not an interrogation.
+
+    The call runs at whatever ``KOURAI_MODEL_TIER`` is active. A future
+    optimization could pin discussion to ``cheap`` regardless of the
+    pipeline tier, but that would require a tier-override on
+    ``kourai_common.llm.chat`` (not surfaced today).
+    """
+    system_prompt = (
+        get_enriched_system_prompt(SYSTEM_PROMPT, "metis")
+        + "\n\nDISCUSSION MODE: This is a quick parallel brainstorm during "
+        "Hephaestus's order classification — NOT a full spec. Give 1-2 "
+        "SHORT paragraphs of architectural concerns, edge cases, or "
+        "tradeoffs the player should weigh before confirming. Stay tight; "
+        "the read-back is coming. Speak in your usual voice (quoted lines "
+        "for direct address per M10). Do NOT emit FACT tags here — those "
+        "belong in the actual spec call later."
+    )
+    messages: list[dict[str, Any]] = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_request},
+    ]
+    log.info("Metis discuss_tradeoffs for: %.100s", user_request)
+    return await chat("metis", messages, temperature=0.4, max_tokens=400, context_id=context_id)
+
+
 async def create_spec(
     idea: str,
     file_contents: dict[str, str] | None = None,

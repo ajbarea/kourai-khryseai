@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import logging
 from typing import TYPE_CHECKING
 
@@ -10,6 +12,7 @@ from a2a.utils.errors import ServerError
 
 from agents.hephaestus.agent import determine_pipeline, execute_pipeline
 from agents.hephaestus.confirmation import parse_confirmation_response
+from agents.metis.agent import discuss_tradeoffs
 from kourai_common.a2a_utils import extract_file_attachments
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
@@ -71,7 +74,21 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
                 emoji=AGENT_EMOJI["hephaestus"],
             )
 
-            pipeline = await determine_pipeline(user_input, context_id=task.context_id)
+            # M14 — kick Metis's discuss_tradeoffs in parallel with the
+            # router classifier so the dead zone between "Analyzing
+            # request..." and the CONFIRM_ORDER card becomes useful
+            # architectural context. Surfaced to the player only on
+            # tier-2 (smart) and tier-3 (clarify) confirmations; on
+            # tier-1 (clear) Metis stays silent so the read-back beat
+            # is a beat, not an interrogation. Skip entirely when
+            # /yolo is on — power-user flow doesn't want the chatter.
+            metis_task = self._maybe_spawn_metis_discussion(user_input, task.context_id)
+
+            try:
+                pipeline = await determine_pipeline(user_input, context_id=task.context_id)
+            except Exception:
+                await self._cancel_metis(metis_task)
+                raise
 
             # Handle non-pipeline responses
             if isinstance(pipeline, str):
@@ -110,15 +127,33 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
                             parse_err,
                             pipeline,
                         )
+                        # No tier on parse failure — discard Metis's work.
+                        await self._cancel_metis(metis_task)
                         message = (
                             f"{AGENT_EMOJI['hephaestus']} \"I couldn't parse "
                             "my own confirmation. Could you re-state the "
                             'request?"'
                         )
+                        await send_input_required(updater, task, message)
+                        return
+
+                    # M14 — surface Metis's parallel discussion BEFORE the
+                    # confirmation card on smart/clarify tiers, so the
+                    # player has architectural context when they decide.
+                    # On clear tier, discard Metis's work — the player
+                    # just wants to ship and a wall of text would be noise.
+                    if confirmation.tier in ("smart", "clarify"):
+                        await self._await_and_emit_metis(metis_task, updater, task)
+                    else:
+                        await self._cancel_metis(metis_task)
+
                     await send_input_required(updater, task, message)
                     return
 
                 if pipeline.startswith("ASK_USER:"):
+                    # Ambiguous request — Metis's discussion is moot
+                    # because we don't know what to discuss yet.
+                    await self._cancel_metis(metis_task)
                     clarification = pipeline.removeprefix("ASK_USER:").strip()
                     await send_input_required(
                         updater,
@@ -128,6 +163,9 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
                     return
 
                 if pipeline.startswith("CHAT:"):
+                    # Conversational route — Metis's architectural notes
+                    # are irrelevant to a casual chat. Drop her output.
+                    await self._cancel_metis(metis_task)
                     chat_body = pipeline.removeprefix("CHAT:").strip()
                     # Check for agent-directed chat: "CHAT:kallos: ..."
                     # Includes companion spirits puck and cupid
@@ -198,6 +236,11 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
                     return
 
             # Step 2: Report the pipeline (pipeline must be list[str] here)
+            # Reaching this branch means /yolo bypassed CONFIRM_ORDER and
+            # we got the agent list directly. Player wants speed, not
+            # commentary — drop Metis's parallel discussion silently.
+            await self._cancel_metis(metis_task)
+
             if not isinstance(pipeline, list):
                 raise TypeError(
                     f"Pipeline should be list[str] at this point, but got {type(pipeline)}"
@@ -293,6 +336,72 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
             )
             await updater.complete()
             log.info("Hephaestus pipeline completed: %s", pipeline_display)
+
+    # ── M14 Metis-First Parallel Routing helpers ──────────────────
+
+    def _maybe_spawn_metis_discussion(
+        self, user_input: str, context_id: str | None
+    ) -> asyncio.Task[str] | None:
+        """Spawn Metis's ``discuss_tradeoffs`` as a parallel asyncio task.
+
+        Returns the task so cancellation/awaiting is the caller's
+        responsibility. Skips entirely when ``[yolo:`` is in the input —
+        the power-user opt-out also opts out of the parallel chatter.
+        """
+        if "[yolo:" in user_input.lower():
+            log.debug("yolo on — skipping parallel Metis discussion")
+            return None
+        return asyncio.create_task(
+            discuss_tradeoffs(user_input, context_id=context_id),
+            name="metis-discuss-tradeoffs",
+        )
+
+    async def _cancel_metis(self, metis_task: asyncio.Task[str] | None) -> None:
+        """Cancel Metis's discussion and swallow ``CancelledError``.
+
+        Used when the route turns out to be CHAT, ASK_USER, malformed
+        CONFIRM_ORDER, tier-1 (clear) confirmation, or yolo pipeline —
+        any path where the player won't see Metis's output.
+        """
+        if metis_task is None or metis_task.done():
+            return
+        metis_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError, Exception):
+            await metis_task
+
+    async def _await_and_emit_metis(
+        self,
+        metis_task: asyncio.Task[str] | None,
+        updater: TaskUpdater,
+        task: Task,
+        deadline_seconds: float = 8.0,
+    ) -> None:
+        """Wait for Metis's discussion (with deadline) and emit as a status event.
+
+        Called only on tier-2 (smart) and tier-3 (clarify) confirmations.
+        The deadline guards against a Metis call that drags past the
+        classifier's wall-clock window — better to drop her contribution
+        than make the player wait for it. Output is emitted with the
+        Metis emoji prefix so the existing host-side ``_maidenify_status``
+        renders it as a Metis comms window, italicizing any quoted
+        speech per M10.
+        """
+        if metis_task is None:
+            return
+        try:
+            metis_text = await asyncio.wait_for(metis_task, timeout=deadline_seconds)
+        except (TimeoutError, asyncio.CancelledError):
+            log.debug("Metis discussion timed out or cancelled — skipping emit")
+            await self._cancel_metis(metis_task)
+            return
+        except Exception:
+            log.warning("Metis discussion errored — skipping emit", exc_info=True)
+            return
+
+        text = (metis_text or "").strip()
+        if not text:
+            return
+        await send_working_status(updater, task, text, emoji=AGENT_EMOJI["metis"])
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
         raise ServerError(error=UnsupportedOperationError())
