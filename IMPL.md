@@ -5,168 +5,153 @@ milestone lands, the matching detail block in [ROADMAP.md](./ROADMAP.md)
 collapses to a one-liner under "Shipped" and this file gets reset to the
 next milestone.
 
-Updated: 2026-04-26 · Working on: **M13 — Forge Order Confirmation**
-(Phase 1 of `plans/2026-04-26-forge-order-confirmation.md`)
+Updated: 2026-04-26 · Working on: **M14 — Metis-First Parallel Routing**
+(Phase 2 of `plans/2026-04-26-forge-order-confirmation.md`)
 
 ---
 
 ## Plan-of-record
 
-End state: every development task goes through a guaranteed pre-pipeline
-confirmation gate. Hephaestus reads the parsed intent back to the player
-("Light the forge?") and waits for explicit confirmation before any
-specialist runs. Three tiers scale verbosity to ambiguity (clear / smart
-/ clarify). `/yolo` opts out for power users.
+End state: Metis discusses architectural tradeoffs in parallel with
+Hephaestus's order classification, surfaced to the player on tier-2
+(smart) and tier-3 (clarify) confirmations. Together with M13 the
+player-experience load-bearing pair is complete: M13 makes the gate
+legible (read-back-then-confirm), M14 fills the dead zone with
+useful context.
 
-Following the plan's TDD flow inline (not subagent-driven). T1-T3 + T5 +
-T6 land in this PR. T4 (ForgeSession `[forge_intent]` block for richer
-specialist context) deferred to a follow-up — the gate works without it
-because the LLM router sees the prior CONFIRM_ORDER + player response in
-context_id memory automatically.
+Following the plan's TDD flow inline. T7 + T9 land in this PR with a
+batch-parallel architecture (Metis runs concurrently, output buffered,
+emitted at end). T8 (ParallelContext shared buffer feeding Metis's
+partial output back into the classifier prompt to enrich the read-back
+text) is deferred — the player still sees both panels independently.
 
-### T1 — CONFIRM_ORDER protocol parser + ROUTING_PROMPT ✅ 2026-04-26
+### T7 part 1 — `discuss_tradeoffs` entry point on Metis ✅ 2026-04-26
 
-- [x] `agents/hephaestus/confirmation.py`: `parse_confirmation_response`
-      decodes `CONFIRM_ORDER: <tier> "<read-back>"` → frozen
-      `ConfirmationResponse(tier, read_back)`. Three known tiers, raises
-      on unknown / malformed.
-- [x] `agents/hephaestus/agent.py::ROUTING_PROMPT`: response option #5
-      added with the three-tier rubric, examples, and voice constraints
-      (tight tier 1; tier 2 may have one in-character aside; never
-      roasts the player).
-- [x] `tests/unit/test_hephaestus_confirmation.py`: 12 tests across 2
-      classes (parser happy/error paths, prompt content assertions).
+- [x] `agents/metis/agent.py::discuss_tradeoffs`: new async function
+      doing one `chat()` call with a focused "DISCUSSION MODE" system
+      prompt — 1-2 short paragraphs, NOT a full spec, no FACT tags.
+      `max_tokens=400` to bound runaway output.
+- [x] Runs at whatever `KOURAI_MODEL_TIER` is active (no per-call
+      tier override today). Future optimization: pin to `cheap`
+      regardless of pipeline tier — would require `chat()` to grow a
+      tier kwarg. Documented in the function docstring.
 
-### T2 — Wire CONFIRM_ORDER through executor → INPUT_REQUIRED ✅ 2026-04-26
+### T7 part 2 — Spawn Metis discussion in parallel ✅ 2026-04-26
 
-- [x] `agents/hephaestus/agent.py::determine_pipeline`: recognises
-      `CONFIRM_ORDER:` prefix and forwards verbatim, parallel to the
-      existing `ASK_USER:` / `CHAT:` branches.
-- [x] `agents/hephaestus/agent_executor.py`: new branch ahead of the
-      existing `ASK_USER:` handling. Parses the token, prefixes the
-      Hephaestus emoji (`AGENT_EMOJI["hephaestus"]`) so the host's
-      `_maidenify_status` renders as a comms window, appends a
-      tier-specific suffix (Metis-muttering hint on smart, forge-cools
-      hint on clarify), then calls `send_input_required`.
-- [x] Fail-safe: malformed CONFIRM_ORDER tokens log a warning and
-      surface a generic ask — never auto-execute.
-- [x] Resume is implicit: the next user message lands in the same
-      context_id, the LLM sees the CONFIRM_ORDER + player response in
-      memory, and emits the agent list on the resumed routing call.
-      No explicit "resume metadata" plumbing needed.
-- [x] `tests/unit/test_confirmation_protocol.py` `TestDeterminePipeline*`
-      and `TestExecutorEmits*`: 8 tests covering tier forwarding +
-      executor INPUT_REQUIRED emission + emoji-prefix + tier suffixes
-      + malformed fail-safe + pipeline-not-running guard.
+- [x] `agents/hephaestus/agent_executor.py`: `_maybe_spawn_metis_discussion`
+      kicks off `asyncio.create_task(discuss_tradeoffs(...))` BEFORE
+      awaiting `determine_pipeline`. Skip entirely when `[yolo:` is in
+      the input (power-user opt-out skips the parallel chatter too —
+      no point burning tokens on chatter that won't reach the player).
+- [x] `_cancel_metis` swallows `CancelledError` cleanly. Used on every
+      route the player won't see Metis's output: CHAT, ASK_USER,
+      malformed CONFIRM_ORDER, tier-1 confirmation, yolo pipeline.
+- [x] Exception path: classifier raising → cancel Metis → re-raise
+      so the executor's error handler sees the original exception.
 
-### T3 — CLI render confirmation card + `/yolo` toggle ✅ 2026-04-26
+### T9 — Surface Metis to player on tier 2/3 ✅ 2026-04-26
 
-Skipped the plan's `format_confirmation_card` invention — the executor's
-emoji-prefixed message already routes through the existing
-`_maidenify_status` → `_comms_window` pipeline and renders correctly
-via M10's italic-on-quoted convention. One less abstraction.
+- [x] `_await_and_emit_metis(metis_task, updater, task, timeout=8.0)`
+      awaits Metis with a deadline, emits the result as one
+      `send_working_status` event with the Metis emoji prefix
+      (`📐 \U0001f4d0`) so the host's existing `_maidenify_status`
+      renders it as a Metis comms window. Italicized speech per M10
+      kicks in automatically (Metis's discussion-mode prompt instructs
+      her to quote player-directed lines).
+- [x] Wired into the CONFIRM_ORDER branch: tier `smart` and `clarify`
+      → `_await_and_emit_metis`; tier `clear` → `_cancel_metis`.
+- [x] Timeout dropped silently — confirmation card still ships even
+      if Metis dragged. The player never waits longer than the
+      classifier required just because Metis is being verbose.
 
-- [x] `hosts/cli/settings.py`: `yolo_enabled: bool = False` field.
-      Plus a forward-compat fix to `CLISettings.load()` that drops
-      unknown JSON keys silently (regression that pre-existed M13 — a
-      hypothetical future settings upgrade would have crashed otherwise).
-- [x] `hosts/cli/completer.py`: `/yolo` registered.
-- [x] `hosts/cli/__main__.py`: `/yolo` handler toggles, persists, prints
-      a state line. The text-tag `[yolo: on]\n` prepends to outgoing
-      `forge_msg` when enabled.
-- [x] `agents/hephaestus/agent.py::extract_yolo`: strips the tag,
-      returns `(clean_text, yolo_bool)`. Same convention as
-      `extract_project_root` and `extract_relationship_tiers`.
-- [x] `determine_pipeline`: when yolo is set, augments the system prompt
-      with `YOLO MODE: skip CONFIRM_ORDER, emit agent list directly`.
-- [x] `tests/unit/test_confirmation_protocol.py` `TestYoloBypass` and
-      `TestCLISettingsYoloField`: 9 tests — extraction (case-insensitive,
-      tag-only not bare-word match), system-prompt augmentation, default
-      OFF, toggle persists, unknown-keys-don't-crash.
+### T8 — DEFERRED
 
-### T4 — Forge session captures confirmed-spec → memoir (DEFERRED)
+The plan's T8 (`ParallelContext` shared async buffer letting the
+classifier read Metis's partial output during prompt construction)
+is scoped out. M14 ships meaningful value without it: player sees
+Metis's full discussion panel + the confirmation card on tier 2/3.
+What T8 would add: the smart-tier read-back text would itself
+mention Metis's specific concerns (vs. mentioning them via Metis's
+panel and then again via the read-back). Worth a follow-up PR after
+we feel whether the two-panel rendering is sufficient in dogfooding.
 
-Scoped out of this PR. The gate is functional without it because the
-LLM router on the resume turn already sees the CONFIRM_ORDER + player
-response in context_id memory and emits the agent list informed by
-that context. Specialists today receive the player's resume message as
-the user_request; the original ask is implicit but not explicitly
-fielded into a `[forge_intent]` block.
+### M14 tests ✅ 2026-04-26
 
-Adding the explicit `[forge_intent tier=X ORIGINAL: ... PLAYER_CONFIRMED:
-...]` block (per the plan's T4) would let Metis / Techne / Dokimasia /
-Kallos work against the structured confirmed scope rather than the
-inferred one. Worth a follow-up PR once we feel whether the implicit
-context is sufficient in dogfooding.
+- [x] `tests/unit/test_metis_parallel.py`: 13 tests across 4 classes:
+      - `TestDiscussTradeoffs` (4) — chat_response shape, agent name
+        is "metis", DISCUSSION MODE marker present, `max_tokens` capped.
+      - `TestParallelDispatch` (1) — Metis starts within 50ms of
+        classifier (true `asyncio.gather`-style parallelism, not
+        sequential).
+      - `TestCancellationMatrix` (4) — CHAT / ASK_USER / clear-tier /
+        yolo all take the cancel path (asserted via `_cancel_metis`
+        spy; checking inside the patched `discuss_tradeoffs` doesn't
+        work because the task can be cancelled before it ever
+        schedules).
+      - `TestSurfacing` (4) — smart + clarify emit Metis with the
+        📐 emoji prefix; clear does NOT; Metis timeout doesn't block
+        the confirmation card from firing.
+      - Whole file passes in 2.78 s.
 
-### T5 — Voice regression tests ✅ 2026-04-26
+### Step 5 — Live smoke (queued for next interactive session)
 
-- [x] `tests/integration/test_confirmation_voice.py`: 31 tests across
-      4 parametrised cases. Curated GOOD_CLEAR / GOOD_SMART /
-      GOOD_CLARIFY corpora; `BANNED_PHRASES` list catches mocking /
-      condescending tones (`"really?"`, `"that's all"`, `"obviously"`,
-      etc.); tier-1 verbosity cap (≤15 words); no-quoted-quotes hygiene
-      so read-backs round-trip through the parser cleanly. Voice drift
-      is now a test failure, not a vibe-check.
-
-### T6 — SMOKE_TODO Round 7 ✅ 2026-04-26
-
-- [x] `SMOKE_TODO.md`: Round 7 appended after Round 6. Three tier
-      exercises with intentionally chosen prompts (tier-1 quadruple,
-      tier-2 divide, tier-3 "make my codebase faster"). `/yolo`
-      verification. Save terminal output to
-      `assets/poster/forge-order-tier-{1,2,3}.txt` for the conference
-      poster figure.
-
-### Step 7 — Live smoke (queued for next interactive `/project` session)
-
-- [ ] Round 7 from `SMOKE_TODO.md` — three-tier walkthrough + `/yolo`
-      verification + poster artifact capture. ~10 min interactive.
+- [ ] Send a tier-2 prompt (e.g., "add a divide function") → confirm
+      Metis's discussion appears as a 📐 comms window BEFORE
+      Hephaestus's confirmation card.
+- [ ] Send a tier-1 prompt (e.g., "add quadruple(n)") → confirm
+      Metis stays silent; only Hephaestus's card appears.
+- [ ] `/yolo` → confirm Metis is not even spawned (no token spend).
+- [ ] Compare wall-clock tier-2 latency before/after — should be
+      ~max(metis, classifier) instead of sequential sum (~5s saved
+      on tier-2 confirmations).
+- [ ] Add a tier-2 capture to `assets/poster/forge-order-tier-2.txt`
+      (per Round 7 in `SMOKE_TODO.md`) showing Metis's panel + the
+      Hephaestus card together — that's the conference poster figure.
 
 ---
 
 ## Notes / open questions
 
-- **Why prefix the read-back with the Hephaestus emoji in the
-  executor (vs adding a new format_confirmation_card)?** The host's
-  existing `_maidenify_status` already renders emoji-prefixed status
-  text as a comms window for the matched agent. Adding a new
-  card-renderer would have duplicated that convention. Server-side
-  composition keeps the CLI side a no-op for this feature.
+- **Why batch-parallel, not live-streaming?** Streaming Metis's chunks
+  to the player as they arrive (rather than buffering until classifier
+  decides) would fill the dead zone live, but introduces ugly edge
+  cases: if the classifier decides CHAT mid-stream, the player sees
+  half a Metis sentence then a chat response. Buffer-then-emit at end
+  is cleaner UX. Trade-off: the dead zone is shorter (max(metis,
+  classifier) instead of sum) but still present in absolute terms.
 
-- **Why text-tag `[yolo: on]` instead of A2A message metadata?**
-  Because `[project_root: …]` and `[relationship_tiers: …]` already
-  use the text-tag convention in this codebase, and message metadata
-  isn't guaranteed to be forwarded by every transport per the comment
-  in `extract_project_root`. Following the established pattern is
-  cheaper than adding a transport-dependent metadata field.
+- **Tier-1 silently drops Metis's work.** ~5 seconds of LLM compute
+  goes nowhere on every clear-tier confirmation. Tradeoff: spawning
+  Metis later (only after classifier returns smart/clarify) would
+  make the smart/clarify path SLOWER (sequential), defeating the
+  parallel-latency benefit. The waste on tier-1 is the price for
+  the win on tier-2/3. If the cheap-tier override lands later
+  (T7-future), the cost on tier-1 drops to near-zero.
 
-- **The `CLISettings.load()` unknown-keys fix is in passing.** Before
-  this PR, adding a new field to `CLISettings` and trying to load an
-  older `cli_settings.json` would crash because `cls(**data)` errors
-  on unknown keys. That used to be silently OK because the dataclass
-  fields have all been there forever. Now that we're adding fields
-  more often, the forward-compat fix prevents a future-rolled-back
-  build from breaking the player's settings. Asserted in
-  `test_load_tolerates_unknown_keys`.
+- **No A2A round-trip for Metis discussion.** `discuss_tradeoffs` is
+  called directly from Hephaestus's process via the in-process
+  `chat()` helper, not via A2A to Metis's container. Saves the A2A
+  hop latency. Metis's container still handles the actual `create_spec`
+  call later in the pipeline — this is just a lightweight brainstorm.
+
+- **T8 (ParallelContext) is a real refinement worth shipping.** The
+  smart-tier read-back today is generated by the classifier without
+  Metis's input. T8 would let the classifier prompt include Metis's
+  partial notes ("Metis is flagging zero-division — fold into your
+  read-back if relevant"). Smaller surface than the M14 work itself.
 
 ---
 
 ## Up next (queued, not yet active)
 
-- **Phase 2 of the M13/M14 plan** — Metis-first parallel routing
-  (T7-T9): spawn Metis's `discuss_tradeoffs` in parallel with the
-  classifier so the dead zone becomes engaging architectural dialogue.
-  Builds on M13's CONFIRM_ORDER primitives. Separate PR.
-- **T4 follow-up** — `[forge_intent]` block on the user message
-  passed to specialists, so Metis / Techne / Dokimasia / Kallos see
-  the confirmed scope explicitly rather than via implicit context_id
-  memory. Tractable as a small standalone PR once we feel whether
-  the implicit context is sufficient.
-- **M9** (Opus 4.6 → 4.7 in `MODELS_SMART["metis"]`) — one-line
-  bump, unblocked by Round 6.
-- **M2** (`kourai-forge-mcp` server) — unblocked by Round 6.
-- **M15** (forge logging architecture) — operational hygiene.
-- **M5** (UID alignment for forge worktrees) — quality-of-life.
-- **M7** (a2a-sdk 1.0.x migration) — properly scoped.
-- **M12** (dynamic sizing across the GUI) — biggest GUI refactor.
+- **T8 follow-up** (ParallelContext shared buffer) — feed Metis's
+  partial output into the classifier prompt so smart-tier read-backs
+  reference her specific concerns.
+- **T4 follow-up from M13** (`[forge_intent]` block on user message
+  to specialists) — paired well with T8.
+- **M9** (Opus 4.6 → 4.7 in `MODELS_SMART["metis"]`) — one-line bump.
+- **M2** (`kourai-forge-mcp` server).
+- **M15** (forge logging architecture).
+- **M5** (UID alignment for forge worktrees).
+- **M7** (a2a-sdk 1.0.x migration).
+- **M12** (dynamic sizing across the GUI).

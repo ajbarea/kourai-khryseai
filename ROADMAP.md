@@ -5,7 +5,7 @@ A public, living plan for where the forge is heading. Items here are either
 *currently working on* lives in [IMPL.md](./IMPL.md) — when it lands, the
 matching milestone here collapses to a single line under "Shipped".
 
-Last reviewed: 2026-04-26 (M1 fully shipped — Round 6 accept+discard validated end-to-end with 22 `tool_use` frames in techne logs, 11 `tool_result` frames closing the loop, zero `parse_and_apply_fixes` hits across all 6 agent containers; `/clear` ANSI escape fix; M13 Forge Order Confirmation + M14 Metis-First parallel routing planned as the player-experience load-bearing pair to close the dead zone between "Analyzing request..." and pipeline announcement; M15 forge logging architecture planned; M3 tool-call streaming gap closed for Kallos+Dokimasia; M4 within-loop caching shipped; M10 speech-vs-action convention shipped; M11 GUI attachment send path shipped; /usage CLI command shipped + /reset_usage + Gemini pricing follow-on; Kokoro slow tests extracted + a2a-sdk pinned `<1.0` after protobuf-migration finding; agent-level READMEs for the 6 main pipeline agents; /project delete two-tier confirmation guard — see Shipped and revised M7)
+Last reviewed: 2026-04-26 (M1 fully shipped — Round 6 accept+discard validated end-to-end with 22 `tool_use` frames in techne logs, 11 `tool_result` frames closing the loop, zero `parse_and_apply_fixes` hits across all 6 agent containers; `/clear` ANSI escape fix; M13 Forge Order Confirmation + M14 Metis-First parallel routing both shipped — the player-experience load-bearing pair is complete; M15 forge logging architecture planned; M3 tool-call streaming gap closed for Kallos+Dokimasia; M4 within-loop caching shipped; M10 speech-vs-action convention shipped; M11 GUI attachment send path shipped; /usage CLI command shipped + /reset_usage + Gemini pricing follow-on; Kokoro slow tests extracted + a2a-sdk pinned `<1.0` after protobuf-migration finding; agent-level READMEs for the 6 main pipeline agents; /project delete two-tier confirmation guard — see Shipped and revised M7)
 
 ---
 
@@ -275,46 +275,6 @@ widget that caches rendered surfaces.
 
 ---
 
-## M14 — Metis-First Parallel Routing (the dead-zone fix)
-
-> Status: planned · Blocked by: nothing (M13 Phase 1 shipped 2026-04-26) · Player-experience load-bearing
-
-Run Metis's `discuss_tradeoffs` entry point in parallel with Hephaestus's
-classifier so the silence between "Analyzing request..." and the pipeline
-announcement becomes useful architectural dialogue. Metis's preliminary
-notes feed the smart-tier read-back (M13); her full discussion surfaces to
-the player on tier 2/3, stays internal on tier 1.
-
-**Why.** Phase 1 of M13 fixes the *gate*; M14 fixes the *latency*. Together
-they convert the dead zone into the most engaging part of the interaction —
-the player gets architectural input AND a confirmation gate, all in the time
-that used to be silence. Matches Kourai's design north star (player
-experience load-bearing, characters believable in the forge).
-
-**Scope.**
-
-- `asyncio.gather`-based parallel dispatch (classifier + Metis discussion)
-- `ParallelContext` async buffer in `shared/src/kourai_common/federation/`
-  giving the classifier deadline-bounded read access to Metis's partial
-  output (suggested deadline 5s — long enough for obvious tradeoffs, short
-  enough that classifier doesn't drag)
-- Cancellation when Hephaestus's route is `CHAT:` (Metis irrelevant)
-- CLI streaming surfaces Metis's full discussion on tier 2/3
-- GUI parity (`hosts/gui/client.py`) — likely a sub-PR within this milestone
-
-**Done when.**
-
-- Tier-2/3 confirmation cards visibly include Metis-surfaced tradeoffs in
-  the read-back text.
-- Metis speech card renders in the CLI before the Hephaestus confirmation
-  card on tier 2/3 (no card on tier 1).
-- Token-cost guardrail: Metis's parallel discussion runs at `MODEL_TIER=cheap`
-  by default; escalates to `smart` only if the pipeline fires.
-- Round 7 SMOKE artifact updated to verify Metis's contribution is visible
-  on tier 2/3 prompts.
-
----
-
 ## M15 — Forge logging architecture
 
 > Status: planned · Operational hygiene · Surfaced 2026-04-26 during M1 Round 6 validation
@@ -519,6 +479,7 @@ One-liner per item, newest first. Detail moves out of this file when work lands.
 
 - 2026-04-26 — **M1 fully shipped — Round 6 live smoke validated end-to-end** (accept path 6a + discard path 6b, both clean). Provider tool-use loop replaces the `parse_and_apply_fixes` regex parser everywhere it ran. Validation: 22 `'type': 'tool_use'` frames in techne container logs (with `toolu_*` IDs proving real provider blocks); 11 `'type': 'tool_result'` frames closing the loop; **zero `parse_and_apply_fixes` hits** across all 6 agent containers (`techne`, `hephaestus`, `metis`, `dokimasia`, `kallos`, `mneme`). Wall-clock: 244.8s on 6a, 418.6s on 6b — both under the 462s v2 baseline; the provider tool-use loop is faster than the regex parser AND cleaner. Bonus emergent behavior: Aidos's slop-detection now actively *teaches* commit-message hygiene with `<FACT category="skill" confidence="medium">` markers tracking the player's improvement across runs (e.g., flagging "comprehensive" as repeated slop after the first run). M1 detail block removed from above; this is the canonical record
 - 2026-04-26 — `/clear` ANSI escape mangled by `prompt_toolkit.patch_stdout` (printed `?[2J?[1;1H` literally instead of clearing the viewport). Fix: new `hosts/cli/rendering._clear_screen()` helper writes the standard cursor-home + erase-screen sequence (`\x1b[H\x1b[2J`, matching Ubuntu's `clear`) directly to `_raw_out` (the pre-`patch_stdout` stream) — same pattern `_echo()` already uses to bypass the proxy. `hosts/cli/__main__.py` calls the new helper instead of `click.clear()`; click import retained for the rest of the CLI. Caught in AJ's REPL during M1 Round 6 smoke
+- 2026-04-26 — M14 Metis-First Parallel Routing (Phase 2) shipped: Hephaestus's executor now spawns Metis's `discuss_tradeoffs` as a parallel `asyncio.create_task` BEFORE awaiting `determine_pipeline`, with a deadline-bounded await + emit on tier-2 (smart) and tier-3 (clarify) confirmations. Cancellation matrix covers every other route silently — CHAT, ASK_USER, malformed CONFIRM_ORDER, tier-1 confirmation, yolo pipeline. `[yolo:` skips the spawn entirely (no token spend on chatter the player won't see). Metis's output emits as a `working_status` event with the 📐 emoji prefix so the existing `_maidenify_status` renders her as a Metis comms window alongside the Hephaestus confirmation card. Together with M13 the player-experience load-bearing pair is complete: M13 made the gate legible, M14 fills the dead zone with architectural context. 13 new tests in `tests/unit/test_metis_parallel.py` covering the parallel-timing, cancellation matrix, and tier-gated surfacing. T8 (ParallelContext shared buffer feeding Metis's partial output back into the classifier prompt to enrich the read-back text) and the cheap-tier override on `chat()` deferred to follow-ups
 - 2026-04-26 — M13 Forge Order Confirmation (Phase 1) shipped: pre-pipeline gate via new `CONFIRM_ORDER: <tier> "<read-back>"` routing token in Hephaestus. Three tiers (clear / smart / clarify) scale verbosity to ambiguity; tier-1 is ≤15 words; tier-2 surfaces Metis's suggested upsells; tier-3 asks one specific question. Executor parses the token, prefixes the Hephaestus emoji so the existing `_maidenify_status` renders a comms window, appends tier-specific hints, fires `send_input_required` — pipeline does NOT start until the player responds. Resume happens implicitly via context_id memory (no explicit metadata plumbing). `/yolo` opt-out via `[yolo: on]\n` text-tag (same convention as `[project_root: …]`); persisted in `CLISettings.yolo_enabled`. Voice regression guardrails in `tests/integration/test_confirmation_voice.py` (banned-phrase list — Hephaestus never roasts the player; ≤15-word tier-1 cap; round-trip-through-parser corpus). Round 7 added to `SMOKE_TODO.md` as the conference-poster artifact (three-tier walkthrough + `/yolo` verification, capture to `assets/poster/forge-order-tier-{1,2,3}.txt`). 52 new tests across 3 files. T4 (ForgeSession `[forge_intent]` block for explicit specialist context) deferred to a follow-up PR — gate works without it via context_id memory. Phase 2 (M14 Metis-first parallel routing) follows in a separate PR. Fail-safe: malformed `CONFIRM_ORDER` tokens log a warning and surface a generic ask, never auto-execute. Side-cleanup: `CLISettings.load()` now drops unknown JSON keys silently so future field-add PRs don't break older settings files
 - 2026-04-26 — `/project delete` now confirms before nuking. Two-tier guard via `_confirm_project_delete()` in `hosts/cli/commands.py`: bare `delete` (registry-only; project files survive at the path) prompts `[y/N]` default-no; `--purge` (`shutil.rmtree` on the project dir; irreversible) requires typed `DELETE <name>` confirmation matching the existing `_reset_progression_data` pattern. New `--yes` / `-y` flag bypasses both for headless / scripted use. Success message now distinguishes the two paths and tells the player how to recover after a bare delete (`re-add with /project new <name> against that path`). 16 new unit tests in `tests/unit/test_project_delete_confirm.py`. Caught in AJ's REPL — typing `/project delete hello-forge` deleted instantly with no warning
 - 2026-04-26 — Agent-level READMEs landed for the 6 main pipeline agents (Hephaestus + Metis + Techne + Dokimasia + Kallos + Mneme). Each covers responsibility, A2A surface (port, skill ID, streaming, INPUT_REQUIRED, project root, attachments), output artifact, tools, pipeline neighbors, key files, smoke recipe, and persona notes. Template-from-Kallos approach per ROADMAP guidance. Companion / spirit READMEs (Puck, Cupid, Aidos, Aletheia) deferred to when M6 voice-lab / gossip / romance work crystallises so we don't document an in-flight design twice. Stale ROADMAP claim about hypothesis being unused was struck — it's already in 11 test files
