@@ -143,3 +143,92 @@ def test_accept_fails_when_main_diverged():
 
     with pytest.raises(ForgeSessionError, match="Fast-forward"):
         s.accept()
+
+
+# ---------------------------------------------------------------------------
+# _sanitize_branch_slug — Round 6 caught backticks slipping through
+# ---------------------------------------------------------------------------
+
+
+class TestSanitizeBranchSlug:
+    """Branch slugs must satisfy ``git check-ref-format`` to avoid the
+    ``git worktree add -b forge/<slug>`` call rejecting. Round 6 produced
+    ``please-add-a-function-`d`` from a prompt with a backtick — the old
+    logic only stripped spaces. Conservative whitelist ``[a-z0-9-]``
+    handles every shell-meta and quote character at once."""
+
+    def test_simple_label_lowercased_and_hyphenated(self):
+        from kourai_common.forge_session import _sanitize_branch_slug
+
+        assert _sanitize_branch_slug("Add a function") == "add-a-function"
+
+    def test_backtick_replaced_with_hyphen(self):
+        # The exact Round 6 case: prompt had a backtick.
+        from kourai_common.forge_session import _sanitize_branch_slug
+
+        result = _sanitize_branch_slug("please add a function `d`")
+        assert "`" not in result
+        assert result.startswith("please-add-a-function")
+
+    def test_quotes_replaced(self):
+        from kourai_common.forge_session import _sanitize_branch_slug
+
+        # Single AND double quotes both get squashed.
+        assert "'" not in _sanitize_branch_slug("don't break things")
+        assert '"' not in _sanitize_branch_slug('"hello"')
+
+    def test_runs_of_disallowed_chars_collapse_to_one_hyphen(self):
+        from kourai_common.forge_session import _sanitize_branch_slug
+
+        # 'a   b' → 'a-b', not 'a---b'
+        assert _sanitize_branch_slug("a   b") == "a-b"
+        assert _sanitize_branch_slug("a!@#b") == "a-b"
+
+    def test_leading_trailing_hyphens_stripped(self):
+        from kourai_common.forge_session import _sanitize_branch_slug
+
+        assert _sanitize_branch_slug("  hello  ") == "hello"
+        assert _sanitize_branch_slug("---hello---") == "hello"
+
+    def test_empty_or_none_falls_back_to_session(self):
+        from kourai_common.forge_session import _sanitize_branch_slug
+
+        assert _sanitize_branch_slug(None) == "session"
+        assert _sanitize_branch_slug("") == "session"
+        assert _sanitize_branch_slug("   ") == "session"
+        # Pure-disallowed input is also empty after sanitization.
+        assert _sanitize_branch_slug("```") == "session"
+
+    def test_truncated_to_max_len_without_trailing_hyphen(self):
+        # Default 24-char cap — and no trailing hyphen left over from
+        # a truncation that lands on a hyphen boundary.
+        from kourai_common.forge_session import _sanitize_branch_slug
+
+        result = _sanitize_branch_slug("abcdefghijklmnopqrstuvwxyz1234")
+        assert len(result) <= 24
+        # If truncation lands on a hyphen, it gets stripped.
+        result2 = _sanitize_branch_slug("twelve-chars-then-cut-here-and-there")
+        assert not result2.endswith("-")
+
+    def test_all_lowercase(self):
+        from kourai_common.forge_session import _sanitize_branch_slug
+
+        # Even when input is uppercase, output is lowercase.
+        assert _sanitize_branch_slug("ADD A FUNCTION") == "add-a-function"
+
+    def test_only_alphanumeric_and_hyphen(self):
+        # Property-style: every character in the output is in [a-z0-9-].
+        from kourai_common.forge_session import _sanitize_branch_slug
+
+        for label in [
+            "weird !@#$%^&* chars",
+            "newlines\nand\ttabs",
+            "unicode: café résumé naïve",
+            "shell: $(rm -rf /) ; rm -rf /",
+            "/path/like/this",
+            "\\back\\slashes\\too",
+        ]:
+            result = _sanitize_branch_slug(label)
+            assert all(c.isalnum() or c == "-" for c in result), (
+                f"label={label!r} → result={result!r} has bad chars"
+            )
