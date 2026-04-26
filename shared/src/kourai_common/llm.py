@@ -32,6 +32,15 @@ litellm.suppress_debug_info = True
 
 WORKING_MEMORY_LIMIT = 5
 
+# Anthropic prompt caching (see ROADMAP.md M4).
+# LiteLLM forwards `cache_control` blocks to Anthropic / Gemini / Vertex and
+# silently drops them on other providers, so the markers below are safe to
+# emit unconditionally. Min cacheable prefix tokens (April 2026):
+# Sonnet 4.6 = 2048, Opus 4.6 / 4.7 = 4096 — sub-threshold prefixes are
+# silently ignored by Anthropic with no charge, so marking small prompts
+# costs nothing.
+_EPHEMERAL_CACHE: dict[str, str] = {"type": "ephemeral"}
+
 
 class LLMError(Exception):
     """Base exception for LLM call failures."""
@@ -134,6 +143,95 @@ async def _manage_memory(context_id: str, agent_name: str) -> None:
             log.warning("Failed to summarize memory for %s: %s", agent_name, e)
 
 
+def _mark_system_cacheable(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Convert a string-content system message into one cache-marked text block.
+
+    No-op when there is no leading system message or when the system content is
+    already a structured list (caller has already chosen its breakpoints).
+    """
+    if not messages or messages[0].get("role") != "system":
+        return messages
+    sys = messages[0]
+    content = sys.get("content")
+    if not isinstance(content, str):
+        return messages
+    new_sys = {
+        **sys,
+        "content": [{"type": "text", "text": content, "cache_control": _EPHEMERAL_CACHE}],
+    }
+    return [new_sys, *messages[1:]]
+
+
+def _mark_first_user_cacheable(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Mark the first user message as a cache breakpoint.
+
+    Used inside chat_with_tools so the [system + tools + initial-user] prefix
+    is cached once and reused across every iteration of the agentic loop. For
+    multimodal user content (text + images), the marker attaches to the last
+    text block — Anthropic only accepts cache_control on text blocks.
+    """
+    out = list(messages)
+    for i, msg in enumerate(out):
+        if msg.get("role") != "user":
+            continue
+        content = msg.get("content")
+        if isinstance(content, str):
+            out[i] = {
+                **msg,
+                "content": [
+                    {"type": "text", "text": content, "cache_control": _EPHEMERAL_CACHE},
+                ],
+            }
+        elif isinstance(content, list):
+            new_content = list(content)
+            for j in range(len(new_content) - 1, -1, -1):
+                block = new_content[j]
+                if isinstance(block, dict) and block.get("type") == "text":
+                    new_content[j] = {**block, "cache_control": _EPHEMERAL_CACHE}
+                    break
+            out[i] = {**msg, "content": new_content}
+        return out
+    return out
+
+
+def _mark_last_tool_cacheable(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Mark cache_control on the final tool's function dict.
+
+    Per Anthropic's spec the marker on the last tool caches the entire tool
+    array as one prefix block, so we get tool caching with a single annotation.
+    """
+    if not tools:
+        return tools
+    last = tools[-1]
+    fn = last.get("function") if isinstance(last, dict) else None
+    if not isinstance(fn, dict) or "cache_control" in fn:
+        return tools
+    out = list(tools)
+    out[-1] = {**last, "function": {**fn, "cache_control": _EPHEMERAL_CACHE}}
+    return out
+
+
+def _log_cache_usage(agent_name: str, response: Any) -> None:
+    """Debug-log cache read/write tokens from a LiteLLM response.usage.
+
+    Silent when usage is missing or the cached/written counts are not real
+    ints (so MagicMock-based unit tests don't trip false log lines).
+    """
+    usage = getattr(response, "usage", None)
+    if usage is None:
+        return
+    cached = 0
+    details = getattr(usage, "prompt_tokens_details", None)
+    if details is not None:
+        val = getattr(details, "cached_tokens", None)
+        if isinstance(val, int):
+            cached = val
+    written_val = getattr(usage, "cache_creation_input_tokens", None)
+    written = written_val if isinstance(written_val, int) else 0
+    if cached or written:
+        log.debug("cache %s read=%d write=%d", agent_name, cached, written)
+
+
 async def _build_contextual_messages(
     agent_name: str, messages: Sequence[dict[str, Any]], context_id: str | None
 ) -> list[dict[str, Any]]:
@@ -183,6 +281,7 @@ async def chat(
     timeout = AGENT_TIMEOUTS.get(agent_name, 120.0)
 
     full_messages = await _build_contextual_messages(agent_name, messages, context_id)
+    full_messages = _mark_system_cacheable(full_messages)
 
     log.debug("LLM call: %s -> %s (%d messages)", agent_name, model, len(full_messages))
 
@@ -197,6 +296,7 @@ async def chat(
     except TimeoutError:
         raise LLMTimeoutError(agent_name, timeout) from None
 
+    _log_cache_usage(agent_name, response)
     content = response.choices[0].message.content
     if not content:
         raise LLMResponseError(agent_name, "empty response")
@@ -275,6 +375,7 @@ async def chat_stream(
     timeout = AGENT_TIMEOUTS.get(agent_name, 120.0)
 
     full_messages = await _build_contextual_messages(agent_name, messages, context_id)
+    full_messages = _mark_system_cacheable(full_messages)
 
     log.debug("LLM stream: %s -> %s (%d messages)", agent_name, model, len(full_messages))
 
@@ -363,6 +464,9 @@ async def chat_with_tools(
     timeout = AGENT_TIMEOUTS.get(agent_name, 120.0)
 
     working_messages = await _build_contextual_messages(agent_name, messages, context_id)
+    working_messages = _mark_system_cacheable(working_messages)
+    working_messages = _mark_first_user_cacheable(working_messages)
+    cached_tools = _mark_last_tool_cacheable(tools)
     handler_ctx = handler_context or {}
     tool_call_log: list[dict[str, Any]] = []
     final_text = ""
@@ -374,7 +478,7 @@ async def chat_with_tools(
             agent_name,
             iteration,
             len(working_messages),
-            len(tools),
+            len(cached_tools),
         )
         try:
             response = await _execute_completion(
@@ -383,12 +487,13 @@ async def chat_with_tools(
                 messages=working_messages,
                 temperature=temperature,
                 max_tokens=max_tokens,
-                tools=tools,
+                tools=cached_tools,
                 tool_choice="auto",
             )
         except TimeoutError:
             raise LLMTimeoutError(agent_name, timeout) from None
 
+        _log_cache_usage(agent_name, response)
         choice = response.choices[0]
         message = choice.message
         text_content = _coerce_chunk_content(getattr(message, "content", None))

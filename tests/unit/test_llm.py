@@ -635,3 +635,218 @@ class TestChatWithTools:
                     tools=[],
                     tool_handlers={},
                 )
+
+
+class TestCacheControlMarkers:
+    """Pure-function coverage for the prompt-caching helpers (M4).
+
+    LiteLLM forwards `cache_control` to Anthropic / Gemini / Vertex and drops
+    it on other providers, so the markers are safe everywhere.
+    """
+
+    def test_mark_system_string_becomes_one_text_block(self):
+        from kourai_common.llm import _mark_system_cacheable
+
+        out = _mark_system_cacheable(
+            [
+                {"role": "system", "content": "hello"},
+                {"role": "user", "content": "hi"},
+            ]
+        )
+        assert out[0]["content"] == [
+            {"type": "text", "text": "hello", "cache_control": {"type": "ephemeral"}}
+        ]
+        assert out[1] == {"role": "user", "content": "hi"}
+
+    def test_mark_system_no_system_message_returns_unchanged(self):
+        from kourai_common.llm import _mark_system_cacheable
+
+        msgs = [{"role": "user", "content": "hi"}]
+        assert _mark_system_cacheable(msgs) is msgs
+
+    def test_mark_system_empty_list_returns_unchanged(self):
+        from kourai_common.llm import _mark_system_cacheable
+
+        assert _mark_system_cacheable([]) == []
+
+    def test_mark_system_already_block_content_is_left_alone(self):
+        from kourai_common.llm import _mark_system_cacheable
+
+        existing = [{"type": "text", "text": "pre"}, {"type": "text", "text": "post"}]
+        msgs = [{"role": "system", "content": existing}]
+        out = _mark_system_cacheable(msgs)
+        assert out is msgs
+
+    def test_mark_first_user_string_becomes_text_block(self):
+        from kourai_common.llm import _mark_first_user_cacheable
+
+        out = _mark_first_user_cacheable(
+            [
+                {"role": "system", "content": "sys"},
+                {"role": "user", "content": "task"},
+            ]
+        )
+        assert out[1]["content"] == [
+            {"type": "text", "text": "task", "cache_control": {"type": "ephemeral"}}
+        ]
+        assert out[0] == {"role": "system", "content": "sys"}
+
+    def test_mark_first_user_only_marks_first(self):
+        from kourai_common.llm import _mark_first_user_cacheable
+
+        out = _mark_first_user_cacheable(
+            [
+                {"role": "user", "content": "first"},
+                {"role": "assistant", "content": "ok"},
+                {"role": "user", "content": "second"},
+            ]
+        )
+        assert out[0]["content"][0]["cache_control"] == {"type": "ephemeral"}
+        assert out[2] == {"role": "user", "content": "second"}
+
+    def test_mark_first_user_multimodal_marks_last_text_block(self):
+        from kourai_common.llm import _mark_first_user_cacheable
+
+        content = [
+            {"type": "text", "text": "look at this"},
+            {"type": "image_url", "image_url": {"url": "data:image/png;base64,..."}},
+            {"type": "text", "text": "and tell me what you see"},
+        ]
+        out = _mark_first_user_cacheable([{"role": "user", "content": content}])
+        marked = out[0]["content"]
+        assert marked[0] == {"type": "text", "text": "look at this"}
+        assert marked[1] == {
+            "type": "image_url",
+            "image_url": {"url": "data:image/png;base64,..."},
+        }
+        assert marked[2] == {
+            "type": "text",
+            "text": "and tell me what you see",
+            "cache_control": {"type": "ephemeral"},
+        }
+
+    def test_mark_first_user_no_user_returns_unchanged(self):
+        from kourai_common.llm import _mark_first_user_cacheable
+
+        msgs = [{"role": "system", "content": "sys"}]
+        assert _mark_first_user_cacheable(msgs) == msgs
+
+    def test_mark_last_tool_marks_function_dict(self):
+        from kourai_common.llm import _mark_last_tool_cacheable
+
+        tools = [
+            {"type": "function", "function": {"name": "a"}},
+            {"type": "function", "function": {"name": "b"}},
+        ]
+        out = _mark_last_tool_cacheable(tools)
+        assert out[0]["function"] == {"name": "a"}
+        assert out[1]["function"] == {
+            "name": "b",
+            "cache_control": {"type": "ephemeral"},
+        }
+
+    def test_mark_last_tool_empty_returns_unchanged(self):
+        from kourai_common.llm import _mark_last_tool_cacheable
+
+        assert _mark_last_tool_cacheable([]) == []
+
+    def test_mark_last_tool_idempotent(self):
+        from kourai_common.llm import _mark_last_tool_cacheable
+
+        tools = [
+            {
+                "type": "function",
+                "function": {"name": "a", "cache_control": {"type": "ephemeral"}},
+            }
+        ]
+        assert _mark_last_tool_cacheable(tools) == tools
+
+
+class TestLogCacheUsage:
+    """_log_cache_usage emits a debug line only when real cache numbers exist."""
+
+    def test_logs_cache_read_and_write(self, caplog):
+        import logging
+
+        from kourai_common.llm import _log_cache_usage
+
+        usage = MagicMock()
+        usage.prompt_tokens_details.cached_tokens = 1500
+        usage.cache_creation_input_tokens = 0
+        response = MagicMock(usage=usage)
+        with caplog.at_level(logging.DEBUG, logger="kourai_common.llm"):
+            _log_cache_usage("techne", response)
+        assert any("cache techne read=1500 write=0" in r.message for r in caplog.records)
+
+    def test_silent_when_no_usage_attr(self, caplog):
+        import logging
+
+        from kourai_common.llm import _log_cache_usage
+
+        with caplog.at_level(logging.DEBUG, logger="kourai_common.llm"):
+            _log_cache_usage("techne", MagicMock(usage=None))
+        assert not any("cache" in r.message for r in caplog.records)
+
+    def test_silent_when_counts_are_not_ints(self, caplog):
+        """MagicMock attribute access returns a Mock, which must NOT log."""
+        import logging
+
+        from kourai_common.llm import _log_cache_usage
+
+        with caplog.at_level(logging.DEBUG, logger="kourai_common.llm"):
+            _log_cache_usage("techne", MagicMock())
+        assert not any("cache techne" in r.message for r in caplog.records)
+
+
+class TestChatWithToolsCachesPrefix:
+    """Integration: chat_with_tools must hand cache-marked prefix to LiteLLM."""
+
+    @pytest.mark.asyncio
+    async def test_marks_system_user_and_last_tool(self):
+        seen_kwargs: dict = {}
+
+        async def _capture(timeout_seconds, **kwargs):
+            seen_kwargs.update(kwargs)
+            return _mk_response(text="done")
+
+        messages = [
+            {"role": "system", "content": "you are techne"},
+            {"role": "user", "content": "make a file"},
+        ]
+        tools = [
+            {"type": "function", "function": {"name": "write_file"}},
+            {"type": "function", "function": {"name": "edit_file"}},
+        ]
+        with (
+            patch("kourai_common.llm._execute_completion", new=_capture),
+            patch(
+                "kourai_common.llm._build_contextual_messages",
+                new_callable=AsyncMock,
+                return_value=list(messages),
+            ),
+        ):
+            from kourai_common.llm import chat_with_tools
+
+            await chat_with_tools("techne", messages, tools=tools, tool_handlers={})
+
+        sent_messages = seen_kwargs["messages"]
+        assert sent_messages[0]["content"] == [
+            {
+                "type": "text",
+                "text": "you are techne",
+                "cache_control": {"type": "ephemeral"},
+            }
+        ]
+        assert sent_messages[1]["content"] == [
+            {
+                "type": "text",
+                "text": "make a file",
+                "cache_control": {"type": "ephemeral"},
+            }
+        ]
+        sent_tools = seen_kwargs["tools"]
+        assert sent_tools[0]["function"] == {"name": "write_file"}
+        assert sent_tools[1]["function"] == {
+            "name": "edit_file",
+            "cache_control": {"type": "ephemeral"},
+        }
