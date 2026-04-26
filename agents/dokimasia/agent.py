@@ -25,7 +25,7 @@ from kourai_common.prompts import CURRENT_DATE, build_system_prompt
 from kourai_common.subprocess import StatusCallback, run_command
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterable
+    from collections.abc import AsyncIterable, Awaitable, Callable
     from pathlib import Path
 
 log = logging.getLogger(__name__)
@@ -128,8 +128,20 @@ async def apply_test_fixes(
     file_paths: set[str],
     project_root: str | Path,
     context_id: str | None = None,
+    on_tool_call: Callable[[str, dict[str, Any], str], Awaitable[None]] | None = None,
 ) -> int:
-    """Drive the tool-use loop to fix failing tests and return the write count."""
+    """Drive the tool-use loop to fix failing tests and return the write count.
+
+    Args:
+        pytest_output: Combined pytest output from the failing run.
+        file_paths: Files implicated by the pytest output.
+        project_root: Project root for path validation in the tool handlers.
+        context_id: Conversation context ID for the LLM call.
+        on_tool_call: Optional async callback fired once per tool execution
+            with ``(name, args, result)``. The executor wires this to
+            ``send_working_status`` so the player sees Dokimasia's edits land
+            live instead of a black box during the fix loop.
+    """
     files_block = ""
     for file_path in file_paths:
         path = AnyioPath(file_path)
@@ -167,6 +179,7 @@ async def apply_test_fixes(
         max_tokens=4096,
         max_iters=10,
         context_id=context_id,
+        on_tool_call=on_tool_call,
     )
     return count_successful_writes(tool_log)
 

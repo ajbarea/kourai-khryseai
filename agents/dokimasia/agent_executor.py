@@ -117,6 +117,8 @@ class DokimasiaAgentExecutor(BaseAgentExecutor):
                     update_virtue(_profile.player_id, "arete", 0.01)
 
             elif is_run_request:
+                from typing import Any
+
                 from agents.dokimasia.agent import (
                     apply_test_fixes,
                     run_pytest,
@@ -131,12 +133,23 @@ class DokimasiaAgentExecutor(BaseAgentExecutor):
                     result = await run_pytest(cwd=str(project_root), status_callback=_pytest_status)
                     return result.success, result.output
 
+                async def _on_tool(name: str, args: dict[str, Any], result: str) -> None:
+                    target = args.get("path", "")
+                    ok = "ok" if not result.startswith("ERROR:") else "fail"
+                    await send_working_status(updater, task, f"{name} {target} ({ok})", emoji="🧪")
+
                 async def _apply_fixes(
                     pytest_output: str,
                     files: set[str],
                     ctx_id: str | None,
                 ) -> int:
-                    return await apply_test_fixes(pytest_output, files, project_root, ctx_id)
+                    return await apply_test_fixes(
+                        pytest_output,
+                        files,
+                        project_root,
+                        ctx_id,
+                        on_tool_call=_on_tool,
+                    )
 
                 all_passed, test_output, result = await run_fix_loop(
                     tool_name="pytest",

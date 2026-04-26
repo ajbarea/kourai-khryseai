@@ -5,130 +5,120 @@ milestone lands, the matching detail block in [ROADMAP.md](./ROADMAP.md)
 collapses to a one-liner under "Shipped" and this file gets reset to the
 next milestone.
 
-Updated: 2026-04-26 · Working on: **M10 — Speech-vs-action rendering convention**
+Updated: 2026-04-26 · Working on: **M3 — A2A streaming task events**
 
 ---
 
-## M10 plan-of-record
+## M3 plan-of-record
 
-End state: every host (CLI, GUI, VN) treats a leading double-quote as the
-single signal that decides "this line is dialogue, render it italic" vs
-"this line is a status report, render it plain". Every agent's
-SYSTEM_PROMPT carries the rule so the LLM emits the right shape; every
-host renderer carries the matching detector so the player sees the
-distinction. The maidens stop reading like CLI tools.
+End state: every specialist that drives `chat_with_tools` (Techne,
+Kallos, Dokimasia) emits one `TaskStatusUpdateEvent` per tool call so
+the player sees `kallos: edit_file src/foo.py (ok)` land live during
+the lint-fix loop instead of staring at a black box for a minute.
 
-### Step 1 — `UNIVERSAL_RULES` carries the convention ✅ 2026-04-26
+The protocol stack was already wired (Techne shipped this in M1):
 
-- [x] `shared/src/kourai_common/prompts.py`: added a 9th rule to
-      `UNIVERSAL_RULES` ("SPEECH VS ACTION") covering quoting and what
-      the host does with it. `build_system_prompt()` already appends
-      `UNIVERSAL_RULES` to every specialist, so all 9 specialists
-      (Metis, Techne, Kallos, Dokimasia, Mneme, Puck, Cupid, Aidos,
-      Aletheia) inherit the rule with zero per-agent edits.
+- `chat_with_tools` invokes `on_tool_call(name, args, result)` once per
+  successful tool execution (`shared/src/kourai_common/llm.py:555`).
+- Hephaestus's `RemoteAgentConnection.send()` consumes
+  `TaskStatusUpdateEvent`s from the SSE stream and yields them as
+  `("status", text)` tuples (`agents/hephaestus/remote_connections.py:159`).
+- `execute_pipeline` forwards the tuples to the host
+  (`agents/hephaestus/agent.py:489`).
+- The CLI's `_maidenify_status` renders each into a comms window in
+  real time (`hosts/cli/events.py:86`).
 
-### Step 2 — Hephaestus's hand-rolled prompt + handoffs ✅ 2026-04-26
+What was missing: Kallos's `apply_lint_fixes` and Dokimasia's
+`apply_test_fixes` swallowed the LLM tool-loop entirely — no
+`on_tool_call` parameter, no callback wiring in the executor.
 
-- [x] `agents/hephaestus/agent.py`: `ROUTING_PROMPT` got the same
-      `SPEECH VS ACTION` paragraph plus quoted forms of the `CHAT:` and
-      `ASK_USER:` examples (the routing tokens stay unquoted — protocol,
-      not speech).
-- [x] Every value in `HEPH_HANDOFFS` (15 lines across 5 keys) wrapped
-      in double quotes — the ROADMAP table lists "handoff line" under
-      Talking. Default fallback in `get_heph_narration()` quoted too.
-- [x] Inline narration in `execute_pipeline` (`loop_msg`, `check_msg`,
-      the iteration-cap message) wrapped — same reason.
+### Step 1 — Surface `on_tool_call` on Kallos's apply_lint_fixes ✅ 2026-04-26
 
-### Step 3 — CLI italic on quoted lines ✅ 2026-04-26
+- [x] `agents/kallos/agent.py::apply_lint_fixes`: added
+      `on_tool_call: Callable[[str, dict, str], Awaitable[None]] | None`
+      parameter, default `None`, forwarded to `chat_with_tools` verbatim.
+      Mirrors Techne's `apply_code_changes` signature so the executor
+      pattern is identical.
 
-- [x] `hosts/cli/rendering.py::_comms_window`: detects leading `"`
-      after `lstrip()`, applies `_ITALIC` for the dialogue text. The
-      `whisper` style composes `_DIM + _ITALIC` for outgoing-maiden
-      handoff parting shots so they read as both dialogue *and* fading.
-      Status lines stay plain. `_maidenify_status` doesn't need a touch
-      — it routes through `_comms_window`.
+### Step 2 — Same surface on Dokimasia's apply_test_fixes ✅ 2026-04-26
 
-### Step 4 — GUI italic on quoted lines ✅ 2026-04-26
+- [x] `agents/dokimasia/agent.py::apply_test_fixes`: same parameter,
+      same default, same forwarding shape.
 
-- [x] `hosts/gui/dialogue.py`: new `_is_quoted_dialogue` helper +
-      `oblique` keyword on `_draw_line_with_emotes`. When the entry
-      text starts with `"` the body renders with
-      `pygame.freetype.STYLE_OBLIQUE` (synthesised italic — no font
-      asset add). `*emote*` spans keep their dim-gold treatment
-      regardless. The GUI matches the CLI line-for-line.
+### Step 3 — Kallos executor wires `_on_tool` ✅ 2026-04-26
 
-### Step 5 — VN: scrub orphan `what_prefix` ✅ 2026-04-26
+- [x] `agents/kallos/agent_executor.py`: added an `_on_tool` closure
+      mirroring Techne's wrench-style status (`f"{name} {target}
+      ({ok|fail})"`) but with Kallos's signature emoji `✨`. The
+      closure is passed via the `_apply_fixes` wrapper so `run_fix_loop`
+      threads it through transparently.
 
-- [x] `hosts/vn/kourai_vn/game/script_data.rpy` (8 main agents) was
-      already Hades-style as of an earlier pass.
-- [x] `hosts/vn/kourai_vn/game/script_labels.rpy:67-68` (aidos and
-      aletheia debug-only Character defs) had the legacy
-      `what_prefix='"', what_suffix='"'` — stripped, with the same
-      explanatory comment as `script_data.rpy`. `grep -rn what_prefix
-      hosts/vn/` returns zero hits.
+### Step 4 — Dokimasia executor wires `_on_tool` ✅ 2026-04-26
 
-### Step 6 — Tests ✅ 2026-04-26
+- [x] `agents/dokimasia/agent_executor.py`: same pattern with
+      Dokimasia's `🧪`. Wired only in the `is_run_request` branch —
+      the test-generation branch doesn't drive `chat_with_tools` so it
+      doesn't need the callback.
 
-- [x] `tests/unit/test_speech_vs_action.py`: 26 tests across 6 classes:
-      `TestUniversalRule` (2 + 5 parametrised), `TestHephaestusRoutingPrompt`
-      (3), `TestHephaestusHandoffs` (4), `TestCommsWindowItalic` (4),
-      `TestGuiIsQuotedDialogue` (6 parametrised + 1 signature guard),
-      `TestVnNoBlanketQuoting` (1 walks every `*.rpy` for `what_prefix`).
-      Whole file passes in 2.93 s.
+### Step 5 — Tests ✅ 2026-04-26
 
-### Step 7 — Docs refresh
+- [x] `tests/unit/test_tool_call_streaming.py`: 7 tests across 5 classes:
+      `TestApplyLintFixesForwardsCallback` (2), `TestApplyTestFixesForwardsCallback`
+      (2) — boundary tests verifying the callback reaches `chat_with_tools`
+      with both an explicit value and the default `None`. Then
+      `TestKallosExecutorEmitsToolCallStatus`, `TestDokimasiaExecutorEmitsToolCallStatus`,
+      and `TestErrorTagInToolMessage` (1 each) drive the executors with
+      a fake `run_fix_loop` that synthesises a tool execution and
+      asserts `send_working_status` was called with the right emoji and
+      `(ok)` / `(fail)` suffix. Suite runs in 2.82 s.
 
-- [ ] Sample CLI transcript in README.md / docs/cli.md updated where it
-      contradicts the new convention. Only touch lines that are now
-      *wrong* — don't fabricate prose to demonstrate the change.
+### Step 6 — Live smoke (queued for next interactive `/project` session)
 
-### Step 8 — Live smoke (queued for next interactive `/project` session)
-
-The visual outcome (italic agent dialogue, plain status) needs eyes on
-the running CLI/GUI to confirm. Adding to the existing
-[SMOKE_TODO.md](./SMOKE_TODO.md) follow-up list:
-
-- [ ] CLI: send "@metis plan a CSV exporter" → confirm Metis's
-      clarifying question renders italic, the subsequent
-      file-listing/pytest lines stay plain.
-- [ ] GUI: same task → confirm dialogue bubbles render with
-      synthesised italic, status bubbles stay upright.
-- [ ] VN: scripted demo → confirm name plaque carries identity, no
-      double-quote chrome around lines that are *not* themselves quoted
-      by the agent.
+- [ ] Send `@kallos` task that triggers a non-trivial lint fix → confirm
+      multiple `✨ edit_file <path> (ok)` lines stream during the fix
+      loop instead of one big silence.
+- [ ] Send `@dokimasia run tests` against a failing suite → confirm
+      `🧪 write_file tests/test_x.py (ok)` lines appear during the
+      auto-fix iteration.
+- [ ] Compare the perceived stage latency between Techne (already
+      streamed) and the newly streamed Kallos/Dokimasia — they should
+      feel the same now.
 
 ---
 
 ## Notes / open questions
 
-- **Italic in terminals.** `_ITALIC = "\033[3m"` works in every modern
-  emulator (WSL, iTerm, Terminal.app, Windows Terminal, VSCode,
-  WezTerm, Hyper, Kitty, Alacritty). A handful of legacy terminals
-  swallow SGR 3 silently; the rendered text just stays upright on
-  those. No fallback needed — italic is decoration, not information.
+- **Per-tool emoji vs per-maiden emoji.** Techne uses `🔧` (wrench) for
+  her tool-call status, distinct from her own `⚙️`. Kallos and
+  Dokimasia ship with their signature emojis (`✨` and `🧪`) since
+  the comms-window header already names the maiden — duplicating the
+  wrench across all three would obscure attribution in the CLI's
+  emoji-driven `_maidenify_status` detector. If we ever add a
+  generic "agent did a tool call" detector, revisit.
 
-- **Pygame oblique vs true italic.** `STYLE_OBLIQUE` synthesises italic
-  by skewing the regular face. It's slightly less elegant than a real
-  italic font file but ships zero new assets and looks correct at every
-  zoom level the GUI supports today. If/when M12 (dynamic sizing) lands
-  and the font system grows a registry, dropping in an italic asset and
-  swapping `STYLE_OBLIQUE` → real italic is a one-line change.
+- **Streaming subprocess output is unchanged.** Kallos's `_lint_status`
+  callback still forwards each ruff/ty stdout line to
+  `send_working_status` with `💻`. Dokimasia's `_pytest_status` does
+  the same with `🧪`. Those are subprocess-streaming, separate from
+  the new LLM-tool-call streaming. Both flows now yield events; the
+  player sees a much busier (in a good way) status stream during the
+  fix loop.
 
-- **Why quote, not bracket?** `"..."` is what fiction uses. The maidens
-  are characters, not CLI tools — the convention is borrowed from the
-  300-year-old prose convention, not invented for this product. It also
-  keeps the model's output grep-friendly: `grep '^"' transcript.txt`
-  filters dialogue out of a session log.
+- **The `(ok)` / `(fail)` suffix.** Forge tools return `"ERROR: ..."`
+  on path-safety violations and similar guards. The `_on_tool` closure
+  prefix-checks the result and renders `(fail)` in that case. Saves the
+  player from squinting at the actual error string in the comms stream
+  — they get the actual error in the final artifact text after the
+  loop completes.
 
 ---
 
 ## Up next (queued, not yet active)
 
 - **M2** (`kourai-forge-mcp` server) — gated on M1 Round 6 smoke
-  ("we've felt whether the toolset is right" — needs the live CLI
-  loop, not unit tests).
-- **M3** (A2A streaming task events) — biggest UX win still on the
-  board; the speech-vs-action work makes per-stage updates *legible*,
-  M3 makes them *real-time*.
+  (the toolset-feel check needs the live REPL).
+- **M11** (GUI attachment send path) — closes the CLI/GUI multimodal
+  asymmetry; Alt+V capture works but the captured image never reaches
+  Hephaestus today. Concrete done criteria, no blockers.
 - **M9** (Opus 4.6 → 4.7 in `MODELS_SMART["metis"]`) — one-line bump,
-  safe to slip in alongside any future PR that touches `config.py`.
+  also wants Round 6 smoke first.
