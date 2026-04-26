@@ -67,6 +67,38 @@ def _reset_progression_data() -> None:
     _echo(f"  {_GOLD_BRIGHT}✨ Progression data reset complete.{_RESET}")
 
 
+def _confirm_project_delete(name: str, path: object, *, purge: bool) -> bool:
+    """Prompt for confirmation before /project delete touches anything.
+
+    Two tiers because the underlying ``ProjectManager.delete()`` has two
+    very different blast radii:
+
+    - **bare delete** removes only the SQLite registry row. The project
+      files at ``path`` survive and can be re-added with
+      ``/project new <name>`` against that path. Annoying-but-recoverable
+      → simple ``[y/N]`` is enough.
+    - **--purge** runs ``shutil.rmtree`` on ``path``. There is no
+      recovery. Match the typed-name pattern used by
+      ``_reset_progression_data`` ("Type DELETE <name> to confirm") so
+      muscle-memory tab-completion can't nuke a real project.
+
+    Returns True iff the user typed an affirmative response.
+    """
+    if purge:
+        _echo("")
+        _echo(f"  {_GOLD_BOLD}⚠ Permanently delete project files{_RESET}")
+        _echo(f"  This will run rm -rf on {path}.")
+        _echo(f"  {_RED}There is no undo.{_RESET}")
+        confirm = input(f"  {_GOLD}Type DELETE {name} to confirm:{_RESET} ").strip()
+        return confirm == f"DELETE {name}"
+
+    _echo("")
+    _echo(f"  {_GOLD_BOLD}Remove '{name}' from the project registry?{_RESET}")
+    _echo(f"  {_DIM}Files at {path} will survive — only the registry row goes.{_RESET}")
+    confirm = input(f"  {_GOLD}[y/N]:{_RESET} ").strip().lower()
+    return confirm in ("y", "yes")
+
+
 _SETTINGS_MAPPING: dict[str, str] = {
     "1": "voice_enabled",
     "2": "music_enabled",
@@ -274,20 +306,38 @@ def _handle_project_command(prompt_text: str, settings: CLISettings) -> None:
 
     if sub == "delete":
         if not args:
-            _echo(f"  {_DIM}Usage: /project delete <name|id> [--purge]{_RESET}")
+            _echo(f"  {_DIM}Usage: /project delete <name|id> [--purge] [--yes]{_RESET}")
             return
         purge = "--purge" in args
-        target = " ".join(a for a in args if a != "--purge")
+        skip_confirm = "--yes" in args or "-y" in args
+        target = " ".join(a for a in args if a not in ("--purge", "--yes", "-y"))
         project = ProjectManager.find(player_id, target)
         if project is None:
             _echo(f"  {_RED}No project matches {target!r}{_RESET}")
             return
+
+        # Two-tier confirmation: bare `delete` removes the registry row
+        # (recoverable — files survive at the path); --purge runs rm -rf
+        # on the project directory (irreversible). Match the typed-name
+        # pattern used by /settings → reset_progression for the
+        # destructive case so muscle memory can't nuke a real project.
+        if not skip_confirm:
+            if not _confirm_project_delete(project.name, project.path, purge=purge):
+                _echo(f"  {_DIM}Cancelled. No data changed.{_RESET}")
+                return
+
         ProjectManager.delete(project.project_id, purge_files=purge)
         if settings.active_project_id == project.project_id:
             settings.active_project_id = None
             settings.save()
-        suffix = " and files purged" if purge else ""
-        _echo(f"  {_DIM}Deleted project '{project.name}'{suffix}.{_RESET}")
+        if purge:
+            _echo(f"  {_DIM}Deleted project '{project.name}' and purged {project.path}.{_RESET}")
+        else:
+            _echo(
+                f"  {_DIM}Removed '{project.name}' from the registry. "
+                f"Files survive at {project.path} — re-add with "
+                f"`/project new <name>` against that path to restore.{_RESET}"
+            )
         return
 
     if sub == "clear":
