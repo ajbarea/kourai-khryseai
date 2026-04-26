@@ -532,6 +532,13 @@ async def main(
                     _show_usage_summary()
                     continue
 
+                if prompt_text == "/reset_usage":
+                    from kourai_common.usage import reset_session_usage
+
+                    reset_session_usage()
+                    _echo(f"  {_DIM}Session usage cleared.{_RESET}")
+                    continue
+
                 if prompt_text == "/metrics":
                     _show_metrics_dashboard()
                     continue

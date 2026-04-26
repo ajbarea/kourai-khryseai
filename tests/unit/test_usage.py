@@ -20,7 +20,13 @@ from types import SimpleNamespace
 
 import pytest
 
-from kourai_common.pricing import ANTHROPIC_PRICING, ModelPricing, compute_cost, get_model_pricing
+from kourai_common.pricing import (
+    ANTHROPIC_PRICING,
+    GEMINI_PRICING,
+    ModelPricing,
+    compute_cost,
+    get_model_pricing,
+)
 from kourai_common.usage import (
     AgentUsage,
     record_usage,
@@ -202,15 +208,54 @@ class TestPricingTable:
 
 
 class TestGetModelPricing:
-    def test_known_model_returns_rates(self):
+    def test_known_anthropic_model_returns_rates(self):
         rates = get_model_pricing("anthropic/claude-sonnet-4-6")
         assert isinstance(rates, ModelPricing)
         assert rates.input_per_m == 3.0
 
+    def test_known_gemini_model_returns_rates(self):
+        # Both Anthropic and Gemini live in the unified lookup table.
+        rates = get_model_pricing("gemini/gemini-2.5-pro")
+        assert isinstance(rates, ModelPricing)
+        assert rates.input_per_m == 1.25
+
     def test_unknown_model_returns_none(self):
+        # Ollama models are local / free; we deliberately don't price them.
         assert get_model_pricing("ollama/llama3.3:70b") is None
-        assert get_model_pricing("gemini/gemini-2.5-pro") is None
+        # An unrecognised provider id returns None — the CLI falls back
+        # to the "$—" rendering plus the footer hint.
+        assert get_model_pricing("openai/gpt-5") is None
         assert get_model_pricing("") is None
+
+
+class TestGeminiPricing:
+    """Gemini rates have to be spot-checked individually — output-to-input
+    ratio is not tier-uniform like Anthropic (Flash 4x, Pro 8x)."""
+
+    def test_2_0_flash_rates(self):
+        rates = GEMINI_PRICING["gemini/gemini-2.0-flash"]
+        assert (rates.input_per_m, rates.output_per_m) == (0.10, 0.40)
+
+    def test_2_5_pro_rates(self):
+        rates = GEMINI_PRICING["gemini/gemini-2.5-pro"]
+        # Under-200K context tier — most agent calls fit.
+        assert (rates.input_per_m, rates.output_per_m) == (1.25, 10.0)
+
+    def test_cache_read_is_one_tenth_input(self):
+        # The 0.1x cache-read multiplier holds across providers.
+        for model_id, rates in GEMINI_PRICING.items():
+            assert rates.cache_read_per_m == pytest.approx(rates.input_per_m * 0.1), (
+                f"{model_id}: cache_read rate is not 0.1x input"
+            )
+
+    def test_cache_write_left_at_zero_intentionally(self):
+        # Gemini's caching is per-hour storage, not per-write — the
+        # 4-rate ModelPricing shape doesn't fit cleanly. We document
+        # the under-count rather than guess a per-write rate.
+        for model_id, rates in GEMINI_PRICING.items():
+            assert rates.cache_write_5min_per_m == 0.0, (
+                f"{model_id}: cache_write_5min should be 0 (Gemini billing model)"
+            )
 
 
 class TestComputeCost:
@@ -317,10 +362,13 @@ class TestUsageSlashCommand:
     def test_unknown_model_renders_dash_and_explains(self, monkeypatch):
         from hosts.cli.__main__ import _show_usage_summary
 
+        # Ollama is the only unpriced provider we use today (local models,
+        # actually free). Anything else (Anthropic, Gemini) lives in the
+        # pricing table.
         record_usage(
             "experimental",
             _fake_response(prompt_tokens=500_000, completion_tokens=100_000),
-            model="gemini/gemini-2.5-pro",
+            model="ollama/llama3.3:70b",
         )
 
         captured = self._patch_echo(monkeypatch)
@@ -331,3 +379,72 @@ class TestUsageSlashCommand:
         assert "$—" in out
         # Explanatory hint pointing at the pricing table.
         assert "kourai_common.pricing" in out
+
+    def test_gemini_model_now_renders_dollar_cost(self, monkeypatch):
+        from hosts.cli.__main__ import _show_usage_summary
+
+        # 1M input on 2.0 Flash → $0.10. Used to be $— before this PR.
+        record_usage(
+            "metis",
+            _fake_response(prompt_tokens=1_000_000, completion_tokens=0),
+            model="gemini/gemini-2.0-flash",
+        )
+
+        captured = self._patch_echo(monkeypatch)
+        _show_usage_summary()
+        out = "\n".join(captured)
+        assert "metis" in out
+        # Real cost line, not the unknown-model placeholder.
+        assert "0.1000" in out
+        assert "$—" not in out
+
+
+class TestResetUsage:
+    """``reset_session_usage`` is what the new /reset_usage slash command calls."""
+
+    def test_clears_all_buckets(self):
+        from kourai_common.usage import get_session_usage
+
+        record_usage(
+            "techne",
+            _fake_response(prompt_tokens=1000, completion_tokens=500),
+            model="anthropic/claude-sonnet-4-6",
+        )
+        record_usage(
+            "kallos",
+            _fake_response(prompt_tokens=200, completion_tokens=50),
+            model="anthropic/claude-haiku-4-5-20251001",
+        )
+        assert len(get_session_usage().agents) == 2
+
+        reset_session_usage()
+
+        assert get_session_usage().agents == {}
+
+    def test_safe_to_call_on_empty_session(self):
+        # Idempotent — calling /reset_usage with nothing in the bucket
+        # shouldn't raise.
+        reset_session_usage()
+        reset_session_usage()
+        from kourai_common.usage import get_session_usage
+
+        assert get_session_usage().agents == {}
+
+
+class TestResetUsageSlashCommand:
+    """The /reset_usage slash command is registered in the completer."""
+
+    def test_command_registered_in_completer(self):
+        from hosts.cli.completer import SLASH_COMMANDS
+
+        names = [c.name for c in SLASH_COMMANDS]
+        assert "reset_usage" in names
+
+    def test_command_appears_in_help_via_slash_commands(self):
+        # _show_help() iterates SLASH_COMMANDS, so registering the
+        # command auto-surfaces it in /help. Sanity-check that the
+        # description is non-empty.
+        from hosts.cli.completer import SLASH_COMMANDS
+
+        cmd = next(c for c in SLASH_COMMANDS if c.name == "reset_usage")
+        assert cmd.description.strip()
