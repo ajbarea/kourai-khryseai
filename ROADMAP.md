@@ -424,11 +424,51 @@ slash command, UX pattern, or architectural lift for the CLI host;
 sized for individual focused PRs, not bundled. The MCP/A2A bullets are
 captured in M2 and M7 above; the player-experience bullets live here.
 
+**Cross-cutting observations.**
+
+- **Three-layer memory architecture is the convergent pattern.** Every
+  serious clone organises persistence as three deliberate layers:
+  (1) session persistence to disk (we have `forge_sessions` SQLite
+  table — covered), (2) transcript compaction within a session
+  (we have within-loop caching from M4 but no compaction step —
+  the `/compact` bullet below), and (3) context discovery on resume
+  (we have project-root injection but no "what threads were open
+  last time we talked" surfacing — the `/session show` bullet
+  below). Worth keeping the three-layer framing in mind when M15
+  logging architecture lands so the layers don't drift apart again.
+- **SSE-only forecloses some integrations.** ClawCode supports six
+  MCP transports (Stdio, SSE, HTTP, WebSocket, SDK, ClaudeAiProxy).
+  We're SSE-only end-to-end. M2 should at minimum offer Stdio
+  alongside SSE so a future IDE-side integration (Cursor, VS Code,
+  Zed) can reach `kourai-forge-mcp` without standing up an HTTP
+  server. Already noted in M2 scope.
+
+**Prioritization (player-experience-per-effort, highest first).**
+
+1. **`/compact`** — universal across every clone, we don't have it,
+   Mneme already has the documenter persona. Single-PR-sized.
+2. **MCP `roots` + `elicitation` declared at M2 init** — design-time
+   work, near-zero cost if done while M2 is being scaffolded;
+   retrofitting later is much more painful.
+3. **`/permissions` granular tool gating** — small extension to
+   `CLISettings`, big UX win for players who want partial autonomy
+   without full YOLO. Maps onto existing `MUTATING_TOOL_NAMES`.
+4. **`A2A-Version` header** — must-do prerequisite for any v1.0
+   migration attempt. One header field, one line of code.
+5. **`/cost` alias for `/usage`** — five-line cleanup matching
+   OSS-CC vocabulary so muscle-memory carries over.
+
+The remaining bullets (Plan Mode, autoDream, custom-agents-via-markdown,
+tree-sitter project map, LSP integration) are higher-effort
+architectural moves; valuable but not the first lift.
+
 - **`/compact` slash command — transcript compaction with Mneme
-  summarization.** Every OSS clone we surveyed (ClawCode, Cline,
-  OpenCode) ships a `/compact` primitive. Today our `context_id`
-  conversation memory grows monotonically across turns; long sessions
-  re-pay full prompt cost on every turn beyond the cache horizon.
+  summarization. (Tier-1 priority — see prioritization above.)**
+  Every OSS clone we surveyed (ClawCode, Cline, OpenCode) ships a
+  `/compact` primitive — it's the single most universal pattern in
+  the post-leak ecosystem. Today our `context_id` conversation
+  memory grows monotonically across turns; long sessions re-pay
+  full prompt cost on every turn beyond the cache horizon.
   `/compact` calls Mneme to produce a structured summary
   (`<COMPACTED>` block: open threads, decisions made, files touched,
   player intent), replaces the long history with the summary plus the
