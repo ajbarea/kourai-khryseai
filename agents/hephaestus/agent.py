@@ -60,6 +60,12 @@ Pipeline templates:
 - "plan X" → metis
 - "lint/format X" → kallos
 
+SPEECH VS ACTION: When you address the player directly — greeting,
+commentary, narration of a handoff to a maiden — wrap that spoken line in
+double quotes ("like this"). The host italicizes quoted lines as dialogue
+and leaves unquoted lines plain. Routing tokens (the agent list, CHAT:,
+ASK_USER:) are protocol, not speech, so they are never quoted.
+
 Response format — reply with EXACTLY ONE of these:
 
 1. A comma-separated list of agent names for development tasks:
@@ -67,7 +73,7 @@ Response format — reply with EXACTLY ONE of these:
 
 2. CHAT: <your response> — for casual conversation, greetings, questions about
    yourself or the maidens, or anything that isn't a development task.
-   Example: CHAT: The forge is always hot. What brings you here today?
+   Example: CHAT: "The forge is always hot. What brings you here today?"
 
 3. CHAT:<agent_name>: <routing note> — when the player wants to talk to a specific
    maiden (e.g., "@kallos", "talk to Dokimasia", "bring me Techne"),
@@ -78,44 +84,48 @@ Response format — reply with EXACTLY ONE of these:
    Example: CHAT:cupid: Player is asking about relationship dynamics.
 
 4. ASK_USER: <your clarifying question> — when a development request is ambiguous.
+   The question itself is player-directed speech, so quote it.
+   Example: ASK_USER: "Should the CSV export stream in chunks for large files?"
 """
 
 # Agents available for routing (pipeline specialists)
 AVAILABLE_AGENTS = {"metis", "techne", "dokimasia", "kallos", "mneme"}
 
-# Hephaestus handoff narration (Forge Master persona)
+# Hephaestus handoff narration (Forge Master persona).
+# Quote-wrapped per the speech-vs-action convention so the host renders
+# them as italicized dialogue against the plain status stream.
 HEPH_HANDOFFS = {
     "metis": [
-        "Metis! Draw up the plans. And no improvising.",
-        "Architect — you're up. Make it clean.",
-        "Metis, I need blueprints, not poetry. Get to it.",
+        '"Metis! Draw up the plans. And no improvising."',
+        '"Architect — you\'re up. Make it clean."',
+        '"Metis, I need blueprints, not poetry. Get to it."',
     ],
     "techne": [
-        "Techne! Write something worthy of my forge.",
-        "Artisan — the metal's hot. Get. To. Work.",
-        "Techne, build it solid. I didn't forge you for sloppy work.",
+        '"Techne! Write something worthy of my forge."',
+        '"Artisan — the metal\'s hot. Get. To. Work."',
+        '"Techne, build it solid. I didn\'t forge you for sloppy work."',
     ],
     "dokimasia": [
-        "Dokimasia — find every flaw. Leave nothing.",
-        "Crucible! Test it 'til it screams. Then test it again.",
-        "Your turn, bug-hunter. Make me proud. ...Don't tell them I said that.",
+        '"Dokimasia — find every flaw. Leave nothing."',
+        '"Crucible! Test it \'til it screams. Then test it again."',
+        '"Your turn, bug-hunter. Make me proud. ...Don\'t tell them I said that."',
     ],
     "kallos": [
-        "Kallos, go make it pretty or whatever you do.",
-        "Muse! Polish time. And yes, it does need it. Don't gloat.",
-        "Kallos — style it. And spare me the commentary this time.",
+        '"Kallos, go make it pretty or whatever you do."',
+        '"Muse! Polish time. And yes, it does need it. Don\'t gloat."',
+        '"Kallos — style it. And spare me the commentary this time."',
     ],
     "mneme": [
-        "Mneme, write it down. The FACTS, not your opinions.",
-        "Oracle! Chronicle duty. And keep it under ten scrolls this time.",
-        "Mneme — document everything. You know the drill, old friend.",
+        '"Mneme, write it down. The FACTS, not your opinions."',
+        '"Oracle! Chronicle duty. And keep it under ten scrolls this time."',
+        '"Mneme — document everything. You know the drill, old friend."',
     ],
 }
 
 
 def get_heph_narration(agent_name: str) -> str:
     """Get a random Forge Master handoff line for the given agent."""
-    lines = HEPH_HANDOFFS.get(agent_name, ["Next specialist. NOW."])
+    lines = HEPH_HANDOFFS.get(agent_name, ['"Next specialist. NOW."'])
     return random.choice(lines)  # noqa: S311
 
 
@@ -521,7 +531,10 @@ async def execute_pipeline(
                 while iteration < MAX_ITERATIONS and _kallos_found_issues(result):
                     iteration += 1
                     # Intervene as Hephaestus
-                    loop_msg = f"Lint issues found — Techne, another round! Iteration {iteration}/{MAX_ITERATIONS}"
+                    loop_msg = (
+                        f'"Lint issues found — Techne, another round! '
+                        f'Iteration {iteration}/{MAX_ITERATIONS}"'
+                    )
                     yield ("hephaestus", f"\U0001f525 {loop_msg}", "")
                     transcript += f"\n\n[Hephaestus]: {loop_msg}"
 
@@ -554,7 +567,7 @@ async def execute_pipeline(
 
                             # Re-run Kallos to verify
                             # Hephaestus narration for re-check
-                            check_msg = "All done? Kallos, give it another look."
+                            check_msg = '"All done? Kallos, give it another look."'
                             yield ("hephaestus", f"\U0001f525 {check_msg}", "")
                             transcript += f"\n\n[Hephaestus]: {check_msg}"
 
@@ -583,7 +596,7 @@ async def execute_pipeline(
                             break
 
                 if iteration >= MAX_ITERATIONS and _kallos_found_issues(result):
-                    msg = "Enough! We're proceeding with remaining issues."
+                    msg = '"Enough! We\'re proceeding with remaining issues."'
                     yield ("hephaestus", f"\U0001f525 {msg}", "")
 
         # Final result is the last agent's output

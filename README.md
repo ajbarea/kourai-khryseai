@@ -118,7 +118,7 @@ Each agent shows you:
 
 ```
 📐 Metis: Analyzing requirements...
-   → Should CSV use streaming for large files? (Option A: yes, Option B: no)
+   → "Should CSV use streaming for large files?" (Option A: yes, Option B: no)
 
 ❯ Option A, streaming
 

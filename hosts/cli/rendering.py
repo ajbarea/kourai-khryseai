@@ -177,16 +177,23 @@ def _comms_window(agent_name: str, dialogue: str, *, style: str = "speak") -> st
 
     title = str(m["title"])
 
+    # Speech-vs-action: per the agents-speak-don't-emit guiding principle,
+    # a line that starts with a double-quote is dialogue (the maiden talking
+    # to the player) and renders italic; an unquoted line is a status report
+    # and stays plain. The convention is uniform across CLI/GUI/VN so the
+    # human-on-the-loop checkpoint pops against the status stream.
+    is_dialogue = dialogue.lstrip().startswith('"')
+
     # Style variants
     if style == "shout":
         text_col = _GOLD_BRIGHT
         border = _GOLD_BOLD
         dialogue = dialogue.upper()
     elif style == "whisper":
-        text_col = _DIM
+        text_col = f"{_DIM}{_ITALIC}" if is_dialogue else _DIM
         border = _DIM
     else:
-        text_col = _RESET
+        text_col = _ITALIC if is_dialogue else _RESET
         border = _GOLD
 
     # Dynamic width detection

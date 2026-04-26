@@ -62,10 +62,14 @@ label portrait_debug:
     python:
         # Build the full agent list — AGENT_CHARS covers the 8 main agents;
         # aidos and aletheia have portraits but no game Character objects, so
-        # we define temporary ones here just for the debug preview.
+        # we define temporary ones here just for the debug preview. Hades-style
+        # convention (per ROADMAP M10): the name plaque already signals the
+        # speaker, so dialogue is NOT auto-wrapped in literal quote marks —
+        # agent outputs decide per-line whether a line is quoted, matching the
+        # script_data.rpy maidens and the CLI/GUI convention.
         _dbg_agents = list(AGENT_CHARS.items()) + [
-            ("aidos",    (Character("Aidos",    color="#B8D4E3", what_prefix='"', what_suffix='"'), "Keeper of Shame")),
-            ("aletheia", (Character("Aletheia", color="#2E8B57", what_prefix='"', what_suffix='"'), "Seeker of Truth")),
+            ("aidos",    (Character("Aidos",    color="#B8D4E3"), "Keeper of Shame")),
+            ("aletheia", (Character("Aletheia", color="#2E8B57"), "Seeker of Truth")),
         ]
 
     "Entering portrait debug mode. No Docker required — press to step through each character."
