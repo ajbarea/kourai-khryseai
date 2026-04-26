@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import re
 import shutil
 import subprocess
 import time
@@ -63,7 +64,7 @@ class ForgeSession:
         `label` is an optional human hint folded into the branch name.
         """
         timestamp = time.strftime("%Y%m%d-%H%M%S")
-        slug = (label or "session").strip().lower().replace(" ", "-")[:24] or "session"
+        slug = _sanitize_branch_slug(label)
         branch = f"forge/{timestamp}-{slug}"
         session_id = uuid4().hex
         workdir = project.path / FORGES_DIRNAME / session_id
@@ -279,6 +280,33 @@ def _worktree_is_dirty(cwd: Path) -> bool:
         check=False,
     )
     return result.returncode == 0 and bool(result.stdout.strip())
+
+
+# Allowed in branch slugs — lowercase letters, digits, hyphen. Anything
+# else gets squashed to '-' so git's check-ref-format doesn't reject the
+# `git worktree add -b forge/<slug>` call. Round 6 produced
+# `please-add-a-function-`d` from a prompt with a backtick; the old
+# logic only handled spaces. Conservative whitelist over enumerating
+# git's blocklist.
+_SLUG_DISALLOWED = re.compile(r"[^a-z0-9-]+")
+
+
+def _sanitize_branch_slug(label: str | None, max_len: int = 24) -> str:
+    """Normalize ``label`` into a git-branch-safe slug.
+
+    Lowercases, replaces every disallowed character (space, backtick,
+    quote, slash, etc.) with a hyphen, collapses runs of hyphens, strips
+    leading/trailing hyphens, truncates to ``max_len``, and strips any
+    trailing hyphen the truncation produced. Empty / None input falls
+    back to ``"session"`` so the branch name always ends up shaped like
+    ``forge/<timestamp>-<slug>``.
+    """
+    raw = (label or "").strip().lower()
+    cleaned = _SLUG_DISALLOWED.sub("-", raw)
+    # Collapse runs of hyphens so 'a   b' → 'a-b' (not 'a---b').
+    collapsed = re.sub(r"-+", "-", cleaned).strip("-")
+    truncated = collapsed[:max_len].rstrip("-")
+    return truncated or "session"
 
 
 def _grant_group_write(root: Path) -> None:

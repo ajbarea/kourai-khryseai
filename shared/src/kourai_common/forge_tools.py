@@ -94,14 +94,22 @@ FORGE_TOOL_SCHEMAS: list[dict[str, Any]] = [
         "function": {
             "name": "read_file",
             "description": (
-                "Read a file's contents to inspect what is already on disk before "
-                "editing. Returns line-numbered text. Use this before edit_file "
-                "if you are not certain of the exact text to match."
+                "Read a regular file's contents to inspect what is already on disk "
+                "before editing. Returns line-numbered text. Use this before "
+                "edit_file if you are not certain of the exact text to match. "
+                "The path must point to a regular file, not a directory — "
+                "directory listing is not supported by this tool."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Project-relative path."},
+                    "path": {
+                        "type": "string",
+                        "description": (
+                            "Project-relative path to a regular file (NOT a "
+                            "directory). Example: 'src/utils.py'."
+                        ),
+                    },
                 },
                 "required": ["path"],
                 "additionalProperties": False,
@@ -173,13 +181,26 @@ async def delete_file(path: str, *, project_root: Path | str) -> str:
 
 
 async def read_file(path: str, *, project_root: Path | str) -> str:
-    """Tool handler — return line-numbered contents."""
+    """Tool handler — return line-numbered contents.
+
+    Rejects directory paths explicitly so the model gets a clear error
+    rather than a silent garbage-result. Round 6 caught Techne
+    repeatedly trying directory paths through this handler; the schema
+    description has been tightened too, but the runtime guard makes
+    the error legible when the model still attempts it.
+    """
     try:
         target = _resolve(path, project_root)
     except PathViolation as exc:
         return f"ERROR: {exc}"
     if not target.exists():
         return f"ERROR: file not found: {path}"
+    if target.is_dir():
+        return (
+            f"ERROR: {path!r} is a directory; read_file expects a regular "
+            "file. Use a more specific path or list the directory contents "
+            "yourself before calling read_file."
+        )
     return read_file_with_context(str(target))
 
 

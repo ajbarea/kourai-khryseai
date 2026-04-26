@@ -167,3 +167,30 @@ class TestReadFile:
     async def test_rejects_path_escape(self, project_root: Path):
         result = await read_file("../../etc/passwd", project_root=project_root)
         assert result.startswith("ERROR:")
+
+    @pytest.mark.asyncio
+    async def test_rejects_directory_path(self, project_root: Path):
+        # Round 6 caught Techne repeatedly trying directory paths
+        # through read_file. The handler's `target.exists()` check
+        # used to pass for directories and read_file_with_context
+        # would then return garbage. Now the handler explicitly
+        # rejects directories with a clear error.
+        (project_root / "src").mkdir(exist_ok=True)
+        result = await read_file("src", project_root=project_root)
+        assert result.startswith("ERROR:")
+        assert "directory" in result.lower()
+        # Hint nudges the model toward the right next move.
+        assert "specific" in result or "list" in result
+
+    def test_schema_description_warns_against_directory_paths(self):
+        # Schema-level guard so the LLM gets the hint at request time.
+        # If the description is rephrased, this test names the contract:
+        # "directory" must appear so the model is told not to try it.
+        from kourai_common.forge_tools import FORGE_TOOL_SCHEMAS
+
+        read_schema = next(t for t in FORGE_TOOL_SCHEMAS if t["function"]["name"] == "read_file")
+        # Either the function-level description OR the path-param
+        # description should call out the directory restriction.
+        function_desc = read_schema["function"]["description"]
+        path_desc = read_schema["function"]["parameters"]["properties"]["path"]["description"]
+        assert "directory" in function_desc or "directory" in path_desc
