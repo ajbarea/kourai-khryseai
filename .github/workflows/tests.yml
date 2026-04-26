@@ -70,7 +70,11 @@ jobs:
         run: mkdir -p logs
 
       - name: Run unit tests
-        run: uv run pytest -n auto tests/unit/ -v --tb=short --cov=. --cov-report=xml:logs/coverage.xml --cov-report=term-missing --junitxml=logs/junit.xml
+        # -m "not slow" skips the heavyweight Kokoro inference tests on the
+        # push/PR fast lane. They flake intermittently on shared CI runners
+        # with SystemExit:1 (model-load timeout / OOM). The nightly workflow
+        # runs them by inverting the marker.
+        run: uv run pytest -n auto tests/unit/ -m "not slow" -v --tb=short --cov=. --cov-report=xml:logs/coverage.xml --cov-report=term-missing --junitxml=logs/junit.xml
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v6.0.0
