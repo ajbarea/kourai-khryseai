@@ -5,7 +5,7 @@ A public, living plan for where the forge is heading. Items here are either
 *currently working on* lives in [IMPL.md](./IMPL.md) — when it lands, the
 matching milestone here collapses to a single line under "Shipped".
 
-Last reviewed: 2026-04-26 (M1 code shipped awaiting Round 6 live smoke; M4 within-loop caching shipped; M10 speech-vs-action convention shipped — see Shipped)
+Last reviewed: 2026-04-26 (M1 code shipped awaiting Round 6 live smoke; M3 tool-call streaming gap closed for Kallos+Dokimasia; M4 within-loop caching shipped; M10 speech-vs-action convention shipped — see Shipped)
 
 ---
 
@@ -122,37 +122,6 @@ References: [MCP architecture](https://modelcontextprotocol.io/docs/learn/archit
 Current MCP spec version: **2025-11-25**; 2026 roadmap prioritises streamable-HTTP
 scalability, Tasks lifecycle, and enterprise readiness
 ([blog.modelcontextprotocol.io/posts/2026-mcp-roadmap](https://blog.modelcontextprotocol.io/posts/2026-mcp-roadmap/)).
-
----
-
-## M3 — A2A streaming task events
-
-> Status: planned
-
-Hephaestus already orchestrates specialists via the `a2a-sdk` (0.3.26 in the
-lockfile). What's missing is per-stage UX. Today the CLI prints
-`[2/4] Techne — Coder completed` *after* Techne finishes. With A2A's
-`TaskStatusUpdateEvent` stream we can show `Techne: writing src/hello.py …`
-in real time.
-
-**Scope.**
-
-- Specialists return a `Task` from `message/stream` and emit
-  `TaskStatusUpdateEvent` from inside the tool loop (one event per tool call).
-- Hephaestus subscribes via SSE (`Content-Type: text/event-stream`) and
-  forwards events to the CLI through existing `a2a_events` helpers.
-- CLI renders a live-updating line per active stage instead of a static
-  "[N/4] completed" after the fact.
-
-**Why.** Pipeline latency is the biggest UX threat (~7-8 min per session).
-We can't make the model faster; we can make the wait *legible*.
-
-Terminal states the CLI must handle: `COMPLETED`, `FAILED`, `CANCELED`,
-`REJECTED`, `INPUT_REQUIRED`.
-
-Reference: [A2A streaming & async](https://a2a-protocol.org/latest/topics/streaming-and-async/).
-
----
 
 ---
 
@@ -478,6 +447,7 @@ widget that caches rendered surfaces.
 
 One-liner per item, newest first. Detail moves out of this file when work lands.
 
+- 2026-04-26 — M3 tool-call streaming gap closed for Kallos and Dokimasia: `apply_lint_fixes` and `apply_test_fixes` now accept an `on_tool_call` parameter and forward it to `chat_with_tools`; both executors wire an `_on_tool` closure that emits one `send_working_status` per tool call (`✨ edit_file <path> (ok|fail)` for Kallos, `🧪 write_file <path> (ok|fail)` for Dokimasia), mirroring Techne's M1 wiring. The protocol stack from M1 (`chat_with_tools.on_tool_call` → `send_working_status` → `TaskStatusUpdateEvent` → SSE → Hephaestus → CLI `_maidenify_status`) was already in place; this PR wired the missing two endpoints. 7 new unit tests in `tests/unit/test_tool_call_streaming.py`. Live visual smoke (multiple per-tool status lines streaming during fix loops) folds into the next interactive `/project` session
 - 2026-04-26 — M10 speech-vs-action rendering convention shipped: a 9th rule in `UNIVERSAL_RULES` ("SPEECH VS ACTION") propagates to all 9 specialists via `build_system_prompt`; Hephaestus's hand-rolled `ROUTING_PROMPT` carries it too and every `HEPH_HANDOFFS` value is now quoted; CLI `_comms_window` flips `_ITALIC` (and `_DIM+_ITALIC` for whisper) on lines starting with `"`; GUI `_draw_line_with_emotes` accepts an `oblique` kwarg backed by `pygame.freetype.STYLE_OBLIQUE` (no font asset add); the orphan `what_prefix='"'` on the aidos/aletheia debug Character defs in `script_labels.rpy` was stripped — `grep -rn what_prefix hosts/vn/` returns zero. Live visual smoke (italic dialogue, plain status across CLI/GUI/VN) folds into the next interactive `/project` session
 - 2026-04-26 — M4 prompt caching landed in `chat_with_tools`: `cache_control: {"type": "ephemeral"}` on the system block, last tool definition, and initial user message; iterations 2–N of every Techne/Kallos/Dokimasia run hit the cache for the `[system + tools + initial-user]` prefix (which routinely carries 2K–10K tokens of `file_contents`/`git_context`/docs). `chat` and `chat_stream` mark the system block too — sub-threshold prefixes are silently ignored at no charge. `usage.cache_read_input_tokens` / `cache_creation_input_tokens` debug-logged after every call. Note: cross-call caching of just the agent system prompt does NOT pay today (Techne 1101 tokens vs 2048 Sonnet / 4096 Opus minimums); within-loop is the actual win
 - 2026-04-23 — OTEL spans around every MCP tool call (``mcp.context7.query``, ``mcp.memory.*``); per-call latency now lands in Jaeger alongside A2A hops

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from anyio import Path as AnyioPath
 
@@ -22,6 +22,7 @@ from kourai_common.prompts import CURRENT_DATE, build_system_prompt
 from kourai_common.subprocess import StatusCallback, run_command
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
     from pathlib import Path
 
 log = logging.getLogger(__name__)
@@ -180,8 +181,20 @@ async def apply_lint_fixes(
     file_paths: set[str],
     project_root: str | Path,
     context_id: str | None = None,
+    on_tool_call: Callable[[str, dict[str, Any], str], Awaitable[None]] | None = None,
 ) -> int:
-    """Drive the tool-use loop to fix lint errors and return the write count."""
+    """Drive the tool-use loop to fix lint errors and return the write count.
+
+    Args:
+        lint_output: Combined ruff/ty output to fix.
+        file_paths: Files implicated by the lint output.
+        project_root: Project root for path validation in the tool handlers.
+        context_id: Conversation context ID for the LLM call.
+        on_tool_call: Optional async callback fired once per tool execution
+            with ``(name, args, result)``. The executor wires this to
+            ``send_working_status`` so the player sees Kallos's edits land
+            live instead of a black box during the fix loop.
+    """
     files_block = ""
     for file_path in file_paths:
         path = AnyioPath(file_path)
@@ -213,6 +226,7 @@ async def apply_lint_fixes(
         max_tokens=4096,
         max_iters=10,
         context_id=context_id,
+        on_tool_call=on_tool_call,
     )
     return count_successful_writes(tool_log)
 
