@@ -37,7 +37,14 @@ from hosts.cli.completer import SlashCommandCompleter
 from hosts.cli.demo import run_demo
 from hosts.cli.headless import _headless
 from hosts.cli.maidens import _MAIDEN_FACES, _MAIDENS
-from hosts.cli.rendering import _banner, _echo, _maiden_card, _maiden_gallery, set_raw_out
+from hosts.cli.rendering import (
+    _banner,
+    _clear_screen,
+    _echo,
+    _maiden_card,
+    _maiden_gallery,
+    set_raw_out,
+)
 from hosts.cli.settings import CLISettings
 from hosts.cli.streaming import _connect_with_url_override, get_last_result, send_and_stream
 from hosts.cli.styling import _DIM, _GOLD, _GOLD_BRIGHT, _ITALIC, _RED, _RESET
@@ -539,6 +546,18 @@ async def main(
                     _echo(f"  {_DIM}Session usage cleared.{_RESET}")
                     continue
 
+                if prompt_text == "/yolo":
+                    settings.yolo_enabled = not settings.yolo_enabled
+                    settings.save()
+                    state = "ON" if settings.yolo_enabled else "OFF"
+                    desc = (
+                        "bypassed — pipelines run without read-back"
+                        if settings.yolo_enabled
+                        else "active — Hephaestus reads back before any pipeline"
+                    )
+                    _echo(f"  {_GOLD}/yolo{_RESET} {state} — confirmation gate {desc}.")
+                    continue
+
                 if prompt_text == "/metrics":
                     _show_metrics_dashboard()
                     continue
@@ -602,7 +621,7 @@ async def main(
                     continue
 
                 if prompt_text == "/clear":
-                    click.clear()
+                    _clear_screen()
                     continue
 
                 if prompt_text.startswith("/"):
@@ -644,6 +663,14 @@ async def main(
                             f"{_RED}Could not start forge session: {exc}"
                             f" \u2014 falling back to no-project mode.{_RESET}"
                         )
+
+                # M13 yolo bypass — when on, prepend a tag the Hephaestus
+                # router strips and treats as "skip CONFIRM_ORDER, route
+                # straight to the agent list". Same text-tag convention as
+                # [project_root: …] and [relationship_tiers: …]. Default OFF
+                # so the gate stays the contract of the forge.
+                if settings.yolo_enabled:
+                    forge_msg = f"[yolo: on]\n{forge_msg}"
 
                 _echo("")
                 stream_kwargs: dict[str, object] = {}

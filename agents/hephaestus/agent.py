@@ -86,6 +86,29 @@ Response format — reply with EXACTLY ONE of these:
 4. ASK_USER: <your clarifying question> — when a development request is ambiguous.
    The question itself is player-directed speech, so quote it.
    Example: ASK_USER: "Should the CSV export stream in chunks for large files?"
+
+5. CONFIRM_ORDER: <tier> "<read-back>" — for ANY development task, ALWAYS use
+   this BEFORE emitting the agent list (response #1). The forge does not light
+   without confirmation. The agent list (response #1) is now ONLY emitted on
+   the resumed turn AFTER the player responds to your CONFIRM_ORDER prompt.
+
+   Tiers (pick exactly one):
+   - clear:    Order is unambiguous. Read it back in 1 sentence + "Light the forge?"
+               Tier 1 is TIGHT — under 15 words. The warmth is in doing your job
+               competently, not in cracking wise.
+               Example: CONFIRM_ORDER: clear "double(n) in src/math.py with a test. Light the forge?"
+   - smart:    Order is reasonable but Metis would suggest implicit upgrades
+               (edge cases, docstring, parity with existing code). Read it back +
+               surface Metis's suggestions + offer "the works or just the bare?"
+               Example: CONFIRM_ORDER: smart "double(n) in src/math.py — plus the edge cases Metis would want (zero, negatives, floats). Bare function or the works?"
+   - clarify:  Order is genuinely ambiguous. Ask ONE specific question to resolve.
+               Example: CONFIRM_ORDER: clarify "Which functions are you targeting? Algorithmic or micro-optimization? Got benchmarks I should target?"
+
+   VOICE: You are gruff, professional, brief. Tier 2 may include a single
+   in-character aside ("Metis won't even unsheath her stylus" / "Tiny one")
+   but NEVER roasts the player — the maidens roast each other and Hephaestus,
+   never the patron. Tier 3 sounds like a journeyman asking the master smith
+   to clarify a commission.
 """
 
 # Agents available for routing (pipeline specialists)
@@ -168,6 +191,25 @@ def extract_project_root(text: str) -> tuple[str, str | None]:
         clean = re.sub(r"\[project_root:\s*[^\]]+\]\n?", "", text).strip()
         return clean, root
     return text, None
+
+
+def extract_yolo(text: str) -> tuple[str, bool]:
+    """Strip the ``[yolo: on]`` tag the CLI prepends when ``/yolo`` is on.
+
+    Same text-tag convention as ``extract_project_root`` and
+    ``extract_relationship_tiers`` — the CLI inlines the flag into the
+    user message because A2A `Message.metadata` isn't guaranteed to be
+    forwarded by every transport. When yolo is on, the routing call
+    augments its system prompt to skip CONFIRM_ORDER and emit the agent
+    list directly (M13 power-user opt-out).
+
+    Returns ``(clean_text, yolo_enabled)``.
+    """
+    pattern = re.compile(r"\[yolo:\s*on\]\n?", re.IGNORECASE)
+    if pattern.search(text):
+        clean = pattern.sub("", text).strip()
+        return clean, True
+    return text, False
 
 
 def extract_relationship_tiers(text: str) -> tuple[str, dict[str, float]]:
@@ -267,12 +309,23 @@ async def determine_pipeline(user_request: str, context_id: str | None = None) -
     # The routing LLM only needs the human-readable request, not the tag prefixes.
     user_request, _ = extract_project_root(user_request)
     user_request, affinities = extract_relationship_tiers(user_request)
+    user_request, yolo = extract_yolo(user_request)
     user_request = expand_mentions(user_request)
 
     with create_span("hephaestus.route", {"request_length": str(len(user_request))}):
         # Inject player identity into routing prompt for personalized responses
         profile = PlayerProfile.load()
         system_prompt = ROUTING_PROMPT
+        if yolo:
+            # /yolo bypass — instruct the LLM to skip CONFIRM_ORDER and
+            # emit the agent list directly. The system prompt below
+            # otherwise demands CONFIRM_ORDER for every dev task.
+            system_prompt += (
+                "\n\nYOLO MODE: The player has /yolo on. Skip CONFIRM_ORDER "
+                "for this turn — emit response option #1 (the comma-separated "
+                "agent list) directly for development tasks. CHAT: and ASK_USER: "
+                "are still legal if the request isn't a dev task."
+            )
         if profile and profile.display_name:
             player_ctx = build_player_context(profile, "hephaestus", top_k_memories=4)
             if player_ctx:
@@ -302,6 +355,15 @@ async def determine_pipeline(user_request: str, context_id: str | None = None) -
         # Conversational mode — no pipeline needed
         if response.startswith("CHAT:"):
             log.info("Conversational response: %.100s", response)
+            return response
+
+        # M13 — Forge Order Confirmation gate. Pre-pipeline read-back
+        # ("Light the forge?"); the executor surfaces this as
+        # INPUT_REQUIRED and pauses until the player confirms. On the
+        # next turn the LLM sees the confirmation in context_id memory
+        # and emits the agent list (the path below).
+        if response.startswith("CONFIRM_ORDER:"):
+            log.info("Confirmation gate: %.100s", response)
             return response
 
         # Parse comma-separated agent names
