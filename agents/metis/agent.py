@@ -138,10 +138,11 @@ async def discuss_tradeoffs(
     (clarify) confirmations only; on tier-1 (clear) Metis stays silent
     so the read-back-then-confirm beat is a beat, not an interrogation.
 
-    The call runs at whatever ``KOURAI_MODEL_TIER`` is active. A future
-    optimization could pin discussion to ``cheap`` regardless of the
-    pipeline tier, but that would require a tier-override on
-    ``kourai_common.llm.chat`` (not surfaced today).
+    Pinned to the ``cheap`` tier regardless of the active
+    ``KOURAI_MODEL_TIER`` — discussion is a quick auxiliary call (often
+    dropped silently on tier-1 confirmations and yolo paths), so paying
+    smart-tier rates for it would be ongoing waste. The override goes
+    through ``kourai_common.llm.chat(..., tier="cheap")``.
     """
     system_prompt = (
         get_enriched_system_prompt(SYSTEM_PROMPT, "metis")
@@ -158,7 +159,14 @@ async def discuss_tradeoffs(
         {"role": "user", "content": user_request},
     ]
     log.info("Metis discuss_tradeoffs for: %.100s", user_request)
-    return await chat("metis", messages, temperature=0.4, max_tokens=400, context_id=context_id)
+    return await chat(
+        "metis",
+        messages,
+        temperature=0.4,
+        max_tokens=400,
+        context_id=context_id,
+        tier="cheap",
+    )
 
 
 async def create_spec(

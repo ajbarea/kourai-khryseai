@@ -186,6 +186,70 @@ class TestManageMemory:
         assert "Existing Summary" in user_msg
 
 
+class TestChatTierKwarg:
+    """``tier`` kwarg on ``chat()`` overrides the env-set MODEL_TIER per call."""
+
+    @pytest.mark.asyncio
+    async def test_tier_kwarg_passed_to_get_model(self):
+        from kourai_common import llm
+
+        captured: dict = {}
+
+        def fake_get_model(agent_name, tier=None):
+            captured["agent_name"] = agent_name
+            captured["tier"] = tier
+            return "fake-model-id"
+
+        async def fake_execute(**kwargs):
+            captured["model"] = kwargs.get("model")
+            return MagicMock(
+                choices=[MagicMock(message=MagicMock(content="ok"))],
+                usage=None,
+            )
+
+        with (
+            patch.object(llm, "get_model", side_effect=fake_get_model),
+            patch.object(llm, "_execute_completion", side_effect=fake_execute),
+            patch.object(
+                llm, "_build_contextual_messages", new_callable=AsyncMock, return_value=[]
+            ),
+        ):
+            await llm.chat("metis", [{"role": "user", "content": "x"}], tier="cheap")
+
+        assert captured["agent_name"] == "metis"
+        assert captured["tier"] == "cheap"
+        assert captured["model"] == "fake-model-id"
+
+    @pytest.mark.asyncio
+    async def test_default_tier_none_preserves_existing_callers(self):
+        # Backward-compat: callers that don't pass tier get the env behavior
+        # (None → get_model uses MODEL_TIER). Regression guard.
+        from kourai_common import llm
+
+        captured: dict = {}
+
+        def fake_get_model(agent_name, tier=None):
+            captured["tier"] = tier
+            return "fake"
+
+        async def fake_execute(**kwargs):
+            return MagicMock(
+                choices=[MagicMock(message=MagicMock(content="ok"))],
+                usage=None,
+            )
+
+        with (
+            patch.object(llm, "get_model", side_effect=fake_get_model),
+            patch.object(llm, "_execute_completion", side_effect=fake_execute),
+            patch.object(
+                llm, "_build_contextual_messages", new_callable=AsyncMock, return_value=[]
+            ),
+        ):
+            await llm.chat("metis", [{"role": "user", "content": "x"}])
+
+        assert captured["tier"] is None
+
+
 class TestChatStream:
     """Tests for chat_stream — streaming path, fallback, and timeout."""
 

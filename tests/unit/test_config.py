@@ -64,6 +64,54 @@ class TestGetModel:
         result = config.get_model("metis")
         assert result == "anthropic/claude-haiku-4-5-20251001"
 
+    def test_tier_kwarg_overrides_env(self, monkeypatch):
+        """Per-call ``tier`` overrides KOURAI_MODEL_TIER for that call only."""
+        monkeypatch.setattr("kourai_common.config.PROVIDER", "anthropic")
+        monkeypatch.setattr("kourai_common.config.MODEL_TIER", "smart")
+
+        # Even though the env says smart, asking for cheap returns cheap.
+        result = config.get_model("metis", tier="cheap")
+        assert result == "anthropic/claude-haiku-4-5-20251001"
+
+        # And the env's smart tier still resolves correctly without the kwarg.
+        env_result = config.get_model("metis")
+        assert env_result == "anthropic/claude-opus-4-6"
+
+    def test_tier_kwarg_none_falls_back_to_env(self, monkeypatch):
+        """Default ``tier=None`` reads ``KOURAI_MODEL_TIER`` (backward-compat)."""
+        monkeypatch.setattr("kourai_common.config.PROVIDER", "anthropic")
+        monkeypatch.setattr("kourai_common.config.MODEL_TIER", "standard")
+
+        # Pre-tier-kwarg behavior preserved when caller doesn't pass it.
+        result = config.get_model("metis", tier=None)
+        assert result == "anthropic/claude-sonnet-4-6"
+
+    def test_tier_kwarg_unknown_falls_back_to_cheap(self, monkeypatch):
+        """Same fallback semantics as MODEL_TIER — unknown tier → cheap."""
+        monkeypatch.setattr("kourai_common.config.PROVIDER", "anthropic")
+        monkeypatch.setattr("kourai_common.config.MODEL_TIER", "smart")
+
+        result = config.get_model("metis", tier="bogus_tier")
+        assert result == "anthropic/claude-haiku-4-5-20251001"
+
+    def test_tier_kwarg_ignored_when_local_provider(self, monkeypatch):
+        """Local (Ollama) provider has no tier dimension — ``tier`` is moot."""
+        monkeypatch.setattr("kourai_common.config.PROVIDER", "local")
+
+        # Both calls return the same Ollama model; tier is ignored.
+        without_tier = config.get_model("techne")
+        with_tier = config.get_model("techne", tier="cheap")
+        assert without_tier == with_tier
+
+    def test_tier_kwarg_ignored_when_model_override_set(self, monkeypatch):
+        """``KOURAI_MODEL_OVERRIDE`` still wins over ``tier`` (test escape hatch)."""
+        monkeypatch.setattr("kourai_common.config.PROVIDER", "anthropic")
+        monkeypatch.setattr("kourai_common.config.MODEL_TIER", "smart")
+        monkeypatch.setenv("KOURAI_MODEL_OVERRIDE", "test/mock-model")
+
+        result = config.get_model("metis", tier="cheap")
+        assert result == "test/mock-model"
+
 
 class TestGetAgentUrl:
     """Tests for get_agent_url() function."""
