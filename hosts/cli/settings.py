@@ -31,6 +31,30 @@ class CLISettings:
     # Currently selected player project (project_id), or None for "no project".
     # When set, the REPL wraps each turn in a forge worktree session.
     active_project_id: str | None = None
+    # Skip the M13 Forge Order Confirmation gate. Power-user opt-out for
+    # iterative work where the read-back-then-confirm beat is friction.
+    # Default OFF — the gate is the always-on contract of the forge.
+    yolo_enabled: bool = False
+
+    @classmethod
+    def load(cls) -> CLISettings:
+        """Load settings from disk, falling back to defaults.
+
+        Forward-compatible: unknown keys in older settings.json files are
+        dropped silently so a player upgrading mid-stream doesn't get a
+        crash; missing keys for new fields fall back to dataclass
+        defaults (which is how ``yolo_enabled`` lands on existing files).
+        """
+        if not _SETTINGS_FILE.exists():
+            return cls()
+        try:
+            with _SETTINGS_FILE.open(encoding="utf-8") as f:
+                data = json.load(f)
+                known = {f.name for f in cls.__dataclass_fields__.values()}
+                return cls(**{k: v for k, v in data.items() if k in known})
+        except Exception as e:
+            logger.warning("Failed to load CLI settings, using defaults: %s", e)
+            return cls()
 
     def save(self) -> None:
         """Persist settings to disk."""
@@ -40,19 +64,6 @@ class CLISettings:
                 json.dump(asdict(self), f, indent=2)
         except Exception as e:
             logger.error("Failed to save CLI settings: %s", e)
-
-    @classmethod
-    def load(cls) -> CLISettings:
-        """Load settings from disk, falling back to defaults."""
-        if not _SETTINGS_FILE.exists():
-            return cls()
-        try:
-            with _SETTINGS_FILE.open(encoding="utf-8") as f:
-                data = json.load(f)
-                return cls(**data)
-        except Exception as e:
-            logger.warning("Failed to load CLI settings, using defaults: %s", e)
-            return cls()
 
     def toggle(self, key: str) -> bool:
         """Toggle a boolean setting and save. Returns the new value."""

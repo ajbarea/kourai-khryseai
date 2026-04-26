@@ -5,7 +5,7 @@ A public, living plan for where the forge is heading. Items here are either
 *currently working on* lives in [IMPL.md](./IMPL.md) — when it lands, the
 matching milestone here collapses to a single line under "Shipped".
 
-Last reviewed: 2026-04-26 (M1 code shipped awaiting Round 6 live smoke; M3 tool-call streaming gap closed for Kallos+Dokimasia; M4 within-loop caching shipped; M10 speech-vs-action convention shipped; M11 GUI attachment send path shipped; /usage CLI command shipped + /reset_usage + Gemini pricing follow-on; Kokoro slow tests extracted + a2a-sdk pinned `<1.0` after protobuf-migration finding; agent-level READMEs for the 6 main pipeline agents; /project delete two-tier confirmation guard — see Shipped and revised M7)
+Last reviewed: 2026-04-26 (M1 fully shipped — Round 6 accept+discard validated end-to-end with 22 `tool_use` frames in techne logs, 11 `tool_result` frames closing the loop, zero `parse_and_apply_fixes` hits across all 6 agent containers; `/clear` ANSI escape fix; M13 Forge Order Confirmation + M14 Metis-First parallel routing planned as the player-experience load-bearing pair to close the dead zone between "Analyzing request..." and pipeline announcement; M15 forge logging architecture planned; M3 tool-call streaming gap closed for Kallos+Dokimasia; M4 within-loop caching shipped; M10 speech-vs-action convention shipped; M11 GUI attachment send path shipped; /usage CLI command shipped + /reset_usage + Gemini pricing follow-on; Kokoro slow tests extracted + a2a-sdk pinned `<1.0` after protobuf-migration finding; agent-level READMEs for the 6 main pipeline agents; /project delete two-tier confirmation guard — see Shipped and revised M7)
 
 ---
 
@@ -52,45 +52,6 @@ but not precious.
   `constants.py` being read at import time, convert it to a function of the
   current display dimensions. Tracked in
   [M12](#m12--dynamic-sizing-across-the-gui).
-
----
-
-## M1 — Tool-use migration (Techne · Dokimasia · Kallos)
-
-> Status: **code shipped, awaiting live smoke** · Tracking: [IMPL.md](./IMPL.md)
-
-Replace the `ACTION: CREATE/EDIT/DELETE` text-block convention plus the
-`parse_and_apply_fixes` regex with **provider tool-use** (Anthropic tool-use
-API, routed through LiteLLM's `tools=` parameter so non-Anthropic providers
-keep working).
-
-**Why.** The current parser silently accepts zero matches when the LLM wraps
-headers in markdown bold. Once Techne reports "completed", Dokimasia runs on
-whatever was on disk before — a green build with no actual changes. Tool-use
-eliminates the entire class: the model literally cannot finish without emitting
-a schema-validated `tool_use` block.
-
-**Scope.**
-
-- New `chat_with_tools()` in `shared/src/kourai_common/llm.py` driving the
-  agentic loop until `stop_reason != "tool_use"`.
-- Forge-tool registry in `shared/src/kourai_common/forge_tools.py`:
-  `write_file`, `edit_file`, `delete_file`, `read_file` — each defined once
-  with a JSON Schema and a callable that delegates to existing helpers
-  (path validation kept).
-- Migrate Techne, Dokimasia (test-write paths), Kallos (lint-fix paths).
-- Retire `parse_and_apply_fixes` and its tests once the last caller is gone.
-
-**Done when.**
-
-- Smoke run produces non-empty `tool_use` blocks logged at debug. *(pending —
-  Round 6 in [SMOKE_TODO.md](./SMOKE_TODO.md))*
-- `grep -r parse_and_apply_fixes` returns zero hits in source. *(✅ 2026-04-20)*
-- New unit tests cover the tool loop with mocked LiteLLM responses. *(✅
-  2026-04-20 — 2322 unit tests passing, including 9 for `chat_with_tools`,
-  20 for `forge_tools`, and refreshed Techne / Kallos / Dokimasia coverage)*
-
-Reference: [Anthropic tool-use overview](https://docs.claude.com/en/docs/agents-and-tools/tool-use/overview).
 
 ---
 
@@ -314,12 +275,157 @@ widget that caches rendered surfaces.
 
 ---
 
+## M14 — Metis-First Parallel Routing (the dead-zone fix)
+
+> Status: planned · Blocked by: nothing (M13 Phase 1 shipped 2026-04-26) · Player-experience load-bearing
+
+Run Metis's `discuss_tradeoffs` entry point in parallel with Hephaestus's
+classifier so the silence between "Analyzing request..." and the pipeline
+announcement becomes useful architectural dialogue. Metis's preliminary
+notes feed the smart-tier read-back (M13); her full discussion surfaces to
+the player on tier 2/3, stays internal on tier 1.
+
+**Why.** Phase 1 of M13 fixes the *gate*; M14 fixes the *latency*. Together
+they convert the dead zone into the most engaging part of the interaction —
+the player gets architectural input AND a confirmation gate, all in the time
+that used to be silence. Matches Kourai's design north star (player
+experience load-bearing, characters believable in the forge).
+
+**Scope.**
+
+- `asyncio.gather`-based parallel dispatch (classifier + Metis discussion)
+- `ParallelContext` async buffer in `shared/src/kourai_common/federation/`
+  giving the classifier deadline-bounded read access to Metis's partial
+  output (suggested deadline 5s — long enough for obvious tradeoffs, short
+  enough that classifier doesn't drag)
+- Cancellation when Hephaestus's route is `CHAT:` (Metis irrelevant)
+- CLI streaming surfaces Metis's full discussion on tier 2/3
+- GUI parity (`hosts/gui/client.py`) — likely a sub-PR within this milestone
+
+**Done when.**
+
+- Tier-2/3 confirmation cards visibly include Metis-surfaced tradeoffs in
+  the read-back text.
+- Metis speech card renders in the CLI before the Hephaestus confirmation
+  card on tier 2/3 (no card on tier 1).
+- Token-cost guardrail: Metis's parallel discussion runs at `MODEL_TIER=cheap`
+  by default; escalates to `smart` only if the pipeline fires.
+- Round 7 SMOKE artifact updated to verify Metis's contribution is visible
+  on tier 2/3 prompts.
+
+---
+
+## M15 — Forge logging architecture
+
+> Status: planned · Operational hygiene · Surfaced 2026-04-26 during M1 Round 6 validation
+
+What Round 6 exposed: the host's `logs/` directory has stale per-agent log
+files (`logs/hephaestus.log`, `logs/metis.log`, `logs/kallos.log`,
+`logs/dokimasia.log` all from earlier sessions, NOT from the live smoke
+run). The live agent traces only live inside containers — `docker logs
+kourai-khryseai-techne-1` was the only way to validate that 22 `'type':
+'tool_use'` frames flowed during the smoke. That's brittle for post-mortem
+work, smoke validation, and CI artifact collection.
+
+**Why.** Smoke recipes that grep host log files (`SMOKE_TODO.md` Round 6
+told you to grep `logs/dev-latest.log` for tool_use frames) silently never
+matched because the log mount was broken. Future smoke recipes will hit
+the same wall. Beyond smoke, tool-event observability matters for poster
+demos, customer support, and onboarding new contributors who want to see
+what the swarm actually did.
+
+**Scope.**
+
+- **Host log volume mounts.** Compose services bind-mount each container's
+  `/app/logs/` to the host's `./logs/<agent>.log`. Today only the CLI host
+  log lives there reliably. Verify and fix in `compose.yaml`.
+- **Structured tool-event log.** New emitter in
+  `shared/src/kourai_common/llm.py::chat_with_tools` writes one line per
+  tool call: `session=<id> agent=<name> tool=<name> path=<arg> ms=<elapsed>
+  result=<ok|fail>`. Lands in `logs/tool_events.jsonl` on the host. Smoke
+  recipes grep this file directly — no more LiteLLM DEBUG payload spelunking.
+- **Session-id correlation.** Forge sessions have a stable `946e593a` ID;
+  thread it through `setup_logging()` as a logger filter so every record
+  emitted during a session carries `session_id=<id>` in the format string.
+  Then `grep session=<id> logs/*.log` answers "what happened in session X"
+  in one command.
+- **Rename / retire `dev-latest.log`.** It's the dev-runner wrapper output
+  (~933 bytes), not a live agent trace. The name implies otherwise. Either
+  rename to `logs/dev-runner-latest.log` or kill it entirely and rely on
+  the timestamped `logs/dev-<ts>-<cmd>.log` files.
+- **Demote LiteLLM DEBUG default in containers.** Useful for smoke
+  testing; verbose noise for steady state. New env var `KOURAI_LLM_DEBUG`
+  (default unset / INFO) gates the `litellm.set_verbose = True` line.
+  Smoke recipes set it; production-ish runs don't.
+
+**Done when.**
+
+- `ls logs/` on the host shows live, modified-during-the-run log files for
+  every agent that ran (techne, hephaestus, metis, dokimasia, kallos, mneme).
+- `grep -nE 'tool_use.*write_file' logs/tool_events.jsonl` returns hits
+  during a smoke run (no more `docker logs` workaround).
+- `grep session=<forge_id> logs/*.log` returns every event for that session
+  across all agents.
+- SMOKE_TODO.md Round 6 recipe updated to use the new grep targets.
+
+---
+
 ## M6 — Future / unprioritized
+
+### Surfaced 2026-04-26 during M1 Round 6 validation
+
+- **Branch label sanitization (`forge_session.py`).**
+  `ForgeSession.start(label=prompt_text[:24])` slugifies the label but
+  doesn't strip backticks, slashes, or other special chars. Round 6a's
+  session branch was `forge/20260426-114210-please-add-a-function-\`d` —
+  git accepted it but the trailing backtick is ugly in `git branch -a`
+  and `/project status`. Strip non-alphanumeric (and non-hyphen) before
+  slugifying.
+
+- **`read_file` tool schema description tightening.** Both Round 6 runs
+  showed Techne misusing `read_file` on directory paths (`(fail)` returned
+  cleanly, but wasted tool turns and tokens). Tighten the JSON schema
+  description in `shared/src/kourai_common/forge_tools.py` to say "must
+  be a regular file path, not a directory" and add an explicit example.
+  The dispatch error path works; this is a model-behavior tightening only.
+
+- **CLI greeting shows maiden name alongside kaomoji.**
+  `hosts/cli/__main__.py:454` renders `_MAIDEN_FACES[_greet_name]` as the
+  startup greeting but never the name. Players have to memorize the
+  emoji-to-name mapping. Render as `{kaomoji} {NameTitle}: {quote}` —
+  same line, name in gold. Lifts the gallery's identity work into the
+  greeting so first-time players learn the maidens by face + name
+  together.
+
+- **WSL audio environment graceful handling.** ALSA emits a `cannot find
+  card '0'` cascade on every CLI startup under WSL2 without an audio
+  device. The error path already disables audio cleanly (`AudioManager`
+  catches and logs the warning), but the noise is alarming on first
+  launch. Detect WSL2 (presence of
+  `/proc/sys/fs/binfmt_misc/WSLInterop` is the canonical signal) and
+  set `SDL_AUDIODRIVER=dummy` before pygame init when ALSA isn't
+  reachable; suppress the ALSA chatter behind a conditional on the
+  same signal. Non-WSL Linux audio is unaffected.
+
+- **Git context discovery for specialist agents in worktree.** Both
+  Round 6 runs showed `🔍 $ git status --short` then `🔍 exit 128` from
+  Metis and Techne early in their flow. Exit 128 from git means "not a
+  git repository" — the agent containers' default cwd (`/app`) isn't
+  the worktree. The `[project_root: ...]` prefix is in the user message,
+  but agents aren't `cd`-ing to it before `git status`. Pick option (c)
+  for minimum scope: have the bash-tool helper auto-prepend
+  `cd <project_root> && ` when `project_root` is in the agent's context.
+  Doesn't change agent prompts; doesn't churn agent_executors.
+
+### Older items
 
 - **MCP Tasks primitive (experimental):** when stable, replace our hand-rolled
   `forge_sessions` SQLite table with MCP Tasks for durable execution.
 - **A2A `INPUT_REQUIRED` handling:** wire it through Hephaestus → CLI so a
   specialist mid-pipeline can ask the player a question instead of failing.
+  *(Lifts via M13 — the Forge Order Confirmation feature builds the same
+  primitive end-to-end. Once M13 lands, this bullet collapses to "extend
+  M13's INPUT_REQUIRED plumbing to mid-pipeline specialists.")*
 - **Strict tool use** (`strict: true` on tool defs): once M1 lands, turn it
   on for forge tools to guarantee schema conformance.
 - **Anthropic Agent SDK:** evaluate when it stabilises; could replace some
@@ -411,6 +517,9 @@ widget that caches rendered surfaces.
 
 One-liner per item, newest first. Detail moves out of this file when work lands.
 
+- 2026-04-26 — **M1 fully shipped — Round 6 live smoke validated end-to-end** (accept path 6a + discard path 6b, both clean). Provider tool-use loop replaces the `parse_and_apply_fixes` regex parser everywhere it ran. Validation: 22 `'type': 'tool_use'` frames in techne container logs (with `toolu_*` IDs proving real provider blocks); 11 `'type': 'tool_result'` frames closing the loop; **zero `parse_and_apply_fixes` hits** across all 6 agent containers (`techne`, `hephaestus`, `metis`, `dokimasia`, `kallos`, `mneme`). Wall-clock: 244.8s on 6a, 418.6s on 6b — both under the 462s v2 baseline; the provider tool-use loop is faster than the regex parser AND cleaner. Bonus emergent behavior: Aidos's slop-detection now actively *teaches* commit-message hygiene with `<FACT category="skill" confidence="medium">` markers tracking the player's improvement across runs (e.g., flagging "comprehensive" as repeated slop after the first run). M1 detail block removed from above; this is the canonical record
+- 2026-04-26 — `/clear` ANSI escape mangled by `prompt_toolkit.patch_stdout` (printed `?[2J?[1;1H` literally instead of clearing the viewport). Fix: new `hosts/cli/rendering._clear_screen()` helper writes the standard cursor-home + erase-screen sequence (`\x1b[H\x1b[2J`, matching Ubuntu's `clear`) directly to `_raw_out` (the pre-`patch_stdout` stream) — same pattern `_echo()` already uses to bypass the proxy. `hosts/cli/__main__.py` calls the new helper instead of `click.clear()`; click import retained for the rest of the CLI. Caught in AJ's REPL during M1 Round 6 smoke
+- 2026-04-26 — M13 Forge Order Confirmation (Phase 1) shipped: pre-pipeline gate via new `CONFIRM_ORDER: <tier> "<read-back>"` routing token in Hephaestus. Three tiers (clear / smart / clarify) scale verbosity to ambiguity; tier-1 is ≤15 words; tier-2 surfaces Metis's suggested upsells; tier-3 asks one specific question. Executor parses the token, prefixes the Hephaestus emoji so the existing `_maidenify_status` renders a comms window, appends tier-specific hints, fires `send_input_required` — pipeline does NOT start until the player responds. Resume happens implicitly via context_id memory (no explicit metadata plumbing). `/yolo` opt-out via `[yolo: on]\n` text-tag (same convention as `[project_root: …]`); persisted in `CLISettings.yolo_enabled`. Voice regression guardrails in `tests/integration/test_confirmation_voice.py` (banned-phrase list — Hephaestus never roasts the player; ≤15-word tier-1 cap; round-trip-through-parser corpus). Round 7 added to `SMOKE_TODO.md` as the conference-poster artifact (three-tier walkthrough + `/yolo` verification, capture to `assets/poster/forge-order-tier-{1,2,3}.txt`). 52 new tests across 3 files. T4 (ForgeSession `[forge_intent]` block for explicit specialist context) deferred to a follow-up PR — gate works without it via context_id memory. Phase 2 (M14 Metis-first parallel routing) follows in a separate PR. Fail-safe: malformed `CONFIRM_ORDER` tokens log a warning and surface a generic ask, never auto-execute. Side-cleanup: `CLISettings.load()` now drops unknown JSON keys silently so future field-add PRs don't break older settings files
 - 2026-04-26 — `/project delete` now confirms before nuking. Two-tier guard via `_confirm_project_delete()` in `hosts/cli/commands.py`: bare `delete` (registry-only; project files survive at the path) prompts `[y/N]` default-no; `--purge` (`shutil.rmtree` on the project dir; irreversible) requires typed `DELETE <name>` confirmation matching the existing `_reset_progression_data` pattern. New `--yes` / `-y` flag bypasses both for headless / scripted use. Success message now distinguishes the two paths and tells the player how to recover after a bare delete (`re-add with /project new <name> against that path`). 16 new unit tests in `tests/unit/test_project_delete_confirm.py`. Caught in AJ's REPL — typing `/project delete hello-forge` deleted instantly with no warning
 - 2026-04-26 — Agent-level READMEs landed for the 6 main pipeline agents (Hephaestus + Metis + Techne + Dokimasia + Kallos + Mneme). Each covers responsibility, A2A surface (port, skill ID, streaming, INPUT_REQUIRED, project root, attachments), output artifact, tools, pipeline neighbors, key files, smoke recipe, and persona notes. Template-from-Kallos approach per ROADMAP guidance. Companion / spirit READMEs (Puck, Cupid, Aidos, Aletheia) deferred to when M6 voice-lab / gossip / romance work crystallises so we don't document an in-flight design twice. Stale ROADMAP claim about hypothesis being unused was struck — it's already in 11 test files
 - 2026-04-26 — `/reset_usage` slash command + Gemini pricing follow-on to today's `/usage` ship: `kourai_common.pricing` grew `GEMINI_PRICING` covering `gemini-2.0-flash` ($0.10/$0.40 per M tokens), `gemini-2.5-pro` ($1.25/$10 — under-200K context tier), and `gemini-2.5-flash` ($0.30/$2.50). Cache-write left at 0 because Gemini bills caching as per-hour storage, not per-write — documented under-count. New unified `_ALL_PRICING` lookup table so `get_model_pricing()` searches both providers. New `/reset_usage` slash command zeroes the session counter mid-REPL via `reset_session_usage()`. 31 tests in `tests/unit/test_usage.py` (was 21 — added `TestGeminiPricing` × 4, `TestResetUsage` × 2, `TestResetUsageSlashCommand` × 2, plus updates to `TestGetModelPricing` and `TestUsageSlashCommand` since Gemini is no longer the canonical "unknown" example)

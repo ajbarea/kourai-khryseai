@@ -395,3 +395,19 @@ def _echo(text: str = "", nl: bool = True) -> None:
         import asyncclick as click
 
         click.echo(text)
+
+
+def _clear_screen() -> None:
+    """Clear the terminal viewport (matches Ubuntu's `clear`).
+
+    Writes the cursor-home + erase-screen sequence directly to _raw_out so
+    the ESC byte survives prompt_toolkit's patch_stdout (which sanitizes \\x1b
+    to '?' and turns click.clear() output into literal '?[2J?[1;1H').
+    """
+    try:
+        _raw_out.write("\x1b[H\x1b[2J")
+        _raw_out.flush()
+    except Exception:
+        import asyncclick as click
+
+        click.clear()

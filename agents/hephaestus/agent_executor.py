@@ -9,6 +9,7 @@ from a2a.types import DataPart, Part, Task, TextPart, UnsupportedOperationError
 from a2a.utils.errors import ServerError
 
 from agents.hephaestus.agent import determine_pipeline, execute_pipeline
+from agents.hephaestus.confirmation import parse_confirmation_response
 from kourai_common.a2a_utils import extract_file_attachments
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
@@ -74,6 +75,49 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
 
             # Handle non-pipeline responses
             if isinstance(pipeline, str):
+                # M13 — Forge Order Confirmation gate. Hephaestus's router
+                # ALWAYS emits CONFIRM_ORDER before any pipeline; we surface
+                # the read-back to the player via INPUT_REQUIRED and let
+                # the A2A task pause. The next user message lands in the
+                # same context_id, the LLM sees the prior CONFIRM_ORDER
+                # turn in memory, and emits the agent list (response #1)
+                # on the resumed routing call. No explicit resume metadata
+                # plumbing needed.
+                if pipeline.startswith("CONFIRM_ORDER:"):
+                    try:
+                        confirmation = parse_confirmation_response(pipeline)
+                        # Compose the input_required message so the existing
+                        # _maidenify_status pipeline in the host renders it
+                        # as a Hephaestus comms window (via the 🔥 emoji
+                        # prefix) and italicizes the read-back per M10
+                        # (the LLM already wraps it in double quotes).
+                        # Tier-specific hint trails on smart/clarify so the
+                        # player knows whether to expect Metis chiming in
+                        # or whether the forge is genuinely waiting.
+                        body = confirmation.read_back
+                        if confirmation.tier == "smart":
+                            body += "  (Metis is muttering — say the word.)"
+                        elif confirmation.tier == "clarify":
+                            body += "  (Forge cools while we sort this out.)"
+                        message = f"{AGENT_EMOJI['hephaestus']} {body}"
+                    except ValueError as parse_err:
+                        # Fail-safe: malformed token from the LLM (rare).
+                        # Don't crash the request and don't auto-execute.
+                        # Surface a generic ask so the player can clarify.
+                        log.warning(
+                            "Hephaestus emitted malformed CONFIRM_ORDER (%s); "
+                            "surfacing generic ask. Raw: %r",
+                            parse_err,
+                            pipeline,
+                        )
+                        message = (
+                            f"{AGENT_EMOJI['hephaestus']} \"I couldn't parse "
+                            "my own confirmation. Could you re-state the "
+                            'request?"'
+                        )
+                    await send_input_required(updater, task, message)
+                    return
+
                 if pipeline.startswith("ASK_USER:"):
                     clarification = pipeline.removeprefix("ASK_USER:").strip()
                     await send_input_required(

@@ -44,6 +44,7 @@ SLASH_COMMANDS: tuple[SlashCommand, ...] = (
     SlashCommand("model_tier", "Show current provider, tier, and model"),
     SlashCommand("usage", "Show running token + dollar cost for this session"),
     SlashCommand("reset_usage", "Zero the session token + dollar counter"),
+    SlashCommand("yolo", "Toggle the M13 Forge Order Confirmation gate (default OFF — gate is on)"),
     SlashCommand("metrics", "Show alignment, affinity, and virtue metrics"),
     SlashCommand("maidens", "Meet the Golden Maidens", arg_hint="[name]"),
     SlashCommand("status", "Agent info: name, URL, model, context ID"),
