@@ -380,9 +380,15 @@ async def chat_stream(
     temperature: float = 0.3,
     max_tokens: int = 4096,
     context_id: str | None = None,
+    tier: str | None = None,
 ) -> AsyncIterable[str]:
-    """Stream a chat completion, yielding text chunks."""
-    model = get_model(agent_name)
+    """Stream a chat completion, yielding text chunks.
+
+    ``tier`` overrides the env-set ``KOURAI_MODEL_TIER`` for this single
+    streaming call — same semantics as ``chat()``. Symmetrical kwarg
+    so callers don't have to switch APIs to pin a tier.
+    """
+    model = get_model(agent_name, tier=tier)
     timeout = AGENT_TIMEOUTS.get(agent_name, 120.0)
 
     full_messages = await _build_contextual_messages(agent_name, messages, context_id)
@@ -462,6 +468,7 @@ async def chat_with_tools(
     max_iters: int = 10,
     context_id: str | None = None,
     on_tool_call: Callable[[str, dict[str, Any], str], Awaitable[None]] | None = None,
+    tier: str | None = None,
 ) -> tuple[str, list[dict[str, Any]]]:
     """Drive an agentic tool-use loop until the model stops calling tools.
 
@@ -470,8 +477,12 @@ async def chat_with_tools(
     merged into every handler call as keyword arguments and takes precedence
     over model-supplied args (so the model can't override server-trusted
     values like ``project_root``).
+
+    ``tier`` overrides the env-set ``KOURAI_MODEL_TIER`` for this single
+    tool loop — same semantics as ``chat()``. Symmetrical kwarg so a
+    future caller can pin (e.g.) a low-stakes lint-fix loop to cheap.
     """
-    model = get_model(agent_name)
+    model = get_model(agent_name, tier=tier)
     timeout = AGENT_TIMEOUTS.get(agent_name, 120.0)
 
     working_messages = await _build_contextual_messages(agent_name, messages, context_id)
