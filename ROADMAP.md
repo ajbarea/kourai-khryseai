@@ -5,7 +5,7 @@ A public, living plan for where the forge is heading. Items here are either
 *currently working on* lives in [IMPL.md](./IMPL.md) — when it lands, the
 matching milestone here collapses to a single line under "Shipped".
 
-Last reviewed: 2026-04-26 (M1 fully shipped — Round 6 accept+discard validated end-to-end with 22 `tool_use` frames in techne logs, 11 `tool_result` frames closing the loop, zero `parse_and_apply_fixes` hits across all 6 agent containers; `/clear` ANSI escape fix; M13 Forge Order Confirmation + M14 Metis-First parallel routing both shipped — the player-experience load-bearing pair is complete; M15 forge logging architecture planned; M3 tool-call streaming gap closed for Kallos+Dokimasia; M4 within-loop caching shipped; M10 speech-vs-action convention shipped; M11 GUI attachment send path shipped; /usage CLI command shipped + /reset_usage + Gemini pricing follow-on; Kokoro slow tests extracted + a2a-sdk pinned `<1.0` after protobuf-migration finding; agent-level READMEs for the 6 main pipeline agents; /project delete two-tier confirmation guard; Round 6 read_file directory rejection + branch slug whitelist + CLI greeting maiden-name attribution — see Shipped and revised M7)
+Last reviewed: 2026-04-26 (M1 fully shipped — Round 6 accept+discard validated end-to-end with 22 `tool_use` frames in techne logs, 11 `tool_result` frames closing the loop, zero `parse_and_apply_fixes` hits across all 6 agent containers; `/clear` ANSI escape fix; M13 Forge Order Confirmation + M14 Metis-First parallel routing both shipped — the player-experience load-bearing pair is complete; M15 forge logging architecture planned; M3 tool-call streaming gap closed for Kallos+Dokimasia; M4 within-loop caching shipped; M10 speech-vs-action convention shipped; M11 GUI attachment send path shipped; /usage CLI command shipped + /reset_usage + Gemini pricing follow-on; Kokoro slow tests extracted + a2a-sdk pinned `<1.0` after protobuf-migration finding; agent-level READMEs for the 6 main pipeline agents; /project delete two-tier confirmation guard; Round 6 read_file directory rejection + branch slug whitelist + CLI greeting maiden-name attribution; external-research sweep added 11 new M6 bullets on player-experience patterns from OSS-Claude-Code clones + Typer + the MCP 2025-11-25 / A2A 1.0 specs — see Shipped, revised M2/M7, and the new M6 "Surfaced from external research" subsection)
 
 ---
 
@@ -84,6 +84,37 @@ Current MCP spec version: **2025-11-25**; 2026 roadmap prioritises streamable-HT
 scalability, Tasks lifecycle, and enterprise readiness
 ([blog.modelcontextprotocol.io/posts/2026-mcp-roadmap](https://blog.modelcontextprotocol.io/posts/2026-mcp-roadmap/)).
 
+**Three client capabilities to declare when M2 lands** (the host advertises
+these to MCP servers during the
+[initialization handshake](https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle#initialization)
+— researched 2026-04-26):
+
+- **`roots`** — file:// URI boundaries the MCP server is allowed to operate
+  within. Exact fit for our forge tools — when M2 carves out
+  `kourai-forge-mcp`, the host declares the player's `project_root` as the
+  sole root; the server's `read_file` / `write_file` / `edit_file` calls
+  validate against the root list rather than re-implementing
+  `validate_file_path`. Includes `notifications/roots/list_changed` so a
+  `/project switch` mid-session re-scopes the server cleanly.
+- **`elicitation`** — server-initiated request for additional information
+  from the user. Spec-blessed analog of M13's homegrown `CONFIRM_ORDER`
+  pause primitive. Once M2 is up, route `INPUT_REQUIRED` through
+  elicitation rather than reinventing the channel — same UX, standard
+  wire format, future MCP-aware hosts get the gate for free.
+- **`sampling`** — server-initiated LLM call back through the host.
+  Useful if a future `kourai-forge-mcp` skill (e.g., a synth-test
+  generator) wants to ask Hephaestus to classify intent without
+  bundling its own LiteLLM client. Comes with the MUST-explicit-consent
+  rule per the spec, so it pairs naturally with the existing YOLO MODE
+  toggle (`[yolo: on]` → auto-approve sampling; otherwise prompt).
+
+Security note from the 2025-11-25 spec: tool annotations are explicitly
+called out as **untrusted** unless the server itself is trusted.
+Implication for M2 — when the forge MCP server publishes tool
+descriptions, those descriptions can lie if the server is malicious;
+the host's permission gate must be the source of truth, not the
+server's self-described risk level.
+
 ---
 
 ## M5 — Permissions / UID alignment (forge worktree)
@@ -144,6 +175,36 @@ auto-adopting 1.0.x until M7 actually lands. Lockfile reverted to 0.3.26.
 - Live A2A smoke against `make up` is required — the protobuf wire format
   has subtle differences (oneof discrimination, default value semantics)
   that mocked unit tests won't catch.
+
+**Spec deltas to mind during the migration** (per the
+[A2A v1.0 specification](https://a2a-protocol.org/latest/specification/)
+fetched 2026-04-26):
+
+- **`A2A-Version` header is now required** — clients MUST send it; the
+  server assumes v0.3 if absent. Add it to every outbound request in
+  `remote_connections.py` before flipping the SDK pin. A missing header
+  on a v1.0 server silently downgrades the negotiation.
+- **TaskState gained `AUTH_REQUIRED`** alongside `INPUT_REQUIRED`. When
+  M2 introduces an OAuth-scoped MCP server (e.g., a future GitHub-API
+  forge tool), specialists can now pause for re-auth without crashing
+  the task — wire a CLI handler that mirrors the M13 `INPUT_REQUIRED`
+  flow but routes the player to a one-time auth prompt instead of a
+  free-text response.
+- **Multiple concurrent streams per task are explicitly supported**
+  in v1.0. M14's parallel routing currently spawns Metis as a
+  background `asyncio.create_task` and merges its output into the
+  same `TaskStatusUpdateEvent` channel as Hephaestus. Once on v1.0,
+  Metis can publish to a sibling stream of the same task and the CLI
+  can render the two comms windows from independent SSE subscriptions
+  — cleaner cancellation semantics than the current shared channel.
+- **Kind discriminator removed from messages** — already known from
+  the 2026-04-26 collection-error finding, but worth restating: every
+  `Message(kind=...)` constructor needs to drop the field at the same
+  time the `Part` rewrite happens.
+- **Authenticated extended cards.** Skip until M2 — useful when the
+  forge MCP server publishes both a public card (capability summary)
+  and a credential-gated extended card (full tool list with internal
+  schemas). Not load-bearing for the v1.0 cutover itself.
 
 **Optional follow-ons.**
 
@@ -352,6 +413,126 @@ what the swarm actually did.
   for minimum scope: have the bash-tool helper auto-prepend
   `cd <project_root> && ` when `project_root` is in the agent's context.
   Doesn't change agent prompts; doesn't churn agent_executors.
+
+### Surfaced 2026-04-26 from external research (OSS Claude Code clones, Typer, MCP/A2A specs)
+
+AJ asked for a sweep of the post-leak open-source Claude Code rewrites
+(ClawCode in Python+Rust, OpenCode, Cline, Aider, Plandex, Roo Code,
+Kilo, etc.) and Typer for CLI patterns we could lift, plus the latest
+Anthropic A2A/MCP spec primitives. Findings below — each is a candidate
+slash command, UX pattern, or architectural lift for the CLI host;
+sized for individual focused PRs, not bundled. The MCP/A2A bullets are
+captured in M2 and M7 above; the player-experience bullets live here.
+
+- **`/compact` slash command — transcript compaction with Mneme
+  summarization.** Every OSS clone we surveyed (ClawCode, Cline,
+  OpenCode) ships a `/compact` primitive. Today our `context_id`
+  conversation memory grows monotonically across turns; long sessions
+  re-pay full prompt cost on every turn beyond the cache horizon.
+  `/compact` calls Mneme to produce a structured summary
+  (`<COMPACTED>` block: open threads, decisions made, files touched,
+  player intent), replaces the long history with the summary plus the
+  most-recent N turns, and emits a comms window from Mneme confirming
+  what was retained. Mneme already has the documenter persona — this
+  is the player-facing entry point for it. Pairs cleanly with M4's
+  cache-write behaviour (compacted prompts re-cache on the next call).
+
+- **`/model` slash command — runtime tier switching without restart.**
+  We have `KOURAI_MODEL_TIER` as an env var, but switching mid-session
+  requires `/q` and re-launch. `/model cheap|standard|smart` (and
+  per-agent `/model metis smart`) flips the dispatch in-place. Aligns
+  with the per-call `tier` kwarg shipped in M9-follow-on PRs (#30/#32)
+  — the plumbing is already there; this is just the player-facing
+  UI for it. Useful when a player notices Hephaestus is being
+  expensive on a chatty session and wants to drop to Haiku for
+  routing-only turns.
+
+- **`/permissions` slash command — granular tool gating.** YOLO MODE
+  today is binary (gates the entire confirmation gate). ClawCode and
+  Cline both expose per-tool deny lists (`bash`, `write_file`,
+  `delete_file`) so a player can auto-approve `read_file` while
+  retaining the gate on writes. Maps onto our `MUTATING_TOOL_NAMES`
+  frozenset cleanly — extend `CLISettings` with
+  `auto_approve: dict[str, bool]` keyed on tool name, gate the
+  `CONFIRM_ORDER` short-circuit on whether the planned tool calls
+  fall entirely inside the auto-approve set.
+
+- **`/session` slash command — inspect / fork / resume context.**
+  Today `/project status` covers projects + forge sessions but not
+  conversation context. `/session show` prints turn count,
+  cumulative usage, and last-N-turns digest; `/session fork` clones
+  the current `context_id` for branching exploration ("what if I
+  asked Metis for a different plan?"); `/session resume <id>` jumps
+  back to a prior conversation. Mirrors ClawCode's `/session`
+  command and our existing forge-session vocabulary so players don't
+  have to relearn the term.
+
+- **Plan Mode toggle (Cline-style).** Persistent plan-mode where
+  Hephaestus loops on planning — runs M14 Metis-first parallel
+  routing every turn but **never dispatches** the pipeline until
+  the player explicitly types `/plan execute`. Distinct from
+  M13's per-pipeline confirmation gate: M13 confirms one specific
+  read-back; Plan Mode lets a player iterate the *shape* of the
+  ask across multiple turns before any specialist runs. Pairs
+  with `/permissions`: in Plan Mode, all tool gates are forced on
+  regardless of YOLO — by definition the player isn't ready to
+  execute yet.
+
+- **Background memory consolidation (Mneme "autoDream").** ClawCode's
+  autoDream pattern: between sessions, a low-priority background
+  agent rolls forward yesterday's transcripts into long-term player
+  knowledge (skill markers, recurring patterns, unfinished threads).
+  We have Aidos's slop-detection + Mneme's documenter persona
+  separately; consolidating them into a `make consolidate-memory`
+  cron-style sweep that runs Mneme over the prior 7 days of
+  `agent_memory.db` would cohere the player's mental model of "what
+  the maidens know about me." Output goes into `agent_memory.db`
+  itself — same store, new `player_facts` table.
+
+- **Custom-agent-via-markdown registration (OpenCode-style).**
+  OpenCode lets users drop a `.md` file with frontmatter into
+  `~/.config/opencode/agents/` to register a new sub-agent. We have
+  10 hard-coded agents in `kourai_common.agents.AGENT_METADATA`. A
+  pluggable layer would let a player draft, say, "Eros — copywriter
+  for marketing-flavoured strings" without forking the repo.
+  Architecturally large (touches A2A registration, MCP toolkit,
+  routing prompt) — flag as a long-term direction, not a near-term
+  PR.
+
+- **`/cost` slash command — alias for `/usage` matching OSS-CC
+  vocabulary.** Trivial UX win. Players coming from Claude Code or
+  ClawCode reflexively type `/cost`; we ship `/usage`. Make `/cost`
+  an alias rather than relearning. Five lines in `commands.py`
+  + `completer.py`.
+
+- **Typer-style sub-app pattern for `hosts/cli/commands.py`
+  cleanup.** Honest verdict on Typer (Sebastián Ramírez, FastAPI):
+  it does NOT replace our async REPL — `asyncclick` + `prompt_toolkit`
+  is already deeper than Typer's sweet spot for long-running
+  interactive sessions. But the type-hint-driven sub-app pattern
+  (`projects = typer.Typer(); @projects.command() def new(name: str)`)
+  would clean up the ad-hoc string parsing in `_handle_project_command`
+  if we ever refactor that file. Not a milestone — flag as a
+  refactoring direction when `commands.py` next gets touched.
+
+- **Tree-sitter project mapping (Plandex-style).** Plandex ships
+  with a 2M-token context window AND a tree-sitter-based project map
+  it injects into prompts so the LLM gets a structural index instead
+  of the raw file tree. Our specialists today receive directory
+  listings via `bash` calls; a pre-computed
+  `<PROJECT_MAP>` block (functions, classes, imports per file) would
+  burn fewer tool turns. Synergy with M4 caching — the project map
+  is stable across most turns, so it caches reliably.
+
+- **LSP integration for forge tools (OpenCode pattern).** OpenCode
+  invokes the project's Language Server (pyright, ruff-lsp,
+  rust-analyzer) as a tool the agent can call for type info,
+  diagnostics, and rename-aware refactors. Today our forge tools are
+  text-substitution only — no semantic awareness. A new
+  `lsp_diagnostics(path)` tool would let Dokimasia validate Techne's
+  changes without spinning up `pytest`; a new `lsp_rename(old, new)`
+  would let Kallos rename across the codebase atomically. Big lift,
+  big return on safety.
 
 ### Older items
 
