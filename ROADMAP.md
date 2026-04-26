@@ -5,7 +5,7 @@ A public, living plan for where the forge is heading. Items here are either
 *currently working on* lives in [IMPL.md](./IMPL.md) — when it lands, the
 matching milestone here collapses to a single line under "Shipped".
 
-Last reviewed: 2026-04-26 (M1 code shipped, awaiting Round 6 live smoke; M4 prompt caching shipped within-loop — see Shipped)
+Last reviewed: 2026-04-26 (M1 code shipped awaiting Round 6 live smoke; M4 within-loop caching shipped; M10 speech-vs-action convention shipped — see Shipped)
 
 ---
 
@@ -245,71 +245,6 @@ loop and verifies the JSON-schema specs still come out clean.
 
 ---
 
-## M10 — Speech-vs-action rendering convention
-
-> Status: planned · Blocked by: nothing (can start anytime)
-
-Apply the "agents speak, don't emit" guiding principle across all three
-hosts. Today the convention is splintered: the VN auto-quotes every line
-via `Character(..., what_prefix='"', what_suffix='"')`, the CLI has a
-half-implemented version (only Hephaestus's handoff narration is quoted —
-see `hosts/cli/onboarding.py:209` and the README transcript), and the GUI
-renders everything plain. Result: Metis asking a question looks visually
-identical to Metis reporting test results, flattening her as a character.
-
-**Why.** The maidens are the product. Portraits, voices, affinity tiers,
-romance routes all signal *these are people you're collaborating with*.
-But the terminal stream treats "One decision before I draft the spec."
-the same as "found 3 models with datetime fields" — both unstyled, both
-emoji-prefixed, both indistinguishable. Speech-marked dialogue reinforces
-character presence AND makes clarifying questions pop against the
-unstyled status stream — the human-on-the-loop checkpoint becomes
-visually unmissable instead of scrolling past in the same typographic
-colour as a lint warning.
-
-**Scope.**
-
-- Update agent system prompts (`agents/*/agent.py` SYSTEM_PROMPT blocks)
-  to distinguish speech vs action in their output. One-line addition:
-  *"When you address the player directly — greeting, question, commentary,
-  explanation — wrap that line in double quotes. When you describe what
-  you're doing (analyzing, running tests, listing findings), leave it
-  unquoted."* Hephaestus's `HEPH_HANDOFFS` dict already uses quotes
-  implicitly in the README sample — bring Metis, Techne, Dokimasia,
-  Kallos, Mneme to the same bar.
-- CLI rendering (`hosts/cli/events.py::_maidenify_status`,
-  `hosts/cli/rendering.py::_comms_window`): when a rendered line starts
-  with a double quote, auto-apply italic styling around it. Keeps the
-  status/action lines plain and makes spoken lines read as dialogue.
-- GUI dialogue rendering (`hosts/gui/queue_event_handler.py` +
-  `hosts/gui/typewriter.py`): same italic-on-quoted pass, so speech
-  visually differs from action in the dialogue history.
-- VN: drop `what_prefix='"', what_suffix='"'` from the Character
-  definitions in `hosts/vn/kourai_vn/game/script_data.rpy`. Let agent
-  output decide per-line whether a line is quoted, matching the CLI/GUI
-  convention instead of blanket-quoting status reports.
-- README transcript and getting-started examples (`README.md`, `docs/cli.md`):
-  re-render sample output under the new convention so documentation
-  matches shipped behaviour.
-
-**Done when.**
-
-- Every core-specialist agent prompt includes the speech-vs-action
-  instruction, with unit tests asserting the instruction is present.
-- An end-to-end smoke run shows a clarifying question (e.g. Metis:
-  `"Should CSV export stream chunked I/O for large files?"`) rendered
-  visually distinct from an analysis line in all three hosts.
-- `grep -n 'what_prefix' hosts/vn/kourai_vn/game/*.rpy` returns zero
-  hits; the VN takes quoting from agent output.
-- README sample + `docs/cli.md` transcripts match what the CLI actually
-  produces on a fresh run.
-
-Reference: poster work on 2026-04-23 surfaced the inconsistency;
-see `hosts/cli/demo.py` for the target convention applied to a
-scripted pipeline.
-
----
-
 ## M11 — GUI attachment send path
 
 > Status: planned · Blocked by: nothing
@@ -543,6 +478,7 @@ widget that caches rendered surfaces.
 
 One-liner per item, newest first. Detail moves out of this file when work lands.
 
+- 2026-04-26 — M10 speech-vs-action rendering convention shipped: a 9th rule in `UNIVERSAL_RULES` ("SPEECH VS ACTION") propagates to all 9 specialists via `build_system_prompt`; Hephaestus's hand-rolled `ROUTING_PROMPT` carries it too and every `HEPH_HANDOFFS` value is now quoted; CLI `_comms_window` flips `_ITALIC` (and `_DIM+_ITALIC` for whisper) on lines starting with `"`; GUI `_draw_line_with_emotes` accepts an `oblique` kwarg backed by `pygame.freetype.STYLE_OBLIQUE` (no font asset add); the orphan `what_prefix='"'` on the aidos/aletheia debug Character defs in `script_labels.rpy` was stripped — `grep -rn what_prefix hosts/vn/` returns zero. Live visual smoke (italic dialogue, plain status across CLI/GUI/VN) folds into the next interactive `/project` session
 - 2026-04-26 — M4 prompt caching landed in `chat_with_tools`: `cache_control: {"type": "ephemeral"}` on the system block, last tool definition, and initial user message; iterations 2–N of every Techne/Kallos/Dokimasia run hit the cache for the `[system + tools + initial-user]` prefix (which routinely carries 2K–10K tokens of `file_contents`/`git_context`/docs). `chat` and `chat_stream` mark the system block too — sub-threshold prefixes are silently ignored at no charge. `usage.cache_read_input_tokens` / `cache_creation_input_tokens` debug-logged after every call. Note: cross-call caching of just the agent system prompt does NOT pay today (Techne 1101 tokens vs 2048 Sonnet / 4096 Opus minimums); within-loop is the actual win
 - 2026-04-23 — OTEL spans around every MCP tool call (``mcp.context7.query``, ``mcp.memory.*``); per-call latency now lands in Jaeger alongside A2A hops
 - 2026-04-23 — ``mcp_servers/shell`` ``run_command`` advertises ``_meta["anthropic/maxResultSizeChars"] = 500000``; Claude Code-style clients stop truncating pytest / ruff tracebacks at the 25K default

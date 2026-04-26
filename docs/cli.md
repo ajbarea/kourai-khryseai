@@ -122,8 +122,8 @@ When an agent needs clarification, the CLI prompts you for a response:
 ```
 ❯ refactor the data layer
 
-🔥 Hephaestus: Request needs clarification
-↳ Your response: Which specific module? The ORM layer, the API clients, or the caching layer?
+🔥 Hephaestus: "Request needs clarification."
+↳ Your response: "Which specific module? The ORM layer, the API clients, or the caching layer?"
 ```
 
 Type your response and the pipeline continues. Type `/q` to abort.

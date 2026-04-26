@@ -6,12 +6,24 @@ import re
 import time
 
 import pygame
+import pygame.freetype
 
 from . import constants
 from .maidens import AGENTS
 
 # Pattern for emote cues: *action text*
 _EMOTE_RE = re.compile(r"\*([^*]+)\*")
+
+
+def _is_quoted_dialogue(text: str) -> bool:
+    """Speech-vs-action: a leading double-quote marks the line as dialogue.
+
+    The agents' SYSTEM_PROMPT instructs them to wrap player-directed lines
+    in double quotes; status/action lines stay unquoted. This single
+    line-level check drives italic styling so the human-on-the-loop
+    checkpoint pops against the plain status stream.
+    """
+    return text.lstrip().startswith('"')
 
 
 # ---------------------------------------------------------------------------
@@ -380,11 +392,17 @@ class DialogueHistory:
                     bubble, (right_x - meta_rect.width, 4), meta, constants.GOLD_DIM
                 )
 
+            oblique = _is_quoted_dialogue(e.text)
             for i, line in enumerate(lines):
                 dim = min(i * 8, 40)
                 base_col = tuple(max(0, c - dim) for c in constants.WHITE)
                 self._draw_line_with_emotes(
-                    bubble, pad, header_h + pad + i * self.line_h, line, base_col
+                    bubble,
+                    pad,
+                    header_h + pad + i * self.line_h,
+                    line,
+                    base_col,
+                    oblique=oblique,
                 )
             surf.blit(bubble, (8, y))
             drawn_rect = pygame.Rect(8, y, dest_w - 16, total_h)
@@ -392,12 +410,28 @@ class DialogueHistory:
         return drawn_rect
 
     def _draw_line_with_emotes(
-        self, surf: pygame.Surface, x: int, y: int, line: str, base_col: tuple
+        self,
+        surf: pygame.Surface,
+        x: int,
+        y: int,
+        line: str,
+        base_col: tuple,
+        *,
+        oblique: bool = False,
     ) -> None:
-        """Render a line with *emote* spans in dim gold italic."""
+        """Render a line with *emote* spans in dim gold italic.
+
+        When ``oblique`` is true the body text is rendered with
+        ``pygame.freetype.STYLE_OBLIQUE`` — the agent's SYSTEM_PROMPT
+        wraps player-directed dialogue in double quotes and the host
+        italicizes those lines so they read as speech against the plain
+        status stream. ``*emote*`` spans keep their existing dim-gold
+        treatment regardless.
+        """
         parts = _EMOTE_RE.split(line)
         cursor_x = x
         is_emote = False
+        body_style = pygame.freetype.STYLE_OBLIQUE if oblique else pygame.freetype.STYLE_DEFAULT
         for part in parts:
             if not part:
                 is_emote = not is_emote
@@ -407,7 +441,9 @@ class DialogueHistory:
                 col = (*constants.GOLD_DIM, 180)
                 rect = constants.FONT_AGENT.render_to(surf, (cursor_x, y + 2), text, col)
             else:
-                rect = constants.FONT_BODY.render_to(surf, (cursor_x, y), part, base_col)
+                rect = constants.FONT_BODY.render_to(
+                    surf, (cursor_x, y), part, base_col, style=body_style
+                )
             cursor_x += rect.width + 1
             is_emote = not is_emote
 
