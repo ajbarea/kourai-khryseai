@@ -187,7 +187,8 @@ class TestManageMemory:
 
 
 class TestChatTierKwarg:
-    """``tier`` kwarg on ``chat()`` overrides the env-set MODEL_TIER per call."""
+    """``tier`` kwarg on ``chat()`` / ``chat_stream()`` / ``chat_with_tools()``
+    overrides the env-set MODEL_TIER for that single call."""
 
     @pytest.mark.asyncio
     async def test_tier_kwarg_passed_to_get_model(self):
@@ -246,6 +247,156 @@ class TestChatTierKwarg:
             ),
         ):
             await llm.chat("metis", [{"role": "user", "content": "x"}])
+
+        assert captured["tier"] is None
+
+    @pytest.mark.asyncio
+    async def test_chat_stream_tier_kwarg_passed_to_get_model(self):
+        # Symmetry with chat() — chat_stream takes the same kwarg so a
+        # caller can pin a streaming call to cheap without switching APIs.
+        from kourai_common import llm
+
+        captured: dict = {}
+
+        def fake_get_model(agent_name, tier=None):
+            captured["agent_name"] = agent_name
+            captured["tier"] = tier
+            return "fake-model-id"
+
+        # chat_stream calls _execute_completion(stream=True) which returns
+        # an async iterator of chunks. Mirror the existing
+        # TestChatStream::test_yields_chunks pattern.
+        chunk = MagicMock(
+            choices=[MagicMock(delta=MagicMock(content="hi"), message=None, text=None)]
+        )
+
+        async def fake_execute(timeout_seconds, **kwargs):
+            captured["model"] = kwargs.get("model")
+
+            async def _gen():
+                yield chunk
+
+            return _gen()
+
+        with (
+            patch.object(llm, "get_model", side_effect=fake_get_model),
+            patch.object(llm, "_execute_completion", side_effect=fake_execute),
+            patch.object(
+                llm, "_build_contextual_messages", new_callable=AsyncMock, return_value=[]
+            ),
+        ):
+            async for _ in llm.chat_stream(
+                "metis", [{"role": "user", "content": "x"}], tier="cheap"
+            ):
+                pass
+
+        assert captured["agent_name"] == "metis"
+        assert captured["tier"] == "cheap"
+        assert captured["model"] == "fake-model-id"
+
+    @pytest.mark.asyncio
+    async def test_chat_stream_default_tier_preserves_callers(self):
+        # Backward-compat regression guard for chat_stream.
+        from kourai_common import llm
+
+        captured: dict = {}
+
+        def fake_get_model(agent_name, tier=None):
+            captured["tier"] = tier
+            return "fake"
+
+        chunk = MagicMock(
+            choices=[MagicMock(delta=MagicMock(content="hi"), message=None, text=None)]
+        )
+
+        async def fake_execute(timeout_seconds, **kwargs):
+            async def _gen():
+                yield chunk
+
+            return _gen()
+
+        with (
+            patch.object(llm, "get_model", side_effect=fake_get_model),
+            patch.object(llm, "_execute_completion", side_effect=fake_execute),
+            patch.object(
+                llm, "_build_contextual_messages", new_callable=AsyncMock, return_value=[]
+            ),
+        ):
+            async for _ in llm.chat_stream("metis", [{"role": "user", "content": "x"}]):
+                pass
+
+        assert captured["tier"] is None
+
+    @pytest.mark.asyncio
+    async def test_chat_with_tools_tier_kwarg_passed_to_get_model(self):
+        # Same symmetry on the agentic-loop driver. Future caller might
+        # pin a low-stakes lint-fix loop to cheap; the kwarg is ready.
+        from kourai_common import llm
+
+        captured: dict = {}
+
+        def fake_get_model(agent_name, tier=None):
+            captured["agent_name"] = agent_name
+            captured["tier"] = tier
+            return "fake-model-id"
+
+        async def fake_execute(**kwargs):
+            captured["model"] = kwargs.get("model")
+            # Return a response with no tool_calls so the loop exits
+            # after one iteration.
+            choice = MagicMock()
+            choice.message = MagicMock(content="done", tool_calls=None)
+            choice.message.role = "assistant"
+            return MagicMock(choices=[choice], usage=None)
+
+        with (
+            patch.object(llm, "get_model", side_effect=fake_get_model),
+            patch.object(llm, "_execute_completion", side_effect=fake_execute),
+            patch.object(
+                llm, "_build_contextual_messages", new_callable=AsyncMock, return_value=[]
+            ),
+        ):
+            await llm.chat_with_tools(
+                "kallos",
+                [{"role": "user", "content": "x"}],
+                tools=[],
+                tool_handlers={},
+                tier="cheap",
+            )
+
+        assert captured["agent_name"] == "kallos"
+        assert captured["tier"] == "cheap"
+
+    @pytest.mark.asyncio
+    async def test_chat_with_tools_default_tier_preserves_callers(self):
+        # Backward-compat regression guard for chat_with_tools.
+        from kourai_common import llm
+
+        captured: dict = {}
+
+        def fake_get_model(agent_name, tier=None):
+            captured["tier"] = tier
+            return "fake"
+
+        async def fake_execute(**kwargs):
+            choice = MagicMock()
+            choice.message = MagicMock(content="done", tool_calls=None)
+            choice.message.role = "assistant"
+            return MagicMock(choices=[choice], usage=None)
+
+        with (
+            patch.object(llm, "get_model", side_effect=fake_get_model),
+            patch.object(llm, "_execute_completion", side_effect=fake_execute),
+            patch.object(
+                llm, "_build_contextual_messages", new_callable=AsyncMock, return_value=[]
+            ),
+        ):
+            await llm.chat_with_tools(
+                "kallos",
+                [{"role": "user", "content": "x"}],
+                tools=[],
+                tool_handlers={},
+            )
 
         assert captured["tier"] is None
 
