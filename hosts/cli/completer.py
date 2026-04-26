@@ -69,8 +69,8 @@ SLASH_COMMANDS: tuple[SlashCommand, ...] = (
     ),
     SlashCommand(
         "project delete",
-        "Delete a project from the registry",
-        arg_hint="<name|id> [--purge]",
+        "Delete a project from the registry (asks to confirm)",
+        arg_hint="<name|id> [--purge] [--yes]",
     ),
     SlashCommand("copy", "Copy last result to clipboard"),
     SlashCommand("save", "Save last result to a file", arg_hint="[filename]"),
