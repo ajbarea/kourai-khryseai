@@ -124,7 +124,11 @@ class DemoGuiClient:
         self._recv.put_nowait({"type": "connected", "name": "Hephaestus (demo mode)"})
 
         # React to each prompt the player types.  Items on send_q are
-        # (target_agent, text) tuples from pygame_event_handler._submit_text.
+        # (target_agent, text, attachments) 3-tuples from
+        # pygame_event_handler._submit_text (M11). The legacy 2-tuple shape
+        # is still tolerated so a non-GUI caller can wire a bare prompt
+        # without learning the new slot. Demo mode silently discards any
+        # attachments — no agent is on the other end to consume them.
         loop = asyncio.get_event_loop()
         while True:
             item = await loop.run_in_executor(None, self._send.get)
@@ -132,8 +136,6 @@ class DemoGuiClient:
                 logger.info("DemoGuiClient shutdown signal received.")
                 return
 
-            # pygame_event_handler emits (target, text); other paths may
-            # emit bare strings.  Tolerate both.
             if isinstance(item, tuple) and len(item) >= 2:
                 _target, user_text = item[0], item[1]
             else:

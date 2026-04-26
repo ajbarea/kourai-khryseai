@@ -5,7 +5,7 @@ A public, living plan for where the forge is heading. Items here are either
 *currently working on* lives in [IMPL.md](./IMPL.md) — when it lands, the
 matching milestone here collapses to a single line under "Shipped".
 
-Last reviewed: 2026-04-26 (M1 code shipped awaiting Round 6 live smoke; M3 tool-call streaming gap closed for Kallos+Dokimasia; M4 within-loop caching shipped; M10 speech-vs-action convention shipped — see Shipped)
+Last reviewed: 2026-04-26 (M1 code shipped awaiting Round 6 live smoke; M3 tool-call streaming gap closed for Kallos+Dokimasia; M4 within-loop caching shipped; M10 speech-vs-action convention shipped; M11 GUI attachment send path shipped — see Shipped)
 
 ---
 
@@ -214,62 +214,6 @@ loop and verifies the JSON-schema specs still come out clean.
 
 ---
 
-## M11 — GUI attachment send path
-
-> Status: planned · Blocked by: nothing
-
-The CLI has full image-attachment support through the A2A stream:
-`hosts/cli/commands.py::_capture_image` grabs clipboard pixels via
-`PIL.ImageGrab`, base64-encodes them, and stacks them onto `pending_images`;
-`hosts/cli/streaming.py::send_and_stream` then builds a multi-part `Message`
-(`TextPart` + `FilePart(FileWithBytes(...))`) so Hephaestus actually sees
-the image on the other side.
-
-The **GUI is asymmetric** — after the 2026-04-23 shortcut pass, Alt+V
-captures clipboard images into `PygameEventDispatcher._pending_images`
-and a `[📎 image #N queued]` placeholder shows up in the input bar. But
-`_submit_text` still puts bare `(target, text)` tuples on `send_q`, so
-the captured image never reaches `GuiClient` and is silently discarded
-when the pipeline completes.
-
-**Why.** Multi-modal work (screenshot → "describe this UI bug", design
-mockup → "refactor components to match") is one of the most asked-for
-agent patterns. The CLI proves the wire format works; the GUI just
-needs to match so the entire demo/poster/UX tier isn't second-class.
-
-**Scope.**
-
-- Extend `send_q` message shape from `(target, text)` to
-  `(target, text, attachments)` (attachments: `list[(b64, mime)]`).
-  Update every `send_q.put()` call site in `pygame_event_handler.py`
-  and `__main__.py` to pass `[]` for the new slot by default.
-- `_submit_text` drains `self._pending_images` when submitting and
-  includes them in the send payload. Reset the list after submission
-  so one image doesn't duplicate across turns.
-- `GuiClient.run()` consumes the richer tuple and builds `FilePart`
-  entries the same way `send_and_stream` does in the CLI — same
-  `FileWithBytes` + `Part` dance, routed through `_send_with_retry`.
-- Update the dialogue history to show attached images inline when the
-  user submits (image thumbnail next to their `DialogueEntry`), so the
-  player can visually confirm what was sent.
-- `DemoGuiClient` — picks up attachments for parity but silently
-  discards them (demo mode doesn't round-trip to a real agent).
-
-**Done when.**
-
-- Alt+V → type a prompt → Enter → pygame log shows A2A message with
-  `parts=[TextPart, FilePart]` and Hephaestus receives both.
-- End-to-end: screenshot a code panel, Alt+V in the GUI, "fix the
-  off-by-one in this function" — Techne edits the correct file.
-- `grep send_q.put hosts/gui/ | grep -v "(.*, .*, "` returns zero hits
-  (every producer passes the attachments slot).
-
-Reference: CLI implementation at `hosts/cli/commands.py:481-505`
-(`_capture_image` + `pending_images`) and `hosts/cli/streaming.py:79-93`
-(multi-part message assembly).
-
----
-
 ## M12 — Dynamic sizing across the GUI
 
 > Status: planned · Blocked by: nothing (can land anytime)
@@ -447,6 +391,7 @@ widget that caches rendered surfaces.
 
 One-liner per item, newest first. Detail moves out of this file when work lands.
 
+- 2026-04-26 — M11 GUI attachment send path closed end-to-end: `pygame_event_handler._submit_text` now drains `_pending_images` into a `(target, text, attachments)` 3-tuple on `send_q`; `GuiClient._send_message` builds a multi-part A2A `Message` with `TextPart` + one `FilePart(FileWithBytes(bytes, mime_type, name))` per attachment, identical wire shape to the CLI's `send_and_stream`; `DemoGuiClient` tolerates the new tuple and silently drops attachments; `DialogueEntry` carries an `attachments` field and `DialogueHistory` lazily decodes b64→PIL→`pygame.Surface` thumbnails (80px tall, right-aligned beneath the user bubble) so the player visually confirms what was sent. 10 new unit tests in `tests/unit/test_gui_attachment_send_path.py`. Live multi-modal smoke (Alt+V → submit → Hephaestus references the screenshot) folds into the next interactive `make gui` session
 - 2026-04-26 — M3 tool-call streaming gap closed for Kallos and Dokimasia: `apply_lint_fixes` and `apply_test_fixes` now accept an `on_tool_call` parameter and forward it to `chat_with_tools`; both executors wire an `_on_tool` closure that emits one `send_working_status` per tool call (`✨ edit_file <path> (ok|fail)` for Kallos, `🧪 write_file <path> (ok|fail)` for Dokimasia), mirroring Techne's M1 wiring. The protocol stack from M1 (`chat_with_tools.on_tool_call` → `send_working_status` → `TaskStatusUpdateEvent` → SSE → Hephaestus → CLI `_maidenify_status`) was already in place; this PR wired the missing two endpoints. 7 new unit tests in `tests/unit/test_tool_call_streaming.py`. Live visual smoke (multiple per-tool status lines streaming during fix loops) folds into the next interactive `/project` session
 - 2026-04-26 — M10 speech-vs-action rendering convention shipped: a 9th rule in `UNIVERSAL_RULES` ("SPEECH VS ACTION") propagates to all 9 specialists via `build_system_prompt`; Hephaestus's hand-rolled `ROUTING_PROMPT` carries it too and every `HEPH_HANDOFFS` value is now quoted; CLI `_comms_window` flips `_ITALIC` (and `_DIM+_ITALIC` for whisper) on lines starting with `"`; GUI `_draw_line_with_emotes` accepts an `oblique` kwarg backed by `pygame.freetype.STYLE_OBLIQUE` (no font asset add); the orphan `what_prefix='"'` on the aidos/aletheia debug Character defs in `script_labels.rpy` was stripped — `grep -rn what_prefix hosts/vn/` returns zero. Live visual smoke (italic dialogue, plain status across CLI/GUI/VN) folds into the next interactive `/project` session
 - 2026-04-26 — M4 prompt caching landed in `chat_with_tools`: `cache_control: {"type": "ephemeral"}` on the system block, last tool definition, and initial user message; iterations 2–N of every Techne/Kallos/Dokimasia run hit the cache for the `[system + tools + initial-user]` prefix (which routinely carries 2K–10K tokens of `file_contents`/`git_context`/docs). `chat` and `chat_stream` mark the system block too — sub-threshold prefixes are silently ignored at no charge. `usage.cache_read_input_tokens` / `cache_creation_input_tokens` debug-logged after every call. Note: cross-call caching of just the agent system prompt does NOT pay today (Techne 1101 tokens vs 2048 Sonnet / 4096 Opus minimums); within-loop is the actual win

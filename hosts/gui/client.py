@@ -17,6 +17,8 @@ from uuid import uuid4
 import httpx
 from a2a.client import A2ACardResolver, ClientConfig, ClientFactory
 from a2a.types import (
+    FilePart,
+    FileWithBytes,
     Message,
     Part,
     Role,
@@ -44,7 +46,7 @@ class GuiClient:
 
     def __init__(
         self,
-        send_q: _queue.Queue[tuple[str, str] | None],
+        send_q: _queue.Queue[tuple[str, str, list[tuple[str, str]]] | None],
         recv_q: _queue.Queue[dict],
         agent_url: str | None = None,
     ) -> None:
@@ -106,19 +108,52 @@ class GuiClient:
                 self._put({"type": "disconnected"})
                 break
 
-            target_agent, text = item
+            # The send_q tuple grew an attachments slot in M11; tolerate the
+            # legacy 2-tuple shape so any straggler producer (a non-GUI
+            # caller wiring directly to send_q) still works.
+            if len(item) == 2:
+                target_agent, text = item
+                attachments: list[tuple[str, str]] = []
+            else:
+                target_agent, text, attachments = item
 
             target_url = self._resolve_target_url(target_agent)
-            logger.debug("Routing GUI request to agent=%s via %s", target_agent, target_url)
+            logger.debug(
+                "Routing GUI request to agent=%s via %s (attachments=%d)",
+                target_agent,
+                target_url,
+                len(attachments),
+            )
 
-            await self._send_message(target_url, text, context_id)
+            await self._send_message(target_url, text, context_id, attachments)
 
-    async def _send_message(self, target_url: str, user_text: str, context_id: str) -> None:
+    async def _send_message(
+        self,
+        target_url: str,
+        user_text: str,
+        context_id: str,
+        attachments: list[tuple[str, str]] | None = None,
+    ) -> None:
         import time
 
+        # Build a multi-part Message identical in shape to the CLI's
+        # send_and_stream so Hephaestus can't tell host apart on the wire.
+        parts: list[Part] = [Part(root=TextPart(text=user_text))]
+        for b64_data, mime_type in attachments or []:
+            parts.append(
+                Part(
+                    root=FilePart(
+                        file=FileWithBytes(
+                            bytes=b64_data,
+                            mime_type=mime_type,
+                            name="attachment.png",
+                        )
+                    )
+                )
+            )
         message = Message(
             role=Role.user,
-            parts=[Part(root=TextPart(text=user_text))],
+            parts=parts,
             message_id=str(uuid4()),
         )
         message.context_id = context_id  # type: ignore[attr-defined]
