@@ -5,7 +5,7 @@ A public, living plan for where the forge is heading. Items here are either
 *currently working on* lives in [IMPL.md](./IMPL.md) — when it lands, the
 matching milestone here collapses to a single line under "Shipped".
 
-Last reviewed: 2026-04-26 (M1 code shipped awaiting Round 6 live smoke; M3 tool-call streaming gap closed for Kallos+Dokimasia; M4 within-loop caching shipped; M10 speech-vs-action convention shipped; M11 GUI attachment send path shipped; /usage CLI command shipped + /reset_usage + Gemini pricing follow-on; Kokoro slow tests extracted + a2a-sdk pinned `<1.0` after protobuf-migration finding — see Shipped and revised M7)
+Last reviewed: 2026-04-26 (M1 code shipped awaiting Round 6 live smoke; M3 tool-call streaming gap closed for Kallos+Dokimasia; M4 within-loop caching shipped; M10 speech-vs-action convention shipped; M11 GUI attachment send path shipped; /usage CLI command shipped + /reset_usage + Gemini pricing follow-on; Kokoro slow tests extracted + a2a-sdk pinned `<1.0` after protobuf-migration finding; agent-level READMEs for the 6 main pipeline agents — see Shipped and revised M7)
 
 ---
 
@@ -358,16 +358,22 @@ widget that caches rendered surfaces.
   `.mp3/.wav/.ogg` files anywhere in this repo; `.gitignore`
   doesn't block audio today, so it's a discipline rule, not a
   tooling guard.
-- **Agent-level README.md per `agents/*`:** today a contributor reading
-  `agents/metis/pyproject.toml` learns nothing about what metis actually
-  does, because each agent's `pyproject.toml` is a 10-line stub that
-  just imports `kourai-common`. A one-page README per agent covering
-  responsibility, inputs, outputs, and co-agents it routes through would
-  be a real onboarding win. Template first (kallos, since its scope is
-  tightest), then propagate.
-- **Property-tested agent-coordination invariants:** `hypothesis` is in
-  dev deps but unused. Agent systems have invariants that are hard to
-  specify and easy to lose: every `HandoffMessage` round-trips through
+- **Companion / spirit READMEs (Puck, Cupid, Aidos, Aletheia):** the
+  6 main pipeline agents got READMEs on 2026-04-26 (see Shipped); the
+  4 secondary agents are deferred until M6 voice-lab / gossip /
+  romance work crystallises so we don't document an in-flight design
+  twice.
+- **Property-tested agent-coordination invariants:** `hypothesis` is
+  already heavily used (~11 test files use `@given` strategies for
+  GUI scaling, settings, dialogue history, etc. as of 2026-04-26). What
+  the original entry intended — agent-level invariants — hasn't
+  shipped yet. Specifically: every `INPUT_REQUIRED` resumes on exactly
+  the agent that raised it, every pipeline exits in exactly one of
+  {complete, discarded, error}. (The original entry mentioned
+  `HandoffMessage` round-trips, but that type doesn't exist in the
+  codebase — the closest analog is `AgentInputRequired`.) Property
+  tests over randomised pipeline state machines would catch
+  coordination drift early. every `HandoffMessage` round-trips through
   serialisation, every `INPUT_REQUIRED` resumes on exactly the agent
   that raised it, every pipeline exits in exactly one of {complete,
   discarded, error}. Property tests over randomised agent call graphs
@@ -405,6 +411,7 @@ widget that caches rendered surfaces.
 
 One-liner per item, newest first. Detail moves out of this file when work lands.
 
+- 2026-04-26 — Agent-level READMEs landed for the 6 main pipeline agents (Hephaestus + Metis + Techne + Dokimasia + Kallos + Mneme). Each covers responsibility, A2A surface (port, skill ID, streaming, INPUT_REQUIRED, project root, attachments), output artifact, tools, pipeline neighbors, key files, smoke recipe, and persona notes. Template-from-Kallos approach per ROADMAP guidance. Companion / spirit READMEs (Puck, Cupid, Aidos, Aletheia) deferred to when M6 voice-lab / gossip / romance work crystallises so we don't document an in-flight design twice. Stale ROADMAP claim about hypothesis being unused was struck — it's already in 11 test files
 - 2026-04-26 — `/reset_usage` slash command + Gemini pricing follow-on to today's `/usage` ship: `kourai_common.pricing` grew `GEMINI_PRICING` covering `gemini-2.0-flash` ($0.10/$0.40 per M tokens), `gemini-2.5-pro` ($1.25/$10 — under-200K context tier), and `gemini-2.5-flash` ($0.30/$2.50). Cache-write left at 0 because Gemini bills caching as per-hour storage, not per-write — documented under-count. New unified `_ALL_PRICING` lookup table so `get_model_pricing()` searches both providers. New `/reset_usage` slash command zeroes the session counter mid-REPL via `reset_session_usage()`. 31 tests in `tests/unit/test_usage.py` (was 21 — added `TestGeminiPricing` × 4, `TestResetUsage` × 2, `TestResetUsageSlashCommand` × 2, plus updates to `TestGetModelPricing` and `TestUsageSlashCommand` since Gemini is no longer the canonical "unknown" example)
 - 2026-04-26 — Test hygiene + a2a-sdk pin tightening: 5 Kokoro neural-inference tests in `tests/unit/test_tts_backends.py` marked `@pytest.mark.slow` and the `slow` marker registered in `pyproject.toml`; the `make test-unit` invocation in `scripts/test.py` and the `Unit Tests` job in `.github/workflows/tests.yml` both pass `-m "not slow"` so the push/PR fast lane skips them (they were intermittently `SystemExit:1`-ing on shared CI runners — model-load timeout). The nightly workflow when committed should run with the inverse marker (`-m slow`). Separately: `uv lock` auto-bumped a2a-sdk 0.3.26 → 1.0.2 during a session, the suite hard-broke on collection (16 import errors — protobuf-based Part replaced the Pydantic shape M7's firewall anticipated), so pyproject pins were tightened from `<2.0` to `<1.0` across `shared`, `hosts/cli`, `hosts/gui` and the lockfile reverted. ROADMAP M7 entry rewritten with the actual scope (every Part construction site needs rewriting, not just the inspection firewall)
 - 2026-04-26 — `/usage` CLI command shipped: new `kourai_common.usage` per-session token accumulator (`record_usage` hooked into `chat()` and `chat_with_tools()`) plus `kourai_common.pricing` with April 2026 Anthropic rates (Haiku $1/$5, Sonnet $3/$15, Opus $5/$25; cache_read = input × 0.1, 5-min cache_write = input × 1.25). `/usage` slash command in CLI prints a per-agent breakdown (calls, input/output/cache_r/cache_w tokens, dollar cost) plus a TOTAL row. Unknown providers (Gemini, Ollama) render `$—` with a footer hint pointing at `ANTHROPIC_PRICING`. 21 new unit tests in `tests/unit/test_usage.py`. Streaming undercount note: `chat_stream()` not hooked because LiteLLM doesn't surface final-chunk usage from inside the iterator — affects only Metis spec / Dokimasia test-gen display paths
