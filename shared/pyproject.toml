@@ -4,7 +4,12 @@ version = "0.1.0"
 description = "Shared utilities for Kourai Khryseai agents"
 requires-python = ">=3.12,<3.14"
 dependencies = [
-    "a2a-sdk[http-server]>=0.3.25,<2.0",
+    # M7 (a2a-sdk 1.0.x migration) is bigger than the dual-shape firewall in
+    # a2a_utils.py covers — 1.0 went protobuf-based, so Part/TextPart/FilePart
+    # no longer import as separate Pydantic types and every Part construction
+    # site needs rewriting. Keeping the pin at <1.0 until M7 lands with proper
+    # live-A2A smoke testing. See ROADMAP M7.
+    "a2a-sdk[http-server]>=0.3.25,<1.0",
     "litellm>=1.83.7",
     "uvicorn[standard]>=0.34.0",
     "httpx>=0.27.0",

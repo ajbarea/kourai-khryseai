@@ -5,7 +5,7 @@ A public, living plan for where the forge is heading. Items here are either
 *currently working on* lives in [IMPL.md](./IMPL.md) — when it lands, the
 matching milestone here collapses to a single line under "Shipped".
 
-Last reviewed: 2026-04-26 (M1 code shipped awaiting Round 6 live smoke; M3 tool-call streaming gap closed for Kallos+Dokimasia; M4 within-loop caching shipped; M10 speech-vs-action convention shipped; M11 GUI attachment send path shipped; /usage CLI command shipped — see Shipped)
+Last reviewed: 2026-04-26 (M1 code shipped awaiting Round 6 live smoke; M3 tool-call streaming gap closed for Kallos+Dokimasia; M4 within-loop caching shipped; M10 speech-vs-action convention shipped; M11 GUI attachment send path shipped; /usage CLI command shipped; Kokoro slow tests extracted + a2a-sdk pinned `<1.0` after protobuf-migration finding — see Shipped and revised M7)
 
 ---
 
@@ -144,24 +144,45 @@ Option 1 is cleanest if it doesn't break agent-internal deps that assume UID 100
 
 ## M7 — A2A v1.0 migration
 
-> Status: planned · Cheap-once-SDK-is-stable
+> Status: planned · Bigger-than-the-firewall-claimed (see 2026-04-26 finding) ·
+> Pyproject pinned to `<1.0` until M7 lands properly
 
-`a2a-sdk` shipped 1.0.1 in March 2026 with a stable v1.0 on
-[a2a-protocol.org](https://a2a-protocol.org/latest/announcing-1.0/) targeted
-for May-June 2026. Pyproject pins already permit `a2a-sdk<2.0` (2026-04-23),
-so `uv lock` will auto-adopt 1.0.x when resolution prefers it.
+`a2a-sdk` 1.0.2 was on PyPI as of 2026-04-26 and `uv lock` cheerfully picked
+it up when resolution allowed `<2.0`. We bumped, ran the suite, and **broke
+hard on collection** — 16 test files failed to import because v1.0 went
+**protobuf-based** rather than the member-discriminated-Pydantic shape the
+ROADMAP entry originally anticipated. Concretely:
 
-**Scope.**
+- `Part` is now a `google._upb._message.Message`, not a Pydantic model.
+- `TextPart`, `FilePart`, `DataPart`, `FileWithBytes` are no longer importable
+  from `a2a.types` — the unified `Part` carries member-discriminated fields
+  (`text`, `data`, `raw`, `url`, `filename`, `media_type`).
+- The `_is_file_part` / `_get_file_bytes` firewall in `a2a_utils.py` covered
+  inspection (`hasattr`-based forward compat) but **not construction** — every
+  `Part(root=TextPart(text=...))` and `Part(root=FilePart(file=FileWithBytes(...)))`
+  call site needs rewriting in `remote_connections.py`, `hosts/cli/streaming.py`,
+  `hosts/gui/client.py`, plus the test mocks that build A2A-shaped objects.
 
-- When `uv lock` starts pulling 1.0.x, walk the ``_is_file_part`` /
-  ``_get_file_bytes`` firewall in ``shared/src/kourai_common/a2a_utils.py``
-  (already dual-shaped as of 2026-04-23 for forward compat).
-- Verify unified Part roundtrip in ``remote_connections.py:send()`` —
-  ``TextPart``/``FilePart``/``DataPart`` unify into member-discriminated
-  ``Part`` in v1.0 (``"text" in part``, ``"url" in part``).
-- ``mimeType`` → ``mediaType`` field rename on file parts.
-- AgentCards are backward-compatible so specialists keep running
-  mid-migration; no coordinated re-deploy needed.
+**Pin tightened to `<1.0` on 2026-04-26** in `shared/pyproject.toml`,
+`hosts/cli/pyproject.toml`, `hosts/gui/pyproject.toml` so `uv lock` stops
+auto-adopting 1.0.x until M7 actually lands. Lockfile reverted to 0.3.26.
+
+**Scope (revised).**
+
+- Replace every `Part(root=TextPart(text=...))` construction site with the
+  v1.0 protobuf-style `p = Part(); p.text = "..."` (or whatever the canonical
+  pattern turns out to be — confirm against the v1.0 SDK examples).
+- Replace every `Part(root=FilePart(file=FileWithBytes(bytes=..., mime_type=...)))`
+  with the unified-Part equivalent (`media_type` field, flat `bytes`).
+- Keep the inspection firewall in `a2a_utils.py` — it already handles both shapes.
+- Update test mocks that synthesise Part-shaped objects (FilePart roundtrip
+  tests in `tests/unit/test_a2a_utils.py`, the GUI attachment tests landed
+  in M11, etc.).
+- Do **all** of the above behind a feature branch where `pyproject.toml` is
+  re-bumped to `<2.0` so CI exercises the new SDK end-to-end.
+- Live A2A smoke against `make up` is required — the protobuf wire format
+  has subtle differences (oneof discrimination, default value semantics)
+  that mocked unit tests won't catch.
 
 **Optional follow-ons.**
 
@@ -384,6 +405,7 @@ widget that caches rendered surfaces.
 
 One-liner per item, newest first. Detail moves out of this file when work lands.
 
+- 2026-04-26 — Test hygiene + a2a-sdk pin tightening: 5 Kokoro neural-inference tests in `tests/unit/test_tts_backends.py` marked `@pytest.mark.slow` and the `slow` marker registered in `pyproject.toml`; the `make test-unit` invocation in `scripts/test.py` and the `Unit Tests` job in `.github/workflows/tests.yml` both pass `-m "not slow"` so the push/PR fast lane skips them (they were intermittently `SystemExit:1`-ing on shared CI runners — model-load timeout). The nightly workflow when committed should run with the inverse marker (`-m slow`). Separately: `uv lock` auto-bumped a2a-sdk 0.3.26 → 1.0.2 during a session, the suite hard-broke on collection (16 import errors — protobuf-based Part replaced the Pydantic shape M7's firewall anticipated), so pyproject pins were tightened from `<2.0` to `<1.0` across `shared`, `hosts/cli`, `hosts/gui` and the lockfile reverted. ROADMAP M7 entry rewritten with the actual scope (every Part construction site needs rewriting, not just the inspection firewall)
 - 2026-04-26 — `/usage` CLI command shipped: new `kourai_common.usage` per-session token accumulator (`record_usage` hooked into `chat()` and `chat_with_tools()`) plus `kourai_common.pricing` with April 2026 Anthropic rates (Haiku $1/$5, Sonnet $3/$15, Opus $5/$25; cache_read = input × 0.1, 5-min cache_write = input × 1.25). `/usage` slash command in CLI prints a per-agent breakdown (calls, input/output/cache_r/cache_w tokens, dollar cost) plus a TOTAL row. Unknown providers (Gemini, Ollama) render `$—` with a footer hint pointing at `ANTHROPIC_PRICING`. 21 new unit tests in `tests/unit/test_usage.py`. Streaming undercount note: `chat_stream()` not hooked because LiteLLM doesn't surface final-chunk usage from inside the iterator — affects only Metis spec / Dokimasia test-gen display paths
 - 2026-04-26 — M11 GUI attachment send path closed end-to-end: `pygame_event_handler._submit_text` now drains `_pending_images` into a `(target, text, attachments)` 3-tuple on `send_q`; `GuiClient._send_message` builds a multi-part A2A `Message` with `TextPart` + one `FilePart(FileWithBytes(bytes, mime_type, name))` per attachment, identical wire shape to the CLI's `send_and_stream`; `DemoGuiClient` tolerates the new tuple and silently drops attachments; `DialogueEntry` carries an `attachments` field and `DialogueHistory` lazily decodes b64→PIL→`pygame.Surface` thumbnails (80px tall, right-aligned beneath the user bubble) so the player visually confirms what was sent. 10 new unit tests in `tests/unit/test_gui_attachment_send_path.py`. Live multi-modal smoke (Alt+V → submit → Hephaestus references the screenshot) folds into the next interactive `make gui` session
 - 2026-04-26 — M3 tool-call streaming gap closed for Kallos and Dokimasia: `apply_lint_fixes` and `apply_test_fixes` now accept an `on_tool_call` parameter and forward it to `chat_with_tools`; both executors wire an `_on_tool` closure that emits one `send_working_status` per tool call (`✨ edit_file <path> (ok|fail)` for Kallos, `🧪 write_file <path> (ok|fail)` for Dokimasia), mirroring Techne's M1 wiring. The protocol stack from M1 (`chat_with_tools.on_tool_call` → `send_working_status` → `TaskStatusUpdateEvent` → SSE → Hephaestus → CLI `_maidenify_status`) was already in place; this PR wired the missing two endpoints. 7 new unit tests in `tests/unit/test_tool_call_streaming.py`. Live visual smoke (multiple per-tool status lines streaming during fix loops) folds into the next interactive `/project` session

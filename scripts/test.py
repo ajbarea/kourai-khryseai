@@ -70,6 +70,13 @@ def _build_suites(
                     "-m",
                     "pytest",
                     "tests/unit/",
+                    # Skip @pytest.mark.slow on the push/PR fast lane —
+                    # those tests (Kokoro neural inference, etc.) are
+                    # heavyweight and flake on shared CI runners with
+                    # SystemExit:1 from model load timeouts. The nightly
+                    # workflow runs them by inverting the marker.
+                    "-m",
+                    "not slow",
                     "-n",
                     "auto",
                     "-v",

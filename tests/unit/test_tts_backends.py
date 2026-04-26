@@ -90,6 +90,7 @@ class TestKokoroBackend:
 
         return KokoroBackend()
 
+    @pytest.mark.slow
     async def test_kokoro_synthesize_returns_wav_bytes(self, kokoro_backend):
         """Kokoro should return WAV bytes with RIFF header."""
         voice = TTSVoiceConfig("Sarah", "af_sarah")
@@ -121,6 +122,7 @@ class TestKokoroBackend:
         """Kokoro outputs 24kHz."""
         assert kokoro_backend.sample_rate == 24000
 
+    @pytest.mark.slow
     async def test_kokoro_synthesize_with_speed_override(self, kokoro_backend):
         """Kokoro should respect speed parameter."""
         voice_normal = TTSVoiceConfig("Sarah", "af_sarah", speed=1.0)
@@ -134,6 +136,7 @@ class TestKokoroBackend:
         # Fast audio should be shorter (more compressed at 1.5x speed)
         assert len(audio_fast) < len(audio_normal)
 
+    @pytest.mark.slow
     async def test_kokoro_synthesize_with_pitch_override(self, kokoro_backend):
         """Kokoro should respect pitch parameter."""
         voice_normal = TTSVoiceConfig("Sarah", "af_sarah", pitch=1.0)
@@ -145,6 +148,7 @@ class TestKokoroBackend:
         assert len(audio_normal) > 0
         assert len(audio_high) > 0
 
+    @pytest.mark.slow
     async def test_kokoro_invalid_voice_id_raises_error(self, kokoro_backend):
         """Kokoro should handle invalid voice_id gracefully."""
         voice = TTSVoiceConfig("Invalid", "nonexistent_voice_id")
@@ -184,6 +188,7 @@ class TestKokoroBackend:
         config_b = TTSVoiceConfig("Test", "bf_emma", lang_code="b")
         assert config_b.lang_code == "b"
 
+    @pytest.mark.slow
     async def test_kokoro_synthesize_to_file(self, kokoro_backend, tmp_path):
         """TTSBackend.synthesize_to_file() should save WAV to disk."""
         voice = TTSVoiceConfig("Sarah", "af_sarah")
