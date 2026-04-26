@@ -12,6 +12,7 @@ pytest.importorskip("asyncclick")
 
 from hosts.cli.__main__ import (
     _format_affinity_bar,
+    _format_greeting,
     _maybe_offer_feature_opt_in,
     send_and_stream,
 )
@@ -317,3 +318,43 @@ class TestMetricsFormatting:
     def test_affinity_bar_clamps(self):
         assert _format_affinity_bar(2.0, width=4) == "████"
         assert _format_affinity_bar(-2.0, width=4) == "····"
+
+
+class TestGreetingFormat:
+    """Round 6: greeting must attribute the speaking maiden by name.
+
+    Original line rendered ``( ◡‿◡)✧ Structure IS beauty.`` — face plus
+    italic quote with no name. AJ flagged players had to memorize the
+    emoji-to-name map. Fix adds the name in front and wraps the line in
+    ``"..."`` so M10's italic-on-quoted-line speech convention applies."""
+
+    def test_includes_capitalized_name(self):
+        rendered = _format_greeting("metis", "( ◡‿◡)✧", "Structure IS beauty.")
+        assert "Metis" in rendered
+
+    def test_includes_face(self):
+        rendered = _format_greeting("metis", "( ◡‿◡)✧", "Structure IS beauty.")
+        assert "( ◡‿◡)✧" in rendered
+
+    def test_quote_wrapped_in_double_quotes(self):
+        # M10 convention: leading-double-quote = dialogue, renders italic.
+        rendered = _format_greeting("kallos", "(◕ᴗ◕✿)", "Style isn't optional.")
+        assert '"Style isn\'t optional."' in rendered
+
+    def test_lowercased_name_input_is_capitalized(self):
+        # Maiden registry keys are lowercase; greeting should display
+        # as a proper name, not a key.
+        rendered = _format_greeting("hephaestus", "(╭∩╮)⊃━☆ﾟ.*･｡ﾟ", "Ah, you again.")
+        assert "Hephaestus" in rendered
+        assert "hephaestus" not in rendered.replace("Hephaestus", "")
+
+    def test_name_appears_before_face(self):
+        # Reading order matters: name first so the player ties the
+        # voice to the face, not the other way around.
+        rendered = _format_greeting("techne", "( ⌐■_■)", "Hey gorgeous~")
+        # Strip ANSI for stable position checks.
+        import re
+
+        plain = re.sub(r"\x1b\[[0-9;]*m", "", rendered)
+        assert plain.index("Techne") < plain.index("( ⌐■_■)")
+        assert plain.index("( ⌐■_■)") < plain.index('"Hey gorgeous~"')

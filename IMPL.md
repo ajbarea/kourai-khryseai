@@ -5,106 +5,85 @@ milestone lands, the matching detail block in [ROADMAP.md](./ROADMAP.md)
 collapses to a one-liner under "Shipped" and this file gets reset to the
 next milestone.
 
-Updated: 2026-04-26 · Working on: **Round 6 bug cleanup** (two
-M6-future bullets AJ noted from live smoke)
+Updated: 2026-04-26 · Working on: **Round 6 bullet 3** (CLI greeting
+maiden-name attribution — third of the five M6-future bullets AJ
+flagged from live smoke)
 
 ---
 
 ## Plan-of-record
 
-End state: two concrete bugs from Round 6 are gone. Both surfaced
-when AJ ran live smoke, both bit the player experience, both have
-small-surface fixes:
+End state: the random startup greeting line in the CLI tells the
+player who is speaking. Pre-fix it rendered just `( ◡‿◡)✧ Structure IS
+beauty.` — kaomoji + italic line, no name. Players had to memorize
+the emoji-to-name map to attribute the line; the gallery and the
+agent READMEs already do that work, but the very first interaction
+threw it away.
 
-1. **`read_file` accepts directory paths** → returns garbage. Tighten
-   the schema description so the LLM gets the hint at request time;
-   add a runtime `is_file()` guard so when the model still tries it,
-   the error is actionable instead of silent.
-2. **Branch slug logic only handled spaces** → backticks (and every
-   other shell-meta) slipped through, producing
-   `please-add-a-function-\`d` from a Round 6 prompt. Replace with
-   a `[a-z0-9-]` whitelist so anything weird gets squashed; also
-   collapse hyphen runs and strip edges.
+### Change — `_format_greeting` helper ✅ 2026-04-26
 
-### Change 1 — read_file rejects directories ✅ 2026-04-26
-
-- [x] `shared/src/kourai_common/forge_tools.py::read_file` schema:
-      function description and `path` param description both call
-      out "regular file path, not a directory". Example added in
-      the param description.
-- [x] `read_file` handler: `target.is_dir()` check returns a clear
-      error string ("X is a directory; read_file expects a regular
-      file. Use a more specific path or list the directory contents
-      yourself before calling read_file."). Doesn't crash, doesn't
-      return garbage — gives the LLM a clear next step.
-
-### Change 2 — branch slug sanitization ✅ 2026-04-26
-
-- [x] `shared/src/kourai_common/forge_session.py`: new
-      `_sanitize_branch_slug(label, max_len=24)` helper.
-      Conservative whitelist `[a-z0-9-]` over enumerating
-      `git check-ref-format`'s blocklist — handles every
-      shell-meta and quote character at once. Collapses runs of
-      hyphens, strips leading/trailing, truncates to `max_len` then
-      strips any trailing hyphen the truncation produced.
-      Empty/None → `"session"` so the branch always shapes
-      `forge/<timestamp>-<slug>`.
-- [x] `ForgeSession.start` calls the helper instead of the old
-      one-liner. No call-site changes.
+- [x] `hosts/cli/__main__.py`: new `_format_greeting(name, face,
+      quote)` helper next to `_format_affinity_bar`. Capitalizes the
+      maiden name, renders it in `_GOLD_BOLD`, then face in `_GOLD`,
+      then quote wrapped in `"..."` and rendered `_ITALIC`. The
+      `"..."` wrap is load-bearing: M10's speech-vs-action convention
+      keys italic dialogue off a leading double-quote, so future
+      readers maintain the styling without bespoke flags.
+- [x] `_GOLD_BOLD` added to the styling import block.
+- [x] Greeting call-site replaced — was a one-line f-string with face
+      + quote; now an empty `_echo("")` followed by a call to the
+      helper. The leading newline that used to live inside the
+      f-string moved to its own `_echo("")` for legibility.
 
 ### Tests ✅ 2026-04-26
 
-- [x] `tests/unit/test_forge_tools.py::TestReadFile`:
-      - `test_rejects_directory_path` — explicit guard test
-      - `test_schema_description_warns_against_directory_paths` —
-        contract test naming the schema requirement
-- [x] `tests/unit/test_forge_session.py::TestSanitizeBranchSlug`:
-      9 tests — simple lowercasing, backtick-replaced (the exact
-      Round 6 case), quotes, hyphen-collapse, edge-stripping,
-      empty fallback, truncation without trailing hyphen,
-      lowercasing, property-style "every char is in [a-z0-9-]" check
-      across weird/unicode/shell/path/escape inputs.
-- [x] All 14 new tests pass in 0.43 s.
+- [x] `tests/unit/test_cli.py::TestGreetingFormat`: 5 tests covering
+      name-included, face-included, quote-wrapped-in-double-quotes,
+      lowercase-input-capitalizes-output, and reading-order
+      (name-precedes-face-precedes-quote with ANSI stripped). All
+      pass in 0.6 s.
 
-### Step 4 — Live smoke (folded into next interactive `/project` session)
+### Live smoke (folded into next interactive `/project` session)
 
-- [ ] Send a prompt with a backtick (e.g. ``please add a function `d` ``)
-      → confirm the forge branch shape is well-formed
-      (`forge/20260426-…-please-add-a-function-d` with no backtick).
-- [ ] Send a Techne task that touches a directory → confirm Techne
-      gets the new clear error and routes around it (e.g., reads a
-      specific file inside the directory) instead of failing silently.
+- [ ] Launch CLI → confirm greeting line shows `<Name> <face>
+      "<quote>"` and that the italic styling lands on the quoted
+      text.
+- [ ] Confirm name-color (`_GOLD_BOLD`) reads as a brighter accent
+      than the rest of the line on AJ's terminal.
 
 ---
 
 ## Notes / open questions
 
-- **Whitelist over blocklist.** Git's `check-ref-format` blocks
-  ASCII control chars, space, tilde, caret, colon, question mark,
-  asterisk, open bracket, plus several path-rule violations. Enumerating
-  is fragile (Git updates the rules) and forgets shell metacharacters
-  that aren't strictly invalid but break elsewhere. `[a-z0-9-]` is
-  conservative — accepts everything that's safe by inspection.
+- **Why title-case (`Metis`) over uppercase (`METIS`)?** The
+  `_comms_window` callsign header uses `agent_name.upper()` because
+  it's a status-bar-style label sitting inside a styled box, denser
+  visual context. The greeting is the player's first-glance moment;
+  title-case reads as a personal introduction, uppercase reads as a
+  system label. Different surface, different convention.
 
-- **Why `is_file()` AND the schema hint?** The schema hint is the
-  carrot — the LLM sees it during prompt construction and avoids the
-  mistake. The runtime check is the stick — when it tries anyway,
-  the error is actionable. Both layers cost ~5 lines and remove a
-  whole class of confusion AJ saw in Round 6.
+- **Why wrap in `"..."` instead of just leaving the italic style
+  flag?** Two reasons. (1) M10 already established that quoted text
+  is dialogue everywhere — keeping the same convention here means the
+  greeting line follows the same rule the rest of the CLI does. (2)
+  If a future reader rewrites the greeting they'll see the `"..."`
+  and infer the styling intent without reading any docs.
 
-- **The other 3 Round 6 bullets are still open:**
-  - CLI greeting maiden-name attribution
-  - WSL audio environment graceful handling
-  - Git context discovery for specialist agents in worktree
-  Each is worth its own focused PR. Not bundled here so the diff
-  stays scannable.
+- **The remaining 2 Round 6 bullets are still open:**
+  - WSL audio environment graceful handling (`SDL_AUDIODRIVER=dummy`
+    when ALSA can't reach a card, gated on `/proc/sys/fs/binfmt_misc/WSLInterop`)
+  - Git context discovery for specialist agents in worktree (containers
+    default to `/app`, so `git status --short` exits 128 because the
+    worktree is mounted elsewhere)
+  Each is worth its own focused PR. Not bundled here so the diff stays
+  scannable and the feature label on the PR is honest.
 
 ---
 
 ## Up next (queued, not yet active)
 
-- **Other 3 Round 6 bullets** (greeting attribution, WSL audio, git
-  context discovery) — small focused PRs each.
+- **Other 2 Round 6 bullets** (WSL audio, git context discovery) —
+  small focused PRs each.
 - **T8 follow-up** (ParallelContext shared buffer feeding Metis's
   partial output back into the classifier prompt). Substantial
   async work.

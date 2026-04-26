@@ -47,7 +47,7 @@ from hosts.cli.rendering import (
 )
 from hosts.cli.settings import CLISettings
 from hosts.cli.streaming import _connect_with_url_override, get_last_result, send_and_stream
-from hosts.cli.styling import _DIM, _GOLD, _GOLD_BRIGHT, _ITALIC, _RED, _RESET
+from hosts.cli.styling import _DIM, _GOLD, _GOLD_BOLD, _GOLD_BRIGHT, _ITALIC, _RED, _RESET
 from hosts.gui.tts_engine import TTSEngine
 from kourai_common.audio import AudioManager
 from kourai_common.config import MODEL_TIER, PROVIDER, get_agent_url, get_model
@@ -203,6 +203,22 @@ def _format_affinity_bar(score: float, width: int = 14) -> str:
     fill = int(((score + 1.0) / 2.0) * width)
     fill = max(0, min(width, fill))
     return ("█" * fill) + ("·" * (width - fill))
+
+
+def _format_greeting(name: str, face: str, quote: str) -> str:
+    """Render the startup greeting line with maiden attribution.
+
+    Round 6 caught the original line as ``( ◡‿◡)✧ Structure IS beauty.``
+    — kaomoji + italic line, no name. Players had to memorize the
+    emoji-to-name map to know who was speaking. This adds the name in
+    front and wraps the line in ``"..."`` so the speech-vs-action
+    convention from M10 (italic = dialogue) reads naturally.
+    """
+    return (
+        f"  {_GOLD_BOLD}{name.capitalize()}{_RESET} "
+        f"{_GOLD}{face}{_RESET} "
+        f'{_ITALIC}"{quote}"{_RESET}'
+    )
 
 
 def _show_usage_summary() -> None:
@@ -495,7 +511,8 @@ async def main(
         else _greet_m["quotes"]
     )
     _greet_quote = secrets.choice(_greet_quotes)
-    _echo(f"\n  {_GOLD}{_MAIDEN_FACES[_greet_name]}{_RESET} {_ITALIC}{_greet_quote}{_RESET}")
+    _echo("")
+    _echo(_format_greeting(_greet_name, _MAIDEN_FACES[_greet_name], _greet_quote))
     _echo("")
     if tts:
         await tts.speak(_greet_quote, _greet_name)
