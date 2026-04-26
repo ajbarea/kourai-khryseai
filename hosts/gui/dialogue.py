@@ -31,11 +31,13 @@ def _is_quoted_dialogue(text: str) -> bool:
 # ---------------------------------------------------------------------------
 class DialogueEntry:
     __slots__ = (
+        "_attachment_thumbs",
         "_timestamp",
         "_timestamp_source",
         "_wall_timestamp",
         "agent",
         "agent_count",
+        "attachments",
         "is_error",
         "is_result",
         "is_system",
@@ -56,6 +58,7 @@ class DialogueEntry:
         is_system: bool = False,
         processing_time: float | None = None,
         agent_count: int | None = None,
+        attachments: list[tuple[str, str]] | None = None,
     ) -> None:
         self.agent = agent
         self.text = text
@@ -69,6 +72,13 @@ class DialogueEntry:
         self.processing_time = processing_time
         self.agent_count = agent_count
         self.metadata_visible = True
+        # ``attachments`` is the same (b64, mime_type) shape the send_q
+        # 3-tuple uses (M11). The renderer decodes once, caches on
+        # ``_attachment_thumbs`` (lazy on first draw), and shows each as
+        # a small thumbnail under the user's bubble so the player can
+        # confirm exactly what was attached.
+        self.attachments = attachments
+        self._attachment_thumbs: list[pygame.Surface] | None = None
 
     @property
     def timestamp(self) -> float:
@@ -103,6 +113,11 @@ class DialogueHistory:
     BUBBLE_MAX_W = constants.DIALOGUE_W - 40
     _LINE_H_BASE = 20
     _AGENT_LINE_H_BASE = 14
+    # Attached-image thumbnail strip rendered under user bubbles (M11).
+    # Keep modest so a multi-attachment turn still fits without dominating
+    # the transcript; full-size view is the user's own clipboard.
+    _THUMB_H = 80
+    _THUMB_GAP = 6
 
     @property
     def line_h(self) -> int:
@@ -216,6 +231,49 @@ class DialogueHistory:
         fade_progress = (age - self.SYSTEM_FADE_START) / self.SYSTEM_FADE_DURATION
         return max(0.0, 1.0 - fade_progress)
 
+    def _entry_thumbnails(self, e: DialogueEntry) -> list[pygame.Surface]:
+        """Decode and cache attachment thumbnails for a user entry.
+
+        Each ``e.attachments`` entry is ``(b64_bytes, mime_type)`` —
+        the same shape ``send_q``'s 3-tuple carries. We decode once
+        on the first draw and stash on the entry; PIL is the only way
+        to get from base64 PNG bytes to a pygame Surface in a way that
+        also handles the WEBP/JPEG variants the OS clipboard hands us.
+        """
+        if e._attachment_thumbs is not None:
+            return e._attachment_thumbs
+        if not e.attachments:
+            e._attachment_thumbs = []
+            return e._attachment_thumbs
+
+        import base64
+        import io
+
+        try:
+            from PIL import Image  # type: ignore[import-untyped]
+        except ImportError:
+            # No PIL → can't decode; skip thumbnails silently. The
+            # outgoing FilePart still rides the wire — only the local
+            # preview is degraded.
+            e._attachment_thumbs = []
+            return e._attachment_thumbs
+
+        thumbs: list[pygame.Surface] = []
+        for b64_data, _mime in e.attachments:
+            try:
+                raw = base64.b64decode(b64_data)
+                img = Image.open(io.BytesIO(raw)).convert("RGBA")
+                img.thumbnail((self._THUMB_H, self._THUMB_H), Image.Resampling.LANCZOS)
+                surf = pygame.image.frombuffer(img.tobytes(), img.size, "RGBA").convert_alpha()
+                thumbs.append(surf)
+            except Exception:  # noqa: S112
+                # One bad attachment shouldn't break the whole bubble.
+                # Drop it from the preview; the FilePart still ships
+                # over the wire so the agent still gets the pixels.
+                continue
+        e._attachment_thumbs = thumbs
+        return thumbs
+
     def _entry_height(self, e: DialogueEntry, dest_w: int) -> int:
         if e.is_system:
             alpha = self._system_alpha(e)
@@ -228,6 +286,8 @@ class DialogueHistory:
         bubble_max_w = dest_w - 40
         lines = self._wrap_text(e.text, bubble_max_w - self.PAD * 2)
         h += len(lines) * self.line_h + self.PAD * 2
+        if e.is_user and e.attachments:
+            h += self._THUMB_H + self._THUMB_GAP
         return h
 
     def _wrap_text(self, text: str, max_w: int) -> list[str]:
@@ -319,6 +379,18 @@ class DialogueHistory:
                 )
             surf.blit(bubble, (bx, y))
             drawn_rect = pygame.Rect(bx, y, bubble_w, body_h)
+
+            # Attachment strip — thumbnails right-aligned beneath the bubble
+            # so it reads as part of the same turn. Drawn outside the bubble
+            # surface so dim-gold border doesn't clip them.
+            thumbs = self._entry_thumbnails(e)
+            if thumbs:
+                strip_y = y + body_h + self._THUMB_GAP
+                cursor_x = dest_w - 8
+                for thumb in reversed(thumbs):
+                    cursor_x -= thumb.get_width()
+                    surf.blit(thumb, (cursor_x, strip_y))
+                    cursor_x -= self._THUMB_GAP
         elif e.is_result:
             # Result block — full width, slightly highlighted
             bubble = pygame.Surface((dest_w - 16, total_h), pygame.SRCALPHA)

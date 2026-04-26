@@ -247,11 +247,18 @@ class PygameEventDispatcher:
 
     def _submit_text(self, text: str) -> None:
         """Process user text submission and route to the agent pipeline."""
-        self.history.add(DialogueEntry("user", text, is_user=True))
+        # Drain any clipboard images queued via Alt+V before resetting the
+        # input state — the placeholders ``[📎 image #N queued]`` already
+        # appear in ``text`` so the user's bubble shows what they sent and
+        # the agent sees a hint that images are riding alongside as parts.
+        attachments = self._pending_images.copy()
+        self._pending_images.clear()
+
+        self.history.add(DialogueEntry("user", text, is_user=True, attachments=attachments or None))
         self.history.scroll_to_bottom()
 
         target = self.input_bar.waiting_for_agent or self.state.current_agent
-        self.send_q.put((target, text))
+        self.send_q.put((target, text, attachments))
         self.debug_log.record_user(target, text)
         self.input_bar.processing = True
 
@@ -313,7 +320,7 @@ class PygameEventDispatcher:
         self.history.scroll_to_bottom()
 
         payload = f"{action.display_text}\n\n{action.hidden_prompt}"
-        self.send_q.put((action.agent, payload))
+        self.send_q.put((action.agent, payload, []))
         self.debug_log.record_user(action.agent, action.display_text)
         self.input_bar.processing = True
 
@@ -403,12 +410,10 @@ class PygameEventDispatcher:
         in hosts/cli/commands.py::_capture_image.  On success, the image
         is base64-encoded and appended to `self._pending_images`; an
         input-bar placeholder ``[📎 image #N queued]`` confirms capture.
-
-        NOTE: the GUI's send path in ``_submit_text`` currently only
-        emits ``(target, text)`` tuples — attachment plumbing into
-        send_q is not yet wired (tracked separately).  For now the
-        image data is captured and held on the handler so a future
-        refactor can pick it up without re-soliciting the user.
+        ``_submit_text`` drains the list at submit time and forwards it
+        as the third slot of the ``send_q`` 3-tuple, so GuiClient builds
+        a multi-part A2A ``Message`` (TextPart + FilePart) just like the
+        CLI's ``send_and_stream``.
         """
         try:
             from PIL import ImageGrab  # type: ignore[import-untyped]
