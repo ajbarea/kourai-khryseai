@@ -276,9 +276,18 @@ async def chat(
     temperature: float = 0.3,
     max_tokens: int = 4096,
     context_id: str | None = None,
+    tier: str | None = None,
 ) -> str:
-    """Send a chat completion request and return the response text."""
-    model = get_model(agent_name)
+    """Send a chat completion request and return the response text.
+
+    ``tier`` overrides the env-set ``KOURAI_MODEL_TIER`` for this single
+    call — pass ``"cheap"`` to pin a quick auxiliary call to the cheap
+    tier even when the active pipeline is on smart/standard. Used by
+    Metis's M14 ``discuss_tradeoffs`` so the parallel discussion runs
+    on Haiku regardless of pipeline tier (saves ongoing token spend on
+    every tier-1 confirmation where the discussion is dropped silently).
+    """
+    model = get_model(agent_name, tier=tier)
     timeout = AGENT_TIMEOUTS.get(agent_name, 120.0)
 
     full_messages = await _build_contextual_messages(agent_name, messages, context_id)

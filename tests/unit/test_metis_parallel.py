@@ -110,6 +110,25 @@ class TestDiscussTradeoffs:
         # paragraphs" tweak stays bounded.
         assert captured["kwargs"]["max_tokens"] <= 800
 
+    @pytest.mark.asyncio
+    async def test_pinned_to_cheap_tier(self):
+        # Discussion is auxiliary — often dropped silently on tier-1 /
+        # yolo paths. Pinning to ``cheap`` cuts ongoing token spend
+        # regardless of the active KOURAI_MODEL_TIER. Regression guard
+        # for the cheap-tier follow-up to M14.
+        from agents.metis.agent import discuss_tradeoffs
+
+        captured: dict = {}
+
+        async def capture_chat(agent_name, messages, **kwargs):
+            captured["kwargs"] = kwargs
+            return "ok"
+
+        with patch("agents.metis.agent.chat", side_effect=capture_chat):
+            await discuss_tradeoffs("add divide")
+
+        assert captured["kwargs"].get("tier") == "cheap"
+
 
 # ---------------------------------------------------------------------------
 # Cancellation matrix — what happens to Metis on each route

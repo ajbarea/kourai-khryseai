@@ -155,11 +155,14 @@ _PROVIDER_TIERS: dict[str, dict[str, dict[str, str]]] = {
 }
 
 
-def get_model(agent_name: str) -> str:
+def get_model(agent_name: str, tier: str | None = None) -> str:
     """Get the LLM model ID for an agent based on the active provider and tier.
 
     Provider is selected via KOURAI_PROVIDER (anthropic/google/local).
-    Tier is selected via KOURAI_MODEL_TIER (cheap/standard/smart).
+    Tier defaults to KOURAI_MODEL_TIER (cheap/standard/smart). Pass
+    ``tier`` to override per-call — useful when an agent's quick
+    auxiliary call (e.g., Metis's M14 ``discuss_tradeoffs``) should
+    run at a cheaper tier than the active pipeline.
     Set KOURAI_MODEL_OVERRIDE to force a specific model for all agents
     (useful in test environments with a mock LLM proxy).
     """
@@ -170,8 +173,9 @@ def get_model(agent_name: str) -> str:
     if PROVIDER == "local":
         return AGENT_MODELS_LOCAL[agent_name]
 
+    effective_tier = tier or MODEL_TIER
     tiers = _PROVIDER_TIERS.get(PROVIDER, _PROVIDER_TIERS["anthropic"])
-    models = tiers.get(MODEL_TIER, tiers["cheap"])
+    models = tiers.get(effective_tier, tiers["cheap"])
     return models[agent_name]
 
 
