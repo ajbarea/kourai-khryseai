@@ -21,6 +21,7 @@ from kourai_common.memory import (
     save_agent_state,
 )
 from kourai_common.retry import with_retry
+from kourai_common.usage import record_usage
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterable, Awaitable, Callable, Sequence
@@ -297,6 +298,7 @@ async def chat(
         raise LLMTimeoutError(agent_name, timeout) from None
 
     _log_cache_usage(agent_name, response)
+    record_usage(agent_name, response, model=model)
     content = response.choices[0].message.content
     if not content:
         raise LLMResponseError(agent_name, "empty response")
@@ -494,6 +496,7 @@ async def chat_with_tools(
             raise LLMTimeoutError(agent_name, timeout) from None
 
         _log_cache_usage(agent_name, response)
+        record_usage(agent_name, response, model=model)
         choice = response.choices[0]
         message = choice.message
         text_content = _coerce_chunk_content(getattr(message, "content", None))

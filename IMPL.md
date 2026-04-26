@@ -5,130 +5,133 @@ milestone lands, the matching detail block in [ROADMAP.md](./ROADMAP.md)
 collapses to a one-liner under "Shipped" and this file gets reset to the
 next milestone.
 
-Updated: 2026-04-26 · Working on: **M11 — GUI attachment send path**
+Updated: 2026-04-26 · Working on: **`/usage` CLI command** (M6 unprioritized list)
 
 ---
 
-## M11 plan-of-record
+## Plan-of-record
 
-End state: the GUI matches the CLI's image-attachment story end-to-end.
-Player Alt+V captures a clipboard image; an `[📎 image #N queued]`
-placeholder lands in the input bar; on submit the captured pixels ride
-the same A2A multi-part `Message` (`TextPart` + `FilePart`) the CLI
-ships, so Hephaestus and the downstream specialists see the image
-identically regardless of host. The user's bubble shows a thumbnail
-strip so they can confirm exactly what was attached.
+End state: the player can type `/usage` mid-session and see a per-agent
+breakdown of token spend (input/output/cache_read/cache_write) plus an
+estimated dollar total using April 2026 published rates. Long pipelines
+stop turning into billing surprises.
 
-The clipboard-capture half (Alt+V → `_pending_images`) was already
-shipped on 2026-04-23. M11 closes the send-path half:
-`pygame_event_handler._submit_text` previously emitted a bare
-`(target, text)` tuple on `send_q`, the captured image was held
-on the handler indefinitely, and at pipeline completion it was
-silently discarded.
+The infra was *almost* there: M4 already wired `_log_cache_usage` to
+debug-log per-call usage from `response.usage`. This work upgraded
+that debug log to a per-session accumulator with a CLI command.
 
-### Step 1 — `send_q` carries a 3-tuple ✅ 2026-04-26
+### Step 1 — `kourai_common.usage` module ✅ 2026-04-26
 
-- [x] `hosts/gui/pygame_event_handler.py::_submit_text`: drains
-      `self._pending_images` into a local `attachments` list, resets
-      the handler list, then puts `(target, text, attachments)` on
-      `send_q`. The drain happens BEFORE the put so a transient queue
-      error doesn't strand the image and re-send it next turn (covered
-      by `test_pending_images_drained_even_when_send_fails`).
-- [x] `_submit_quick_action` puts `(action.agent, payload, [])` —
-      quick actions never carry attachments today, but the slot keeps
-      the consumer signature uniform.
-- [x] `_paste_image_from_clipboard` docstring updated — the "send
-      path is not yet wired" caveat is gone.
+- [x] New `shared/src/kourai_common/usage.py`: module-level
+      `_SESSION` (`SessionUsage` dataclass) keyed by agent name.
+      Per-agent `AgentUsage` carries (input/output/cache_read/
+      cache_write/calls/model). Thread-safe via a single lock.
+- [x] `record_usage(agent_name, response, model)` pulls counts using
+      the same MagicMock-aware `_coerce_int` discipline as
+      `_log_cache_usage` so unit tests that mock LLM responses can't
+      inflate session totals with sentinel objects.
+- [x] `get_session_usage()` returns the live snapshot;
+      `reset_session_usage()` clears it for new-session boundaries.
+- [x] All-zero responses don't create a bucket (avoids fake "0
+      calls, 0 tokens" rows from agents that never actually ran).
 
-### Step 2 — `GuiClient` builds `[TextPart, FilePart, ...]` ✅ 2026-04-26
+### Step 2 — `kourai_common.pricing` module ✅ 2026-04-26
 
-- [x] `hosts/gui/client.py::__init__`: typed `send_q` signature
-      grew the attachments slot.
-- [x] `run()` unpacks the 3-tuple and tolerates the legacy 2-tuple
-      shape (any non-GUI caller that wires directly to `send_q` keeps
-      working). Logs the attachment count at debug.
-- [x] `_send_message()`: builds `Part(root=TextPart(text=user_text))`
-      first, then one `Part(root=FilePart(file=FileWithBytes(bytes,
-      mime_type, name="attachment.png")))` per attachment. Identical
-      shape to `hosts/cli/streaming.py::send_and_stream` so
-      Hephaestus can't tell host apart on the wire.
+- [x] New `shared/src/kourai_common/pricing.py`: `ModelPricing`
+      dataclass + `ANTHROPIC_PRICING` table for Haiku 4.5
+      ($1/$5), Sonnet 4.6 ($3/$15), Opus 4.6/4.7 ($5/$25). Uniform
+      cache rates: read = input × 0.1, 5-min write = input × 1.25.
+      Source: Anthropic public pricing as of April 2026 (cross-referenced
+      against finout.io and benchlm.ai 2026 summaries).
+- [x] `get_model_pricing(model)` returns `None` for unknown models so
+      the CLI renders `$ — ` instead of an inflated zero — silent
+      mis-quotes are worse than no quote.
+- [x] `compute_cost(model, usage)` does the per-million-token math
+      across all four token classes, returns `None` for unknown
+      models (same reasoning).
 
-### Step 3 — `DemoGuiClient` accepts the 3-tuple ✅ 2026-04-26
+### Step 3 — Hook into llm.py ✅ 2026-04-26
 
-- [x] `hosts/gui/demo_client.py`: docstring updated; the existing
-      `len(item) >= 2` guard already tolerates 3-tuples and silently
-      ignores `item[2]`. Demo mode has no real agent on the other
-      end, so dropping attachments is the only sensible behaviour.
+- [x] `record_usage(agent_name, response, model=model)` called right
+      after `_log_cache_usage` in `chat()` and `chat_with_tools()`.
+      Two-line addition each.
+- [x] `chat_stream()` not hooked — LiteLLM's streaming iterator
+      doesn't surface a final `usage` block we can read inside the
+      generator. Documented in the usage module docstring as a known
+      undercount; the substantive Techne / Kallos / Dokimasia /
+      Hephaestus traffic all goes through `chat()` or
+      `chat_with_tools()` so the player still sees the load-bearing
+      cost.
 
-### Step 4 — Inline thumbnails in dialogue history ✅ 2026-04-26
+### Step 4 — `/usage` slash command ✅ 2026-04-26
 
-- [x] `hosts/gui/dialogue.py::DialogueEntry`: new `attachments`
-      parameter (kw-only, default `None`) plus a private
-      `_attachment_thumbs` cache slot. `__slots__` extended.
-- [x] New `DialogueHistory._entry_thumbnails()` lazily decodes
-      `(b64, mime)` → PIL → `pygame.Surface`, thumbnails to 80px
-      tall, caches on the entry. Bad attachments are silently
-      dropped from the preview — the outgoing `FilePart` still ships.
-- [x] `_entry_height()` reserves `_THUMB_H + _THUMB_GAP` of vertical
-      room when an entry has attachments, so the next bubble doesn't
-      stack over the strip.
-- [x] `_draw_entry()` user branch renders the strip right-aligned
-      below the bubble after blitting the bubble itself.
+- [x] `hosts/cli/completer.py`: added `SlashCommand("usage", "Show
+      running token + dollar cost for this session")` so `/usage`
+      shows up in the live-filter slash menu and in `/help`
+      automatically (the help renderer reads `SLASH_COMMANDS`).
+- [x] `hosts/cli/__main__.py`: `_show_usage_summary()` formats the
+      session snapshot as a per-agent table (calls / input / output /
+      cache_r / cache_w / cost). TOTAL row aggregates real numbers and
+      the dollar-cost-only sum (unknown-model rows skipped from the
+      cost total but still listed). When unknown models appear,
+      footer hints at `kourai_common.pricing.ANTHROPIC_PRICING` so
+      the next contributor knows where to add rates.
+- [x] Wired the `prompt_text == "/usage"` branch right after
+      `/model_tier` in the REPL loop.
 
 ### Step 5 — Tests ✅ 2026-04-26
 
-- [x] `tests/unit/test_gui_attachment_send_path.py`: 10 tests across
-      5 classes:
-      - `TestSubmitTextTupleShape` (3) — empty-list default, drain
-        on submit, drain-before-put ordering.
-      - `TestQuickActionTupleShape` (1) — quick actions emit
-        `(target, text, [])`.
-      - `TestDialogueEntryAttachments` (3) — default `None`, explicit
-        value stored, `_entry_height` reserves the strip.
-      - `TestGuiClientMultiPartSend` (2) — text-only path emits one
-        `TextPart`; attachments produce TextPart + N FilePart with the
-        b64 payload preserved.
-      - `TestDemoGuiClientToleratesThreeTuple` (1) — drop-in 3-tuple
-        doesn't crash; greeting still emits.
-      Whole file passes in 0.79 s.
+- [x] `tests/unit/test_usage.py`: 21 tests across 5 classes:
+      - `TestRecordUsage` (7) — first-call-creates-bucket, accumulate,
+        per-agent isolation, first-model-wins, missing-usage no-op,
+        all-zero no-op, MagicMock dropped.
+      - `TestPricingTable` (4) — invariant checks (5x, 0.1x, 1.25x
+        ratios) + spot-check on Sonnet/Opus/Haiku absolute rates.
+      - `TestGetModelPricing` (2), `TestComputeCost` (5),
+        `TestUsageSlashCommand` (3 — empty, full breakdown, unknown
+        model).
+      - Autouse fixture resets `_SESSION` before AND after each test
+        so cross-test bleed is impossible.
+      - Whole file passes in 0.91 s.
 
-### Step 6 — Live smoke (queued for next interactive `make gui` session)
+### Step 6 — Live smoke (queued for next interactive `/project` session)
 
-- [ ] Alt+V → type "describe this UI bug" → Enter. Confirm:
-  - User bubble carries the placeholder text and a thumbnail strip
-    underneath the message.
-  - Hephaestus's first response references the screenshot (proves
-    the FilePart reached the routing LLM).
-- [ ] Alt+V three times in a row → submit. Confirm three thumbnails
-      render side-by-side and three FilePart entries hit Hephaestus.
-- [ ] After submit, Alt+V → confirm the placeholder counter resets
-      to `image #1` (drain happened).
-- [ ] `KOURAI_SANDBOX=container make gui-demo` → confirm DemoGuiClient
-      tolerates the 3-tuple shape and the scripted scene still plays.
+- [ ] Issue any prompt that exercises Hephaestus → Techne → Dokimasia
+      pipeline. After it completes, type `/usage`. Confirm:
+  - Each agent shows non-zero `calls` and matching token totals.
+  - Cost column shows non-zero dollar amounts for Anthropic agents.
+  - TOTAL row matches the sum of the agent rows.
+- [ ] Issue several prompts in a row. Confirm `/usage` shows
+      cumulative totals (the accumulator survives across turns).
+- [ ] If running `KOURAI_PROVIDER=google`: confirm Gemini agents
+      render `$—` and the footer hint mentions `gemini/gemini-…`.
 
 ---
 
 ## Notes / open questions
 
-- **Why not strip the `[📎 image #N queued]` placeholder before
-  sending to the agent?** The CLI doesn't strip it either. The text
-  carries the placeholder *and* the FilePart rides alongside, so the
-  agent sees both: a textual hint that images were attached, plus the
-  actual pixels. The user's bubble keeps the same text it submitted —
-  no surprise at re-render time. If we ever want a clean separation,
-  do it once in `a2a_utils` so both hosts strip identically.
+- **Why a separate `usage.py` module instead of folding into `llm.py`?**
+  Keeps the accumulator testable in isolation (no LiteLLM import path,
+  no httpx side effects). The autouse-fixture pattern relies on being
+  able to reset module-level state cheaply per test.
 
-- **Thumbnail strip placement.** Right-aligned beneath the bubble —
-  same edge as the bubble itself. The alternative (left edge of
-  bubble) splits the eye between text and image; right-aligning
-  keeps the user's visual scan one column.
+- **Streaming undercount.** `chat_stream()` is used by Metis's
+  `create_spec_stream` and Dokimasia's `generate_tests_stream`. Both
+  display text live; neither writes to disk. The user will see those
+  agents' rows show fewer tokens than they actually consumed. Acceptable
+  for a first cut; if/when LiteLLM exposes a way to read the final
+  aggregate from inside the iterator, hook it.
 
-- **Pillow availability.** Both Alt+V capture and thumbnail decode
-  require Pillow. It's already a hard dep in `hosts/gui/pyproject.toml`
-  for the existing image rendering, so M11 doesn't add weight. The
-  decode path silently degrades to "no thumbnail, FilePart still
-  rides" if Pillow is missing — better than crashing the whole
-  history render.
+- **Per-call vs per-tier model tracking.** `record_usage` keeps the
+  *first* model id seen per agent. A mid-session `KOURAI_MODEL_TIER`
+  swap would silently keep computing costs at the old tier's rate
+  for that agent. Out of scope for now — the configuration is
+  process-lifetime, not per-call.
+
+- **Gemini / Ollama pricing.** Not in `ANTHROPIC_PRICING` today.
+  Gemini rates are knowable; Ollama is free (local). Add them when
+  AJ uses those providers in anger; until then `$—` plus the footer
+  hint is the right behavior.
 
 ---
 
@@ -136,9 +139,13 @@ silently discarded.
 
 - **M2** (`kourai-forge-mcp` server) — gated on M1 Round 6 smoke.
 - **M9** (Opus 4.6 → 4.7 in `MODELS_SMART["metis"]`) — one-line bump,
-  also wants Round 6 smoke first.
+  also wants Round 6 smoke first. (Pricing already in
+  `ANTHROPIC_PRICING` so the bump is also `/usage`-ready.)
 - **M5** (UID alignment for forge worktrees) — quality-of-life,
-  zombie `.pytest_cache` mitigation. Container-plumbing work; tractable
-  but not the highest leverage win available.
+  needs live docker testing to verify.
 - **M12** (dynamic sizing across the GUI) — biggest GUI refactor
   on the board; high-DPI / accessibility win once it lands.
+- **Strict tool use** (M6 list) — once we've felt the M1 toolset's
+  shape under live traffic, turn `strict: true` on for forge tools
+  to guarantee schema conformance. Cross-provider behavior through
+  LiteLLM needs a quick web-research pass first.

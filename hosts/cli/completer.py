@@ -42,6 +42,7 @@ SLASH_COMMANDS: tuple[SlashCommand, ...] = (
     ),
     SlashCommand("config", "Alias for /settings", arg_hint="[1-9]"),
     SlashCommand("model_tier", "Show current provider, tier, and model"),
+    SlashCommand("usage", "Show running token + dollar cost for this session"),
     SlashCommand("metrics", "Show alignment, affinity, and virtue metrics"),
     SlashCommand("maidens", "Meet the Golden Maidens", arg_hint="[name]"),
     SlashCommand("status", "Agent info: name, URL, model, context ID"),
