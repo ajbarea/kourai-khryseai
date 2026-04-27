@@ -1,4 +1,6 @@
-# Jaeger v2 — translated from v1 env vars (M16 Change 3, 2026-04-27).
+# Jaeger v2 — translated from v1 env vars (M16 Change 3, 2026-04-27)
+# and extended with the spanmetrics connector + prometheus exporter
+# (M16 Change 4, 2026-04-27).
 #
 # v1 env → v2 yaml:
 #   COLLECTOR_OTLP_ENABLED=true            → receivers.otlp.protocols.{grpc,http}
@@ -9,7 +11,15 @@
 #
 # Port move v1→v2: internal metrics scrape target was :14269, now :8888
 # (set by service.telemetry.metrics.readers.pull.prometheus.port). The
-# host-side :14269 mapping in compose has been dropped to match.
+# host-side :14269 mapping in compose was dropped to match.
+#
+# Spanmetrics: the trace pipeline tees to the spanmetrics connector,
+# which derives RED metrics (rate, errors, p50/p95/p99 durations) from
+# every span and emits them into a dedicated metrics pipeline. That
+# pipeline writes to the otel prometheus exporter on :8889, which
+# Prometheus scrapes (job=spanmetrics in docker/prometheus.yml). The
+# Monitor tab in the v2 UI reads the same metrics back via the
+# promstore metric_backend, closing the loop.
 
 service:
   extensions: [jaeger_storage, jaeger_query, healthcheckv2]
@@ -17,7 +27,10 @@ service:
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [jaeger_storage_exporter]
+      exporters: [jaeger_storage_exporter, spanmetrics]
+    metrics/spanmetrics:
+      receivers: [spanmetrics]
+      exporters: [prometheus]
   telemetry:
     resource:
       service.name: jaeger
@@ -67,6 +80,26 @@ receivers:
 processors:
   batch:
 
+# Connectors bridge pipelines: spanmetrics receives traces from the
+# `traces` pipeline and emits metrics into `metrics/spanmetrics`.
+# Default dimensions (service.name, span.name, span.kind, status.code)
+# are auto-included; we deliberately skip custom dimensions on the
+# first pass to keep cardinality bounded — high-cardinality fields
+# like trace.id, user.id, http.url are explicitly NOT added.
+connectors:
+  spanmetrics:
+    histogram:
+      explicit:
+        buckets: [2ms, 6ms, 10ms, 50ms, 100ms, 250ms, 500ms, 1s, 2s, 5s, 10s, 30s, 60s]
+    aggregation_cardinality_limit: 1000
+    aggregation_temporality: AGGREGATION_TEMPORALITY_CUMULATIVE
+    # Flush every 15s to match docker/prometheus.yml's scrape_interval —
+    # default 60s makes the Monitor tab lag a full minute behind reality
+    # in the dev loop, which defeats the "fire a trace, see RED" UX.
+    metrics_flush_interval: 15s
+
 exporters:
   jaeger_storage_exporter:
     trace_storage: memstore
+  prometheus:
+    endpoint: 0.0.0.0:8889

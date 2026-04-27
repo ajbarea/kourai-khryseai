@@ -69,9 +69,17 @@ services:
           memory: 512M
     logging: *default-logging
 
-  # Prometheus: Time-series database for metrics aggregation.
+  # Prometheus v3 (distroless variant: minimal base image, nonroot
+  # UID 65532). Time-series database for metrics aggregation —
+  # scrapes Jaeger's own telemetry on :8888 and the spanmetrics
+  # connector's RED output on :8889 (both reached over the kourai
+  # bridge; no host mapping needed for either Jaeger port).
+  #
+  # Distroless is a free win here because we run with no persistent
+  # volume — the named-volume chown migration that the regular
+  # busybox→distroless swap requires doesn't apply to us.
   prometheus:
-    image: prom/prometheus:v2.54.1
+    image: prom/prometheus:v3.10.0-distroless
     volumes:
       - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
