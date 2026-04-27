@@ -4,6 +4,19 @@ global:
 scrape_configs:
   # Jaeger's own internal telemetry. Port moved from v1's :14269 to v2's
   # :8888 (set in jaeger-config.yaml under service.telemetry.metrics).
+  # fallback_scrape_protocol guards against the v3 Content-Type
+  # strictness — if the exporter ever skips the header, we still parse.
   - job_name: 'jaeger-metrics'
+    fallback_scrape_protocol: PrometheusText0.0.4
     static_configs:
       - targets: ['jaeger:8888']
+
+  # Spanmetrics: RED (rate, errors, p50/p95/p99 durations) derived from
+  # OTLP traces by Jaeger v2's spanmetrics connector and exposed via
+  # the otel prometheus exporter on :8889 (config in jaeger-config.yaml).
+  # The Jaeger v2 Monitor tab reads these metrics back via the promstore
+  # metric_backend, so this scrape is what populates that tab.
+  - job_name: 'spanmetrics'
+    fallback_scrape_protocol: PrometheusText0.0.4
+    static_configs:
+      - targets: ['jaeger:8889']
