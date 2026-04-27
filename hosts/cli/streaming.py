@@ -69,11 +69,23 @@ async def send_and_stream(
     *,
     memoir: Memoir | None = None,
     scene_id: str | None = None,
+    forge_tags: list[str] | None = None,
 ) -> tuple[bool, str, str | None]:
     """Send a message and stream the response.
 
     Returns:
         (continue_loop, context_id, task_id) tuple.
+
+    ``forge_tags`` carries the bracket-tag prefixes the REPL prepended on
+    the original turn (``[project_root: …]``, ``[yolo: on]``,
+    ``[auto_approve_reads: on]``). The ``input_required`` follow-up loop
+    re-prepends them to the player's response so multi-turn confirmation
+    flows preserve forge metadata. Without this, every M13 ``yes`` would
+    arrive at specialists stripped of project_root, dropping them back to
+    ``Path.cwd()`` (= ``/app`` in the agent container — not a git repo,
+    fails with ``exit 128``). A2A v1.0's ``Message.metadata`` channel is
+    the spec-correct destination for these (see M7 scope) but the
+    text-tag carrier ships value today on 0.3.x.
     """
     global _last_result
     t0 = time.monotonic()
@@ -216,6 +228,16 @@ async def send_and_stream(
         follow_up: str = await click.prompt(f"\n{_GOLD}\u21b3 Your response{_RESET}")
         if follow_up.strip().lower() in ("/q", "/quit", "quit"):
             return False, context_id, task_id
+        # Re-prepend the original turn's bracket-tags so specialists
+        # still receive [project_root: ...] / [yolo: on] / [auto_approve_reads: on]
+        # on the resumed task. Without this, the M13 confirmation `yes`
+        # arrives bare and Hephaestus's transcript-build emits an empty
+        # `Project root:` line. Metis/Techne then fall back to Path.cwd()
+        # (= /app inside the agent container) and git operations fail
+        # with exit 128. Tags propagate per-turn until the player exits
+        # to the REPL outer loop and the next turn rebuilds them.
+        if forge_tags:
+            follow_up = "\n".join((*forge_tags, follow_up))
         return await send_and_stream(
             client,
             follow_up,
@@ -224,6 +246,7 @@ async def send_and_stream(
             verbose,
             tts=tts,
             gossip_enabled=gossip_enabled,
+            forge_tags=forge_tags,
         )
 
     return True, context_id, task_id

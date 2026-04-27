@@ -813,13 +813,21 @@ async def main(
                 forge_session: ForgeSession | None = None
                 forge_memoir: Memoir | None = None
                 forge_turn_number: int = 0
+                # Tags collected here also propagate across input_required
+                # follow-ups (M13 confirmations, mid-pipeline ASK_USER replies)
+                # via send_and_stream's `forge_tags=` kwarg. Without that
+                # propagation the resumed turn arrives bare and specialists
+                # fall back to /app, breaking git context. A2A v1.0's
+                # Message.metadata is the spec-correct destination once M7
+                # lands the SDK migration; text-tag carrier ships value today.
+                forge_tags: list[str] = []
                 project = _active_project(settings)
                 if project is not None:
                     try:
                         forge_session = ForgeSession.start(project, label=prompt_text[:24])
                         forge_memoir = Memoir(forge_session.workdir)
                         forge_turn_number = 0
-                        forge_msg = f"[project_root: {forge_session.workdir}]\n{prompt_text}"
+                        forge_tags.append(f"[project_root: {forge_session.workdir}]")
                         _echo(
                             f"{_DIM}\u2692 Forging in {project.name}"
                             f" \u00b7 session {forge_session.session_id[:8]}"
@@ -837,11 +845,14 @@ async def main(
                 # [project_root: …] and [relationship_tiers: …]. Default OFF
                 # so the gate stays the contract of the forge.
                 if settings.yolo_enabled:
-                    forge_msg = f"[yolo: on]\n{forge_msg}"
+                    forge_tags.append("[yolo: on]")
                 elif settings.auto_approve_reads:
                     # Granular middle ground — only takes effect when /yolo
                     # is OFF. With both on, /yolo's broader bypass wins.
-                    forge_msg = f"[auto_approve_reads: on]\n{forge_msg}"
+                    forge_tags.append("[auto_approve_reads: on]")
+
+                if forge_tags:
+                    forge_msg = "\n".join((*forge_tags, forge_msg))
 
                 _echo("")
                 stream_kwargs: dict[str, object] = {}
@@ -860,6 +871,7 @@ async def main(
                     attachments=attachments or None,
                     tts=tts,
                     gossip_enabled=settings.gossip_enabled,
+                    forge_tags=forge_tags or None,
                     **stream_kwargs,
                 )
 
