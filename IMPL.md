@@ -30,40 +30,73 @@ piece — retrofitting `roots` / `elicitation` / `sampling` after the
 server is scaffolded is significantly more painful than declaring them
 upfront.
 
-### Change 1 — Init-handshake client capabilities (design-time gate)
+### Change 1 — Declare `roots` capability with project-root scope (design-time gate) ✅ 2026-04-27
 
 **Why first.** MCP's `initialize` request is where a host advertises
-which client capabilities it speaks (`roots`, `elicitation`,
-`sampling`). The declaration shapes every server-side decision: a
-server that knows the host has `roots` won't reinvent path validation;
-a server that knows the host has `elicitation` won't bake confirmation
-prompts into tool descriptions; a server that knows the host has
-`sampling` can offload LLM calls back to the host instead of bundling
-LiteLLM. Get this wrong and we either over-build (re-implementing what
-the host already does) or under-build (papering over missing
-primitives with text-tag hacks).
+which client capabilities it speaks. The MCP Python SDK 1.27.0 (which
+we're pinned to) gates capability declaration on **callback presence**:
+when `ClientSession.initialize()` runs, it declares `roots` /
+`elicitation` / `sampling` only when the corresponding callback is
+non-default (verified by reading
+`mcp/client/session.py:148-188`). Default callbacks return
+`ErrorData(INVALID_REQUEST, "...not supported")` — the worst case.
 
-- [ ] **`roots`** declared in the host. Player's `project_root`
-  becomes the sole declared root; the server's file-touching tools
-  validate against the root list rather than re-implementing
-  `validate_file_path`. Includes
-  `notifications/roots/list_changed` so a `/project switch`
-  mid-session re-scopes the server cleanly.
-- [ ] **`elicitation`** declared. Spec-blessed analog of M13's
-  homegrown `CONFIRM_ORDER` pause primitive. Once Change 4 lands,
-  `INPUT_REQUIRED` flows through elicitation rather than the
-  text-tag carrier — same UX, standard wire format, future
-  MCP-aware hosts get the gate for free.
-- [ ] **`sampling`** declared. Server-initiated LLM call back
-  through the host. Useful if a future skill (e.g., a synth-test
-  generator) wants to ask Hephaestus to classify intent without
-  bundling its own LiteLLM client. Pairs with the existing YOLO
-  toggle: `[yolo: on]` → auto-approve sampling; otherwise prompt
-  per the spec's MUST-explicit-consent rule.
-- [ ] Host-side capability advertisement wired into `MCPToolkit`'s
-  init path. Verified via mock `initialize` request: response
-  payload carries all three keys with shapes matching spec
-  2025-11-25.
+So the right approach is "declare what we actually implement, leave
+the rest off". `roots` lands now (real callback, real backing data —
+the player's `project_root`). `elicitation` lands with Change 4 (when
+INPUT_REQUIRED routes through it). `sampling` lands when the first
+caller appears (no callers exist today). Splitting like this avoids
+the "host that lies about its capabilities" trap that an
+all-three-with-stubs approach would create.
+
+- [x] New `build_client_session(read, write) -> ClientSession`
+  factory in `shared/src/kourai_common/mcp_client.py` — wraps
+  `ClientSession` construction with kourai's standard client-side
+  callbacks. Properly typed via `MemoryObjectReceiveStream` /
+  `MemoryObjectSendStream` (TYPE_CHECKING-imported) so ty stays at
+  `Found 0 diagnostics`.
+- [x] New `kourai_project_root_var: ContextVar[Path | None]` (default
+  `None`) so the `list_roots_callback` reads the active project root
+  without threading it through every call signature. Wiring the
+  executor side is the follow-on commit; this PR establishes the
+  contextvar + factory.
+- [x] `_kourai_list_roots(context)` callback returns
+  `ListRootsResult(roots=[Root(uri=FileUrl(root.as_uri()),
+  name="project_root")])` when the contextvar is set,
+  `ListRootsResult(roots=[])` when unset (honest "we have no roots
+  right now" rather than the SDK default's "we don't support
+  roots"). `RootsCapability(listChanged=True)` declared automatically
+  by the SDK because the callback is non-default.
+- [x] `client_info=Implementation(name="kourai-khryseai",
+  version="0.1.0")` so server-side observability sees a real client
+  name instead of the SDK default `"mcp"`.
+- [x] Refactored the three existing async functions in
+  `mcp_client.py` (`query_context7`, `create_memory_entities`,
+  `search_memory_nodes`) to construct sessions through the factory.
+  Today's call sites don't operate on files, so declaring roots
+  changes nothing for them — but preempts the "host that lies" issue
+  when kourai-forge-mcp lands in Change 2.
+- [x] 5 unit tests in `tests/unit/test_mcp_client.py`:
+  - `TestBuildClientSession::test_factory_wires_kourai_list_roots_callback`
+    — verifies `session._list_roots_callback is _kourai_list_roots`
+    AND `is not _default_list_roots_callback` (the predicate the SDK
+    uses to decide whether to declare the capability).
+  - `TestBuildClientSession::test_factory_does_not_supply_elicitation_or_sampling_callbacks`
+    — verifies elicitation + sampling stay at SDK defaults so those
+    capabilities are NOT declared (no lying about supporting them).
+  - `TestBuildClientSession::test_factory_supplies_kourai_client_info`
+    — verifies override of SDK default `Implementation(name="mcp", ...)`.
+  - `TestKouraiListRoots::test_returns_empty_list_when_contextvar_unset`.
+  - `TestKouraiListRoots::test_returns_single_root_when_contextvar_set`
+    (tmp_path fixture, full URI roundtrip via `Path.as_uri()`).
+- [x] All 31 tests in `test_mcp_client.py` green; full unit suite
+  `2679 passed`. `make lint` ends `Found 0 diagnostics`.
+- [ ] **Follow-on (queued, not in this PR):** wire executor entry
+  points (the existing `parse_project_root(user_input)` site in
+  Techne / Metis / Kallos / Dokimasia executors) to call
+  `kourai_project_root_var.set(parsed_root)` so the contextvar is
+  populated for forge-relevant calls. Today the var stays `None` and
+  `_kourai_list_roots` returns an empty list — correct, just inert.
 
 ### Change 2 — `mcp_servers/forge/server.py` stdio scaffold
 
@@ -110,13 +143,20 @@ primitives with text-tag hacks).
   forge server shared across multiple host machines — not a dev-loop
   need.
 
-- **Why declare capabilities at init even if some won't be exercised
-  immediately?** `roots` is used from day one. `elicitation` lands with
-  Change 4. `sampling` may not have a caller for weeks. But the
-  declaration is cheap and the cost of NOT declaring is that future
-  servers see a host that lies about its capabilities — worse than
-  papering over a missing capability. Declare what we actually
-  support; leave the rest off.
+- **Why declare capabilities incrementally rather than all at init?**
+  The MCP Python SDK gates capability declaration on callback presence
+  (`ClientSession.initialize()` only declares `roots` / `elicitation`
+  / `sampling` when the corresponding callback is non-default — see
+  `mcp/client/session.py:148-188`). The default callbacks return
+  `ErrorData(INVALID_REQUEST, "...not supported")`, so an
+  all-three-with-stubs approach would technically declare the
+  capability but lie about supporting it. Better to declare each
+  capability exactly when its real implementation lands: `roots` now
+  (Change 1), `elicitation` with Change 4 (INPUT_REQUIRED routing),
+  `sampling` when the first caller exists. Cost of wrong-direction is
+  asymmetric — a host that under-declares loses some server features;
+  a host that over-declares produces protocol errors when servers try
+  to use the capability.
 
 - **MCP spec version pinned to 2025-11-25.** The spec drift watcher
   cron (`scripts/watch_protocols.py`) will flag any subsequent
