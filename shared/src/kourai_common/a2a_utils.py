@@ -20,10 +20,51 @@ import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import httpx
 from a2a.types import FileWithBytes
 
 if TYPE_CHECKING:
     from a2a.server.agent_execution import RequestContext
+
+
+# ── A2A protocol version negotiation ──────────────────────────────────
+
+# The version we declare on every outbound A2A request via the
+# ``A2A-Version`` header. v1.0 of the spec made this header REQUIRED for
+# clients (servers assume 0.3 if absent — see
+# https://a2a-protocol.org/latest/specification/). We declare 0.3
+# explicitly so that when M7 lands an a2a-sdk 1.0.x server, the
+# negotiation is unambiguous: this client speaks 0.3 today. Bump this
+# constant in lockstep with the SDK pin in pyproject when M7 ships.
+A2A_PROTOCOL_VERSION = "0.3"
+
+
+def make_a2a_http_client(
+    *,
+    timeout: float | httpx.Timeout | None = None,
+    extra_headers: dict[str, str] | None = None,
+) -> httpx.AsyncClient:
+    """Construct an ``httpx.AsyncClient`` carrying the ``A2A-Version`` header.
+
+    Every outbound A2A request now MUST carry this header per the v1.0
+    spec — without it, a v1.0 server silently downgrades to 0.3
+    semantics. Centralising the construction means we have one place
+    to bump the version when M7 (a2a-sdk 1.0 migration) is ready, and
+    every client (CLI, GUI, VN bridge, Hephaestus → specialist) gets
+    the header for free.
+
+    ``timeout`` is forwarded as-is to ``httpx.AsyncClient`` so callers
+    keep their existing timeout policy. ``extra_headers`` merges into
+    the version header for callers that need additional defaults
+    (rare — pre-shared auth, tracing).
+    """
+    headers: dict[str, str] = {"A2A-Version": A2A_PROTOCOL_VERSION}
+    if extra_headers:
+        headers.update(extra_headers)
+    if timeout is None:
+        return httpx.AsyncClient(headers=headers)
+    return httpx.AsyncClient(timeout=timeout, headers=headers)
+
 
 # ── Project root extraction ───────────────────────────────────────────
 

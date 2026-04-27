@@ -28,6 +28,7 @@ from kourai_common.a2a_events import (
     extract_status_text,
     extract_task_text,
 )
+from kourai_common.a2a_utils import make_a2a_http_client
 from kourai_common.agents_manifest import fallback_card_for
 from kourai_common.tracing import create_span, get_trace_context
 
@@ -54,7 +55,7 @@ class RemoteAgentConnection:
     def __init__(self, agent_name: str, agent_url: str):
         self.agent_name = agent_name
         self.agent_url = agent_url
-        self.http = httpx.AsyncClient(
+        self.http = make_a2a_http_client(
             timeout=httpx.Timeout(connect=5.0, read=120.0, write=10.0, pool=5.0),
         )
         self.client: Client | None = None

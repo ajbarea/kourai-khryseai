@@ -43,6 +43,9 @@ SLASH_COMMANDS: tuple[SlashCommand, ...] = (
     SlashCommand("config", "Alias for /settings", arg_hint="[1-9]"),
     SlashCommand("model_tier", "Show current provider, tier, and model"),
     SlashCommand("usage", "Show running token + dollar cost for this session"),
+    SlashCommand(
+        "cost", "Alias for /usage — matches OSS-CC vocabulary (ClawCode, Cline, OpenCode)"
+    ),
     SlashCommand("reset_usage", "Zero the session token + dollar counter"),
     SlashCommand("yolo", "Toggle the M13 Forge Order Confirmation gate (default OFF — gate is on)"),
     SlashCommand(

@@ -68,3 +68,54 @@ class TestTranslateToContainer:
         with patch("kourai_common.a2a_utils.Path.home", return_value=fake_home):
             text = "Project root: /home/ajbar/.kourai_khryseai/projects/p1/hello"
             assert parse_project_root(text) == forge
+
+
+class TestA2AHttpClient:
+    """``make_a2a_http_client`` carries the spec-required ``A2A-Version``
+    header so v1.0 servers don't silently downgrade to 0.3 semantics
+    when our SDK pin eventually flips. Centralising construction means
+    one bump-site for M7 (a2a-sdk 1.0 migration)."""
+
+    def test_default_carries_version_header(self):
+        from kourai_common.a2a_utils import A2A_PROTOCOL_VERSION, make_a2a_http_client
+
+        client = make_a2a_http_client()
+        try:
+            assert client.headers["A2A-Version"] == A2A_PROTOCOL_VERSION
+        finally:
+            # Tests don't await aclose; rely on GC for the test client.
+            pass
+
+    def test_protocol_version_is_documented_pin(self):
+        # Regression guard: the constant must match what M7 expects.
+        # When M7 lands the SDK 1.0 cutover, this test failure is the
+        # signal to bump in lockstep.
+        from kourai_common.a2a_utils import A2A_PROTOCOL_VERSION
+
+        assert A2A_PROTOCOL_VERSION == "0.3"
+
+    def test_extra_headers_merge_without_overriding_version(self):
+        from kourai_common.a2a_utils import A2A_PROTOCOL_VERSION, make_a2a_http_client
+
+        client = make_a2a_http_client(extra_headers={"X-Trace-Id": "abc123"})
+        assert client.headers["A2A-Version"] == A2A_PROTOCOL_VERSION
+        assert client.headers["X-Trace-Id"] == "abc123"
+
+    def test_timeout_passed_through(self):
+        import httpx
+
+        from kourai_common.a2a_utils import make_a2a_http_client
+
+        client = make_a2a_http_client(timeout=42.0)
+        # httpx normalises a float to a Timeout(connect=42, read=42, write=42, pool=42).
+        assert isinstance(client.timeout, httpx.Timeout)
+        assert client.timeout.read == 42.0
+
+    def test_explicit_override_in_extra_headers_wins(self):
+        # Defensive: a caller can override A2A-Version (for compat
+        # testing with a legacy server). The helper passes the explicit
+        # value through unchanged.
+        from kourai_common.a2a_utils import make_a2a_http_client
+
+        client = make_a2a_http_client(extra_headers={"A2A-Version": "0.2"})
+        assert client.headers["A2A-Version"] == "0.2"
