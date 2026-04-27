@@ -92,6 +92,28 @@ Subagent scan-area split:
 - Config/build: `pyproject.toml`, `Makefile`, `.github/workflows/**`, `zensical.toml`, `docker-compose*.yml`, `docker/**/Dockerfile`, `.vscode/**`
 - Docs (opt-in): `docs/**/*.md`
 
+## working_docs
+
+- **ROADMAP.md** and **IMPL.md** in this repo are editable working docs — the "Kourai creative latitude" rule. Rewrite anything that doesn't feel perfect; treat them as persistent scratchpads, not read-only canon. (Cross-project rule lives in `~/.claude/CLAUDE.md`; this section confirms it for kourai.)
+- **Demo targets vs interactive targets**: `make cli-demo` / `gui-demo` / `vn-demo` are **scripted** (used for poster screenshots, deterministic output) — those are the right invocations for a demo capture. `make cli` / `gui` / `vn` are **interactive** (player REPL / pygame loop / Ren'Py loop) — listed under "Do-not-run" for skill use, but right for live development. Never confuse them when generating poster artifacts.
+
+## ci_pipeline
+
+- **Pre-push gate is `make lint`** — not file-scoped `uv run ruff check <files>`. The wrapper at `scripts/lint.py` runs `ruff format --check`, `ruff check`, AND `ty check` in sequence; skipping the wrapper skips `ty` entirely, and file-scoped invocations miss repo-wide drift in unrelated files. Always run `make lint` (or `make validate` for lint + unit tests) before `git push`. Both write a SUMMARY block in `logs/dev-<ts>-<cmd>.log` — verify `overall rc : 0` and `steps failed : 0` before pushing.
+- **Both `ruff format --check` AND `ruff check` are separate gates** — `make lint` runs both. Even if I only ran `ruff format` locally, the check pass can still fail and CI will catch it.
+- **Nightly threshold:** any CI suite >5 min belongs in `nightly.yml` (cron-scheduled). The push/PR fast lane stays under that. The nightly job already covers integration tests; new heavy suites should follow the same pattern (see `.github/workflows/nightly.yml`).
+
+## design_north_stars
+
+- **Player experience is load-bearing** — every system change should be evaluated against "does this make the player journey better." Architectural moves that don't reach the player aren't worth the same scrutiny.
+- **DE/ME inspirations are explicit** — Dating-Sim and Mecha-Engineer reference points (comms windows, callsign labels, romance arcs, READY/WAIT semaphores) should be obvious in design choices. Don't bury them.
+- **Search latest FL practice constantly** when touching M11+ paper work — Kourai is FL-research-adjacent and the field moves weekly. Re-grep recent papers / framework releases before committing to a design.
+- **No system is too late to redesign.** If a feature isn't carrying its weight, rip it out — even shipped ones. Sunk-cost is not a reason to keep code.
+
+## renpy
+
+- VN host (`hosts/vn/`) targets **Ren'Py 8.5.x**. My recall keeps producing Ren'Py 6.x APIs that crash. **Always resolve API questions via context7** (`mcp__claude_ai_Context7__query-docs` against `renpy`) before writing `config.*` settings, init priorities, or special screen overrides (`screen main_menu`, `screen game_menu`, etc.). Don't trust my pattern-match for anything 6.x-vs-8.x sensitive.
+
 ## docs_site (aj-docs-site)
 
 - config: `zensical.toml`
