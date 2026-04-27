@@ -143,16 +143,74 @@ all-three-with-stubs approach would create.
   flow end-to-end. Today's tests cover the wiring; Change 3 closes
   the loop.
 
-### Change 3 — Specialist clients via `MCPToolkit`
+### Change 3 — Specialist clients via the MCP bridge
 
-- [ ] Techne / Kallos / Dokimasia executors swap
-  `agents.forge_tools` imports for `MCPToolkit.get_client("forge")`
-  calls.
-- [ ] LiteLLM tool-use bindings reflect the MCP-served tool schemas
-  (`tools/list` round-trips through `MCPToolkit`).
-- [ ] One smoke per specialist: forge tool call lands at the server,
-  the server validates the root, response surfaces back as a
-  tool-result frame identical to today's local-Python-import shape.
+Split into incremental sub-PRs to keep blast radius small. 3a establishes
+the bridge layer (purely additive, no caller changes); 3b/3c/3d migrate
+one specialist each with a green-CI gate between, so a regression in any
+one specialist surfaces in isolation.
+
+#### Change 3a — `mcp_bridge` module + live forge subprocess roundtrip ✅ 2026-04-27
+
+- [x] New `shared/src/kourai_common/mcp_bridge.py` with
+  `mcp_tool_bridge(server_params)` async context manager: launches the
+  MCP server via stdio, opens a kourai client session (declares
+  `roots`), fetches `tools/list`, and yields an `MCPToolBridge` whose
+  `tools` are OpenAI-shaped schema dicts and whose `tool_handlers`
+  proxy each call through `session.call_tool`.
+- [x] `forge_tool_bridge()` convenience: launches
+  `uv run --no-active kourai-mcp-forge` for the standard kourai case.
+- [x] `mcp_tool_to_openai_schema(tool)` converts MCP `Tool` (name +
+  description + inputSchema) to LiteLLM-compatible
+  `{"type": "function", "function": {...}}`.
+- [x] Handler factory wraps `session.call_tool` and surfaces server
+  errors verbatim if they're already prefixed with `ERROR:` (forge
+  server's convention), wraps unprefixed errors with `ERROR: ` so
+  the existing `chat_with_tools` error path keeps working.
+- [x] **Live integration tests** in
+  `tests/unit/test_mcp_bridge.py::TestForgeBridgeLive`: launch the
+  actual `kourai-mcp-forge` subprocess via `uv run`, set
+  `kourai_project_root_var` to a `tmp_path`, write a file via the
+  `write_file` MCP tool, read it back via `read_file`, verify the
+  file landed in the right place AND the path-escape attempt
+  (`../escape.py`) gets rejected with an ERROR. End-to-end stack
+  validation: kourai declares `roots`, server asks `roots/list`,
+  kourai responds with the contextvar, server validates the path,
+  result flows back through the bridge.
+- [x] 11 unit tests total in `test_mcp_bridge.py`; all 2717 unit
+  tests pass; `make lint` ends `Found 0 diagnostics`.
+- [ ] Purely additive: no specialist callers wired yet — both code
+  paths coexist on main until 3b/3c/3d.
+
+#### Change 3b — Migrate Techne to the MCP bridge
+
+- [ ] `agents/techne/agent.py::apply_code_changes` swaps
+  `tools=FORGE_TOOL_SCHEMAS, tool_handlers=FORGE_TOOL_HANDLERS` for
+  `tools=bridge.tools, tool_handlers=bridge.tool_handlers` inside
+  an `async with forge_tool_bridge() as bridge:` block.
+- [ ] `handler_context={"project_root": ...}` no longer needed —
+  the MCP server gets `project_root` via `roots/list`. Remove the
+  injection so the model doesn't see a redundant kw.
+- [ ] Live smoke per Round-7-style scenario: Techne writes a file
+  via the bridge, the file lands in the player's project root
+  (not `/app`), the trace ID propagates from kourai through the
+  forge subprocess via OTel context (verify in Jaeger).
+
+#### Change 3c — Migrate Kallos to the MCP bridge
+
+- [ ] Same swap in `agents/kallos/agent.py::apply_lint_fixes`.
+- [ ] Verify the Kallos lint-fix loop still terminates inside the
+  bridge's session lifetime; if a single lint loop spans many
+  iterations, the subprocess stays warm under one `async with`.
+
+#### Change 3d — Migrate Dokimasia to the MCP bridge
+
+- [ ] Same swap in `agents/dokimasia/agent.py::apply_test_fixes`.
+- [ ] After 3d lands, delete `FORGE_TOOL_SCHEMAS` /
+  `FORGE_TOOL_HANDLERS` (still imported nowhere) — single-source
+  the schemas via the MCP server. `kourai_common.forge_tools`
+  keeps the async handler functions because the MCP server itself
+  imports them.
 
 ### Change 4 — `INPUT_REQUIRED` over `elicitation`
 
