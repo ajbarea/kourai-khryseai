@@ -35,6 +35,13 @@ class CLISettings:
     # iterative work where the read-back-then-confirm beat is friction.
     # Default OFF — the gate is the always-on contract of the forge.
     yolo_enabled: bool = False
+    # Granular middle ground between full /yolo and the always-on gate:
+    # when True, Hephaestus skips CONFIRM_ORDER for read-only / planning-only
+    # pipelines (Metis-only, Mneme-only, CHAT) and still gates anything
+    # that would touch disk (Techne / Kallos / Dokimasia). Inspired by
+    # Cline + ClawCode's per-tool gating; tier-2 lift from the OSS-CC
+    # research sweep (#37). Default OFF — matches the always-on gate.
+    auto_approve_reads: bool = False
 
     @classmethod
     def load(cls) -> CLISettings:

@@ -176,6 +176,84 @@ class TestYoloBypass:
         assert "YOLO MODE" not in system_msg["content"]
 
 
+class TestAutoApproveReadsBypass:
+    """``[auto_approve_reads: on]`` — granular middle ground from
+    ``/permissions auto_approve_reads``. Skips CONFIRM_ORDER for read-
+    only / planning-only pipelines; still gates anything that touches
+    disk. Tier-2 lift from the 2026-04-26 OSS-CC research sweep."""
+
+    def test_extract_auto_approve_reads_strips_tag_and_returns_true(self):
+        from agents.hephaestus.agent import extract_auto_approve_reads
+
+        clean, on = extract_auto_approve_reads("[auto_approve_reads: on]\nplan a feature")
+        assert on is True
+        assert clean == "plan a feature"
+
+    def test_extract_auto_approve_reads_case_insensitive(self):
+        from agents.hephaestus.agent import extract_auto_approve_reads
+
+        clean, on = extract_auto_approve_reads("[AUTO_APPROVE_READS: ON]\nplan a feature")
+        assert on is True
+        assert clean == "plan a feature"
+
+    def test_extract_auto_approve_reads_absent_returns_false(self):
+        from agents.hephaestus.agent import extract_auto_approve_reads
+
+        clean, on = extract_auto_approve_reads("plan a feature")
+        assert on is False
+        assert clean == "plan a feature"
+
+    def test_extract_does_not_match_substring_in_text(self):
+        from agents.hephaestus.agent import extract_auto_approve_reads
+
+        # The bracket-tag format is what we strip — bare phrase in body must NOT trigger.
+        clean, on = extract_auto_approve_reads("explain what auto_approve_reads does")
+        assert on is False
+        assert "auto_approve_reads" in clean
+
+    @pytest.mark.asyncio
+    async def test_augments_system_prompt(self):
+        from agents.hephaestus.agent import determine_pipeline
+
+        captured: dict = {}
+
+        async def capture_chat(agent, messages, **kwargs):
+            captured["messages"] = messages
+            return "metis"
+
+        with patch("agents.hephaestus.agent.chat", side_effect=capture_chat):
+            await determine_pipeline("[auto_approve_reads: on]\nplan a feature")
+
+        system_msg = next(m for m in captured["messages"] if m["role"] == "system")
+        assert "AUTO_APPROVE_READS" in system_msg["content"]
+        # Must explicitly call out the three mutating agents so the LLM
+        # doesn't widen the bypass to write paths.
+        assert "techne" in system_msg["content"].lower()
+        assert "kallos" in system_msg["content"].lower()
+        assert "dokimasia" in system_msg["content"].lower()
+
+    @pytest.mark.asyncio
+    async def test_yolo_wins_when_both_set(self):
+        # Defensive: if both flags are on, /yolo's broader bypass takes
+        # precedence — auto_approve_reads is the narrower middle ground.
+        from agents.hephaestus.agent import determine_pipeline
+
+        captured: dict = {}
+
+        async def capture_chat(agent, messages, **kwargs):
+            captured["messages"] = messages
+            return "metis, techne"
+
+        with patch("agents.hephaestus.agent.chat", side_effect=capture_chat):
+            await determine_pipeline("[yolo: on]\n[auto_approve_reads: on]\nbuild a feature")
+
+        system_msg = next(m for m in captured["messages"] if m["role"] == "system")
+        assert "YOLO MODE" in system_msg["content"]
+        # The auto_approve_reads block should NOT also be appended —
+        # the elif in determine_pipeline guards against double-injection.
+        assert "AUTO_APPROVE_READS" not in system_msg["content"]
+
+
 class TestCLISettingsYoloField:
     """``CLISettings`` carries the persisted yolo flag with safe defaults."""
 
@@ -230,6 +308,110 @@ class TestCLISettingsYoloField:
         assert loaded.yolo_enabled is True
         # Unknown key dropped silently — no crash.
         assert not hasattr(loaded, "future_field_we_dont_know_about")
+
+
+class TestCLISettingsAutoApproveReadsField:
+    """``CLISettings`` carries the persisted auto_approve_reads flag."""
+
+    def test_default_off(self):
+        from hosts.cli.settings import CLISettings
+
+        assert CLISettings().auto_approve_reads is False
+
+    def test_toggle_persists(self, tmp_path, monkeypatch):
+        settings_file = tmp_path / "cli_settings.json"
+        monkeypatch.setattr("hosts.cli.settings._SETTINGS_FILE", settings_file)
+
+        from hosts.cli.settings import CLISettings
+
+        settings = CLISettings()
+        new_value = settings.toggle("auto_approve_reads")
+        assert new_value is True
+        assert CLISettings.load().auto_approve_reads is True
+
+
+class TestPermissionsCommand:
+    """``/permissions`` slash handler — view + toggle pipeline gates."""
+
+    def test_bare_lists_all_gates_with_state(self, tmp_path, monkeypatch):
+        # Sandbox the settings file; we don't want the test mutating the user's.
+        settings_file = tmp_path / "cli_settings.json"
+        monkeypatch.setattr("hosts.cli.settings._SETTINGS_FILE", settings_file)
+
+        echoed: list[str] = []
+        monkeypatch.setattr(
+            "hosts.cli.__main__._echo",
+            lambda text="", nl=True: echoed.append(text),
+        )
+
+        from hosts.cli.__main__ import _handle_permissions_command
+        from hosts.cli.settings import CLISettings
+
+        _handle_permissions_command("/permissions", CLISettings())
+        out = "\n".join(echoed)
+
+        # Both gates must appear in the listing with their default state.
+        assert "yolo" in out
+        assert "reads" in out
+        assert "OFF" in out
+        assert "Permissions" in out
+
+    def test_toggles_named_gate_and_persists(self, tmp_path, monkeypatch):
+        settings_file = tmp_path / "cli_settings.json"
+        monkeypatch.setattr("hosts.cli.settings._SETTINGS_FILE", settings_file)
+
+        echoed: list[str] = []
+        monkeypatch.setattr(
+            "hosts.cli.__main__._echo",
+            lambda text="", nl=True: echoed.append(text),
+        )
+
+        from hosts.cli.__main__ import _handle_permissions_command
+        from hosts.cli.settings import CLISettings
+
+        settings = CLISettings()
+        _handle_permissions_command("/permissions reads", settings)
+        out = "\n".join(echoed)
+
+        assert settings.auto_approve_reads is True
+        assert "ON" in out
+        # Persists across reload.
+        assert CLISettings.load().auto_approve_reads is True
+
+    def test_unknown_gate_lists_valid_options(self, tmp_path, monkeypatch):
+        settings_file = tmp_path / "cli_settings.json"
+        monkeypatch.setattr("hosts.cli.settings._SETTINGS_FILE", settings_file)
+
+        echoed: list[str] = []
+        monkeypatch.setattr(
+            "hosts.cli.__main__._echo",
+            lambda text="", nl=True: echoed.append(text),
+        )
+
+        from hosts.cli.__main__ import _handle_permissions_command
+        from hosts.cli.settings import CLISettings
+
+        _handle_permissions_command("/permissions nonsense", CLISettings())
+        out = "\n".join(echoed).lower()
+        assert "unknown" in out
+        assert "yolo" in out  # valid options listed
+        assert "reads" in out
+
+    def test_yolo_alias_toggles_existing_field(self, tmp_path, monkeypatch):
+        # /permissions yolo should map to yolo_enabled — same field
+        # /yolo toggles, just exposed through the unified UI.
+        settings_file = tmp_path / "cli_settings.json"
+        monkeypatch.setattr("hosts.cli.settings._SETTINGS_FILE", settings_file)
+
+        monkeypatch.setattr("hosts.cli.__main__._echo", lambda text="", nl=True: None)
+
+        from hosts.cli.__main__ import _handle_permissions_command
+        from hosts.cli.settings import CLISettings
+
+        settings = CLISettings()
+        _handle_permissions_command("/permissions yolo", settings)
+        assert settings.yolo_enabled is True
+        assert CLISettings.load().yolo_enabled is True
 
 
 class TestExecutorEmitsInputRequiredOnConfirmOrder:

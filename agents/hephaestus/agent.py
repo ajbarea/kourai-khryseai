@@ -212,6 +212,26 @@ def extract_yolo(text: str) -> tuple[str, bool]:
     return text, False
 
 
+def extract_auto_approve_reads(text: str) -> tuple[str, bool]:
+    """Strip the ``[auto_approve_reads: on]`` tag the CLI prepends when the
+    matching ``/permissions`` toggle is on.
+
+    Granular middle ground between full ``/yolo`` and the always-on
+    CONFIRM_ORDER gate: when set, Hephaestus skips the gate for
+    read-only / planning-only pipelines (no Techne / Kallos / Dokimasia
+    in the route) but still confirms anything that would touch disk.
+    Tier-2 lift from the 2026-04-26 OSS-CC research sweep (Cline +
+    ClawCode both ship per-tool gating).
+
+    Returns ``(clean_text, auto_approve_reads_enabled)``.
+    """
+    pattern = re.compile(r"\[auto_approve_reads:\s*on\]\n?", re.IGNORECASE)
+    if pattern.search(text):
+        clean = pattern.sub("", text).strip()
+        return clean, True
+    return text, False
+
+
 def extract_relationship_tiers(text: str) -> tuple[str, dict[str, float]]:
     """Strip the [relationship_tiers: name=score,...] tag injected by vn_bridge.
 
@@ -310,6 +330,7 @@ async def determine_pipeline(user_request: str, context_id: str | None = None) -
     user_request, _ = extract_project_root(user_request)
     user_request, affinities = extract_relationship_tiers(user_request)
     user_request, yolo = extract_yolo(user_request)
+    user_request, auto_approve_reads = extract_auto_approve_reads(user_request)
     user_request = expand_mentions(user_request)
 
     with create_span("hephaestus.route", {"request_length": str(len(user_request))}):
@@ -325,6 +346,22 @@ async def determine_pipeline(user_request: str, context_id: str | None = None) -
                 "for this turn — emit response option #1 (the comma-separated "
                 "agent list) directly for development tasks. CHAT: and ASK_USER: "
                 "are still legal if the request isn't a dev task."
+            )
+        elif auto_approve_reads:
+            # Granular middle ground from `/permissions auto_approve_reads`.
+            # Skip CONFIRM_ORDER only for routes that won't touch disk —
+            # still confirm anything that includes Techne / Kallos /
+            # Dokimasia (those agents are the ones with mutating tools per
+            # forge_tools.MUTATING_TOOL_NAMES).
+            system_prompt += (
+                "\n\nAUTO_APPROVE_READS: The player has /permissions "
+                "auto_approve_reads on. Skip CONFIRM_ORDER ONLY when the "
+                "planned pipeline contains none of {techne, kallos, "
+                "dokimasia} — i.e. read-only / planning-only routes "
+                "(metis-only, mneme-only, CHAT). When the pipeline "
+                "includes any of those three agents, you MUST still emit "
+                "CONFIRM_ORDER as usual; this flag does NOT bypass the "
+                "gate for write paths."
             )
         if profile and profile.display_name:
             player_ctx = build_player_context(profile, "hephaestus", top_k_memories=4)
