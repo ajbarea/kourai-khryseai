@@ -46,6 +46,7 @@ class TestApplyLintFixesForwardsCallback:
             )
 
         assert mock_chat.await_count == 1
+        assert mock_chat.await_args is not None  # narrow `_Call | None` for ty
         kwargs = mock_chat.await_args.kwargs
         assert kwargs["on_tool_call"] is my_callback
 
@@ -65,6 +66,7 @@ class TestApplyLintFixesForwardsCallback:
                 context_id="ctx-1",
             )
 
+        assert mock_chat.await_args is not None  # narrow `_Call | None` for ty
         assert mock_chat.await_args.kwargs["on_tool_call"] is None
 
 
@@ -91,6 +93,7 @@ class TestApplyTestFixesForwardsCallback:
                 on_tool_call=my_callback,
             )
 
+        assert mock_chat.await_args is not None  # narrow `_Call | None` for ty
         assert mock_chat.await_args.kwargs["on_tool_call"] is my_callback
 
     @pytest.mark.asyncio
@@ -109,6 +112,7 @@ class TestApplyTestFixesForwardsCallback:
                 context_id="ctx-1",
             )
 
+        assert mock_chat.await_args is not None  # narrow `_Call | None` for ty
         assert mock_chat.await_args.kwargs["on_tool_call"] is None
 
 
@@ -381,6 +385,7 @@ class TestErrorTagInToolMessage:
         ):
             await apply_fixes("ruff", set(), "ctx-1")
             callback = captured_callback.get("fn")
+            assert callback is not None  # captured during apply_fixes; narrow Optional for ty
             await callback(
                 "edit_file",
                 {"path": "src/foo.py", "old_string": "x", "new_string": "y"},

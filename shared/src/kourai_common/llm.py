@@ -212,7 +212,10 @@ def _mark_first_user_cacheable(messages: list[dict[str, Any]]) -> list[dict[str,
             new_content = list(content)
             for j in range(len(new_content) - 1, -1, -1):
                 block = new_content[j]
-                if isinstance(block, dict) and block.get("type") == "text":
+                # ty narrows the list element type unhelpfully through the
+                # isinstance, so .get("type") trips invalid-argument-type
+                # even though the runtime is fine.
+                if isinstance(block, dict) and block.get("type") == "text":  # ty: ignore[invalid-argument-type]
                     new_content[j] = {**block, "cache_control": _EPHEMERAL_CACHE}
                     break
             out[i] = {**msg, "content": new_content}
