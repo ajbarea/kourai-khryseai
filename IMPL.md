@@ -225,9 +225,6 @@ all-three-with-stubs approach would create.
 - **M16 follow-ons:**
   - Live trace-ID-in-Dozzle smoke (Change 1 unit-tested but worth
     eyeballing in a real `make up` + smoked pipeline).
-  - Cross-link from `.claude/skill-context.md` to
-    `docs/observability.md` so future agents consult the page
-    before designing observability changes.
   - `scripts/watch_protocols.py kind="docker-tag"` digester for
     `amir20/dozzle`, `jaegertracing/jaeger`, `prom/prometheus` so
     future image drift surfaces automatically.
