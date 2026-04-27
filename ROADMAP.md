@@ -5,7 +5,7 @@ A public, living plan for where the forge is heading. Items here are either
 *currently working on* lives in [IMPL.md](./IMPL.md) — when it lands, the
 matching milestone here collapses to a single line under "Shipped".
 
-Last reviewed: 2026-04-27 (M1 fully shipped + 5 Round 6 M6-future bullets closed (#34/#35/#36/#38) + research-driven ROADMAP additions (#37) + four OSS-CC lifts shipped (#39/#40/#41); 2026-04-27 live smoke pass uncovered + fixed two infrastructure bugs: forge worktree gitdir resolves from container (#42) and CLI input_required follow-up preserves forge tags (#43); spec drift watcher cron lands (#44) — "track latest aggressively" automated rather than nudge-driven; skill-context migration (#45) prunes personal memory 17→5 entries by lifting per-repo facts to `.claude/skill-context.md` and cross-project rules to `~/.claude/CLAUDE.md`; ty warning baseline cleared (#46) — `Found 0 diagnostics` for the first time; **observability triad complete (this PR)** — dozzle real-time per-container log dashboard joins Jaeger (per-trace flow) + Prometheus (rates/durations) at http://localhost:8888, scoped to the kourai-khryseai compose project; M7 scope grew the Message.metadata migration item informed by the v1.0 spec research; all the rest from the prior reviewed line still applies — see Shipped, revised M2/M7, and the M6 "Surfaced from external research" subsection)
+Last reviewed: 2026-04-27 (M1 fully shipped + 5 Round 6 M6-future bullets closed (#34/#35/#36/#38) + research-driven ROADMAP additions (#37) + four OSS-CC lifts shipped (#39/#40/#41); 2026-04-27 live smoke pass uncovered + fixed two infrastructure bugs: forge worktree gitdir resolves from container (#42) and CLI input_required follow-up preserves forge tags (#43); spec drift watcher cron lands (#44) — "track latest aggressively" automated rather than nudge-driven; skill-context migration (#45) prunes personal memory 17→5 entries by lifting per-repo facts to `.claude/skill-context.md` and cross-project rules to `~/.claude/CLAUDE.md`; ty warning baseline cleared (#46) — `Found 0 diagnostics` for the first time; observability triad complete (#47) — dozzle real-time per-container log dashboard joins Jaeger (per-trace flow) + Prometheus (rates/durations) at http://localhost:8888, scoped to the kourai-khryseai compose project; **`make observe` cross-platform launcher (in working tree, ready for PR)** — single command opens all three obs UIs in the dev's default browser via Python's stdlib `webbrowser` with a WSL2 fallback through `cmd.exe /c start` (no `wslu`/`xdg-open` required); each printed line carries its category + the question it answers ("traces — where did this go", "metrics — how often / how slow", "logs — what is THIS agent saying"); **Dozzle sidebar grouping (in working tree)** — `dev.dozzle.group` labels on the compose anchor + non-agent services partition the sidebar into agents (10) / mcp (2) / observability (3) / infra (1) so triage of "is this an agent issue or an infra issue" is one click; **M16 (Observability DX uplift) drafted + Changes 1/2/5 shipped (in working tree)** — `make observe` audit surfaced three load-bearing gaps (Jaeger v1 EOL'd 2025-12-31; Prometheus scrapes only Jaeger's own `:14269`, none of the 10 agents; Dozzle log lines lacked trace IDs, so no cross-pane jump from a slow span back to the agent's narration); five workstreams scoped, three landed today: (1) **trace-ID injection** via a 10-line `_OtelTraceFilter` + `_TraceAwareFormatter` in `kourai_common.log` reading `trace.get_current_span()` directly (skipped `opentelemetry-instrumentation-logging` once source-reading revealed it gates attribute injection on `set_logging_format=True` which would also call `basicConfig` and clash with our explicit handlers); (2) **`docs/observability.md`** with mental model, triage runbook, container-groups table, candid "what's populated, what's not" section flagging the Prometheus gap, span-naming convention; wired into nav under Architecture → Observability; slimmed the parallel section in `infrastructure.md` and corrected its overpromise about SPM's Monitor tab being populated; (5) **dozzle pin verified current** — v10.5.0 released 2026-04-26 21:13 UTC per the GitHub releases API, exactly current, no bump needed but discipline of always-checking is the durable win; Changes 3 (Jaeger v1.60 → v2.17 migration) and 4 (`spanmetrics` connector + Prometheus v3 + agent RED scrape) remain — both want a focused live-smoke session, not autonomous bundling; M7 scope grew the Message.metadata migration item informed by the v1.0 spec research; all the rest from the prior reviewed line still applies — see Shipped, revised M2/M7, and the M6 "Surfaced from external research" subsection)
 
 ---
 
@@ -409,6 +409,218 @@ what the swarm actually did.
 
 ---
 
+## M17 — HOTL answer persistence (project-scoped facts)
+
+> Status: planned · Builds on: M13 (CONFIRM_ORDER) · Memoir foundation ·
+> `kourai_common.facts` knowledge graph · Distinct from M6 autoDream
+
+When Metis pauses on a clarifying question — *"what's your test coverage
+target?"*, *"does this project use type hints?"*, *"preferred logging
+backend?"* — the player's answer should stick. Today the answer is captured
+into the per-session Memoir JSONL (good — labeled training tuple for the
+federation pipeline), but agents do not surface prior sessions' preferences
+when planning. Result: every new session, Metis re-asks the same questions a
+careful contributor already answered last week.
+
+This milestone closes the loop between `AgentInputRequired` (M13's
+extracted primitive) and the **`facts.py` knowledge-graph layer**
+(already-shipped infrastructure). Net effect for the player: agents
+*remember the project* across runs and only ask about preferences once.
+
+### Why `facts.py` and not `player_memories` (architecture pivot from initial draft)
+
+Initial scoping assumed M17's write path would extend the `player_memories`
+SQLite table used by the gossip / affinity / personality stack. A code
+audit revealed `kourai_common.facts` already implements *exactly the
+right shape* for this use case:
+
+- `<FACT category="preference" confidence="high">…</FACT>` extraction
+  format parsed from agent output (`extract_facts`)
+- `PlayerFact` + `KnowledgeGraphFact` dataclasses with relationships
+  (refines / contradicts / supports), confidence weights, and source-agent
+  attribution
+- `store_facts()` writes; `get_relevant_facts_for_enrichment()` reads
+  with importance scoring; `build_fact_context()` injects into agent
+  system prompts at planning time
+- `VALID_CATEGORIES` already includes `"preference"`
+
+The missing pieces are tiny by comparison: a *project-scope axis* (facts
+are currently per-player only, no project axis) and a *HOTL-resolution
+write synthesis path* (facts today come exclusively from agent-output XML
+tags, not from structured player-pause answers). Extending `facts.py` is
+materially cheaper than building a parallel project-preference layer on
+top of `player_memories`, and it inherits the entire knowledge-graph
+machinery (relationships, confidence decay, prompt enrichment) for free.
+
+### Why prompt enrichment, not a new pre-pause hook
+
+`facts.py`'s `build_fact_context()` already runs at planning time and
+injects relevant facts into agent system prompts BEFORE the agent decides
+what to ask. If Metis's prompt arrives carrying
+`<FACT category="preference" project_id="..." confidence="high">coverage
+target: 80%</FACT>`, she will simply not generate a clarifying question
+for something she already knows — no new hook plumbing required, no
+Metis-side recall logic, no per-specialist patches in Phase 2 (every
+specialist's system prompt is already enriched the same way). This is
+*structurally* simpler than the original draft's "patch each agent with a
+recall hook" sketch, and it's what AJ's existing knowledge-graph
+investment was designed to do.
+
+The post-task hook layer (`hooks.py` → `run_post_task_hooks`) handles the
+write side cleanly: it's already the documented integration point for
+"after each agent task completes, do follow-up bookkeeping," and an
+`INPUT_REQUIRED`-resolution synthesis fits in alongside the existing
+`extract_memories_from_interaction` and `score_alignment` calls.
+
+### Anchors in current 2026 best practice
+
+[Mem0](https://github.com/mem0ai/mem0) and Letta (the production
+evolution of MemGPT) have converged on a four-scope memory model:
+`user_id` × `agent_id` × `session_id` × **`project_id`-as-metadata**,
+with metadata-filtered retrieval at lookup time. Mem0 v1.0.3 (Jan 2026)
+formalised project-level configuration — inclusion / exclusion prompts,
+custom categories, targeted searches scoped by project metadata. M17
+adopts the *project_id-as-metadata-attribute* pattern (rather than the
+original draft's `project_root`-as-column), aligning with the industry
+direction without taking on the full mem0 / Letta stack as a dependency.
+Reference points worth tracking but **not adopting wholesale** today —
+the right framing is "use the convergent vocabulary so a future migration
+to mem0 / Letta is incremental rather than a rewrite."
+
+### What's true today — anti-overclaim ledger
+
+- ✓ HOTL pauses fire via `AgentInputRequired` (shipped via M13).
+- ✓ Player answers persist to per-session Memoir JSONL on disk
+  (`shared/src/kourai_common/federation/memoir.py`), capturing
+  `agent_proposed`, `player_response`, `affinity_delta`, and a
+  `training_label` for federated learning.
+- ✓ `facts.py` knowledge graph: extraction (`<FACT …>` regex), storage
+  (`store_facts`), enrichment-time retrieval
+  (`get_relevant_facts_for_enrichment`), prompt injection
+  (`build_fact_context`) — full lifecycle is shipped, just unused for
+  HOTL-pause answers today.
+- ✓ Cross-session player memory SQLite exists separately for affinity /
+  gossip / personality (`player_memory.py`); M17 does **not** extend
+  this table.
+- ✓ Post-task hook orchestration (`hooks.py` → `run_post_task_hooks`)
+  is the documented write-side integration point.
+- ✗ Facts are currently global to the player — no `project_id` axis.
+- ✗ No write path from `INPUT_REQUIRED` resolution to `store_facts()`.
+- ✗ `get_relevant_facts_for_enrichment()` does not filter by project.
+- ✗ `derive_project_id()` does not exist in `projects.py`.
+
+### Scope
+
+1. **`project_id` axis on facts.** Add an optional `project_id: str |
+   None` field to `PlayerFact` (defaults to `None` = global / cross-
+   project). Extend the `<FACT …>` tag regex to parse a
+   `project_id="..."` attribute. `store_facts()` persists it;
+   `get_relevant_facts_for_enrichment()` accepts a `project_id` filter
+   parameter and prefers project-scoped facts over global facts at the
+   same retrieval score.
+2. **Project-id derivation.** Add `derive_project_id(project_root)` in
+   `projects.py` — a stable hash (e.g. `sha256` truncated to 16 hex)
+   of the absolute, normalised path. Avoids leaking host-absolute
+   paths into the fact body, survives the player moving the repo on
+   disk, and gives a clean tag value for telemetry attributes.
+3. **HOTL → facts write path** (post-task hook synthesis). New helper
+   `synthesise_fact_from_pause(player_id, project_id, preference_kind,
+   player_response, source_agent)` in `hooks_interaction.py` (peer to
+   `extract_memories_from_interaction`). Wired into
+   `run_post_task_hooks` so it fires when the most recent task
+   resolved an `INPUT_REQUIRED` AND the originating agent tagged the
+   pause with a `preference_kind`. Synthesises a
+   `PlayerFact(category="preference", confidence="high",
+   project_id=..., body="<kind>: <answer>", source_agent=...)` and
+   calls `store_facts()`. Memoir continues to receive the
+   `PlayerResponse` independently — Memoir is the FL training-data
+   ground-truth, facts are the fast structured-recall surface.
+4. **Pause-kind tagging.** Metis's `INPUT_REQUIRED` token grows a
+   `preference_kind` attribute (mirroring M13's `CONFIRM_ORDER:
+   <tier>` pattern), populated when she classifies a clarifying
+   question as a one-time-per-project preference. Scope this Phase 1
+   tag set to ~5 kinds (`coverage_target`, `python_version`,
+   `style_rules`, `commit_style`, `test_framework`); broaden later.
+5. **Read path: zero-touch via prompt enrichment.** Extend
+   `build_fact_context()` to filter by the active `project_id`,
+   preferring project-scoped facts over global ones. Metis's
+   existing system-prompt scaffold (and every other specialist's,
+   for free) receives the project-scoped facts; her HOTL-question
+   synthesis logic naturally skips kinds she already has answers
+   for. **No Metis-side patch beyond a one-line audit confirming the
+   fact context lands in her routing prompt** — this is the big
+   simplification vs. the original draft.
+6. **Visible recall (player UX).** When `build_fact_context()` injects
+   a project-scoped fact and the agent would otherwise have asked,
+   narrate via the existing `_maidenify_status` plumbing — e.g.
+   `📐 Metis: "Using your stored coverage target (80%)."` Load-
+   bearing for trust: silent recall feels like agents are guessing.
+7. **`/preferences` CRUD CLI.** New slash command modeled on
+   `/permissions`. Aliases: `/prefs`, `/memory project`. Lists
+   project-scoped facts for the active project; `forget <kind>`
+   removes a fact; `set <kind> <value>` overrides without re-asking.
+   Right-to-forget is non-negotiable for player trust and gives any
+   future user study an honest "edit-the-memory" affordance.
+8. **Telemetry.** Two new span attributes on every specialist span
+   that could-have-paused: `kourai.fact.recalled` (`bool`) and
+   `kourai.fact.kinds` (`list[str]`). Cross-pane linkage is
+   automatic per M16's trace-ID injection — researchers can grep
+   Dozzle for `fact.recalled=true` and find the matching Jaeger
+   trace immediately.
+9. **Confidence decay.** `facts.py` already carries `confidence`
+   weight and `last_accessed`. Add a `PROJECT_FACT_DECAY_DAYS = 90`
+   default — facts older than this drop confidence one tier
+   (`high → medium → low → skip`). Re-confirmation by the player
+   resets the timer. Mirrors mem0's "memory depth" concept without
+   adopting the dependency.
+
+### Phasing
+
+- **Phase 1 (foundational, gates the milestone).** Items 1–5:
+  `project_id` axis + derivation + write path + pause-kind tagging +
+  read-path filter + Metis emit-side audit. Smallest end-to-end claim
+  worth shipping: *"a HOTL answer persists, is recalled in the same
+  agent on the next run for the same project, is NOT recalled when
+  the player switches to a different project."*
+- **Phase 2 (UX + dev tools).** Items 6–9: visible recall narrator
+  line + `/preferences` CRUD + telemetry attributes + confidence
+  decay.
+
+### Out of scope — defer to follow-on milestones
+
+- *Memoir → facts batch synthesis.* autoDream territory below — the
+  end-of-day sweep that consolidates transcripts into prose markers
+  could ALSO scan recent Memoir entries for un-tagged-but-extractable
+  preferences ("the player chose chunked I/O three times this week —
+  promote to a project-scoped fact"). Keep that work in autoDream's
+  scope; M17 only handles the structured-pause case.
+- *Multi-agent recall extension.* `build_fact_context()`'s prompt
+  enrichment already applies to every specialist's system prompt
+  construction; once the `project_id` filter lands in Phase 1,
+  Techne / Kallos / Dokimasia inherit recall for free. Tracked as a
+  one-line audit task post-Phase-1 rather than a separate milestone.
+- *Cross-project preference inference* (*"you usually use ruff at 88
+  cols — apply to this new project?"*). Federation / sharing
+  question; lives in M6 alongside the federated-forge work.
+- *GUI / VN renderers for `/preferences`.* CLI-first per existing
+  pattern; lifts in a separate milestone once the CLI surface
+  stabilises.
+
+### Honest external-artifact claim language after this milestone ships
+
+*"Kourai captures HOTL responses as project-scoped entries in the
+existing `kourai_common.facts` knowledge-graph layer. Project-scoped
+facts are injected into specialist system prompts at planning time, so
+agents like Metis recall the player's stated preferences (e.g. test-
+coverage target, language version, naming convention) on subsequent
+sessions without re-asking. Scoping aligns with the four-scope memory
+model formalised by Mem0 / Letta in 2026."* Defensible **only** once
+Phase 1 lands. Until then, the truthful claim is *"HOTL responses are
+persisted to a per-session Forge Memoir as labeled training tuples;
+cross-session project-scoped recall is planned future work."*
+
+---
+
 ## M6 — Future / unprioritized
 
 ### Surfaced 2026-04-26 during M1 Round 6 validation
@@ -520,8 +732,15 @@ architectural moves; valuable but not the first lift.
   separately; consolidating them into a `make consolidate-memory`
   cron-style sweep that runs Mneme over the prior 7 days of
   `agent_memory.db` would cohere the player's mental model of "what
-  the maidens know about me." Output goes into `agent_memory.db`
-  itself — same store, new `player_facts` table.
+  the maidens know about me." Output goes into the `kourai_common.facts`
+  knowledge graph as the natural home (already shipped, supports
+  relationships and confidence decay) rather than a parallel
+  `player_facts` table. **See [M17](#m17--hotl-answer-persistence-project-scoped-facts)**
+  for the structured-pause case (real-time write of project-scoped
+  facts on `INPUT_REQUIRED` resolution); autoDream is the *batch
+  prose-consolidation* peer that scans Memoir entries for
+  un-tagged-but-extractable patterns and promotes them into the
+  same fact graph M17 populates.
 
 - **Custom-agent-via-markdown registration (OpenCode-style).**
   OpenCode lets users drop a `.md` file with frontmatter into
@@ -657,12 +876,55 @@ architectural moves; valuable but not the first lift.
   ever grows more overrides, consider switching to Renovate's
   vulnerability alerts for the whole class.
 
+
+### Surfaced 2026-04-27 during M16 live-smoke session
+
+- **CLI audio volume parity (`hosts/cli/settings.py:20`,
+  `hosts/cli/commands.py:127-128`).** `CLISettings` exposes only
+  `*_enabled` booleans (toggle on/off) for music / ambient / voice; the
+  `/settings` menu renders them as `ON/OFF`. The GUI's
+  `hosts/gui/settings_overlay.py:223` already exposes proper volume
+  sliders (`ambient_volume` etc., default 0.50) backed by the wired-up
+  `AudioManager.set_*_volume()` API in
+  `shared/src/kourai_common/audio.py:110-126` — the CLI just never
+  plumbed sliders through. Surfaced when ambient was loud enough during
+  a live-smoke that the only available relief was flipping it OFF
+  entirely. Fix: mirror the GUI shape in `CLISettings` (`music_volume /
+  ambient_volume / voice_volume / sfx_volume: float`, defaulting to the
+  GUI's defaults), surface in `/settings` with `+/-` (or direct numeric
+  input), call `audio.set_*_volume(settings.*_volume)` in
+  `_apply_audio_settings`. Closes the GUI/CLI parity gap.
+
+- **VN Codex broken (`hosts/vn/kourai_vn/game/codex_data.rpy`,
+  `screens_codex.rpy`).** Symptom and reproduction TBD; needs a
+  debugging session next time the VN host (`make vn`) is exercised.
+
+- **Background-music toggle OFF skips to the next track instead of
+  stopping (`shared/src/kourai_common/audio.py:284-299`,
+  `hosts/cli/__main__.py:120-125`).** Toggling `[2] Background Music`
+  OFF in `/settings` calls `audio.stop_music(fade_ms=300)`, which fades
+  the current track out — but `play_playlist`'s daemon thread (a
+  `while True` polling `is_music_playing()` every 1s) then sees no
+  music playing and calls `play_next_track()`, audibly resurrecting
+  the playlist on track 2. Same mechanism leaks threads: every
+  `_apply_audio_settings` re-run while `music_enabled=True` calls
+  `play_playlist()` again, spawning another daemon thread that races
+  with the existing ones. Fix: add a `threading.Event` shutdown signal
+  the loop checks each iteration, expose it via a new
+  `AudioManager.stop_playlist()` method, call it in
+  `_apply_audio_settings`'s `music_enabled=False` branch (before
+  `stop_music`), and guard `play_playlist()` so it doesn't spawn a
+  second thread when one's already running. Pairs with the volume-
+  parity item above — both are CLI audio plumbing gaps that probably
+  share a follow-on PR.
+
 ---
 
 ## Shipped
 
 One-liner per item, newest first. Detail moves out of this file when work lands.
 
+- 2026-04-27 — **M16 fully shipped — observability DX uplift end-to-end** (this PR + #47/#48/#49 across three sessions; the stack now runs `jaegertracing/jaeger:2.17.0` + `prom/prometheus:v3.10.0-distroless` with the `spanmetrics` connector emitting RED metrics on `:8889`). Eight pieces, one trajectory: (1) Mneme `_OtelTraceFilter` in `shared/src/kourai_common/log.py` reads `trace.get_current_span()` directly via the `opentelemetry-api` we already depend on — **did NOT** end up using `opentelemetry-instrumentation-logging`, whose record factory only injects `otelTraceID` / `otelSpanID` when `set_logging_format=True` (verified by reading the source — both the attribute injection and the `basicConfig` call are gated on the same flag), which would clash with `log.py`'s explicit handler setup. (2) `_TraceAwareFormatter` switches between two format strings per-record so non-traced lines (startup chatter, pre-request setup) skip the `[trace=...]` block entirely instead of padding 32 zeros — when present the trace ID renders as full 32-char hex (`[trace=750edeb816c2fa5eab9b2261945b1c10]`, copy-paste-grep-able from Jaeger). Both console + `RotatingFileHandler` carry the filter so trace IDs land in Dozzle live tail AND `logs/<agent>.log` archive. (3) `make observe` quickstart wired through `Makefile` + `shared/src/kourai_common/dev_cli.py` + new `scripts/observe.py` — cross-platform browser dispatch with explicit WSL2 handling (`webbrowser` falls back to `gio` which can't open `http://` without a real GNOME session, so we bypass to `wslview` from `wslu` when present, otherwise drop to `cmd.exe /c start` via WSL interop at `/mnt/c/Windows/System32/cmd.exe`). (4) `docs/observability.md` onboarding page wired into the Zensical nav under Architecture → Observability — mental-model table (trace=flow, metric=aggregate, log=narrative), `make observe` quickstart, cross-tool linking explainer covering the trace-ID-in-logs plumbing, four-pattern triage runbook ("agent looks stuck", "request finished but felt slow", "errors visible somewhere unclear which agent", "OOM / kept restarting"), container-groups table mapping the four `dev.dozzle.group` buckets, "what's currently populated, and what's not" honesty section flagging Prometheus as sparsely-populated today (so contributors don't go hunting for Monitor-tab data that isn't there yet), span naming convention table. (5) `dev.dozzle.group` labels added across `docker-compose.yml` (agents / observability / mcp / infra) so Dozzle's group rendering matches the docs page. (6) `docs/architecture/infrastructure.md` slimmed to a brief intro + link, fixing the **SPM overpromise** that page carried (it claimed the Monitor tab was populated; the audit showed it isn't, and that mismatch would have burned a new contributor). (7) Jaeger v1.60 → v2.17.0 migration via OTel-Collector–shape `docker/jaeger-config.yaml` (#48); env-var collapse (`COLLECTOR_OTLP_ENABLED`, `METRICS_STORAGE_TYPE`, `PROMETHEUS_SERVER_URL`, `PROMETHEUS_QUERY_SUPPORT_SPAN_UNIT`, `SPAN_STORAGE_TYPE`) into a single config file built on the OTel Collector framework. (8) `spanmetrics` connector + Prometheus `v3.10.0-distroless` + agent RED scrape (#49) — web-searching current best practice while bumping pins caught two details that would have shipped unnoticed: `dimensions_cache_size` is deprecated post-Jaeger-v2.16 in favor of the `dimensions_cache.max_size` shape, and the spanmetrics 60s default `metrics_flush_interval` is the post-deprecation default that wants explicit acknowledgment. Dozzle pin verified `v10.5.0` exactly current (released 2026-04-26 21:13 UTC; no bump). 4 new unit tests in `tests/unit/test_logging.py::TestOtelTraceInjection` (bare format outside span, trace ID rendered inside span, filter populates `otelTraceID` from active context, both handlers carry the filter); ruff format + ruff check + ty all green. M16 follow-ons queued separately in IMPL.md: live trace-ID-in-Dozzle smoke (unit-tested but worth eyeballing in a real `make up` + smoked pipeline), `.claude/skill-context.md` cross-link to `docs/observability.md`, `scripts/watch_protocols.py` `kind="docker-tag"` digester for `amir20/dozzle` / `jaegertracing/jaeger` / `prom/prometheus` so future image drift surfaces automatically. M16 detail block removed from above; this is the canonical record
 - 2026-04-26 — **M1 fully shipped — Round 6 live smoke validated end-to-end** (accept path 6a + discard path 6b, both clean). Provider tool-use loop replaces the `parse_and_apply_fixes` regex parser everywhere it ran. Validation: 22 `'type': 'tool_use'` frames in techne container logs (with `toolu_*` IDs proving real provider blocks); 11 `'type': 'tool_result'` frames closing the loop; **zero `parse_and_apply_fixes` hits** across all 6 agent containers (`techne`, `hephaestus`, `metis`, `dokimasia`, `kallos`, `mneme`). Wall-clock: 244.8s on 6a, 418.6s on 6b — both under the 462s v2 baseline; the provider tool-use loop is faster than the regex parser AND cleaner. Bonus emergent behavior: Aidos's slop-detection now actively *teaches* commit-message hygiene with `<FACT category="skill" confidence="medium">` markers tracking the player's improvement across runs (e.g., flagging "comprehensive" as repeated slop after the first run). M1 detail block removed from above; this is the canonical record
 - 2026-04-26 — `/clear` ANSI escape mangled by `prompt_toolkit.patch_stdout` (printed `?[2J?[1;1H` literally instead of clearing the viewport). Fix: new `hosts/cli/rendering._clear_screen()` helper writes the standard cursor-home + erase-screen sequence (`\x1b[H\x1b[2J`, matching Ubuntu's `clear`) directly to `_raw_out` (the pre-`patch_stdout` stream) — same pattern `_echo()` already uses to bypass the proxy. `hosts/cli/__main__.py` calls the new helper instead of `click.clear()`; click import retained for the rest of the CLI. Caught in AJ's REPL during M1 Round 6 smoke
 - 2026-04-27 — Real-time per-container log dashboard via dozzle (this PR): added `amir20/dozzle:v10.5.0` as a compose service (read-only docker socket mount, localhost-bound on `127.0.0.1:8888`, filtered to the `kourai-khryseai` compose project via `DOZZLE_FILTER`). Direct response to AJ's "can we make a tiny frontend that shows the agent logs in real time" question earlier in the day — confirmed dozzle is still the right pick over Loki+Grafana (heavier, production-grade) and Logdy (general-purpose pipe viewer) for our shape (single dev box, ~14 containers, want a single browser tab). Pairs with the existing observability layer: Jaeger (per-trace flow, http://localhost:16686) + Prometheus (rates/durations, http://localhost:9090) + dozzle (per-agent live tail, http://localhost:8888) — three panes that together cover "where did this request go," "how often / how slow," and "what is *this* agent saying right now." Verified live: HTTP 200 from the UI, dozzle logs `Connected to Docker` + `Accepting connections on :8080`, container filter scopes correctly to the project's 14 containers
