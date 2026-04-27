@@ -1,0 +1,78 @@
+name: Protocol spec watch
+
+# Weekly cron that watches MCP and A2A spec/SDK URLs for drift and opens
+# a GitHub issue (tagged `protocol-watch`) when anything changes. State
+# persists between runs via actions/cache; a cache miss is treated as an
+# initial run and emits no issues. Manual dispatch is supported for
+# testing or after the script's WATCHES list grows.
+#
+# Why we built this:
+# Protocol-tracking was ad-hoc — Claude did web-search sweeps when
+# AJ remembered to nudge. That left drift unnoticed (e.g. A2A v1.0's
+# Message.metadata channel landed and we kept the text-tag carrier
+# for months). Cron makes "track latest aggressively" actually mean
+# something — a spec change becomes a triageable inbox item.
+# Source: feat/spec-watch-cron, 2026-04-27.
+
+on:
+  schedule:
+    # Sunday 13:00 UTC — quiet weekend slot; doesn't compete with the
+    # nightly.yml integration suite (08:17 UTC daily).
+    - cron: "0 13 * * 0"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Print would-be issues to logs without opening them."
+        required: false
+        default: "false"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  watch:
+    name: Watch protocol drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Restore prior snapshot
+        # restore-keys does prefix-match so we always pick up the most
+        # recent saved state regardless of run-id suffix.
+        uses: actions/cache@v4
+        with:
+          path: .cache/spec-watch
+          key: spec-watch-state-${{ github.run_id }}
+          restore-keys: |
+            spec-watch-state-
+
+      - name: Install httpx
+        # Keep this tiny — the script only needs httpx; full project
+        # install would burn ~2 minutes for no benefit.
+        run: pip install "httpx>=0.27,<1.0"
+
+      - name: Run watch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          KOURAI_PROTOCOL_WATCH_DRY_RUN: ${{ inputs.dry_run == 'true' && '1' || '0' }}
+        run: python scripts/watch_protocols.py
+
+      - name: Save updated snapshot
+        # always() so we persist state even if a single fetch failed —
+        # the script already carries forward unchanged entries on fetch
+        # error, so a bad week doesn't wipe the baseline.
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .cache/spec-watch
+          key: spec-watch-state-${{ github.run_id }}
