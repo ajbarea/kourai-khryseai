@@ -17,6 +17,7 @@ from agents.techne.agent import (
 from kourai_common.a2a_utils import extract_image_parts, parse_project_root
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
+from kourai_common.mcp_client import kourai_project_root_var
 from kourai_common.messaging import send_working_status
 from kourai_common.player import PlayerProfile
 from kourai_common.stack import looks_like_scaffolding
@@ -54,6 +55,7 @@ class TechneAgentExecutor(BaseAgentExecutor):
         with create_span("techne.execute", {"a2a.method": "execute"}):
             user_input = context.get_user_input()
             project_root = parse_project_root(user_input)
+            kourai_project_root_var.set(project_root)
 
             # Step 1: Parse file paths from the request
             file_paths = parse_file_paths(user_input)

@@ -12,6 +12,7 @@ from agents.aidos.agent import analyze_slop, flag_slop_words
 from kourai_common.a2a_utils import parse_project_root
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
+from kourai_common.mcp_client import kourai_project_root_var
 from kourai_common.messaging import send_working_status
 from kourai_common.player import PlayerProfile
 from kourai_common.tracing import create_span
@@ -53,6 +54,7 @@ class KallosAgentExecutor(BaseAgentExecutor):
                 await send_working_status(updater, task, line, emoji="💻")
 
             project_root = parse_project_root(context.get_user_input())
+            kourai_project_root_var.set(project_root)
 
             async def _run_lint_with_status() -> tuple[bool, str]:
                 return await run_make_lint(cwd=str(project_root), status_callback=_lint_status)
