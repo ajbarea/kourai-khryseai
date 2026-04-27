@@ -10,16 +10,14 @@ end-to-end shapes via subprocess for the entry point itself.
 from __future__ import annotations
 
 import json
-import sys
-from pathlib import Path
 
 import pytest
 
-# scripts/ is not a package — add it to sys.path so the test can import.
-_SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "scripts"
-sys.path.insert(0, str(_SCRIPTS_DIR))
-
-import watch_protocols as wp
+# scripts/ is a real package (has __init__.py) — import via dotted path so
+# `ty` static analysis can resolve it. Earlier draft used sys.path.insert
+# + bare import which worked at runtime but tripped `ty unresolved-import`
+# in CI.
+from scripts import watch_protocols as wp
 
 
 class TestDigesters:
