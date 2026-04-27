@@ -5,149 +5,133 @@ milestone lands, the matching detail block in [ROADMAP.md](./ROADMAP.md)
 collapses to a one-liner under "Shipped" and this file gets reset to the
 next milestone.
 
-Updated: 2026-04-26 · Working on: **`/permissions` slash command**
-(tier-2 lift from the OSS-CC research sweep — granular middle ground
-between full `/yolo` and the always-on confirmation gate)
+Updated: 2026-04-26 · Working on: **`A2A-Version` header + `/cost`
+alias** (tier-4 + tier-5 lifts from the OSS-CC research sweep, bundled
+because both are small and independent — single PR keeps the cadence
+moving without a 5-line standalone)
 
 ---
 
 ## Plan-of-record
 
-End state: a player can opt into "skip the gate when nothing's about
-to write to disk" without taking the full `/yolo` blast radius. Today
-`/yolo` is binary — either every CONFIRM_ORDER is bypassed or every
-pipeline goes through it. The lift adds one new policy
-(`auto_approve_reads`) and a unified `/permissions` command for
-inspecting and toggling all gating policies side-by-side.
+End state: every outbound A2A request carries the spec-required
+`A2A-Version` header (so a future a2a-sdk 1.0.x server doesn't
+silently downgrade the negotiation to 0.3 semantics), and players
+arriving with muscle-memory from ClawCode / Cline / OpenCode can
+type `/cost` instead of having to relearn `/usage`.
 
-The mechanism mirrors `/yolo` end-to-end so future per-tool gates can
-land along the same path without re-litigating transport choices:
+Both pieces are tiny on their own. Bundling preserves
+one-PR-per-shippable-tier cadence without making the WSL-audio /
+greeting-attribution PRs look big by comparison.
 
-1. **CLI persistence** — `CLISettings.auto_approve_reads: bool = False`.
-2. **CLI → Hephaestus transport** — text-tag `[auto_approve_reads: on]`
-   prepended to outbound messages (A2A `Message.metadata` isn't
-   transport-guaranteed; same convention as `[yolo: on]` and
-   `[project_root: …]`).
-3. **Hephaestus extracts + augments prompt** — new
-   `extract_auto_approve_reads(text)` parallel to `extract_yolo`.
-   System-prompt augmentation tells the LLM to skip CONFIRM_ORDER
-   ONLY when the planned pipeline contains none of {techne, kallos,
-   dokimasia} — those three are the agents whose tools live in
-   `MUTATING_TOOL_NAMES`.
-4. **Unified `/permissions` UI** — bare `/permissions` lists every
-   gate with state + effect; `/permissions <name>` toggles. Aliases
-   `yolo` and `reads` keep typing short.
+### Change 1 — `make_a2a_http_client` helper + 4 wiring sites ✅ 2026-04-26
 
-### Change 1 — `CLISettings.auto_approve_reads` field ✅ 2026-04-26
+- [x] `shared/src/kourai_common/a2a_utils.py`: new
+      `A2A_PROTOCOL_VERSION = "0.3"` constant + `make_a2a_http_client(*,
+      timeout=None, extra_headers=None) -> httpx.AsyncClient` factory
+      that sets `A2A-Version` on every constructed client. `extra_headers`
+      merges with the version header for callers that need additional
+      defaults; an explicit `A2A-Version` in `extra_headers` wins
+      (defensive — lets a compat-test override the value).
+- [x] `agents/hephaestus/remote_connections.py`: replaced the inline
+      `httpx.AsyncClient(timeout=httpx.Timeout(...))` with
+      `make_a2a_http_client(timeout=...)`.
+- [x] `hosts/cli/__main__.py`, `hosts/cli/headless.py`,
+      `agents/vn_bridge.py`: same swap. `vn_bridge.py` `httpx` import
+      moved into the `TYPE_CHECKING` block since it's now only
+      referenced as a forward-ref string in `cast`.
 
-- [x] Default `False` so existing players see no behaviour change.
-- [x] Persists through `CLISettings.load()/save()` like every other
-      bool field. Forward-compat fallback already in place from M13.
+### Change 2 — `/cost` alias for `/usage` ✅ 2026-04-26
 
-### Change 2 — `extract_auto_approve_reads` + system-prompt augment ✅ 2026-04-26
-
-- [x] `agents/hephaestus/agent.py::extract_auto_approve_reads` —
-      regex strip + bool, mirrors `extract_yolo`.
-- [x] `determine_pipeline` parses both flags. `if yolo` augments
-      the prompt with the YOLO MODE block as before; `elif
-      auto_approve_reads` augments with the AUTO_APPROVE_READS
-      block. The `elif` is intentional — `/yolo` wins when both are
-      set since it's the broader bypass.
-- [x] AUTO_APPROVE_READS prompt block explicitly names {techne,
-      kallos, dokimasia} as the agents that still require
-      CONFIRM_ORDER, so the LLM doesn't widen the bypass to write
-      paths.
-
-### Change 3 — CLI text-tag prepend + `/permissions` handler ✅ 2026-04-26
-
-- [x] `hosts/cli/__main__.py` text-tag prepend — same site as
-      `[yolo: on]`, with the `elif` guard so `/yolo` wins.
-- [x] `_handle_permissions_command(prompt_text, settings)` —
-      bare lists all gates with state + descriptions; argument
-      toggles the named gate and persists.
-- [x] `_PERMISSIONS_GATES` dict makes new gates a one-line
-      addition (field name → off/on description tuple).
-- [x] `_PERMISSIONS_ALIASES` keeps user-facing names short
-      (`yolo`, `reads`) while accepting the long forms for
-      muscle-memory.
-
-### Change 4 — `/permissions` slash-command registration ✅ 2026-04-26
-
-- [x] `hosts/cli/completer.py`: new `SlashCommand("permissions",
-      …, arg_hint="[yolo|reads]")` between `/compact` and
-      `/metrics`.
+- [x] `hosts/cli/__main__.py`: REPL dispatch now matches
+      `if prompt_text in ("/usage", "/cost"):` so both route to
+      `_show_usage_summary`.
+- [x] `hosts/cli/completer.py`: new `SlashCommand("cost", "Alias for
+      /usage — matches OSS-CC vocabulary (ClawCode, Cline, OpenCode)")`
+      so the popup and `/help` surface it.
 
 ### Tests ✅ 2026-04-26
 
-- [x] `tests/unit/test_confirmation_protocol.py::TestAutoApproveReadsBypass`
-      — 6 tests: extract strips tag, case-insensitive,
-      absent-returns-false, doesn't-match-substring, prompt
-      augmentation names the three mutating agents, `/yolo` wins
-      when both flags are set.
-- [x] `tests/unit/test_confirmation_protocol.py::TestCLISettingsAutoApproveReadsField`
-      — 2 tests: default-off, toggle-persists.
-- [x] `tests/unit/test_confirmation_protocol.py::TestPermissionsCommand`
-      — 4 tests: bare lists all gates, named toggle persists,
-      unknown gate prints help, `yolo` alias maps to existing
-      `yolo_enabled` field.
-- [x] All 33 tests in `test_confirmation_protocol.py` green; full
-      `test_cli.py` + `test_hephaestus.py` suite (78 tests) green.
+- [x] `tests/unit/test_a2a_utils.py::TestA2AHttpClient` — 5 tests:
+      default carries `A2A-Version`, version-pin regression guard
+      (`A2A_PROTOCOL_VERSION == "0.3"` so the eventual M7 bump is
+      deliberate), `extra_headers` merge without overriding the
+      version, `timeout` passes through to `httpx.AsyncClient`,
+      explicit override of the version in `extra_headers` wins.
+- [x] `tests/unit/test_usage.py::TestUsageSlashCommand` — 3 new
+      tests: `/cost` registered in `SLASH_COMMANDS`, REPL dispatch
+      resolves to the same handler as `/usage` (source-level
+      assertion via `inspect.getsource` so a future refactor that
+      splits the branches gets caught), pre-existing
+      `_show_usage_summary` tests still green.
+- [x] All 116 tests across `test_a2a_utils.py`, `test_usage.py`,
+      `test_cli.py`, `test_confirmation_protocol.py` green.
 
 ### Live smoke (folds into next interactive `/project` session)
 
-- [ ] `/permissions` → confirm both gates listed with current state.
-- [ ] `/permissions reads` → confirm toggle + persist message.
-- [ ] Send "summarize the project structure" (Metis-only route) →
-      confirm pipeline runs without CONFIRM_ORDER.
-- [ ] Send "add a function to foo.py" (Techne in route) → confirm
-      CONFIRM_ORDER still appears (the bypass should NOT widen).
+- [ ] Send a Hephaestus request, then check container logs (or
+      enable httpx debug) → confirm `A2A-Version: 0.3` is present on
+      every outbound request.
+- [ ] Type `/cost` in the REPL → confirm the same usage summary
+      `/usage` produces.
 
 ---
 
 ## Notes / open questions
 
-- **Why `elif` instead of treating both flags additively?** `/yolo`
-  is the broader bypass — when both are on, the player has clearly
-  opted into max-autonomy mode and the narrower `auto_approve_reads`
-  augmentation would just add noise to the prompt. The `elif` keeps
-  the system-prompt clean and the precedence semantics legible.
+- **Why "0.3" and not "1.0" as the declared version?** The spec
+  says the client MUST send the version it speaks; if it lies,
+  the server treats every request as 1.0 semantics and our 0.3
+  client breaks. We declare the truth — 0.3 — so a 1.0-aware
+  server can treat us with backward compatibility. When M7 lands
+  and we move every Part construction to the unified-Part shape
+  (see ROADMAP M7 spec deltas section), the constant flips to "1.0"
+  in lockstep with the SDK pin. The version-pin regression test is
+  there so that bump is deliberate.
 
-- **Why text-tag transport again rather than `Message.metadata`?**
-  Same answer as `[yolo: on]` and `[project_root: …]` from M13:
-  `a2a-sdk` 0.3.x doesn't guarantee metadata propagation across
-  every transport. Inlining the flag survives every code path.
-  When we eventually move to MCP `elicitation` (M2) the host can
-  declare these as proper protocol primitives.
+- **Why centralise into `make_a2a_http_client` rather than just
+  add the header at each construction site?** Four current sites,
+  with M2 (kourai-forge-mcp) likely to add a fifth and the
+  voice-lab spinoff likely to add a sixth. Already past the "rule
+  of three" for extracting a helper; doing it now is cheaper than
+  adding the header six times in four months.
 
-- **Why a unified `/permissions` instead of more `/yolo`-style
-  per-flag commands?** Two reasons. (1) The OSS-CC clones (Cline,
-  ClawCode) all converged on a single `/permissions` surface — the
-  tier-2 entry exists so future per-tool gates have a discoverable
-  home rather than 5 new top-level slash commands. (2) Listing all
-  gates side-by-side makes the security posture legible at a glance
-  ("am I in YOLO right now?") rather than requiring the player to
-  remember every relevant command.
+- **Why bundle these two unrelated lifts?** Each is too small for
+  its own PR (one helper + 4 swap-sites; one alias entry + 1
+  dispatch tuple). Splitting them would make each look like
+  busy-work and clutter the PR list. They share the
+  "tier-4 + tier-5 OSS-CC follow-up" theme. If a future bisect
+  ever needs to roll one back independently, the commit history
+  is clean enough to revert just the `/cost` lines.
 
-- **What this lift does NOT do.** It doesn't add per-tool gates the
-  way ClawCode does (e.g., "auto-approve `read_file` but gate
-  `write_file`"). The reason: those gates would need to fire inside
-  the specialist containers' tool-dispatch loop, and specialists
-  don't have access to host CLISettings. That's an M2 (forge MCP)
-  concern — once tools are MCP-served, the host can intercept each
-  call via the MCP `elicitation` primitive (see M2 section in
-  ROADMAP). For now, pipeline-level gating is the cleanest cut.
+- **What this lift does NOT do.** It does not flip the SDK pin to
+  ≥1.0 — that's M7. The header is a prerequisite for M7, not the
+  whole migration. Pyproject pins still cap at `<1.0` until M7 is
+  ready (see M7 section in ROADMAP for the full spec-delta scope).
 
 ---
 
-## Up next (queued, not yet active — tier order from #37 prioritization)
+## Up next (queued, not yet active — tier order from #37 prioritization, all tier-1-through-5 now done)
 
-- **`A2A-Version` header** — one-line prerequisite for any v1.0
-  migration attempt. Must add it to every outbound request in
-  `remote_connections.py` before the SDK pin can flip to ≥1.0.
-- **`/cost` alias for `/usage`** — five-line cleanup matching
-  OSS-CC vocabulary so muscle-memory carries over.
 - **MCP `roots` + `elicitation` declared at M2 init** — design-time
-  work for when M2 (`kourai-forge-mcp`) is being scaffolded.
+  work for when M2 (`kourai-forge-mcp`) is being scaffolded. The
+  prerequisite chain to M2 itself (M1 done) is complete; pulling
+  M2 into the active queue is a real possibility.
+- **Plan Mode toggle (Cline-style)** — persistent planning mode
+  where Hephaestus loops on M14 parallel routing every turn but
+  never dispatches until the player explicitly types `/plan
+  execute`. Bigger lift than the tier-1-5 follow-ons, but next-
+  tier shippable.
+- **Background memory consolidation (Mneme "autoDream")** —
+  ClawCode pattern; pairs nicely with the just-shipped `/compact`.
+- **Custom-agent-via-markdown registration (OpenCode-style)** —
+  long-term direction; touches A2A registration, MCP toolkit, and
+  routing prompt, so wait until M2 lands.
+- **Tree-sitter project mapping (Plandex-style)** — pre-computed
+  PROJECT_MAP block in prompts; pairs with M4 caching.
+- **LSP integration for forge tools (OpenCode-style)** — biggest
+  architectural pickup; new `lsp_diagnostics` and `lsp_rename`
+  forge tools.
 - **T8 follow-up** (ParallelContext shared buffer feeding Metis's
   partial output back into the classifier prompt). Substantial
   async work.
@@ -156,5 +140,6 @@ land along the same path without re-litigating transport choices:
 - **M2** (`kourai-forge-mcp` server) — real architectural milestone.
 - **M15** (forge logging architecture) — operational hygiene.
 - **M5** (UID alignment for forge worktrees) — quality-of-life.
-- **M7** (a2a-sdk 1.0.x migration) — properly scoped.
+- **M7** (a2a-sdk 1.0.x migration) — properly scoped; the
+  `A2A-Version` header is now in place as a prerequisite.
 - **M12** (dynamic sizing across the GUI) — biggest GUI refactor.

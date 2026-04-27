@@ -50,6 +50,7 @@ from hosts.cli.settings import CLISettings
 from hosts.cli.streaming import _connect_with_url_override, get_last_result, send_and_stream
 from hosts.cli.styling import _DIM, _GOLD, _GOLD_BOLD, _GOLD_BRIGHT, _ITALIC, _RED, _RESET
 from hosts.gui.tts_engine import TTSEngine
+from kourai_common.a2a_utils import make_a2a_http_client
 from kourai_common.audio import AudioManager
 from kourai_common.config import MODEL_TIER, PROVIDER, get_agent_url, get_model
 from kourai_common.federation.host_helpers import derive_scene_id
@@ -566,7 +567,7 @@ async def main(
 
     config = ClientConfig(
         streaming=True,
-        httpx_client=httpx.AsyncClient(timeout=timeout_seconds),
+        httpx_client=make_a2a_http_client(timeout=timeout_seconds),
     )
 
     try:
@@ -690,7 +691,10 @@ async def main(
                     _echo(f"  {_GOLD}Model:{_RESET}     {get_model('hephaestus')}")
                     continue
 
-                if prompt_text == "/usage":
+                if prompt_text in ("/usage", "/cost"):
+                    # `/cost` alias matches OSS-CC vocabulary (ClawCode,
+                    # Cline, OpenCode all use it). Same surface, lets
+                    # muscle-memory carry over for incoming players.
                     _show_usage_summary()
                     continue
 

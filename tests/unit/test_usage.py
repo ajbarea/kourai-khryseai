@@ -338,6 +338,34 @@ class TestUsageSlashCommand:
         out = "\n".join(captured)
         assert "No usage recorded" in out
 
+    def test_cost_alias_registered_in_completer(self):
+        # OSS-CC vocabulary alignment — players coming from ClawCode /
+        # Cline / OpenCode reflexively type /cost. Tier-2 lift from the
+        # 2026-04-26 research sweep (ROADMAP M6 prioritization tier-5).
+        from hosts.cli.completer import SLASH_COMMANDS
+
+        names = [cmd.name for cmd in SLASH_COMMANDS]
+        assert "cost" in names
+        assert "usage" in names  # original still present
+
+    def test_cost_dispatch_resolves_same_handler_as_usage(self):
+        # The actual dispatch lives inside the REPL loop as
+        # `if prompt_text in ("/usage", "/cost")`. Read the source as
+        # a regression guard so a future refactor that splits the
+        # branches gets caught — both must route to _show_usage_summary.
+        import inspect
+
+        from hosts.cli import __main__ as cli_main
+
+        src = inspect.getsource(cli_main)
+        assert '("/usage", "/cost")' in src or '("/cost", "/usage")' in src
+        # And that the branch body calls _show_usage_summary.
+        # Slice the snippet around the membership check for a tighter
+        # assertion than "anywhere in the file".
+        idx = src.find('"/cost"')
+        nearby = src[idx : idx + 500]
+        assert "_show_usage_summary" in nearby
+
     def test_summary_includes_per_agent_breakdown_and_total(self, monkeypatch):
         from hosts.cli.__main__ import _show_usage_summary
 

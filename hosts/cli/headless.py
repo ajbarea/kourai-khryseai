@@ -23,6 +23,7 @@ from a2a.types import (
 
 from hosts.cli.events import _extract_artifact_text, _extract_status_text
 from hosts.cli.streaming import _connect_with_url_override
+from kourai_common.a2a_utils import make_a2a_http_client
 
 
 # ---------------------------------------------------------------------------
@@ -30,7 +31,7 @@ async def _headless(agent_url: str, prompt: str, timeout_seconds: int, verbose: 
     """Run a single prompt non-interactively and exit. For scripts and piping."""
     config = ClientConfig(
         streaming=True,
-        httpx_client=httpx.AsyncClient(timeout=timeout_seconds),
+        httpx_client=make_a2a_http_client(timeout=timeout_seconds),
     )
 
     try:

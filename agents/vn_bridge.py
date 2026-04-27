@@ -14,10 +14,9 @@ import logging
 import re
 import sys
 from collections.abc import AsyncGenerator
-from typing import cast
+from typing import TYPE_CHECKING, cast
 from uuid import uuid4
 
-import httpx
 import uvicorn
 from a2a.client import A2ACardResolver, ClientConfig, ClientFactory
 from a2a.types import (
@@ -38,10 +37,14 @@ from kourai_common.a2a_events import (
     extract_message_text,
     extract_status_text,
 )
+from kourai_common.a2a_utils import make_a2a_http_client
 from kourai_common.companion import infer_portrait_state
 from kourai_common.config import get_agent_url
 from kourai_common.facts import process_agent_output
 from kourai_common.tts_backend import get_voice_for_agent
+
+if TYPE_CHECKING:
+    import httpx
 
 PORT = 10010
 
@@ -107,7 +110,7 @@ def _create_tts_backend():
 async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
     agent_url = get_agent_url("hephaestus")
     log.info(f"Connecting to Hephaestus at {agent_url}")
-    httpx_client = httpx.AsyncClient(timeout=600)
+    httpx_client = make_a2a_http_client(timeout=600)
     config = ClientConfig(streaming=True, httpx_client=httpx_client)
     try:
         resolver = A2ACardResolver(cast("httpx.AsyncClient", config.httpx_client), agent_url)
