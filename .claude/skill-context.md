@@ -110,6 +110,13 @@ Subagent scan-area split:
 - **Search latest FL practice constantly** when touching M11+ paper work — Kourai is FL-research-adjacent and the field moves weekly. Re-grep recent papers / framework releases before committing to a design.
 - **No system is too late to redesign.** If a feature isn't carrying its weight, rip it out — even shipped ones. Sunk-cost is not a reason to keep code.
 
+## observability
+
+- The dev-loop observability triad is **Jaeger** (traces, `:16686`) + **Prometheus** (metrics, `:9090`) + **Dozzle** (per-container live tail, `:8888`). `make observe` opens all three.
+- Before designing any observability change (new spans, metrics, log enrichment, dashboard layout, or container-grouping decision), read [`docs/observability.md`](../docs/observability.md) — it carries the mental model (trace=flow / metric=aggregate / log=narrative), the four-pattern triage runbook, and the "what's currently populated, and what's not" honesty section. Avoids re-deriving design rationale that was load-bearing in M16.
+- Jaeger is on `jaegertracing/jaeger:2.17.0` (OTel-Collector-shape config in `docker/jaeger-config.yaml`); Prometheus on `prom/prometheus:v3.10.0-distroless`; spanmetrics connector emits RED metrics on `:8889`. Bumping any of these pins → web-search current best practice first (caught two deprecations in M16 that recall would have missed).
+- Trace-ID injection into log lines is shipped (`shared/src/kourai_common/log.py::_OtelTraceFilter`); a span found in Jaeger is grep-findable in Dozzle as `trace=<id>` without code changes between observation and search.
+
 ## renpy
 
 - VN host (`hosts/vn/`) targets **Ren'Py 8.5.x**. My recall keeps producing Ren'Py 6.x APIs that crash. **Always resolve API questions via context7** (`mcp__claude_ai_Context7__query-docs` against `renpy`) before writing `config.*` settings, init priorities, or special screen overrides (`screen main_menu`, `screen game_menu`, etc.). Don't trust my pattern-match for anything 6.x-vs-8.x sensitive.
