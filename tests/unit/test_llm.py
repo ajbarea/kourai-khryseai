@@ -185,6 +185,80 @@ class TestManageMemory:
         assert "prior context" in user_msg
         assert "Existing Summary" in user_msg
 
+    @pytest.mark.asyncio
+    async def test_force_bypasses_threshold(self):
+        """force=True summarizes even when below WORKING_MEMORY_LIMIT,
+        which is what the player-triggered /compact slash command needs."""
+        # 4 messages — well below the default 5-message threshold; without
+        # force=True the auto-trigger would skip.
+        msgs = [{"role": "user", "content": f"msg {i}"} for i in range(4)]
+        mock_state = {"semantic_summary": ""}
+
+        async def _fake_exec(timeout_seconds, **kwargs):
+            result = MagicMock()
+            result.choices = [MagicMock(message=MagicMock(content="forced summary"))]
+            return result
+
+        with (
+            patch("kourai_common.llm.get_unsummarized_messages", return_value=msgs),
+            patch("kourai_common.llm.get_max_unsummarized_idx", return_value=4),
+            patch("kourai_common.llm.get_agent_state", return_value=mock_state),
+            patch("kourai_common.llm._execute_completion", new=_fake_exec),
+            patch("kourai_common.llm.save_agent_state") as mock_save,
+            patch("kourai_common.llm.mark_messages_summarized") as mock_mark,
+        ):
+            from kourai_common.llm import _manage_memory
+
+            count = await _manage_memory("ctx-1", "metis", force=True)
+
+        # Default rule "keep last 2 unsummarized" → 4 - 2 = 2 folded
+        assert count == 2
+        mock_save.assert_called_once()
+        mock_mark.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_force_returns_zero_when_too_few_messages(self):
+        """No-op even with force=True when there aren't enough messages
+        to keep the "last 2 unsummarized" buffer plus anything to fold."""
+        msgs = [{"role": "user", "content": "single"}]
+
+        with (
+            patch("kourai_common.llm.get_unsummarized_messages", return_value=msgs),
+            patch("kourai_common.llm._execute_completion", new_callable=AsyncMock) as mock_exec,
+        ):
+            from kourai_common.llm import _manage_memory
+
+            count = await _manage_memory("ctx-1", "metis", force=True)
+
+        assert count == 0
+        mock_exec.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_compact_memory_wrapper_forces(self):
+        """compact_memory is a thin wrapper that always passes force=True."""
+        msgs = [{"role": "user", "content": f"msg {i}"} for i in range(3)]
+        mock_state = {"semantic_summary": ""}
+
+        async def _fake_exec(timeout_seconds, **kwargs):
+            result = MagicMock()
+            result.choices = [MagicMock(message=MagicMock(content="ok"))]
+            return result
+
+        with (
+            patch("kourai_common.llm.get_unsummarized_messages", return_value=msgs),
+            patch("kourai_common.llm.get_max_unsummarized_idx", return_value=3),
+            patch("kourai_common.llm.get_agent_state", return_value=mock_state),
+            patch("kourai_common.llm._execute_completion", new=_fake_exec),
+            patch("kourai_common.llm.save_agent_state"),
+            patch("kourai_common.llm.mark_messages_summarized"),
+        ):
+            from kourai_common.llm import compact_memory
+
+            count = await compact_memory("ctx-1", "metis")
+
+        # 3 - 2 (keep last 2) = 1 folded
+        assert count == 1
+
 
 class TestChatTierKwarg:
     """``tier`` kwarg on ``chat()`` / ``chat_stream()`` / ``chat_with_tools()``

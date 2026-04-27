@@ -5,120 +5,141 @@ milestone lands, the matching detail block in [ROADMAP.md](./ROADMAP.md)
 collapses to a one-liner under "Shipped" and this file gets reset to the
 next milestone.
 
-Updated: 2026-04-26 · Working on: **Round 6 bullet 5 — final** (git
-context discovery for specialist agents in worktree; closes the last
-of the 5 M6-future bullets AJ flagged from live smoke)
+Updated: 2026-04-26 · Working on: **`/compact` slash command** (tier-1
+lift from the OSS-CC research sweep — universal pattern across every
+serious Claude Code clone, we didn't have it)
 
 ---
 
 ## Plan-of-record
 
-End state: `git status --short` no longer exits 128 from inside the
-Metis and Techne specialist containers. The bug was simple: the
-container's default cwd is `/app`, not the worktree, so git had no
-repo to look at. The `[project_root: ...]` tag was already in the
-user message; the executors just weren't threading it through to the
-git-context helpers.
+End state: the player can type `/compact` mid-session and have Mneme
+fold older turns into long-term memory across every agent in the
+current `context_id`, freeing the working window without losing the
+thread. The auto-compaction logic in `_manage_memory` already handled
+the heavy lifting (LLM summarization + state persistence) — it just
+gated on `len(unsummarized) > WORKING_MEMORY_LIMIT`. Player-triggered
+compaction needed (a) a force-flag to bypass that threshold, (b) a
+way to discover which agents have history under the current context,
+(c) a CLI dispatch + Mneme comms-window emit.
 
-The ROADMAP suggested option (c) — auto-prepend `cd <project_root> && `
-in the bash helper — but the cleaner fix is at the call site where
-`project_root` is already in scope as a parsed `Path`. Just pass it
-as `cwd` to the helper that already accepts it.
+### Change 1 — `list_agents_with_history` memory primitive ✅ 2026-04-26
 
-### Change 1 — Techne executor threads project_root → get_git_context cwd ✅ 2026-04-26
+- [x] `shared/src/kourai_common/memory.py`: new function returning
+      distinct `agent_name` values with any messages stored against a
+      `context_id`. Sorted alphabetically for deterministic /compact
+      roster ordering. 4 unit tests in `test_memory.py`.
 
-- [x] `agents/techne/agent_executor.py:103`: `get_git_context(...)`
-      now receives `cwd=str(project_root)`. `project_root` was
-      already parsed at line 56 via `parse_project_root(user_input)`
-      — pure threading change.
+### Change 2 — `_manage_memory` force-flag + `compact_memory` wrapper ✅ 2026-04-26
 
-### Change 2 — Metis executor parses + threads project_root → get_project_context ✅ 2026-04-26
+- [x] `shared/src/kourai_common/llm.py::_manage_memory(... , *, force=False)`:
+      new keyword. When `force=True` bypass the
+      `len(unsummarized) > WORKING_MEMORY_LIMIT` gate. Still keep the
+      "last 2 unsummarized for immediate context fluidity" rule and
+      no-op when there aren't enough messages to fold (≤2). Now
+      returns `int` (count of messages folded) so callers can report.
+- [x] `shared/src/kourai_common/llm.py::compact_memory(context_id, agent_name)`:
+      thin public wrapper that always passes `force=True`. Used by
+      the CLI handler to keep concerns separate (auto-compaction stays
+      private with its threshold gate; player-triggered work has a
+      named entry point).
+- [x] 3 new unit tests in `test_llm.py::TestManageMemory`: force
+      bypasses threshold, no-op on too-few-messages, wrapper forces.
 
-- [x] `agents/metis/agent_executor.py`: import `parse_project_root`
-      alongside the existing `extract_image_parts`. Parse
-      `project_root` from `user_input` immediately after
-      `context.get_user_input()`. Pass `project_root=str(project_root)`
-      to `get_project_context(...)` (the function already accepts
-      it; the executor just wasn't passing it).
-- [x] `parse_project_root` falls back to `Path.cwd()` when the tag
-      is missing (internal/test invocations), so existing test
-      fixtures aren't disturbed.
+### Change 3 — `/compact` slash command ✅ 2026-04-26
+
+- [x] `hosts/cli/completer.py`: new `SlashCommand("compact", ...)`
+      entry between `/yolo` and `/metrics`.
+- [x] `hosts/cli/__main__.py::_compact_session_memory(context_id)`:
+      iterates `list_agents_with_history`, awaits `compact_memory`
+      for each, totals counts, emits a Mneme comms-window narrating
+      what happened. M10 speech convention: dialogue body wrapped in
+      `"..."` so `_comms_window` flips italic. Three states:
+      empty thread (`"Nothing to chronicle yet — the thread is still
+      fresh."`), nothing-to-fold (`"The recent turns are already lean
+      — nothing to fold yet."`), or success (`"I tucked N turns
+      into long-term memory — agent (count), …. The thread is lighter
+      now."`).
+- [x] REPL handler at `__main__.py` calls
+      `_compact_session_memory(context_id)` on `prompt_text == "/compact"`.
+- [x] Hoisted `compact_memory` and `list_agents_with_history` to
+      module-level imports so the function is properly mockable in
+      tests via `hosts.cli.__main__.<name>`.
 
 ### Tests ✅ 2026-04-26
 
-- [x] `tests/unit/test_executors.py::TestTechneExecutor::test_get_git_context_called_with_project_root_cwd`:
-      asserts `get_git_context` is called with a non-None `cwd`
-      kwarg when the user message carries `[project_root: …]`.
-- [x] `tests/unit/test_executors.py::TestMetisExecutor::test_get_project_context_called_with_project_root`:
-      same shape, asserts `get_project_context` receives
-      `project_root=`.
-- [x] All 24 executor unit tests pass (22 pre-existing + 2 new) in
-      ~4 s. No regressions.
+- [x] `tests/unit/test_memory.py::TestListAgentsWithHistory` — 4
+      tests including a "doesn't leak across contexts" guard.
+- [x] `tests/unit/test_llm.py::TestManageMemory` — 3 new tests
+      bringing the class to 6 (3 pre-existing + 3 new).
+- [x] `tests/unit/test_cli.py::TestCompactSessionMemory` — 3 tests:
+      empty-agents path, full iterate-and-total path with order
+      preserved, zero-total "already lean" path.
+- [x] All 90 tests across the three affected files pass in ~3 s.
 
 ### Live smoke (folds into next interactive `/project` session)
 
-- [ ] Send a Techne task → confirm the comms-window line shows
-      `🔍 $ git status --short` followed by *content* (modified
-      files) instead of `🔍 exit 128`.
-- [ ] Same for Metis: `📐` panel should surface a real
-      `Git status:` block in the project-context output rather than
-      the empty fallback.
+- [ ] Run a few exchanges with the agents, then type `/compact`.
+      Confirm the Mneme comms-window appears with a count and
+      roster of agents whose buckets were folded.
+- [ ] Send another message after `/compact` — confirm the agent
+      replies referencing prior context (proving the semantic
+      summary survived).
 
 ---
 
 ## Notes / open questions
 
-- **Why this and not the ROADMAP's `cd <project_root> &&` prefix?**
-  The prefix would have meant mutating the command string inside a
-  bash-tool helper that doesn't currently exist as a shared
-  abstraction (each agent calls `run_command` directly). Threading
-  `cwd` through the helper signature that already supports it is
-  one-line-per-call and surfaces the intent at the call site rather
-  than hiding it behind a runner-level fallback. Same minimum
-  scope, less indirection.
+- **Why a public `compact_memory` wrapper instead of just exposing
+  `_manage_memory`?** Two reasons. (1) The auto-compaction call inside
+  `chat()`/`chat_with_tools()` keeps its threshold gate semantics
+  clearly; the player-triggered call gets a named entry point so a
+  future reader doesn't have to read the `force=True` site to know
+  what's happening. (2) Refactoring later (e.g., to use a cheaper
+  model for player-triggered compaction, or to attach a different
+  prompt) is a one-place change in the wrapper, not a kwarg cascade
+  through `_manage_memory`.
 
-- **Why not also fix the Mneme/Kallos/Dokimasia executors?** Mneme
-  doesn't run git itself (it consumes git output Hephaestus
-  collects). Kallos and Dokimasia operate on file paths the player
-  / Techne supplied — they don't need a repo-scoped cwd today. If
-  that changes when M2 (`kourai-forge-mcp`) lands and tools become
-  MCP-served, this'll need to be revisited; the new MCP `roots`
-  primitive (see M2 section in ROADMAP) is the natural home for
-  per-call worktree scoping.
+- **Why per-agent compaction rather than a single conversation-wide
+  rollup?** Each agent maintains its own `semantic_summary` because
+  the summarization is voiced from that agent's perspective and
+  prefixed back into that agent's prompts. Folding across agents
+  would lose the per-voice framing. The roster Mneme reports lets
+  the player see which agents had enough history to compact.
 
-- **All 5 Round 6 M6-future bullets are now closed.** The five-PR
-  arc that started with #34 (read_file dir rejection + branch slug
-  whitelist) and ends with this PR clears the slate of bugs AJ
-  caught in the M1 Round 6 live smoke. The two big architectural
-  pickups from the same session — M13 Forge Order Confirmation and
-  M14 Metis-First Parallel Routing — both shipped earlier in the
-  day. The next active work is whatever AJ picks from the queue
-  below.
+- **What this lift does NOT do.** It doesn't add a `<COMPACTED>`
+  block format the way I sketched in ROADMAP — that turned out to
+  be over-design. The existing summarization prompt already
+  produces a structured-enough summary; wrapping it in a block-tag
+  was solution looking for a problem. If a future need surfaces
+  (e.g., the LLM needs structural cues about what's a summary vs
+  raw history), that's a separate prompt-engineering PR.
+
+- **Pairs with M4.** Compacted prompts are smaller, so the system
+  block + first user message stays under the 2048/4096-token cache
+  threshold for longer. M4's within-loop caching benefits directly.
 
 ---
 
-## Up next (queued, not yet active)
+## Up next (queued, not yet active — tier order from #37 prioritization)
 
-- **Tier-1 lifts from the OSS-CC research sweep** (#37, just landed):
-  `/compact` slash command (universal across every clone, Mneme has
-  the documenter persona ready), then MCP `roots` + `elicitation`
-  declared at M2 init (cheap design-time work, expensive retrofit),
-  then `/permissions` granular tool gating (small extension to
-  `CLISettings`), then `A2A-Version` header (one-line prerequisite
-  for any v1.0 attempt), then `/cost` alias (5-line cleanup).
+- **MCP `roots` + `elicitation` declared at M2 init** — design-time
+  work for when M2 (`kourai-forge-mcp`) is being scaffolded. Cheap
+  if done at design time, expensive retrofit later.
+- **`/permissions` granular tool gating** — small extension to
+  `CLISettings.auto_approve: dict[str, bool]` keyed on tool name.
+  Maps onto the existing `MUTATING_TOOL_NAMES` frozenset.
+- **`A2A-Version` header** — one-line prerequisite for any v1.0
+  migration attempt.
+- **`/cost` alias for `/usage`** — five-line cleanup matching OSS-CC
+  vocabulary so muscle-memory carries over.
 - **T8 follow-up** (ParallelContext shared buffer feeding Metis's
   partial output back into the classifier prompt). Substantial
   async work.
 - **T4 follow-up from M13** (`[forge_intent]` block on user message
   to specialists). Needs SQL migration or in-memory plumbing.
-- **M2** (`kourai-forge-mcp` server) — real architectural milestone;
-  carries the MCP `roots` / `elicitation` / `sampling` work as part
-  of its scaffolding.
-- **M15** (forge logging architecture) — operational hygiene; the
-  three-layer-memory observation from the OSS-CC sweep is a useful
-  framing for it.
+- **M2** (`kourai-forge-mcp` server) — real architectural milestone.
+- **M15** (forge logging architecture) — operational hygiene.
 - **M5** (UID alignment for forge worktrees) — quality-of-life.
-- **M7** (a2a-sdk 1.0.x migration) — properly scoped now, with the
-  `A2A-Version` header + AUTH_REQUIRED state + multi-stream-per-task
-  notes from the spec sweep.
+- **M7** (a2a-sdk 1.0.x migration) — properly scoped.
 - **M12** (dynamic sizing across the GUI) — biggest GUI refactor.

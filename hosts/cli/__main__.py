@@ -40,6 +40,7 @@ from hosts.cli.maidens import _MAIDEN_FACES, _MAIDENS
 from hosts.cli.rendering import (
     _banner,
     _clear_screen,
+    _comms_window,
     _echo,
     _maiden_card,
     _maiden_gallery,
@@ -54,7 +55,9 @@ from kourai_common.config import MODEL_TIER, PROVIDER, get_agent_url, get_model
 from kourai_common.federation.host_helpers import derive_scene_id
 from kourai_common.federation.memoir import Memoir
 from kourai_common.forge_session import ForgeSession, ForgeSessionError
+from kourai_common.llm import compact_memory
 from kourai_common.log import setup_logging
+from kourai_common.memory import list_agents_with_history
 from kourai_common.player import PlayerProfile, get_all_affinities
 from kourai_common.virtues import FORGE_VIRTUES, get_virtue_deltas, get_virtue_scores
 
@@ -203,6 +206,41 @@ def _format_affinity_bar(score: float, width: int = 14) -> str:
     fill = int(((score + 1.0) / 2.0) * width)
     fill = max(0, min(width, fill))
     return ("█" * fill) + ("·" * (width - fill))
+
+
+async def _compact_session_memory(context_id: str) -> None:
+    """Player-triggered transcript compaction across every agent in scope.
+
+    Iterates the agents that have any history under ``context_id``,
+    forces each through ``compact_memory`` (bypasses the auto-compaction
+    threshold), totals the messages folded into semantic memory, and
+    emits a Mneme comms-window narrating what just happened. Inspired by
+    the universal ``/compact`` primitive in every OSS Claude Code clone
+    surveyed 2026-04-26 (see ROADMAP M6 "Surfaced from external research"
+    → tier-1 priority).
+    """
+    agents = list_agents_with_history(context_id)
+    if not agents:
+        _echo(_comms_window("mneme", '"Nothing to chronicle yet — the thread is still fresh."'))
+        return
+
+    total = 0
+    folded: list[str] = []
+    for agent_name in agents:
+        count = await compact_memory(context_id, agent_name)
+        total += count
+        if count:
+            folded.append(f"{agent_name} ({count})")
+
+    if total == 0:
+        body = '"The recent turns are already lean — nothing to fold yet."'
+    else:
+        roster = ", ".join(folded)
+        body = (
+            f'"I tucked {total} turn{"s" if total != 1 else ""} into long-term '
+            f'memory — {roster}. The thread is lighter now."'
+        )
+    _echo(_comms_window("mneme", body))
 
 
 def _format_greeting(name: str, face: str, quote: str) -> str:
@@ -610,6 +648,10 @@ async def main(
                         else "active — Hephaestus reads back before any pipeline"
                     )
                     _echo(f"  {_GOLD}/yolo{_RESET} {state} — confirmation gate {desc}.")
+                    continue
+
+                if prompt_text == "/compact":
+                    await _compact_session_memory(context_id)
                     continue
 
                 if prompt_text == "/metrics":
