@@ -44,20 +44,22 @@ x-agent-common: &agent-common
 services:
 
   # ──────────────── Infrastructure ────────────────
-  # Jaeger: Distributed tracing backend for telemetry data.
+  # Jaeger v2 (OTel-Collector-based). Configuration lives in
+  # docker/jaeger-config.yaml; the v1 env-var surface
+  # (COLLECTOR_OTLP_ENABLED, SPAN_STORAGE_TYPE, METRICS_STORAGE_TYPE,
+  # PROMETHEUS_SERVER_URL, PROMETHEUS_QUERY_SUPPORT_SPAN_UNIT) collapses
+  # into that file. Internal metrics moved from v1's :14269 to :8888;
+  # Prometheus reaches it over the kourai bridge so no host mapping
+  # is needed for it.
   jaeger:
-    image: jaegertracing/all-in-one:1.60
+    image: jaegertracing/jaeger:2.17.0
+    command: ["--config", "/etc/jaeger/config.yaml"]
+    volumes:
+      - ./docker/jaeger-config.yaml:/etc/jaeger/config.yaml:ro
     ports:
       - "127.0.0.1:16686:16686"
       - "127.0.0.1:4317:4317"
       - "127.0.0.1:4318:4318"
-      - "127.0.0.1:14269:14269"
-    environment:
-      COLLECTOR_OTLP_ENABLED: "true"
-      METRICS_STORAGE_TYPE: "prometheus"
-      PROMETHEUS_SERVER_URL: "http://prometheus:9090"
-      PROMETHEUS_QUERY_SUPPORT_SPAN_UNIT: "true"
-      SPAN_STORAGE_TYPE: "memory"
     networks:
       - kourai
     restart: unless-stopped

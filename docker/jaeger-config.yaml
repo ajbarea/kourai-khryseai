@@ -1,0 +1,72 @@
+# Jaeger v2 — translated from v1 env vars (M16 Change 3, 2026-04-27).
+#
+# v1 env → v2 yaml:
+#   COLLECTOR_OTLP_ENABLED=true            → receivers.otlp.protocols.{grpc,http}
+#   SPAN_STORAGE_TYPE=memory               → extensions.jaeger_storage.backends.memstore.memory
+#   METRICS_STORAGE_TYPE=prometheus        → extensions.jaeger_storage.metric_backends.promstore.prometheus
+#   PROMETHEUS_SERVER_URL                  → ...prometheus.endpoint
+#   PROMETHEUS_QUERY_SUPPORT_SPAN_UNIT=true → ...prometheus.normalize_calls + normalize_duration
+#
+# Port move v1→v2: internal metrics scrape target was :14269, now :8888
+# (set by service.telemetry.metrics.readers.pull.prometheus.port). The
+# host-side :14269 mapping in compose has been dropped to match.
+
+service:
+  extensions: [jaeger_storage, jaeger_query, healthcheckv2]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [jaeger_storage_exporter]
+  telemetry:
+    resource:
+      service.name: jaeger
+    metrics:
+      level: detailed
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: 0.0.0.0
+                port: 8888
+    logs:
+      level: info
+
+extensions:
+  jaeger_storage:
+    backends:
+      memstore:
+        memory:
+          max_traces: 100000
+    metric_backends:
+      promstore:
+        prometheus:
+          endpoint: http://prometheus:9090
+          normalize_calls: true
+          normalize_duration: true
+
+  jaeger_query:
+    storage:
+      traces: memstore
+      metrics: promstore
+
+  healthcheckv2:
+    use_v2: true
+    http:
+      endpoint: 0.0.0.0:13133
+    grpc:
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+
+exporters:
+  jaeger_storage_exporter:
+    trace_storage: memstore
