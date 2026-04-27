@@ -225,6 +225,3 @@ all-three-with-stubs approach would create.
 - **M16 follow-ons:**
   - Live trace-ID-in-Dozzle smoke (Change 1 unit-tested but worth
     eyeballing in a real `make up` + smoked pipeline).
-  - `scripts/watch_protocols.py kind="docker-tag"` digester for
-    `amir20/dozzle`, `jaegertracing/jaeger`, `prom/prometheus` so
-    future image drift surfaces automatically.

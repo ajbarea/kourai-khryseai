@@ -115,6 +115,37 @@ WATCHES: tuple[Watch, ...] = (
         kind="pypi",
         note="mcp Python SDK on PyPI. Used by our memory-mcp / context7-mcp / future M2 server.",
     ),
+    Watch(
+        key="dozzle-docker-tag",
+        url="https://hub.docker.com/v2/repositories/amir20/dozzle/tags?page_size=20",
+        kind="docker-tag",
+        note=(
+            "Dozzle (M16 observability log dashboard) image tag stream. "
+            "The original PR shipped two majors stale (v8.13.0 → v10.5.0 "
+            "mid-PR) because nothing watched the tag stream; this catches "
+            "future drift automatically."
+        ),
+    ),
+    Watch(
+        key="jaeger-docker-tag",
+        url="https://hub.docker.com/v2/repositories/jaegertracing/jaeger/tags?page_size=20",
+        kind="docker-tag",
+        note=(
+            "Jaeger v2 image tag stream. Jaeger v1 went EOL 2025-12-31; "
+            "currency on the trace plane matters for security patches on a "
+            "process with read access to every inter-agent trace."
+        ),
+    ),
+    Watch(
+        key="prometheus-docker-tag",
+        url="https://hub.docker.com/v2/repositories/prom/prometheus/tags?page_size=20",
+        kind="docker-tag",
+        note=(
+            "Prometheus distroless image tag stream. v3.x is the current "
+            "generation; the v2.55 → v3 staircase was mandatory hygiene "
+            "even for a no-persistent-volume dev-loop deployment."
+        ),
+    ),
 )
 
 
@@ -171,10 +202,75 @@ def _digest_pypi(content: str) -> tuple[str, str]:
     return version, excerpt
 
 
+# Mutable / non-release tags that should never be picked as the "latest
+# release" by the docker-tag digester — they always point at the head of
+# some moving stream and would either trigger drift on every cron tick
+# or, worse, mask real version bumps under a stable name.
+_MUTABLE_DOCKER_TAGS: frozenset[str] = frozenset(
+    {"latest", "master", "main", "nightly", "edge", "develop", "dev", "stable"}
+)
+
+
+# Live smoke against Docker Hub during M16 follow-on caught three failure
+# modes the mutable-tag set didn't cover:
+#   1. PR-build artifacts (``pr-4662`` in dozzle) — churn constantly.
+#   2. Major-version aliases (``v3-distroless`` in prometheus) — point at
+#      the head of v3.x and would mask real version bumps under a moving
+#      alias.
+#   3. Minor-stream aliases (``v10.5`` in dozzle) — re-pushed when a new
+#      10.5.x patch lands but the tag name stays the same, so a
+#      name-only digest would never flip.
+# Restricting candidates to a full ``MAJOR.MINOR.PATCH`` triplet catches
+# all three: real releases always carry the full triplet (``v10.5.0``,
+# ``2.17.0``, ``v3.10.0-distroless``); aliases and build artifacts don't.
+_SEMVER_LIKE = re.compile(r"\d+\.\d+\.\d+")
+
+
+def _digest_docker_tag(content: str) -> tuple[str, str]:
+    """Docker Hub repositories/<ns>/<repo>/tags JSON.
+
+    Picks the most recently pushed *stable* tag (active, non-mutable name,
+    semver-shaped) and uses its name as the digest — when a new tag
+    releases, the digest flips and an issue opens. Excerpt shows the top
+    three candidates so the triage path includes the surrounding
+    release-cadence context (e.g. is this a routine point release, or a
+    major bump).
+    """
+    try:
+        data = json.loads(content)
+    except json.JSONDecodeError as exc:
+        log.warning("Docker Hub JSON malformed: %s", exc)
+        return "<malformed>", "JSON decode failed"
+    results = data.get("results") or []
+    candidates = [
+        r
+        for r in results
+        if r.get("tag_status") == "active"
+        and isinstance(r.get("name"), str)
+        and r["name"].lower() not in _MUTABLE_DOCKER_TAGS
+        and _SEMVER_LIKE.search(r["name"]) is not None
+    ]
+    if not candidates:
+        return "<no-stable-tag>", "no stable tag found in Docker Hub response"
+    # Sort newest-first by last_updated; Docker Hub returns ISO-8601 strings
+    # which sort lexicographically.
+    candidates.sort(key=lambda r: r.get("last_updated", ""), reverse=True)
+    latest = candidates[0]
+    digest = latest["name"]
+    excerpt_lines = [
+        f"latest stable tag: {digest}",
+        f"last_updated: {latest.get('last_updated', '')}",
+        "top candidates:",
+        *(f"  - {r['name']} ({r.get('last_updated', '')})" for r in candidates[:3]),
+    ]
+    return digest, "\n".join(excerpt_lines)
+
+
 _DIGESTERS: dict[str, Callable[[str], tuple[str, str]]] = {
     "html": _digest_html,
     "feed": _digest_feed,
     "pypi": _digest_pypi,
+    "docker-tag": _digest_docker_tag,
 }
 
 

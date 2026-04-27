@@ -91,6 +91,150 @@ class TestDigesters:
         assert digest == "<malformed>"
         assert "JSON decode failed" in excerpt
 
+    def _docker_tags_response(
+        self,
+        tags: list[tuple[str, str, str]],
+    ) -> str:
+        """Build a Docker Hub tags JSON body.
+
+        ``tags`` is a list of ``(name, last_updated, status)`` triples.
+        """
+        return json.dumps(
+            {
+                "count": len(tags),
+                "next": None,
+                "previous": None,
+                "results": [
+                    {"name": name, "last_updated": ts, "tag_status": status}
+                    for name, ts, status in tags
+                ],
+            }
+        )
+
+    def test_docker_tag_digest_is_latest_stable_tag(self):
+        body = self._docker_tags_response(
+            [
+                ("v10.5.0", "2026-04-26T21:13:00Z", "active"),
+                ("v10.4.0", "2026-04-10T08:00:00Z", "active"),
+                ("v10.3.0", "2026-03-22T11:30:00Z", "active"),
+            ]
+        )
+        digest, excerpt = wp._digest_docker_tag(body)
+        assert digest == "v10.5.0"
+        assert "latest stable tag: v10.5.0" in excerpt
+        assert "v10.4.0" in excerpt  # second candidate listed in the excerpt
+
+    def test_docker_tag_skips_mutable_tag_names(self):
+        """`latest`, `master`, `nightly` etc. should never be picked as the
+        "latest release" — they always point at a moving stream and would
+        either trigger drift on every cron tick or mask real version bumps.
+        """
+        body = self._docker_tags_response(
+            [
+                ("latest", "2026-04-27T00:00:00Z", "active"),
+                ("master", "2026-04-27T00:00:00Z", "active"),
+                ("nightly", "2026-04-27T00:00:00Z", "active"),
+                ("v3.10.0-distroless", "2026-04-26T12:00:00Z", "active"),
+            ]
+        )
+        digest, _ = wp._digest_docker_tag(body)
+        assert digest == "v3.10.0-distroless"
+
+    def test_docker_tag_skips_inactive_tags(self):
+        """Deleted/withdrawn tags shouldn't be picked even if their
+        ``last_updated`` is recent.
+        """
+        body = self._docker_tags_response(
+            [
+                ("v3.10.0", "2026-04-27T00:00:00Z", "deleted"),
+                ("v3.9.5", "2026-04-15T00:00:00Z", "active"),
+            ]
+        )
+        digest, _ = wp._digest_docker_tag(body)
+        assert digest == "v3.9.5"
+
+    def test_docker_tag_digest_changes_on_release(self):
+        """The whole point of the watcher: when a new tag lands, the
+        digest flips, and `diff_watches` opens an issue.
+        """
+        before = self._docker_tags_response([("v10.4.0", "2026-04-10T08:00:00Z", "active")])
+        after = self._docker_tags_response(
+            [
+                ("v10.5.0", "2026-04-26T21:13:00Z", "active"),
+                ("v10.4.0", "2026-04-10T08:00:00Z", "active"),
+            ]
+        )
+        assert wp._digest_docker_tag(before)[0] != wp._digest_docker_tag(after)[0]
+
+    def test_docker_tag_handles_malformed_json(self):
+        digest, excerpt = wp._digest_docker_tag("not json")
+        assert digest == "<malformed>"
+        assert "JSON decode failed" in excerpt
+
+    def test_docker_tag_handles_no_stable_tags(self):
+        """If a registry response somehow contains only mutable tags (or
+        is empty), don't crash — return a sentinel that's stable across
+        runs so we don't spam the issue tracker on every tick.
+        """
+        body = self._docker_tags_response(
+            [
+                ("latest", "2026-04-27T00:00:00Z", "active"),
+                ("master", "2026-04-27T00:00:00Z", "active"),
+            ]
+        )
+        digest, excerpt = wp._digest_docker_tag(body)
+        assert digest == "<no-stable-tag>"
+        assert "no stable tag" in excerpt
+
+    def test_docker_tag_skips_pr_build_artifacts(self):
+        """Live smoke during M16 follow-on caught dozzle picking ``pr-4662``
+        as the "latest tag" — a CI artifact, not a release. The semver-
+        shaped filter rejects it; only ``v10.5.0`` survives as a real
+        candidate.
+        """
+        body = self._docker_tags_response(
+            [
+                ("pr-4662", "2026-04-27T18:00:00Z", "active"),
+                ("sha-abc123", "2026-04-27T17:00:00Z", "active"),
+                ("v10.5.0", "2026-04-26T21:13:00Z", "active"),
+            ]
+        )
+        digest, _ = wp._digest_docker_tag(body)
+        assert digest == "v10.5.0"
+
+    def test_docker_tag_skips_major_version_aliases(self):
+        """Live smoke caught prometheus picking ``v3-distroless`` — the
+        major-version alias that always points at the head of v3.x. The
+        full-triplet semver filter rejects both major aliases (``v3``,
+        ``v3-distroless``) and minor aliases (``v10.5``); only the full
+        ``v3.10.0-distroless`` survives.
+        """
+        body = self._docker_tags_response(
+            [
+                ("v3-distroless", "2026-04-27T00:00:00Z", "active"),
+                ("v3", "2026-04-27T00:00:00Z", "active"),
+                ("v3.10.0-distroless", "2026-04-26T12:00:00Z", "active"),
+            ]
+        )
+        digest, _ = wp._digest_docker_tag(body)
+        assert digest == "v3.10.0-distroless"
+
+    def test_docker_tag_skips_minor_stream_aliases(self):
+        """Live smoke caught dozzle picking ``v10.5`` — the minor-stream
+        alias re-pushed every time a 10.5.x patch lands. Its name stays
+        the same across patches, so a name-only digest would never flip.
+        Requiring a full ``MAJOR.MINOR.PATCH`` triplet keeps the digest
+        responsive to every real release.
+        """
+        body = self._docker_tags_response(
+            [
+                ("v10.5", "2026-04-27T00:00:00Z", "active"),
+                ("v10.5.0", "2026-04-26T21:13:00Z", "active"),
+            ]
+        )
+        digest, _ = wp._digest_docker_tag(body)
+        assert digest == "v10.5.0"
+
 
 class TestDiffWatches:
     """``diff_watches`` is the pure core — the seam for testing the loop
@@ -308,13 +452,27 @@ class TestWatchesContract:
             assert w.note.strip(), f"{w.key} missing note"
 
 
-@pytest.mark.parametrize("kind", ["html", "feed", "pypi"])
+@pytest.mark.parametrize("kind", ["html", "feed", "pypi", "docker-tag"])
 def test_digester_returns_str_str(kind):
     """Defensive: every digester returns ``(str, str)`` so the loop's
     type assumptions hold even if a future digester author forgets."""
     digester = wp._DIGESTERS[kind]
     if kind == "pypi":
         digest, excerpt = digester(json.dumps({"info": {"version": "0.0.1"}, "releases": {}}))
+    elif kind == "docker-tag":
+        digest, excerpt = digester(
+            json.dumps(
+                {
+                    "results": [
+                        {
+                            "name": "v1.0.0",
+                            "last_updated": "2026-04-27T00:00:00Z",
+                            "tag_status": "active",
+                        }
+                    ]
+                }
+            )
+        )
     else:
         digest, excerpt = digester("<html><body>x</body></html>")
     assert isinstance(digest, str)
