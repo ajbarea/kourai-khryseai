@@ -1,0 +1,86 @@
+name: Nightly
+
+# Runs slow integration tests once per day plus on manual dispatch. These
+# are deliberately excluded from the fast `tests.yml` lane because building
+# the Docker MCP sidecar images and exercising the real integration path
+# takes ~7 minutes — far above the ~5min budget we want push/PR feedback
+# to stay within. Lint, unit, and performance suites continue to run on
+# every push and PR via tests.yml.
+
+on:
+  schedule:
+    - cron: "17 8 * * *"   # 08:17 UTC daily (one hour after vFL nightly to avoid runner contention)
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    env:
+      DOCKER_HUB_USERNAME: ajb6289
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v6.2.0
+        with:
+          python-version-file: "pyproject.toml"
+
+      - name: Install dependencies
+        run: uv sync --all-packages --dev --frozen
+
+      - name: Create .env for CI
+        run: |
+          cat > .env << 'EOF'
+          DOCKER_HUB_USERNAME=ajb6289
+          KOURAI_PROVIDER=local
+          KOURAI_MODEL_TIER=cheap
+          KOURAI_LOG_LEVEL=INFO
+          ENVIRONMENT=ci
+          SERVICE_VERSION=0.1.0
+          EOF
+
+      - name: Build MCP sidecar images for integration tests
+        run: |
+          docker build -f docker/context7-mcp.Dockerfile -t ${DOCKER_HUB_USERNAME}/kourai-khryseai:context7-mcp .
+          docker build -f docker/memory-mcp.Dockerfile -t ${DOCKER_HUB_USERNAME}/kourai-khryseai:memory-mcp .
+
+      - name: Create logs directory
+        run: mkdir -p logs
+
+      - name: Run integration tests
+        run: uv run pytest tests/integration/ -m integration -v --tb=short --cov=. --cov-report=xml:logs/coverage.xml --cov-report=term-missing --junitxml=logs/junit.xml
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v6.0.0
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: ajbarea/kourai_khryseai
+          files: logs/coverage.xml
+          flags: integration
+          fail_ci_if_error: false
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v6.0.0
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: ajbarea/kourai_khryseai
+          files: logs/junit.xml
+          flags: integration
+          report_type: test_results
+          fail_ci_if_error: false
