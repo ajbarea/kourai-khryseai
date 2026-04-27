@@ -216,6 +216,16 @@ services:
       # Forge worktrees live under ~/.kourai_khryseai/projects on the host;
       # specialists need RW access so they can lint/fix files in a session.
       - ~/.kourai_khryseai:/home/kourai/.kourai_khryseai
+      # Mount the same dir AGAIN at the host-absolute path so git worktree
+      # pointers resolve. `git worktree add` writes a `.git` pointer file
+      # containing `gitdir: $HOST_HOME/.kourai_khryseai/.git/worktrees/...`
+      # — that's a host-side absolute path the container can't follow via
+      # the /home/kourai/ mount alone. Compose expands ${HOME} host-side at
+      # up-time, so this mount lands at the same physical files under both
+      # paths inside the container, and git's pointer-file resolution
+      # works without a relative-path rewrite (the Claude-Code git-wtadd
+      # pattern researched 2026-04-27 — same idea, less moving parts).
+      - ~/.kourai_khryseai:${HOME:-/root}/.kourai_khryseai
     develop:
       watch:
         - action: sync
@@ -264,6 +274,9 @@ services:
       # Forge worktrees live under ~/.kourai_khryseai/projects on the host;
       # Techne writes generated code into the active session.
       - ~/.kourai_khryseai:/home/kourai/.kourai_khryseai
+      # See Kallos's mount block above for the rationale on the second
+      # host-absolute-path mount that lets git worktree pointers resolve.
+      - ~/.kourai_khryseai:${HOME:-/root}/.kourai_khryseai
     develop:
       watch:
         - action: sync
@@ -312,6 +325,9 @@ services:
       # Forge worktrees live under ~/.kourai_khryseai/projects on the host;
       # Dokimasia runs pytest inside the session and applies test fixes there.
       - ~/.kourai_khryseai:/home/kourai/.kourai_khryseai
+      # See Kallos's mount block above for the rationale on the second
+      # host-absolute-path mount that lets git worktree pointers resolve.
+      - ~/.kourai_khryseai:${HOME:-/root}/.kourai_khryseai
     develop:
       watch:
         - action: sync
@@ -362,6 +378,9 @@ services:
       # Forge worktrees live under ~/.kourai_khryseai/projects on the host;
       # Metis inspects project config from the active session.
       - ~/.kourai_khryseai:/home/kourai/.kourai_khryseai
+      # See Kallos's mount block above for the rationale on the second
+      # host-absolute-path mount that lets git worktree pointers resolve.
+      - ~/.kourai_khryseai:${HOME:-/root}/.kourai_khryseai
     develop:
       watch:
         - action: sync
@@ -586,6 +605,9 @@ services:
       - ./agents/vn_bridge.py:/app/agents/vn_bridge.py
       - ./shared:/app/shared
       - ~/.kourai_khryseai:/home/kourai/.kourai_khryseai
+      # See Kallos's mount block above for the rationale on the second
+      # host-absolute-path mount that lets git worktree pointers resolve.
+      - ~/.kourai_khryseai:${HOME:-/root}/.kourai_khryseai
     networks:
       - kourai
     restart: unless-stopped
