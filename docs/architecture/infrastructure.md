@@ -2,38 +2,15 @@
 
 ## 🔍 Observability
 
-### Distributed Tracing
+The agent stack ships a three-pane observability triad — **Jaeger** for traces, **Prometheus** for metrics, **Dozzle** for live container logs. One command opens all three:
 
-Every A2A call creates an OpenTelemetry span. W3C Trace Context headers are propagated via A2A message `metadata`, allowing Jaeger to stitch traces across all ten agents into a single view.
+```bash
+make observe
+```
 
-**Span naming convention:**
+Each log line emitted inside a span context carries the active trace ID, so a slow span found in Jaeger is grep-findable in Dozzle without any code change between observation and search.
 
-| Span | Source |
-|---|---|
-| `hephaestus.route` | Pipeline determination |
-| `hephaestus.pipeline.step.{agent}` | Each specialist call |
-| `hephaestus.pipeline.fix_loop` | Kallos-Techne iterations |
-| `a2a.connect.{agent}` | Agent card fetch |
-| `a2a.send.{agent}` | Message send |
-| `{agent}.execute` | Agent-specific execution |
-| `{agent}.generate` | LLM call |
-
-### What You See in Jaeger
-
-Open [`localhost:16686`](http://localhost:16686) and select any service:
-
-- **Full request flow** — One trace spanning all agents in the pipeline
-- **Per-agent latency** — How long each specialist took (LLM call time dominates)
-- **Error locations** — Which agent failed and at which operation
-- **Fix loop iterations** — How many Kallos-Techne rounds were needed
-
-### 📊 Service Performance Monitoring (SPM)
-
-Jaeger generates RED metrics (Rate, Error, Duration) from traces and stores them in Prometheus. This enables the "Monitor" tab in the Jaeger UI for high-level service health visualization.
-
-- **RED Metrics** — Instant visibility into request volume, error percentages, and latency percentiles (P50, P95, P99).
-- **Metric Exploration** — Use the Prometheus UI at [`localhost:9090`](http://localhost:9090) for raw PromQL queries and custom dashboarding.
-- **Span-to-Metrics** — Jaeger's internal collector generates these metrics in real-time as traces arrive via OTLP.
+The full mental model, triage runbook, and current coverage gaps (Prometheus is sparsely populated today; the Jaeger v2 SPM uplift is tracked under M16) live on the dedicated **[Observability](../observability.md)** page.
 
 ---
 
