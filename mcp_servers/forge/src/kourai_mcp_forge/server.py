@@ -33,6 +33,7 @@ from urllib.parse import unquote, urlparse
 from mcp.server.fastmcp import Context, FastMCP
 
 from kourai_common import forge_tools
+from kourai_common.tracing import create_span
 
 log = logging.getLogger(__name__)
 
@@ -80,7 +81,8 @@ async def read_file(path: str, ctx: Context) -> str:
     project_root = await _resolve_project_root(ctx)
     if isinstance(project_root, str):
         return project_root
-    return await forge_tools.read_file(path, project_root=project_root)
+    with create_span("forge.read_file", {"forge.path": path}):
+        return await forge_tools.read_file(path, project_root=project_root)
 
 
 @mcp.tool()
@@ -89,7 +91,11 @@ async def write_file(path: str, content: str, ctx: Context) -> str:
     project_root = await _resolve_project_root(ctx)
     if isinstance(project_root, str):
         return project_root
-    return await forge_tools.write_file(path, content, project_root=project_root)
+    with create_span(
+        "forge.write_file",
+        {"forge.path": path, "forge.content_chars": str(len(content))},
+    ):
+        return await forge_tools.write_file(path, content, project_root=project_root)
 
 
 @mcp.tool()
@@ -107,7 +113,15 @@ async def edit_file(
     project_root = await _resolve_project_root(ctx)
     if isinstance(project_root, str):
         return project_root
-    return await forge_tools.edit_file(path, old_string, new_string, project_root=project_root)
+    with create_span(
+        "forge.edit_file",
+        {
+            "forge.path": path,
+            "forge.old_chars": str(len(old_string)),
+            "forge.new_chars": str(len(new_string)),
+        },
+    ):
+        return await forge_tools.edit_file(path, old_string, new_string, project_root=project_root)
 
 
 @mcp.tool()
@@ -116,4 +130,5 @@ async def delete_file(path: str, ctx: Context) -> str:
     project_root = await _resolve_project_root(ctx)
     if isinstance(project_root, str):
         return project_root
-    return await forge_tools.delete_file(path, project_root=project_root)
+    with create_span("forge.delete_file", {"forge.path": path}):
+        return await forge_tools.delete_file(path, project_root=project_root)

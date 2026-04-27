@@ -189,3 +189,55 @@ class TestDeleteFileTool:
     async def test_no_op_when_absent(self, tmp_path: Path):
         result = await delete_file("nonexistent.py", _ctx_for_root(tmp_path))
         assert "already absent" in result
+
+
+class TestForgeSpans:
+    """Each forge tool wraps the underlying handler in a `create_span` so
+    the tool latency lands in Jaeger when the bridge migration (Change 3b+)
+    routes specialist tool calls through the subprocess. Without this, the
+    in-process trace ends at the bridge handler and the dev sees
+    ``forge.write_file`` time as one undifferentiated subprocess span.
+    """
+
+    @pytest.mark.asyncio
+    async def test_write_file_emits_span(self, tmp_path: Path):
+        from contextlib import contextmanager
+        from unittest.mock import patch
+
+        captured: list[tuple[str, dict]] = []
+
+        @contextmanager
+        def capturing_span(name: str, attributes: dict | None = None):
+            captured.append((name, attributes or {}))
+            yield MagicMock()
+
+        with patch("kourai_mcp_forge.server.create_span", capturing_span):
+            await write_file("traced.py", "x = 1", _ctx_for_root(tmp_path))
+
+        assert "forge.write_file" in [n for n, _ in captured]
+        attrs = next(a for n, a in captured if n == "forge.write_file")
+        assert attrs.get("forge.path") == "traced.py"
+        assert attrs.get("forge.content_chars") == "5"
+
+    @pytest.mark.asyncio
+    async def test_no_span_emitted_when_roots_unscoped(self, tmp_path: Path):
+        """Short-circuit at the roots-resolution stage should NOT emit a
+        span — the underlying handler never runs, so a span would imply
+        work that didn't happen.
+        """
+        from contextlib import contextmanager
+        from unittest.mock import patch
+
+        captured: list[str] = []
+
+        @contextmanager
+        def capturing_span(name: str, attributes: dict | None = None):
+            captured.append(name)
+            yield MagicMock()
+
+        with patch("kourai_mcp_forge.server.create_span", capturing_span):
+            await write_file(
+                "x.py", "y = 1", _make_ctx(__import__("mcp").types.ListRootsResult(roots=[]))
+            )
+
+        assert captured == []
