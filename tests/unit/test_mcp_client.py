@@ -14,11 +14,16 @@ import pytest
 from mcp.types import TextContent
 
 from kourai_common.mcp_client import (
+    _KOURAI_CLIENT_INFO_NAME,
+    _KOURAI_CLIENT_INFO_VERSION,
     MCPToolkit,
     MCPUnavailable,
     ServerConfig,
+    _kourai_list_roots,
+    build_client_session,
     create_memory_entities,
     get_mcp_toolkit,
+    kourai_project_root_var,
     query_context7,
     search_memory_nodes,
 )
@@ -248,7 +253,7 @@ class TestQueryContext7Async:
         session.call_tool = AsyncMock(return_value=empty_result)
 
         @asynccontextmanager
-        async def mock_client_session(_read: object, _write: object):
+        async def mock_client_session(_read: object, _write: object, **_kwargs: object):
             yield session
 
         with (
@@ -265,7 +270,7 @@ class TestQueryContext7Async:
         session = _make_session_mock(docs_text=expected_docs)
 
         @asynccontextmanager
-        async def mock_client_session(_read: object, _write: object):
+        async def mock_client_session(_read: object, _write: object, **_kwargs: object):
             yield session
 
         with (
@@ -290,7 +295,7 @@ class TestQueryContext7Async:
         session = _make_session_mock()
 
         @asynccontextmanager
-        async def mock_client_session(_read: object, _write: object):
+        async def mock_client_session(_read: object, _write: object, **_kwargs: object):
             yield session
 
         with (
@@ -329,7 +334,7 @@ class TestCreateMemoryEntitiesAsync:
         session.call_tool = AsyncMock(return_value=MagicMock(content=[]))
 
         @asynccontextmanager
-        async def mock_client_session(_read: object, _write: object):
+        async def mock_client_session(_read: object, _write: object, **_kwargs: object):
             yield session
 
         entities = [
@@ -360,7 +365,7 @@ class TestCreateMemoryEntitiesAsync:
         session.call_tool = AsyncMock(return_value=MagicMock(content=[]))
 
         @asynccontextmanager
-        async def mock_client_session(_read: object, _write: object):
+        async def mock_client_session(_read: object, _write: object, **_kwargs: object):
             yield session
 
         with (
@@ -402,7 +407,7 @@ class TestSearchMemoryNodesAsync:
         session.call_tool = AsyncMock(return_value=result)
 
         @asynccontextmanager
-        async def mock_client_session(_read: object, _write: object):
+        async def mock_client_session(_read: object, _write: object, **_kwargs: object):
             yield session
 
         with (
@@ -423,7 +428,7 @@ class TestSearchMemoryNodesAsync:
         session.call_tool = AsyncMock(return_value=result)
 
         @asynccontextmanager
-        async def mock_client_session(_read: object, _write: object):
+        async def mock_client_session(_read: object, _write: object, **_kwargs: object):
             yield session
 
         with (
@@ -444,7 +449,7 @@ class TestSearchMemoryNodesAsync:
         session.call_tool = AsyncMock(return_value=result)
 
         @asynccontextmanager
-        async def mock_client_session(_read: object, _write: object):
+        async def mock_client_session(_read: object, _write: object, **_kwargs: object):
             yield session
 
         with (
@@ -490,7 +495,7 @@ class TestMCPSpanEmission:
         session.call_tool = AsyncMock(side_effect=[lib_result, docs_result])
 
         @asynccontextmanager
-        async def mock_session(_r: object, _w: object):
+        async def mock_session(_r: object, _w: object, **_kwargs: object):
             yield session
 
         with (
@@ -519,7 +524,7 @@ class TestMCPSpanEmission:
         session.call_tool = AsyncMock(return_value=result)
 
         @asynccontextmanager
-        async def mock_session(_r: object, _w: object):
+        async def mock_session(_r: object, _w: object, **_kwargs: object):
             yield session
 
         with (
@@ -530,3 +535,91 @@ class TestMCPSpanEmission:
             await search_memory_nodes("anything")
 
         assert any("memory" in name for name in span_names)
+
+
+# ── M2 Change 1: client capability declaration ───────────────────────────────
+
+
+class TestBuildClientSession:
+    """`ClientSession.initialize()` declares `roots` / `elicitation` /
+    `sampling` only when the corresponding callback is non-default
+    (mcp/client/session.py:148-188). The factory's job is to wire the
+    callbacks the SDK expects so the right capabilities — and only
+    those — get declared in the initialize handshake.
+    """
+
+    def test_factory_wires_kourai_list_roots_callback(self):
+        """A non-default `_list_roots_callback` is the predicate that
+        causes the SDK to declare `roots` in the initialize handshake.
+        """
+        from mcp.client.session import _default_list_roots_callback
+
+        session = build_client_session(MagicMock(), MagicMock())
+        assert session._list_roots_callback is _kourai_list_roots
+        assert session._list_roots_callback is not _default_list_roots_callback
+
+    def test_factory_does_not_supply_elicitation_or_sampling_callbacks(self):
+        """Elicitation and sampling callbacks must remain at SDK defaults
+        so the SDK does not declare those capabilities. Each lands when
+        its real implementation does (Change 4 for elicitation; future
+        caller for sampling) — we don't lie about supporting them.
+        """
+        from mcp.client.session import (
+            _default_elicitation_callback,
+            _default_sampling_callback,
+        )
+
+        session = build_client_session(MagicMock(), MagicMock())
+        assert session._elicitation_callback is _default_elicitation_callback
+        assert session._sampling_callback is _default_sampling_callback
+
+    def test_factory_supplies_kourai_client_info(self):
+        """Override the SDK default `Implementation(name="mcp", ...)` so
+        server-side observability sees a real client name + version.
+        """
+        session = build_client_session(MagicMock(), MagicMock())
+        assert session._client_info.name == _KOURAI_CLIENT_INFO_NAME
+        assert session._client_info.version == _KOURAI_CLIENT_INFO_VERSION
+
+
+class TestKouraiListRoots:
+    """The list-roots callback is the actual data path: when a server
+    asks `roots/list`, this is what answers. Reads
+    `kourai_project_root_var` so request handlers can scope per-request
+    without threading the path through every signature.
+    """
+
+    @pytest.mark.asyncio
+    async def test_returns_empty_list_when_contextvar_unset(self):
+        """No project_root in scope → honest empty `ListRootsResult`,
+        distinct from the SDK default's "List roots not supported" error.
+        """
+        from mcp.types import ListRootsResult
+
+        # Defensive: ensure the var is unset for this test (other tests
+        # may have set+forgotten-to-reset it via pytest interleaving).
+        token = kourai_project_root_var.set(None)
+        try:
+            result = await _kourai_list_roots(MagicMock())
+        finally:
+            kourai_project_root_var.reset(token)
+
+        assert isinstance(result, ListRootsResult)
+        assert result.roots == []
+
+    @pytest.mark.asyncio
+    async def test_returns_single_root_when_contextvar_set(self, tmp_path):
+        """project_root in scope → one Root with its `file://` URI."""
+        from mcp.types import ListRootsResult
+
+        token = kourai_project_root_var.set(tmp_path)
+        try:
+            result = await _kourai_list_roots(MagicMock())
+        finally:
+            kourai_project_root_var.reset(token)
+
+        assert isinstance(result, ListRootsResult)
+        assert len(result.roots) == 1
+        root = result.roots[0]
+        assert str(root.uri) == tmp_path.as_uri()
+        assert root.name == "project_root"

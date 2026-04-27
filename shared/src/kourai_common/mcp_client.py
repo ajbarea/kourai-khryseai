@@ -25,11 +25,32 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from contextvars import ContextVar
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from kourai_common.tracing import create_span
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
+    from mcp import ClientSession
+    from mcp.shared.context import RequestContext
+    from mcp.shared.message import SessionMessage
+    from mcp.types import ListRootsResult
+
 log = logging.getLogger(__name__)
+
+# Active project root for the current request, surfaced to MCP servers via
+# `_kourai_list_roots`. Set by the executor / host that already parses
+# `[project_root: ...]` from incoming user messages; propagates through
+# asyncio task children so any MCP call further down the stack picks it
+# up without threading it through every signature.
+kourai_project_root_var: ContextVar[Path | None] = ContextVar("kourai_project_root", default=None)
+
+_KOURAI_CLIENT_INFO_NAME = "kourai-khryseai"
+_KOURAI_CLIENT_INFO_VERSION = "0.1.0"
 
 
 class MCPUnavailable(Exception):
@@ -180,6 +201,62 @@ def _initialize_default_registry(toolkit: MCPToolkit) -> None:
     log.info("Initialized default MCP registry with %d servers", len(toolkit.server_registry))
 
 
+# ── Client-side capability declarations (M2 Change 1) ────────────────────────
+#
+# The MCP Python SDK gates capability declaration on callback presence:
+# ClientSession.initialize() declares ``roots`` / ``elicitation`` /
+# ``sampling`` only when the corresponding callback is non-default
+# (mcp/client/session.py:148-188). Default callbacks return ErrorData
+# saying "...not supported", so an all-three-with-stubs approach would
+# declare capabilities while lying about supporting them. We declare
+# only what we actually back: ``roots`` today (real callback below);
+# ``elicitation`` lands with M2 Change 4 (INPUT_REQUIRED routing);
+# ``sampling`` lands when its first caller appears.
+
+
+async def _kourai_list_roots(
+    context: RequestContext[ClientSession, object],
+) -> ListRootsResult:
+    """Return the active project root as the sole MCP root.
+
+    Reads ``kourai_project_root_var``. When unset, returns an empty
+    list — honest "no roots scoped right now," distinct from the SDK
+    default's "List roots not supported." When set, returns a single
+    Root pointing at the project's ``file://`` URI.
+    """
+    from mcp.types import FileUrl, ListRootsResult, Root
+
+    root = kourai_project_root_var.get()
+    if root is None:
+        return ListRootsResult(roots=[])
+    return ListRootsResult(roots=[Root(uri=FileUrl(root.as_uri()), name="project_root")])
+
+
+def build_client_session(
+    read: MemoryObjectReceiveStream[SessionMessage | Exception],
+    write: MemoryObjectSendStream[SessionMessage],
+) -> ClientSession:
+    """Construct a ``ClientSession`` with kourai's standard client capabilities.
+
+    Today: declares ``roots`` (via ``_kourai_list_roots`` + the
+    ``kourai_project_root_var`` contextvar) and ships ``client_info``
+    identifying the host as kourai-khryseai. Elicitation and sampling
+    are intentionally NOT wired — see the section comment above for why.
+    """
+    from mcp import ClientSession
+    from mcp.types import Implementation
+
+    return ClientSession(
+        read,
+        write,
+        list_roots_callback=_kourai_list_roots,
+        client_info=Implementation(
+            name=_KOURAI_CLIENT_INFO_NAME,
+            version=_KOURAI_CLIENT_INFO_VERSION,
+        ),
+    )
+
+
 # ── Async MCP client functions ───────────────────────────────────────────────
 #
 # Each function opens a fresh streamable_http_client + ClientSession per call.
@@ -210,7 +287,6 @@ async def query_context7(library: str, topic: str, tokens: int = 5000) -> str:
     Raises:
         MCPUnavailable: If the sidecar is unreachable or the call fails.
     """
-    from mcp import ClientSession
     from mcp.client.streamable_http import streamable_http_client
     from mcp.types import TextContent
 
@@ -218,7 +294,7 @@ async def query_context7(library: str, topic: str, tokens: int = 5000) -> str:
     try:
         async with asyncio.timeout(_MCP_CALL_TIMEOUT):
             async with streamable_http_client(url) as (read, write, _):
-                async with ClientSession(read, write) as session:
+                async with build_client_session(read, write) as session:
                     await session.initialize()
                     with create_span(
                         "mcp.context7.query",
@@ -256,14 +332,13 @@ async def create_memory_entities(entities: list[dict]) -> None:
     Raises:
         MCPUnavailable: If the sidecar is unreachable or the call fails.
     """
-    from mcp import ClientSession
     from mcp.client.streamable_http import streamable_http_client
 
     url = os.getenv("MEMORY_MCP_URL", "http://memory-mcp:5001/mcp")
     try:
         async with asyncio.timeout(_MCP_CALL_TIMEOUT):
             async with streamable_http_client(url) as (read, write, _):
-                async with ClientSession(read, write) as session:
+                async with build_client_session(read, write) as session:
                     await session.initialize()
                     with create_span(
                         "mcp.memory.create_entities",
@@ -283,7 +358,6 @@ async def search_memory_nodes(query: str) -> str:
     Raises:
         MCPUnavailable: If the sidecar is unreachable or the call fails.
     """
-    from mcp import ClientSession
     from mcp.client.streamable_http import streamable_http_client
     from mcp.types import TextContent
 
@@ -291,7 +365,7 @@ async def search_memory_nodes(query: str) -> str:
     try:
         async with asyncio.timeout(_MCP_CALL_TIMEOUT):
             async with streamable_http_client(url) as (read, write, _):
-                async with ClientSession(read, write) as session:
+                async with build_client_session(read, write) as session:
                     await session.initialize()
                     with create_span(
                         "mcp.memory.search_nodes",
