@@ -855,11 +855,16 @@ async def main(
                     forge_msg = "\n".join((*forge_tags, forge_msg))
 
                 _echo("")
-                stream_kwargs: dict[str, object] = {}
+                # Explicit kwargs (was a `dict[str, object]` unpacked via
+                # **stream_kwargs, but the loose object typing tripped ty
+                # on every call site — Memoir | None and str | None can't
+                # be expressed through dict[str, object]).
+                memoir_arg: Memoir | None = None
+                scene_id_arg: str | None = None
                 if forge_session is not None and forge_memoir is not None:
                     forge_turn_number += 1
-                    stream_kwargs["memoir"] = forge_memoir
-                    stream_kwargs["scene_id"] = derive_scene_id(
+                    memoir_arg = forge_memoir
+                    scene_id_arg = derive_scene_id(
                         forge_session.session_id,
                         turn_number=forge_turn_number,
                     )
@@ -872,7 +877,8 @@ async def main(
                     tts=tts,
                     gossip_enabled=settings.gossip_enabled,
                     forge_tags=forge_tags or None,
-                    **stream_kwargs,
+                    memoir=memoir_arg,
+                    scene_id=scene_id_arg,
                 )
 
                 if forge_session is not None:

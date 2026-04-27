@@ -139,6 +139,8 @@ class TestMemoirEntry:
                 weight=1.0,
             ),
         )
+        assert entry.player_response is not None  # narrow Optional for ty
+        assert entry.training_label is not None  # narrow Optional for ty
         assert entry.player_response.kind == "modified"
         assert entry.training_label.weight == 1.0
 
@@ -178,5 +180,6 @@ class TestMemoirEntry:
             },
         )
         restored = MemoirEntry.model_validate_json(original.model_dump_json())
+        assert restored.context is not None  # narrow Optional for ty
         assert restored.context["task_type"] == "style_review"
         assert restored.context["preceding_agents"] == ["techne"]

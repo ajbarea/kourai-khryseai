@@ -57,6 +57,7 @@ class TestDeterminePipelineForwardsConfirmOrder:
         ):
             result = await determine_pipeline("add divide function")
 
+        assert isinstance(result, str)  # narrow list[str] | str for ty
         assert result.startswith("CONFIRM_ORDER:")
         assert "smart" in result
 
@@ -71,6 +72,7 @@ class TestDeterminePipelineForwardsConfirmOrder:
         ):
             result = await determine_pipeline("speed it up")
 
+        assert isinstance(result, str)  # narrow list[str] | str for ty
         assert result.startswith("CONFIRM_ORDER:")
         assert "clarify" in result
 

@@ -61,7 +61,10 @@ class Subsystems:
     typewriter: TypewriterManager
     flash: FlashEffect
     quick_actions: QuickActionBar
-    send_q: queue.Queue[tuple[str, str] | None]
+    # Queue carries (target, text, attachments) tuples per the M11 GUI
+    # attachment send-path. GuiClient builds a multi-part A2A Message from
+    # the 3-tuple; DemoGuiClient drops the attachments slot.
+    send_q: queue.Queue[tuple[str, str, list[tuple[str, str]]] | None]
     recv_q: queue.Queue[dict]
     tts_manager: TTSGUIManager
 
@@ -229,7 +232,10 @@ def load_subsystems(
     step += 1
     try:
         logger.debug(f"Starting A2A client (agent_url={agent_url})...")
-        send_q: queue.Queue[tuple[str, str] | None] = queue.Queue()
+        # Queue carries (target, text, attachments) tuples per the M11 GUI
+        # attachment send-path. GuiClient builds a multi-part A2A Message
+        # from the 3-tuple; DemoGuiClient drops the attachments slot.
+        send_q: queue.Queue[tuple[str, str, list[tuple[str, str]]] | None] = queue.Queue()
         recv_q: queue.Queue[dict] = queue.Queue()
         queues_hook["send_q"] = send_q
         if demo_mode:

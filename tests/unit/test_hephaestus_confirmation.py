@@ -78,7 +78,7 @@ class TestParseConfirmationResponse:
         # downstream code mutating the read-back text mid-flight.
         parsed = parse_confirmation_response('CONFIRM_ORDER: clear "x"')
         with pytest.raises((AttributeError, Exception)):
-            parsed.tier = "smart"  # type: ignore[misc]
+            parsed.tier = "smart"  # ty: ignore[invalid-assignment]  # intentional — verifies frozen
 
 
 class TestRoutingPromptDocumentsConfirmOrder:

@@ -55,7 +55,7 @@ def test_configure_sdl_audio_driver_uses_dummy_headless_linux(monkeypatch) -> No
     assert os.environ["SDL_AUDIODRIVER"] == "dummy"
 
 
-def test_audio_module_import_triggers_sdl_configure() -> None:
+def test_audio_module_import_triggers_sdl_configure(monkeypatch) -> None:
     """Regression guard: ``configure_sdl_audio_driver`` was defined long
     before this PR but wasn't called anywhere — so AJ's WSL2 launches
     fell through to SDL's default ALSA backend and produced
@@ -69,9 +69,11 @@ def test_audio_module_import_triggers_sdl_configure() -> None:
 
     # The wiring is at module load. Reload triggers it again with the
     # current `configure_sdl_audio_driver` (so a monkeypatched version
-    # would be observed).
+    # would be observed). Use monkeypatch instead of direct module-attr
+    # assignment so (a) ty stops warning about implicit shadowing of the
+    # function symbol and (b) restoration happens automatically on
+    # teardown — no try/finally bookkeeping.
     calls: list[str | None] = []
-
     real = audio_env.configure_sdl_audio_driver
 
     def _spy() -> str | None:
@@ -79,13 +81,9 @@ def test_audio_module_import_triggers_sdl_configure() -> None:
         calls.append(result)
         return result
 
-    audio_env.configure_sdl_audio_driver = _spy
-    audio.configure_sdl_audio_driver = _spy
-    try:
-        importlib.reload(audio)
-    finally:
-        audio_env.configure_sdl_audio_driver = real
-        audio.configure_sdl_audio_driver = real
+    monkeypatch.setattr(audio_env, "configure_sdl_audio_driver", _spy)
+    monkeypatch.setattr(audio, "configure_sdl_audio_driver", _spy)
+    importlib.reload(audio)
 
     assert calls, (
         "kourai_common.audio failed to call configure_sdl_audio_driver() "

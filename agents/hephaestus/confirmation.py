@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, cast
 
 Tier = Literal["clear", "smart", "clarify"]
 _VALID_TIERS: tuple[Tier, ...] = ("clear", "smart", "clarify")
@@ -62,5 +62,7 @@ def parse_confirmation_response(raw: str) -> ConfirmationResponse:
     tier_str, read_back = match.group(1), match.group(2)
     if tier_str not in _VALID_TIERS:
         raise ValueError(f"unknown tier {tier_str!r}; expected one of {_VALID_TIERS}")
-    # mypy/ty: the membership check above narrows tier_str to Tier.
-    return ConfirmationResponse(tier=tier_str, read_back=read_back)  # type: ignore[arg-type]
+    # mypy/ty: the membership check above narrows tier_str to Tier, but
+    # neither tool propagates set-membership narrowing to Literal types
+    # without `assert tier_str in (...)`. Cast keeps both happy.
+    return ConfirmationResponse(tier=cast("Tier", tier_str), read_back=read_back)
