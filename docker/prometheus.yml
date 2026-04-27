@@ -2,6 +2,8 @@ global:
   scrape_interval: 15s # Balanced scrape frequency (avoid cardinality limits)
 
 scrape_configs:
+  # Jaeger's own internal telemetry. Port moved from v1's :14269 to v2's
+  # :8888 (set in jaeger-config.yaml under service.telemetry.metrics).
   - job_name: 'jaeger-metrics'
     static_configs:
-      - targets: ['jaeger:14269']
+      - targets: ['jaeger:8888']
