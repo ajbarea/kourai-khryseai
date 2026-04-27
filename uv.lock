@@ -18,6 +18,7 @@ members = [
     "kourai-hephaestus",
     "kourai-kallos",
     "kourai-khryseai",
+    "kourai-mcp-forge",
     "kourai-mcp-shell",
     "kourai-metis",
     "kourai-mneme",
@@ -1355,6 +1356,21 @@ dev = [
     { name = "testcontainers", specifier = ">=4.9.1" },
     { name = "ty", specifier = ">=0.0.25,<0.1" },
     { name = "zensical", specifier = ">=0.0.24" },
+]
+
+[[package]]
+name = "kourai-mcp-forge"
+version = "0.1.0"
+source = { editable = "mcp_servers/forge" }
+dependencies = [
+    { name = "kourai-common" },
+    { name = "mcp" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "kourai-common", editable = "shared" },
+    { name = "mcp", specifier = ">=1.26.0,<2" },
 ]
 
 [[package]]

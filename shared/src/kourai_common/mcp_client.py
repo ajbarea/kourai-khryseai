@@ -16,6 +16,9 @@ MCP Servers in Kourai Khryseai:
     - Memory: Player facts via memory-mcp sidecar (HTTP Streamable, port 5001)
     - GitHub: Issue/PR/repo operations (direct PyGithub)
     - Shell: pytest, ruff, npx, node (kourai_mcp_shell over stdio)
+    - Forge: read_file / write_file / edit_file / delete_file scoped to the
+      player's project root via the host-declared ``roots`` capability
+      (kourai_mcp_forge over stdio; M2 Change 2)
     - Playwright: Frontend E2E testing (direct subprocess)
     - Brave Search: Web search (direct curl subprocess)
 """
