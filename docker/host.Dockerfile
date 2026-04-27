@@ -138,6 +138,15 @@ ENV PATH="/app/.venv/bin:$PATH"
 
 USER kourai
 
+# Forge worktrees on the host bind-mount are owned by the host user (typically
+# UID 1001+ for non-default accounts) while the container runs as `kourai`
+# (UID 1000). Git ≥2.35 refuses to operate on a repo owned by a different
+# user without an explicit safe.directory entry (CVE-2022-24765 hardening).
+# Trust every repo we can see — the bind mount IS the trust boundary; if
+# the player has malicious worktrees on disk, the agent containers are
+# already compromised. Root-cause UID alignment lives in M5 (ROADMAP).
+RUN git config --global --add safe.directory '*'
+
 EXPOSE ${PORT}
 
 ENTRYPOINT ["/app/entrypoint.sh"]
