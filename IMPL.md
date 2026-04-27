@@ -103,18 +103,45 @@ all-three-with-stubs approach would create.
   host-side parse) and stays untouched; specialist agents are where
   forge tools land, so they're the right wiring point.
 
-### Change 2 — `mcp_servers/forge/server.py` stdio scaffold
+### Change 2 — `mcp_servers/forge/server.py` stdio scaffold ✅ 2026-04-27
 
-- [ ] New stdio-transport server using the `mcp` Python SDK.
-- [ ] Tools list mirrors today's `agents.forge_tools` Python helpers:
-  `read_file`, `write_file`, `edit_file`, `run_command`.
-- [ ] `roots` validation in each file-touching handler — paths
-  outside the declared roots get rejected with a clear error
-  pointing at `notifications/roots/list_changed` for re-scoping.
-- [ ] Tool annotations stay conservative — the 2025-11-25 spec
-  explicitly marks annotations untrusted unless the server is
-  trusted; the host's permission gate remains source of truth, not
-  the server's self-described risk level.
+- [x] New `mcp_servers/forge/` workspace package
+  (`kourai-mcp-forge`, version 0.1.0) using `FastMCP("kourai-forge")`
+  over stdio — same pattern as the existing `mcp_servers/shell/`
+  but depends on `kourai-common` for the forge tool handlers.
+- [x] Tools mirror `kourai_common.forge_tools` exactly: `read_file`,
+  `write_file`, `edit_file`, `delete_file`. NOT `run_command` —
+  shell concerns stay in the shell MCP server; the forge server is
+  files-only.
+- [x] Each tool resolves the player's project root from
+  `ctx.session.list_roots()` via the new `_resolve_project_root`
+  helper, then delegates to the existing
+  `kourai_common.forge_tools` async handler with `project_root=`
+  injected. Path safety / `validate_file_path` / `PathViolation`
+  is single-sourced — the MCP layer is purely protocol wiring.
+- [x] No roots declared / empty list / list_roots raises → tool
+  short-circuits with a clear ERROR string pointing the contributor
+  at `kourai_project_root_var` so the unset-contextvar diagnosis is
+  legible. Multiple roots → first wins with a log warning.
+- [x] No tool annotations beyond name + description — the
+  2025-11-25 spec explicitly marks tool annotations untrusted
+  unless the server is trusted, and the host's permission gate
+  remains source of truth.
+- [x] 13 unit tests in `tests/unit/test_forge_mcp.py`:
+  - registration: `mcp.list_tools()` returns exactly the 4 expected
+    names;
+  - `_resolve_project_root` happy / empty / error / multi-root paths;
+  - end-to-end per tool against `tmp_path`-scoped Context (write
+    creates file, edit replaces unique match + rejects ambiguous,
+    delete removes + no-op-when-absent, read returns line-numbered
+    contents, write rejects path-escape).
+- [x] `mcp_client.py` module docstring updated with the new server
+  in the "MCP Servers in Kourai Khryseai" list.
+- [ ] **Live verification (deferred to Change 3):** specialist
+  containers connect to `kourai-mcp-forge` via stdio, declare
+  `[project_root: ...]` mid-pipeline, and watch a forge tool call
+  flow end-to-end. Today's tests cover the wiring; Change 3 closes
+  the loop.
 
 ### Change 3 — Specialist clients via `MCPToolkit`
 
