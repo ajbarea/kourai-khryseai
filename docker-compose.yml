@@ -83,6 +83,38 @@ services:
           memory: 256M
     logging: *default-logging
 
+  # Dozzle: Real-time per-container log dashboard. Browser-based,
+  # zero-config, no database. Tails every container in this compose
+  # project (filtered by COMPOSE_PROJECT_NAME via the docker socket).
+  # Use case: live triage when a pipeline goes wrong without juggling
+  # `docker logs -f` across 14 terminals; click on `metis-1` and
+  # follow it in real time. Pairs with Jaeger (per-trace flow) and
+  # Prometheus (rates/durations) — Dozzle is the third pane that
+  # answers "what is *this* agent saying right now."
+  #
+  # Researched 2026-04-27: dozzle is the right choice over Loki+Grafana
+  # (heavier, production-grade) and Logdy (general-purpose pipe viewer)
+  # for our shape — single dev machine, ~14 containers, want a
+  # single browser tab. Docker socket bind is read-only; UI binds
+  # localhost-only so nothing leaks beyond the dev box.
+  dozzle:
+    image: amir20/dozzle:v8.13.0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "127.0.0.1:8888:8080"
+    environment:
+      DOZZLE_FILTER: "label=com.docker.compose.project=kourai-khryseai"
+      DOZZLE_NO_ANALYTICS: "true"
+    networks:
+      - kourai
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    logging: *default-logging
+
   # ──────────────── MCP Sidecars ────────────────
   # Memory MCP: Shared knowledge graph sidecar.
   memory-mcp:
