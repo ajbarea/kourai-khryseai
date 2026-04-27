@@ -49,6 +49,11 @@ SLASH_COMMANDS: tuple[SlashCommand, ...] = (
         "compact",
         "Have Mneme tuck older turns into long-term memory — keep the recent ones in scope",
     ),
+    SlashCommand(
+        "permissions",
+        "Show or toggle pipeline-gating policies (yolo, reads)",
+        arg_hint="[yolo|reads]",
+    ),
     SlashCommand("metrics", "Show alignment, affinity, and virtue metrics"),
     SlashCommand("maidens", "Meet the Golden Maidens", arg_hint="[name]"),
     SlashCommand("status", "Agent info: name, URL, model, context ID"),

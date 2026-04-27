@@ -243,6 +243,69 @@ async def _compact_session_memory(context_id: str) -> None:
     _echo(_comms_window("mneme", body))
 
 
+_PERMISSIONS_GATES: dict[str, tuple[str, str]] = {
+    # field_name → (description-when-OFF, description-when-ON)
+    "yolo_enabled": (
+        "confirmation gate is active — Hephaestus reads back before any pipeline",
+        "ALL pipelines bypass the confirmation gate",
+    ),
+    "auto_approve_reads": (
+        "read-only pipelines (Metis-only, Mneme-only, CHAT) are also gated",
+        "skip the gate when the planned pipeline has no Techne / Kallos / Dokimasia",
+    ),
+}
+
+# Short user-facing aliases — what the player types after /permissions.
+_PERMISSIONS_ALIASES: dict[str, str] = {
+    "yolo": "yolo_enabled",
+    "reads": "auto_approve_reads",
+    "auto_approve_reads": "auto_approve_reads",
+}
+
+
+def _handle_permissions_command(prompt_text: str, settings: CLISettings) -> None:
+    """Show or toggle pipeline-gating permissions.
+
+    Bare ``/permissions`` prints the current state of every gate;
+    ``/permissions <name>`` flips the named one and persists. Inspired
+    by Cline + ClawCode's per-tool gating UIs surveyed 2026-04-26 (see
+    ROADMAP M6 "Surfaced from external research" → tier-2 priority).
+    Unified entry point keeps the surface scannable as new gates land.
+    """
+    parts = prompt_text.split(maxsplit=1)
+    arg = parts[1].strip().lower() if len(parts) > 1 else ""
+
+    if arg:
+        field = _PERMISSIONS_ALIASES.get(arg)
+        if field is None:
+            valid = ", ".join(sorted(_PERMISSIONS_ALIASES))
+            _echo(f"  {_DIM}Unknown gate: {arg!r}. Try one of: {valid}.{_RESET}")
+            return
+        new_value = not getattr(settings, field)
+        setattr(settings, field, new_value)
+        settings.save()
+        state = "ON" if new_value else "OFF"
+        _, on_desc = _PERMISSIONS_GATES[field]
+        off_desc, _ = _PERMISSIONS_GATES[field]
+        desc = on_desc if new_value else off_desc
+        _echo(f"  {_GOLD}{arg}{_RESET} {state} — {desc}.")
+        return
+
+    # Bare /permissions: show every gate, current state, and effect.
+    _echo(f"\n  {_GOLD_BRIGHT}━━━ Permissions ━━━{_RESET}")
+    for field, (off_desc, on_desc) in _PERMISSIONS_GATES.items():
+        # Pick the shortest alias to print as the "name" column.
+        name = next(
+            (alias for alias, target in _PERMISSIONS_ALIASES.items() if target == field),
+            field,
+        )
+        is_on = bool(getattr(settings, field))
+        state = "ON" if is_on else "OFF"
+        desc = on_desc if is_on else off_desc
+        _echo(f"  {_GOLD}{name:<20}{_RESET} {state:<3}  {_DIM}{desc}{_RESET}")
+    _echo(f"  {_DIM}Toggle with /permissions <name>.{_RESET}")
+
+
 def _format_greeting(name: str, face: str, quote: str) -> str:
     """Render the startup greeting line with maiden attribution.
 
@@ -654,6 +717,10 @@ async def main(
                     await _compact_session_memory(context_id)
                     continue
 
+                if prompt_text.startswith("/permissions"):
+                    _handle_permissions_command(prompt_text, settings)
+                    continue
+
                 if prompt_text == "/metrics":
                     _show_metrics_dashboard()
                     continue
@@ -767,6 +834,10 @@ async def main(
                 # so the gate stays the contract of the forge.
                 if settings.yolo_enabled:
                     forge_msg = f"[yolo: on]\n{forge_msg}"
+                elif settings.auto_approve_reads:
+                    # Granular middle ground — only takes effect when /yolo
+                    # is OFF. With both on, /yolo's broader bypass wins.
+                    forge_msg = f"[auto_approve_reads: on]\n{forge_msg}"
 
                 _echo("")
                 stream_kwargs: dict[str, object] = {}

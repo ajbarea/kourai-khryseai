@@ -5,134 +5,149 @@ milestone lands, the matching detail block in [ROADMAP.md](./ROADMAP.md)
 collapses to a one-liner under "Shipped" and this file gets reset to the
 next milestone.
 
-Updated: 2026-04-26 · Working on: **`/compact` slash command** (tier-1
-lift from the OSS-CC research sweep — universal pattern across every
-serious Claude Code clone, we didn't have it)
+Updated: 2026-04-26 · Working on: **`/permissions` slash command**
+(tier-2 lift from the OSS-CC research sweep — granular middle ground
+between full `/yolo` and the always-on confirmation gate)
 
 ---
 
 ## Plan-of-record
 
-End state: the player can type `/compact` mid-session and have Mneme
-fold older turns into long-term memory across every agent in the
-current `context_id`, freeing the working window without losing the
-thread. The auto-compaction logic in `_manage_memory` already handled
-the heavy lifting (LLM summarization + state persistence) — it just
-gated on `len(unsummarized) > WORKING_MEMORY_LIMIT`. Player-triggered
-compaction needed (a) a force-flag to bypass that threshold, (b) a
-way to discover which agents have history under the current context,
-(c) a CLI dispatch + Mneme comms-window emit.
+End state: a player can opt into "skip the gate when nothing's about
+to write to disk" without taking the full `/yolo` blast radius. Today
+`/yolo` is binary — either every CONFIRM_ORDER is bypassed or every
+pipeline goes through it. The lift adds one new policy
+(`auto_approve_reads`) and a unified `/permissions` command for
+inspecting and toggling all gating policies side-by-side.
 
-### Change 1 — `list_agents_with_history` memory primitive ✅ 2026-04-26
+The mechanism mirrors `/yolo` end-to-end so future per-tool gates can
+land along the same path without re-litigating transport choices:
 
-- [x] `shared/src/kourai_common/memory.py`: new function returning
-      distinct `agent_name` values with any messages stored against a
-      `context_id`. Sorted alphabetically for deterministic /compact
-      roster ordering. 4 unit tests in `test_memory.py`.
+1. **CLI persistence** — `CLISettings.auto_approve_reads: bool = False`.
+2. **CLI → Hephaestus transport** — text-tag `[auto_approve_reads: on]`
+   prepended to outbound messages (A2A `Message.metadata` isn't
+   transport-guaranteed; same convention as `[yolo: on]` and
+   `[project_root: …]`).
+3. **Hephaestus extracts + augments prompt** — new
+   `extract_auto_approve_reads(text)` parallel to `extract_yolo`.
+   System-prompt augmentation tells the LLM to skip CONFIRM_ORDER
+   ONLY when the planned pipeline contains none of {techne, kallos,
+   dokimasia} — those three are the agents whose tools live in
+   `MUTATING_TOOL_NAMES`.
+4. **Unified `/permissions` UI** — bare `/permissions` lists every
+   gate with state + effect; `/permissions <name>` toggles. Aliases
+   `yolo` and `reads` keep typing short.
 
-### Change 2 — `_manage_memory` force-flag + `compact_memory` wrapper ✅ 2026-04-26
+### Change 1 — `CLISettings.auto_approve_reads` field ✅ 2026-04-26
 
-- [x] `shared/src/kourai_common/llm.py::_manage_memory(... , *, force=False)`:
-      new keyword. When `force=True` bypass the
-      `len(unsummarized) > WORKING_MEMORY_LIMIT` gate. Still keep the
-      "last 2 unsummarized for immediate context fluidity" rule and
-      no-op when there aren't enough messages to fold (≤2). Now
-      returns `int` (count of messages folded) so callers can report.
-- [x] `shared/src/kourai_common/llm.py::compact_memory(context_id, agent_name)`:
-      thin public wrapper that always passes `force=True`. Used by
-      the CLI handler to keep concerns separate (auto-compaction stays
-      private with its threshold gate; player-triggered work has a
-      named entry point).
-- [x] 3 new unit tests in `test_llm.py::TestManageMemory`: force
-      bypasses threshold, no-op on too-few-messages, wrapper forces.
+- [x] Default `False` so existing players see no behaviour change.
+- [x] Persists through `CLISettings.load()/save()` like every other
+      bool field. Forward-compat fallback already in place from M13.
 
-### Change 3 — `/compact` slash command ✅ 2026-04-26
+### Change 2 — `extract_auto_approve_reads` + system-prompt augment ✅ 2026-04-26
 
-- [x] `hosts/cli/completer.py`: new `SlashCommand("compact", ...)`
-      entry between `/yolo` and `/metrics`.
-- [x] `hosts/cli/__main__.py::_compact_session_memory(context_id)`:
-      iterates `list_agents_with_history`, awaits `compact_memory`
-      for each, totals counts, emits a Mneme comms-window narrating
-      what happened. M10 speech convention: dialogue body wrapped in
-      `"..."` so `_comms_window` flips italic. Three states:
-      empty thread (`"Nothing to chronicle yet — the thread is still
-      fresh."`), nothing-to-fold (`"The recent turns are already lean
-      — nothing to fold yet."`), or success (`"I tucked N turns
-      into long-term memory — agent (count), …. The thread is lighter
-      now."`).
-- [x] REPL handler at `__main__.py` calls
-      `_compact_session_memory(context_id)` on `prompt_text == "/compact"`.
-- [x] Hoisted `compact_memory` and `list_agents_with_history` to
-      module-level imports so the function is properly mockable in
-      tests via `hosts.cli.__main__.<name>`.
+- [x] `agents/hephaestus/agent.py::extract_auto_approve_reads` —
+      regex strip + bool, mirrors `extract_yolo`.
+- [x] `determine_pipeline` parses both flags. `if yolo` augments
+      the prompt with the YOLO MODE block as before; `elif
+      auto_approve_reads` augments with the AUTO_APPROVE_READS
+      block. The `elif` is intentional — `/yolo` wins when both are
+      set since it's the broader bypass.
+- [x] AUTO_APPROVE_READS prompt block explicitly names {techne,
+      kallos, dokimasia} as the agents that still require
+      CONFIRM_ORDER, so the LLM doesn't widen the bypass to write
+      paths.
+
+### Change 3 — CLI text-tag prepend + `/permissions` handler ✅ 2026-04-26
+
+- [x] `hosts/cli/__main__.py` text-tag prepend — same site as
+      `[yolo: on]`, with the `elif` guard so `/yolo` wins.
+- [x] `_handle_permissions_command(prompt_text, settings)` —
+      bare lists all gates with state + descriptions; argument
+      toggles the named gate and persists.
+- [x] `_PERMISSIONS_GATES` dict makes new gates a one-line
+      addition (field name → off/on description tuple).
+- [x] `_PERMISSIONS_ALIASES` keeps user-facing names short
+      (`yolo`, `reads`) while accepting the long forms for
+      muscle-memory.
+
+### Change 4 — `/permissions` slash-command registration ✅ 2026-04-26
+
+- [x] `hosts/cli/completer.py`: new `SlashCommand("permissions",
+      …, arg_hint="[yolo|reads]")` between `/compact` and
+      `/metrics`.
 
 ### Tests ✅ 2026-04-26
 
-- [x] `tests/unit/test_memory.py::TestListAgentsWithHistory` — 4
-      tests including a "doesn't leak across contexts" guard.
-- [x] `tests/unit/test_llm.py::TestManageMemory` — 3 new tests
-      bringing the class to 6 (3 pre-existing + 3 new).
-- [x] `tests/unit/test_cli.py::TestCompactSessionMemory` — 3 tests:
-      empty-agents path, full iterate-and-total path with order
-      preserved, zero-total "already lean" path.
-- [x] All 90 tests across the three affected files pass in ~3 s.
+- [x] `tests/unit/test_confirmation_protocol.py::TestAutoApproveReadsBypass`
+      — 6 tests: extract strips tag, case-insensitive,
+      absent-returns-false, doesn't-match-substring, prompt
+      augmentation names the three mutating agents, `/yolo` wins
+      when both flags are set.
+- [x] `tests/unit/test_confirmation_protocol.py::TestCLISettingsAutoApproveReadsField`
+      — 2 tests: default-off, toggle-persists.
+- [x] `tests/unit/test_confirmation_protocol.py::TestPermissionsCommand`
+      — 4 tests: bare lists all gates, named toggle persists,
+      unknown gate prints help, `yolo` alias maps to existing
+      `yolo_enabled` field.
+- [x] All 33 tests in `test_confirmation_protocol.py` green; full
+      `test_cli.py` + `test_hephaestus.py` suite (78 tests) green.
 
 ### Live smoke (folds into next interactive `/project` session)
 
-- [ ] Run a few exchanges with the agents, then type `/compact`.
-      Confirm the Mneme comms-window appears with a count and
-      roster of agents whose buckets were folded.
-- [ ] Send another message after `/compact` — confirm the agent
-      replies referencing prior context (proving the semantic
-      summary survived).
+- [ ] `/permissions` → confirm both gates listed with current state.
+- [ ] `/permissions reads` → confirm toggle + persist message.
+- [ ] Send "summarize the project structure" (Metis-only route) →
+      confirm pipeline runs without CONFIRM_ORDER.
+- [ ] Send "add a function to foo.py" (Techne in route) → confirm
+      CONFIRM_ORDER still appears (the bypass should NOT widen).
 
 ---
 
 ## Notes / open questions
 
-- **Why a public `compact_memory` wrapper instead of just exposing
-  `_manage_memory`?** Two reasons. (1) The auto-compaction call inside
-  `chat()`/`chat_with_tools()` keeps its threshold gate semantics
-  clearly; the player-triggered call gets a named entry point so a
-  future reader doesn't have to read the `force=True` site to know
-  what's happening. (2) Refactoring later (e.g., to use a cheaper
-  model for player-triggered compaction, or to attach a different
-  prompt) is a one-place change in the wrapper, not a kwarg cascade
-  through `_manage_memory`.
+- **Why `elif` instead of treating both flags additively?** `/yolo`
+  is the broader bypass — when both are on, the player has clearly
+  opted into max-autonomy mode and the narrower `auto_approve_reads`
+  augmentation would just add noise to the prompt. The `elif` keeps
+  the system-prompt clean and the precedence semantics legible.
 
-- **Why per-agent compaction rather than a single conversation-wide
-  rollup?** Each agent maintains its own `semantic_summary` because
-  the summarization is voiced from that agent's perspective and
-  prefixed back into that agent's prompts. Folding across agents
-  would lose the per-voice framing. The roster Mneme reports lets
-  the player see which agents had enough history to compact.
+- **Why text-tag transport again rather than `Message.metadata`?**
+  Same answer as `[yolo: on]` and `[project_root: …]` from M13:
+  `a2a-sdk` 0.3.x doesn't guarantee metadata propagation across
+  every transport. Inlining the flag survives every code path.
+  When we eventually move to MCP `elicitation` (M2) the host can
+  declare these as proper protocol primitives.
 
-- **What this lift does NOT do.** It doesn't add a `<COMPACTED>`
-  block format the way I sketched in ROADMAP — that turned out to
-  be over-design. The existing summarization prompt already
-  produces a structured-enough summary; wrapping it in a block-tag
-  was solution looking for a problem. If a future need surfaces
-  (e.g., the LLM needs structural cues about what's a summary vs
-  raw history), that's a separate prompt-engineering PR.
+- **Why a unified `/permissions` instead of more `/yolo`-style
+  per-flag commands?** Two reasons. (1) The OSS-CC clones (Cline,
+  ClawCode) all converged on a single `/permissions` surface — the
+  tier-2 entry exists so future per-tool gates have a discoverable
+  home rather than 5 new top-level slash commands. (2) Listing all
+  gates side-by-side makes the security posture legible at a glance
+  ("am I in YOLO right now?") rather than requiring the player to
+  remember every relevant command.
 
-- **Pairs with M4.** Compacted prompts are smaller, so the system
-  block + first user message stays under the 2048/4096-token cache
-  threshold for longer. M4's within-loop caching benefits directly.
+- **What this lift does NOT do.** It doesn't add per-tool gates the
+  way ClawCode does (e.g., "auto-approve `read_file` but gate
+  `write_file`"). The reason: those gates would need to fire inside
+  the specialist containers' tool-dispatch loop, and specialists
+  don't have access to host CLISettings. That's an M2 (forge MCP)
+  concern — once tools are MCP-served, the host can intercept each
+  call via the MCP `elicitation` primitive (see M2 section in
+  ROADMAP). For now, pipeline-level gating is the cleanest cut.
 
 ---
 
 ## Up next (queued, not yet active — tier order from #37 prioritization)
 
-- **MCP `roots` + `elicitation` declared at M2 init** — design-time
-  work for when M2 (`kourai-forge-mcp`) is being scaffolded. Cheap
-  if done at design time, expensive retrofit later.
-- **`/permissions` granular tool gating** — small extension to
-  `CLISettings.auto_approve: dict[str, bool]` keyed on tool name.
-  Maps onto the existing `MUTATING_TOOL_NAMES` frozenset.
 - **`A2A-Version` header** — one-line prerequisite for any v1.0
-  migration attempt.
-- **`/cost` alias for `/usage`** — five-line cleanup matching OSS-CC
-  vocabulary so muscle-memory carries over.
+  migration attempt. Must add it to every outbound request in
+  `remote_connections.py` before the SDK pin can flip to ≥1.0.
+- **`/cost` alias for `/usage`** — five-line cleanup matching
+  OSS-CC vocabulary so muscle-memory carries over.
+- **MCP `roots` + `elicitation` declared at M2 init** — design-time
+  work for when M2 (`kourai-forge-mcp`) is being scaffolded.
 - **T8 follow-up** (ParallelContext shared buffer feeding Metis's
   partial output back into the classifier prompt). Substantial
   async work.
