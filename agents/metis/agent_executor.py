@@ -12,6 +12,7 @@ from agents.metis.agent import create_spec_stream, get_project_context
 from kourai_common.a2a_utils import extract_image_parts, parse_project_root
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
+from kourai_common.mcp_client import kourai_project_root_var
 from kourai_common.messaging import send_working_status
 from kourai_common.stack import get_stack_context, looks_like_scaffolding
 from kourai_common.tracing import create_span
@@ -48,6 +49,7 @@ class MetisAgentExecutor(BaseAgentExecutor):
             # the worktree. parse_project_root falls back to cwd when the
             # tag is missing, so internal/test invocations are unaffected.
             project_root = parse_project_root(user_input)
+            kourai_project_root_var.set(project_root)
 
             # Step 1: Gather project context
             await send_working_status(

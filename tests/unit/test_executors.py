@@ -6,12 +6,16 @@ valid input → working → artifact → complete, cancel → unsupported.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
 from a2a.types import Message, Part, Role, TextPart
 from a2a.utils.errors import ServerError
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -449,3 +453,155 @@ class TestHephaestusExecutor:
         executor = HephaestusAgentExecutor()
         with pytest.raises(ServerError):
             await executor.cancel(_make_context(), _make_queue())
+
+
+# ── M2 Change 1 follow-on: contextvar wiring across executors ────────────────
+
+
+class TestExecutorsSetKouraiProjectRootVar:
+    """Each specialist executor populates ``kourai_project_root_var``
+    immediately after parsing ``[project_root: ...]`` from the user
+    message, so an MCP server asking ``roots/list`` during the session
+    receives the parsed project root via ``build_client_session``'s
+    ``_kourai_list_roots`` callback.
+
+    Strategy: replace the first downstream async call after the
+    contextvar set with one that captures ``kourai_project_root_var.get()``,
+    then assert the capture equals the parsed root.
+    """
+
+    @pytest.mark.asyncio
+    async def test_metis_sets_var_before_get_project_context(self, tmp_path):
+
+        from agents.metis.agent_executor import MetisAgentExecutor
+        from kourai_common.mcp_client import kourai_project_root_var
+
+        captured: list[Path | None] = []
+
+        async def capture_var(*args: object, **kwargs: object) -> str:
+            captured.append(kourai_project_root_var.get())
+            return "project ctx"
+
+        executor = MetisAgentExecutor()
+        ctx = _make_context(f"[project_root: {tmp_path}]\nimplement CSV export")
+        queue = _make_queue()
+
+        token = kourai_project_root_var.set(None)
+        try:
+            with (
+                patch("agents.metis.agent_executor.create_span"),
+                patch("agents.metis.agent_executor.get_project_context", capture_var),
+                patch(
+                    "agents.metis.agent_executor.create_spec_stream",
+                    return_value=_async_gen(["spec"]),
+                ),
+                patch("agents.metis.agent_executor.send_working_status"),
+            ):
+                await executor.execute(ctx, queue)
+        finally:
+            kourai_project_root_var.reset(token)
+
+        assert captured[0] == tmp_path
+
+    @pytest.mark.asyncio
+    async def test_techne_sets_var_before_get_git_context(self, tmp_path):
+
+        from agents.techne.agent_executor import TechneAgentExecutor
+        from kourai_common.mcp_client import kourai_project_root_var
+
+        captured: list[Path | None] = []
+
+        async def capture_var(*args: object, **kwargs: object) -> str:
+            captured.append(kourai_project_root_var.get())
+            return "M auth.py"
+
+        executor = TechneAgentExecutor()
+        ctx = _make_context(f"[project_root: {tmp_path}]\nfix auth.py null check")
+        queue = _make_queue()
+
+        token = kourai_project_root_var.set(None)
+        try:
+            with (
+                patch("agents.techne.agent_executor.create_span"),
+                patch(
+                    "agents.techne.agent_executor.parse_file_paths",
+                    return_value=["auth.py"],
+                ),
+                patch(
+                    "agents.techne.agent_executor.read_files",
+                    return_value={"auth.py": "code"},
+                ),
+                patch("agents.techne.agent_executor.get_git_context", capture_var),
+                patch(
+                    "agents.techne.agent_executor.apply_code_changes",
+                    new_callable=AsyncMock,
+                    return_value=("Updated auth.py.", []),
+                ),
+                patch("agents.techne.agent_executor.send_working_status"),
+            ):
+                await executor.execute(ctx, queue)
+        finally:
+            kourai_project_root_var.reset(token)
+
+        assert captured[0] == tmp_path
+
+    @pytest.mark.asyncio
+    async def test_kallos_sets_var_before_run_make_lint(self, tmp_path):
+
+        from agents.kallos.agent_executor import KallosAgentExecutor
+        from kourai_common.mcp_client import kourai_project_root_var
+
+        captured: list[Path | None] = []
+
+        async def capture_var(**kwargs: object) -> tuple[bool, str]:
+            captured.append(kourai_project_root_var.get())
+            return (True, "All checks passed")
+
+        executor = KallosAgentExecutor()
+        ctx = _make_context(f"[project_root: {tmp_path}]\nagents/kallos/agent.py")
+        queue = _make_queue()
+
+        token = kourai_project_root_var.set(None)
+        try:
+            with (
+                patch("agents.kallos.agent_executor.create_span"),
+                patch("agents.kallos.agent.run_make_lint", side_effect=capture_var),
+                patch("kourai_common.subprocess.extract_files_from_output", return_value=[]),
+            ):
+                await executor.execute(ctx, queue)
+        finally:
+            kourai_project_root_var.reset(token)
+
+        assert captured[0] == tmp_path
+
+    @pytest.mark.asyncio
+    async def test_dokimasia_sets_var_before_run_pytest(self, tmp_path):
+
+        from agents.dokimasia.agent_executor import DokimasiaAgentExecutor
+        from kourai_common.mcp_client import kourai_project_root_var
+
+        captured: list[Path | None] = []
+
+        def capture_var(*args: object, **kwargs: object) -> MagicMock:
+            captured.append(kourai_project_root_var.get())
+            result = MagicMock()
+            result.success = True
+            result.output = "8/8 tests passed"
+            return result
+
+        executor = DokimasiaAgentExecutor()
+        ctx = _make_context(f"[project_root: {tmp_path}]\nrun tests please")
+        queue = _make_queue()
+
+        token = kourai_project_root_var.set(None)
+        try:
+            with (
+                patch("agents.dokimasia.agent_executor.create_span"),
+                patch("agents.dokimasia.agent.run_pytest", side_effect=capture_var),
+                patch("kourai_common.subprocess.extract_files_from_output", return_value=[]),
+            ):
+                await executor.execute(ctx, queue)
+        finally:
+            kourai_project_root_var.reset(token)
+
+        assert captured[0] == tmp_path

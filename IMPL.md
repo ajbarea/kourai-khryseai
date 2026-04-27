@@ -91,12 +91,17 @@ all-three-with-stubs approach would create.
     (tmp_path fixture, full URI roundtrip via `Path.as_uri()`).
 - [x] All 31 tests in `test_mcp_client.py` green; full unit suite
   `2679 passed`. `make lint` ends `Found 0 diagnostics`.
-- [ ] **Follow-on (queued, not in this PR):** wire executor entry
-  points (the existing `parse_project_root(user_input)` site in
-  Techne / Metis / Kallos / Dokimasia executors) to call
-  `kourai_project_root_var.set(parsed_root)` so the contextvar is
-  populated for forge-relevant calls. Today the var stays `None` and
-  `_kourai_list_roots` returns an empty list — correct, just inert.
+- [x] **Follow-on (shipped 2026-04-27):** wired executor entry points
+  (the existing `parse_project_root(user_input)` site in Techne /
+  Metis / Kallos / Dokimasia executors) to call
+  `kourai_project_root_var.set(parsed_root)` immediately after the
+  parse — contextvar now populated for any MCP call further down the
+  stack. 4 regression tests in `tests/unit/test_executors.py::TestExecutorsSetKouraiProjectRootVar`
+  patch the first downstream async call after the set with a capture
+  fixture, then assert `kourai_project_root_var.get() == tmp_path`.
+  Hephaestus uses `extract_project_root` (different function — the
+  host-side parse) and stays untouched; specialist agents are where
+  forge tools land, so they're the right wiring point.
 
 ### Change 2 — `mcp_servers/forge/server.py` stdio scaffold
 
