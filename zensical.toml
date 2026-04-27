@@ -29,6 +29,7 @@ nav = [
       { "Overview" = "architecture/index.md" },
       { "Internals" = "architecture/internals.md" },
       { "Infrastructure" = "architecture/infrastructure.md" },
+      { "Observability" = "observability.md" },
   ]},
   { "Interfaces" = [
       { "CLI Reference" = "cli.md" },

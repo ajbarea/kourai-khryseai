@@ -5,147 +5,133 @@ milestone lands, the matching detail block in [ROADMAP.md](./ROADMAP.md)
 collapses to a one-liner under "Shipped" and this file gets reset to the
 next milestone.
 
-Updated: 2026-04-27 · Working on: **Spec drift watcher cron** —
-turning "track latest aggressively" from an ad-hoc nudge-driven habit
-into a triageable inbox item.
+Updated: 2026-04-27 · Working on:
+[**M2 — Carve out `kourai-forge-mcp`**](./ROADMAP.md#m2--carve-out-kourai-forge-mcp) —
+unblocked since M1 shipped 2026-04-26. M16 (observability DX uplift)
+landed earlier today across PRs #47 / #48 / #49 + this PR (Mneme
+`_OtelTraceFilter`, `make observe` quickstart, `docs/observability.md`,
+`dev.dozzle.group` labels) — see ROADMAP `## Shipped` for the rollup.
 
 ---
 
 ## Plan-of-record
 
-End state: every Sunday at 13:00 UTC, a small GitHub Actions job
-fetches a hand-curated list of MCP + A2A spec/SDK URLs, computes a
-per-source digest (HTML hash for spec pages, Atom-feed entry-title
-hash for release feeds, version string for PyPI JSON), and compares
-against the prior snapshot held in `actions/cache`. If anything
-drifted, it opens a GitHub issue tagged `protocol-watch` summarising
-the delta — title, prior/current digest, content excerpt, the watch's
-own one-liner note, and a triage path that explicitly mentions M2 +
-M7 as the likely owners.
+End state: a real `kourai-forge-mcp` MCP server in `mcp_servers/forge/`
+exposing the M1 forge tools (`read_file` / `write_file` / `edit_file` /
+`run_command`) over stdio. Specialists (Techne, Kallos, Dokimasia)
+become MCP clients via the existing `MCPToolkit`. A fourth specialist
+or a third-party host (Claude Code, Cursor, IDE plugins) can adopt the
+same forge without re-importing Python helpers — the wire format does
+the work.
 
-The trigger is the spec moving instead of AJ remembering to nudge.
-The 2026-04-27 finding that A2A v1.0's `Message.metadata` channel had
-landed months before we noticed (and built around it with the
-text-tag carrier) is the canonical "this is why we built the watcher"
-story.
+Workstreams ordered by **design-time-cost-of-deferral**, not strict
+dependency. Init-handshake declarations (Change 1) are the load-bearing
+piece — retrofitting `roots` / `elicitation` / `sampling` after the
+server is scaffolded is significantly more painful than declaring them
+upfront.
 
-### Change 1 — `scripts/watch_protocols.py` ✅ 2026-04-27
+### Change 1 — Init-handshake client capabilities (design-time gate)
 
-- [x] `WATCHES` tuple: 7 sources today
-  (`mcp-spec-2025-11-25`, `mcp-blog`, `a2a-spec-latest`,
-  `a2a-releases`, `mcp-spec-releases`, `a2a-sdk-pypi`, `mcp-pypi`).
-  Adding a new source is one append + a `Watch(...)` literal.
-- [x] Three `_digest_*` functions matched to source kind so the diff
-  signal stays meaningful — full HTML hash for spec pages, Atom feed
-  entry-title hash for release feeds (so a feed metadata refresh
-  doesn't trigger), version-string keying for PyPI (so the "drift"
-  is literally "a2a-sdk: 0.3.26 -> 1.0.2").
-- [x] `diff_watches(watches, state, fetcher)` is the pure core —
-  pure function, fully unit-testable with a mock fetcher and an
-  in-memory state dict.
-- [x] Transient HTTP failures carry the prior baseline forward
-  unchanged; a bad week doesn't wipe state. Unseen-watch fetch
-  failure skips silently rather than recording a placeholder.
-- [x] `--dry-run` (or `KOURAI_PROTOCOL_WATCH_DRY_RUN=1`) prints the
-  would-be issue body to stdout instead of calling `gh`. Same flag
-  is wired into the workflow's `workflow_dispatch` input.
-- [x] Atomic state save via `state.json.tmp` -> `replace(state.json)`
-  so a partial-write doesn't corrupt the snapshot.
+**Why first.** MCP's `initialize` request is where a host advertises
+which client capabilities it speaks (`roots`, `elicitation`,
+`sampling`). The declaration shapes every server-side decision: a
+server that knows the host has `roots` won't reinvent path validation;
+a server that knows the host has `elicitation` won't bake confirmation
+prompts into tool descriptions; a server that knows the host has
+`sampling` can offload LLM calls back to the host instead of bundling
+LiteLLM. Get this wrong and we either over-build (re-implementing what
+the host already does) or under-build (papering over missing
+primitives with text-tag hacks).
 
-### Change 2 — `.github/workflows/spec-watch.yml` ✅ 2026-04-27
+- [ ] **`roots`** declared in the host. Player's `project_root`
+  becomes the sole declared root; the server's file-touching tools
+  validate against the root list rather than re-implementing
+  `validate_file_path`. Includes
+  `notifications/roots/list_changed` so a `/project switch`
+  mid-session re-scopes the server cleanly.
+- [ ] **`elicitation`** declared. Spec-blessed analog of M13's
+  homegrown `CONFIRM_ORDER` pause primitive. Once Change 4 lands,
+  `INPUT_REQUIRED` flows through elicitation rather than the
+  text-tag carrier — same UX, standard wire format, future
+  MCP-aware hosts get the gate for free.
+- [ ] **`sampling`** declared. Server-initiated LLM call back
+  through the host. Useful if a future skill (e.g., a synth-test
+  generator) wants to ask Hephaestus to classify intent without
+  bundling its own LiteLLM client. Pairs with the existing YOLO
+  toggle: `[yolo: on]` → auto-approve sampling; otherwise prompt
+  per the spec's MUST-explicit-consent rule.
+- [ ] Host-side capability advertisement wired into `MCPToolkit`'s
+  init path. Verified via mock `initialize` request: response
+  payload carries all three keys with shapes matching spec
+  2025-11-25.
 
-- [x] Sunday 13:00 UTC cron + `workflow_dispatch` for manual runs
-  (with a `dry_run` input that maps to the env var).
-- [x] State persistence via `actions/cache` keyed on
-  `spec-watch-state-${run_id}` with `restore-keys: spec-watch-state-`
-  prefix — `actions/cache/save@v4` always runs (`if: always()`) so
-  partial fetch failures still save the carried-forward state.
-- [x] Minimal install (`pip install httpx`) — full `uv sync` would
-  burn ~2 minutes for a script that just needs httpx.
-- [x] `permissions: issues: write` so `gh issue create` works with
-  the default `GITHUB_TOKEN`. No extra secrets needed.
+### Change 2 — `mcp_servers/forge/server.py` stdio scaffold
 
-### Change 3 — Tests ✅ 2026-04-27
+- [ ] New stdio-transport server using the `mcp` Python SDK.
+- [ ] Tools list mirrors today's `agents.forge_tools` Python helpers:
+  `read_file`, `write_file`, `edit_file`, `run_command`.
+- [ ] `roots` validation in each file-touching handler — paths
+  outside the declared roots get rejected with a clear error
+  pointing at `notifications/roots/list_changed` for re-scoping.
+- [ ] Tool annotations stay conservative — the 2025-11-25 spec
+  explicitly marks annotations untrusted unless the server is
+  trusted; the host's permission gate remains source of truth, not
+  the server's self-described risk level.
 
-- [x] `tests/unit/test_watch_protocols.py` — 29 tests covering:
-  - `TestDigesters` (9): per-kind digest stability, sensitivity to
-    real changes, malformed-JSON handling, excerpt content.
-  - `TestDiffWatches` (5): empty-state initial run emits no issues
-    (the "we just started watching" case), unchanged run no-op,
-    changed run fires per-watch, transient HTTP error preserves
-    prior state, unseen-watch fetch failure skips silently.
-  - `TestFormatIssueBody` (1): canonical fields present so future
-    readers can grep for them.
-  - `TestStateRoundtrip` (5): missing/malformed state file returns
-    empty dict; save+load roundtrips; parent-dir auto-create;
-    atomic .tmp pattern leaves no leftovers.
-  - `TestOpenIssueDryRun` (2): dry-run path never invokes
-    subprocess; missing-repo also falls through to dry-run.
-  - `TestWatchesContract` (4): unique keys, every kind has a
-    digester, every URL is https, every watch has a non-empty note.
-  - `test_digester_returns_str_str` (3 parametrized): defensive
-    contract that all digesters return `(str, str)`.
+### Change 3 — Specialist clients via `MCPToolkit`
 
-### Live verification ✅ 2026-04-27
+- [ ] Techne / Kallos / Dokimasia executors swap
+  `agents.forge_tools` imports for `MCPToolkit.get_client("forge")`
+  calls.
+- [ ] LiteLLM tool-use bindings reflect the MCP-served tool schemas
+  (`tools/list` round-trips through `MCPToolkit`).
+- [ ] One smoke per specialist: forge tool call lands at the server,
+  the server validates the root, response surfaces back as a
+  tool-result frame identical to today's local-Python-import shape.
 
-- [x] Dry-run against live URLs: all 7 fetched 200 (one had a 301
-  redirect — caught + canonical URL substituted).
-- [x] Synthetic-drift dry-run: stale-seeded state correctly produced
-  the expected `Protocol watch: a2a-sdk-pypi drifted (0.3.26 -> 1.0.2)`
-  issue body with the right title format and triage block.
-- [x] PyPI snapshot capture confirms current versions: a2a-sdk 1.0.2
-  (we're pinned `<1.0`), mcp 1.27.0 (active in our memory-mcp
-  + context7-mcp containers).
+### Change 4 — `INPUT_REQUIRED` over `elicitation`
 
-### Initial CI run
-
-After the PR merges, the **first** workflow run will see no prior
-cache and treat everything as initial — the cache file gets seeded
-with current digests and zero issues open. The **second** run
-(Sunday) is the first real diff opportunity. To smoke-test sooner,
-trigger via `workflow_dispatch` with `dry_run=true` and inspect the
-log output.
+- [ ] M13's `CONFIRM_ORDER` pause migrates from the text-tag carrier
+  to the spec's `elicitation/create` request flow.
+- [ ] T4 follow-up from M13 (`[forge_intent]` block on user message
+  to specialists) lands as part of the elicitation payload rather
+  than a separate text-tag — single channel, less drift surface.
+- [ ] Player UX unchanged: same comms-window rendering, same
+  `[yolo:` bypass.
 
 ---
 
 ## Notes / open questions
 
-- **Why state in actions/cache rather than committed?** Two reasons.
-  (1) Committing snapshot updates would require a `git push` step
-  with branch-protection bypass — fragile and noisy. (2) Cache loss
-  is benign — the next run treats it as initial and emits zero
-  issues, and we lose at most one diff cycle. The trade is "no
-  permanent record of every check" for "no commit-spam." Accepted.
+- **Why stdio, not streamable-HTTP?** MCP's 2026 roadmap prioritises
+  streamable-HTTP scalability, but stdio is the simpler default and the
+  only transport every existing MCP host speaks today (Claude Code,
+  Cursor, IDE plugins). Move to streamable-HTTP when we want a single
+  forge server shared across multiple host machines — not a dev-loop
+  need.
 
-- **Why a hardcoded `WATCHES` list instead of a YAML config?** Today
-  there are 7 entries and adding one is a 5-line dataclass literal.
-  YAML config would be more orchestrator-friendly but adds a parse
-  step + schema discipline for a list that grows by maybe one entry
-  per quarter. Move to config when we hit ~20 watches or want
-  per-environment overrides.
+- **Why declare capabilities at init even if some won't be exercised
+  immediately?** `roots` is used from day one. `elicitation` lands with
+  Change 4. `sampling` may not have a caller for weeks. But the
+  declaration is cheap and the cost of NOT declaring is that future
+  servers see a host that lies about its capabilities — worse than
+  papering over a missing capability. Declare what we actually
+  support; leave the rest off.
 
-- **Why not also watch docker images** (jaegertracing/all-in-one,
-  prom/prometheus, etc.)? Lower priority — those are infrastructure
-  pinned in compose, not protocol-defining. Adding them is a future
-  one-line `Watch(... kind="docker-tag" ...)` once we write that
-  digester. Skip for v1.
+- **MCP spec version pinned to 2025-11-25.** The spec drift watcher
+  cron (`scripts/watch_protocols.py`) will flag any subsequent
+  revision; M2 scope assumes today's spec. Tool annotations being
+  explicitly marked untrusted is a 2025-11-25 thing — predates would
+  be unsafe to assume.
 
-- **Why no `gh` smoke-test in CI?** The actual `gh issue create`
-  call only runs in the live workflow with `GH_TOKEN` set; locally
-  it falls back to dry-run. Mocking `subprocess.run` covers the
-  command-construction path, and we'd be testing GitHub's API
-  rather than our code. Live failure surfaces in a noisy log and
-  the state file still persists, so the next run isn't blocked.
+- **Order vs. dependency.** Change 1 is the design-time gate; Change 2
+  follows directly. Change 3 needs Change 2 done. Change 4 is
+  independent of 3 once 2 is up — could ship in parallel.
 
 ---
 
 ## Up next (queued, not yet active)
 
-- **MCP `roots` + `elicitation` declared at M2 init** — design-time
-  work for when M2 (`kourai-forge-mcp`) is being scaffolded.
-- **M2** (`kourai-forge-mcp` server) — real architectural milestone;
-  unblocked since M1 done. The watcher will start flagging MCP spec
-  changes that affect M2's roots/elicitation/sampling implementation.
 - **Plan Mode toggle (Cline-style)** — persistent planning mode.
 - **Background memory consolidation (Mneme "autoDream")** — pairs
   with the just-shipped `/compact`.
@@ -153,13 +139,23 @@ log output.
   long-term direction; wait until M2 lands.
 - **T8 follow-up** (ParallelContext shared buffer feeding Metis's
   partial output back into the classifier prompt).
-- **T4 follow-up from M13** (`[forge_intent]` block on user message
-  to specialists).
-- **M15** (forge logging architecture) — operational hygiene.
+- **M15** (forge logging architecture) — operational hygiene; pairs
+  naturally with M16's just-shipped trace-ID change since both touch
+  `setup_logging`.
 - **M5** (UID alignment for forge worktrees) — would let us drop
   the `safe.directory '*'` workaround from #42.
 - **M7** (a2a-sdk 1.0.x migration) — the watcher's a2a-sdk-pypi
   entry will fire when 1.0.x stabilises and we should flip the
-  pin. The Message.metadata migration item is queued under M7's
+  pin. The `Message.metadata` migration item is queued under M7's
   scope as a follow-on once the SDK pin flips.
 - **M12** (dynamic sizing across the GUI) — biggest GUI refactor.
+- **M17** (HOTL answer persistence — project-scoped facts).
+- **M16 follow-ons:**
+  - Live trace-ID-in-Dozzle smoke (Change 1 unit-tested but worth
+    eyeballing in a real `make up` + smoked pipeline).
+  - Cross-link from `.claude/skill-context.md` to
+    `docs/observability.md` so future agents consult the page
+    before designing observability changes.
+  - `scripts/watch_protocols.py kind="docker-tag"` digester for
+    `amir20/dozzle`, `jaegertracing/jaeger`, `prom/prometheus` so
+    future image drift surfaces automatically.

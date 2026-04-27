@@ -11,6 +11,8 @@ import os
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
+from opentelemetry import trace
+
 # Libs whose INFO records are noise to an end-user — they still write to the
 # file log, just not the console. Covers httpx request logs and the a2a
 # resolver dumping its full agent-card JSON on every connect.
@@ -41,9 +43,64 @@ class _ConsoleSilenceFilter(logging.Filter):
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
 _LOGS_DIR = _PROJECT_ROOT / "logs"
 
-# Shared format across all agents
+# Shared format across all agents. The `_WITH_TRACE` variant is used by
+# `_TraceAwareFormatter` when an OTel span context is active on the record;
+# otherwise the plain variant is used to avoid 32 zeros of noise on
+# non-traced lines. Trace IDs are emitted as full 32-char hex so a dev can
+# copy a trace ID from Jaeger and grep Dozzle for the matching log lines.
 _CONSOLE_FMT = "%(asctime)s [%(name)s] %(levelname)s: %(message)s"
+_CONSOLE_FMT_WITH_TRACE = (
+    "%(asctime)s [%(name)s] %(levelname)s [trace=%(otelTraceID)s]: %(message)s"
+)
 _FILE_FMT = "%(asctime)s [%(name)s] %(levelname)s: %(message)s"
+_FILE_FMT_WITH_TRACE = "%(asctime)s [%(name)s] %(levelname)s [trace=%(otelTraceID)s]: %(message)s"
+
+
+class _OtelTraceFilter(logging.Filter):
+    """Inject `otelTraceID` / `otelSpanID` from the current OTel span.
+
+    Reads `trace.get_current_span()` directly rather than going through
+    `opentelemetry-instrumentation-logging`, whose factory only injects
+    these attrs when `set_logging_format=True` (which would also call
+    `logging.basicConfig` and clash with this module's explicit handler
+    setup). Always returns True; `_TraceAwareFormatter` decides whether
+    to render the values.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        span = trace.get_current_span()
+        ctx = span.get_span_context()
+        if ctx.trace_id:
+            record.otelTraceID = format(ctx.trace_id, "032x")
+            record.otelSpanID = format(ctx.span_id, "016x")
+        else:
+            record.otelTraceID = "0"
+            record.otelSpanID = "0"
+        return True
+
+
+class _TraceAwareFormatter(logging.Formatter):
+    """Switch between two format strings per-record based on trace presence.
+
+    `_OtelTraceFilter` sets `record.otelTraceID` to a 32-char hex string
+    when a span is active and to "0" otherwise. Embedding the trace block
+    on every non-traced line is visually noisy; we keep it only when it
+    carries signal.
+    """
+
+    def __init__(self, fmt_no_trace: str, fmt_with_trace: str) -> None:
+        super().__init__(fmt_no_trace)
+        self._fmt_no_trace = fmt_no_trace
+        self._fmt_with_trace = fmt_with_trace
+
+    def format(self, record: logging.LogRecord) -> str:
+        trace_id = getattr(record, "otelTraceID", "0")
+        if trace_id and trace_id != "0":
+            self._style._fmt = self._fmt_with_trace
+        else:
+            self._style._fmt = self._fmt_no_trace
+        return super().format(record)
+
 
 # 5 MB per file, keep 3 rotations
 _MAX_BYTES = 5 * 1024 * 1024
@@ -70,13 +127,16 @@ def setup_logging(name: str, *, level: str | None = None) -> logging.Logger:
     root = logging.getLogger()
     root.setLevel(logging.DEBUG)  # capture everything at root; handlers filter.
 
+    trace_filter = _OtelTraceFilter()
+
     if not any(
         isinstance(h, logging.StreamHandler) and not isinstance(h, RotatingFileHandler)
         for h in root.handlers
     ):
         console = logging.StreamHandler()
-        console.setFormatter(logging.Formatter(_CONSOLE_FMT))
+        console.setFormatter(_TraceAwareFormatter(_CONSOLE_FMT, _CONSOLE_FMT_WITH_TRACE))
         console.setLevel(resolved_level)
+        console.addFilter(trace_filter)
         # Verbose mode (-v / KOURAI_LOG_LEVEL=DEBUG) keeps everything; otherwise
         # drop 3rd-party INFO chatter from the terminal (still logged to file).
         if console.level > logging.DEBUG:
@@ -91,8 +151,9 @@ def setup_logging(name: str, *, level: str | None = None) -> logging.Logger:
             backupCount=_BACKUP_COUNT,
             encoding="utf-8",
         )
-        file_handler.setFormatter(logging.Formatter(_FILE_FMT))
+        file_handler.setFormatter(_TraceAwareFormatter(_FILE_FMT, _FILE_FMT_WITH_TRACE))
         file_handler.setLevel(logging.DEBUG)
+        file_handler.addFilter(trace_filter)
         root.addHandler(file_handler)
 
     logger = logging.getLogger(name)

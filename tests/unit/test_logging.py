@@ -182,3 +182,118 @@ class TestSetupLoggingLevel:
             exc_info=None,
         )
         assert all(_apply_filter(f, app_record) for f in console.filters)
+
+
+class TestOtelTraceInjection:
+    """Trace IDs from the active OTel span flow into formatted log lines.
+
+    The contract is: a dev who copies a trace ID from Jaeger can grep Dozzle
+    for `trace=<id>` and get the matching log lines back. Lines emitted
+    outside any span context render with the bare format (no zero-padded
+    trace block).
+    """
+
+    def _reset_root(self) -> logging.Logger:
+        root = logging.getLogger()
+        for h in root.handlers[:]:
+            root.removeHandler(h)
+        return root
+
+    def test_no_span_context_renders_bare_format(self, caplog):
+        from io import StringIO
+
+        from kourai_common.log import _CONSOLE_FMT, _CONSOLE_FMT_WITH_TRACE, _TraceAwareFormatter
+
+        formatter = _TraceAwareFormatter(_CONSOLE_FMT, _CONSOLE_FMT_WITH_TRACE)
+        record = logging.LogRecord(
+            name="agent",
+            level=logging.INFO,
+            pathname=__file__,
+            lineno=1,
+            msg="bare line",
+            args=(),
+            exc_info=None,
+        )
+        record.otelTraceID = "0"
+        out = formatter.format(record)
+        assert "trace=" not in out
+        assert "bare line" in out
+        # Force the writer side too
+        buf = StringIO()
+        handler = logging.StreamHandler(buf)
+        handler.setFormatter(formatter)
+        handler.emit(record)
+        assert "trace=" not in buf.getvalue()
+
+    def test_span_context_renders_trace_id(self):
+        from kourai_common.log import _CONSOLE_FMT, _CONSOLE_FMT_WITH_TRACE, _TraceAwareFormatter
+
+        formatter = _TraceAwareFormatter(_CONSOLE_FMT, _CONSOLE_FMT_WITH_TRACE)
+        record = logging.LogRecord(
+            name="agent",
+            level=logging.INFO,
+            pathname=__file__,
+            lineno=1,
+            msg="traced line",
+            args=(),
+            exc_info=None,
+        )
+        record.otelTraceID = "abc123def456abc123def456abc123de"
+        out = formatter.format(record)
+        assert "trace=abc123def456abc123def456abc123de" in out
+        assert "traced line" in out
+
+    def test_filter_injects_trace_id_when_span_active(self):
+        from opentelemetry import trace
+        from opentelemetry.sdk.trace import TracerProvider
+
+        from kourai_common.log import _OtelTraceFilter
+
+        # Idempotent provider set — repeated tests share the same provider.
+        if not isinstance(trace.get_tracer_provider(), TracerProvider):
+            trace.set_tracer_provider(TracerProvider())
+
+        flt = _OtelTraceFilter()
+        tracer = trace.get_tracer("test")
+
+        record = logging.LogRecord(
+            name="agent",
+            level=logging.INFO,
+            pathname=__file__,
+            lineno=1,
+            msg="m",
+            args=(),
+            exc_info=None,
+        )
+        flt.filter(record)
+        assert getattr(record, "otelTraceID", None) == "0"
+
+        with tracer.start_as_current_span("demo"):
+            record_in = logging.LogRecord(
+                name="agent",
+                level=logging.INFO,
+                pathname=__file__,
+                lineno=1,
+                msg="m",
+                args=(),
+                exc_info=None,
+            )
+            flt.filter(record_in)
+            trace_id = getattr(record_in, "otelTraceID", "0")
+            assert trace_id != "0"
+            assert len(trace_id) == 32  # 32-char hex
+            assert all(c in "0123456789abcdef" for c in trace_id)
+
+    def test_handlers_carry_trace_filter(self):
+        """Both console and file handlers must have the trace filter so
+        every log line — wherever it's headed — gets `otelTraceID` populated.
+        """
+        from kourai_common.log import _OtelTraceFilter
+
+        root = self._reset_root()
+        setup_logging("test_handlers")
+
+        for h in root.handlers:
+            assert any(isinstance(f, _OtelTraceFilter) for f in h.filters), (
+                f"handler {h!r} missing _OtelTraceFilter"
+            )

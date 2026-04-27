@@ -13,7 +13,7 @@
 ## measure intent, not trivial formatting noise.
 ##
 
-.PHONY: help check-env setup setup-artifacts upgrade yolo dev dev-vn up down restart rebuild status gui cli vn docs fix lint validate test test-unit test-integration test-performance audit deps clean clean-cache clean-tests prune logs logs-tail sandbox-image
+.PHONY: help check-env setup setup-artifacts upgrade yolo dev dev-vn up down restart rebuild status gui cli vn docs observe fix lint validate test test-unit test-integration test-performance audit deps clean clean-cache clean-tests prune logs logs-tail sandbox-image
 .DEFAULT_GOAL := help
 
 UV_DEV := uv run --no-active --package kourai-common kourai-dev
@@ -94,6 +94,13 @@ vn-demo:                   ## Launch VN in scripted demo mode (no bridge, no Doc
 
 docs:                      ## Serve project documentation (Zensical on http://localhost:8000)
 	@$(UV_DEV) docs
+
+# ---------------------------------------------------------------------------
+# Observability
+# ---------------------------------------------------------------------------
+
+observe:                   ## Open observability UIs in browser (Jaeger, Prometheus, Dozzle)
+	@$(UV_DEV) observe
 
 # ---------------------------------------------------------------------------
 # Quality Gates

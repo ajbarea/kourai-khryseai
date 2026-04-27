@@ -37,6 +37,8 @@ x-agent-common: &agent-common
     jaeger:
       condition: service_started
   logging: *default-logging
+  labels:
+    dev.dozzle.group: agents
 
 # ----------------------------------------------------------------------
 # SERVICES OVERVIEW
@@ -53,6 +55,8 @@ services:
   # is needed for it.
   jaeger:
     image: jaegertracing/jaeger:2.17.0
+    labels:
+      dev.dozzle.group: observability
     command: ["--config", "/etc/jaeger/config.yaml"]
     volumes:
       - ./docker/jaeger-config.yaml:/etc/jaeger/config.yaml:ro
@@ -80,6 +84,8 @@ services:
   # busybox→distroless swap requires doesn't apply to us.
   prometheus:
     image: prom/prometheus:v3.10.0-distroless
+    labels:
+      dev.dozzle.group: observability
     volumes:
       - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
@@ -109,6 +115,8 @@ services:
   # localhost-only so nothing leaks beyond the dev box.
   dozzle:
     image: amir20/dozzle:v10.5.0
+    labels:
+      dev.dozzle.group: observability
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     ports:
@@ -129,6 +137,8 @@ services:
   # Memory MCP: Shared knowledge graph sidecar.
   memory-mcp:
     image: ${DOCKER_HUB_USERNAME:-local}/kourai-khryseai:memory-mcp
+    labels:
+      dev.dozzle.group: mcp
     build:
       context: .
       dockerfile: docker/memory-mcp.Dockerfile
@@ -164,6 +174,8 @@ services:
   # Context7 MCP: Live documentation context provider.
   context7-mcp:
     image: ${DOCKER_HUB_USERNAME:-local}/kourai-khryseai:context7-mcp
+    labels:
+      dev.dozzle.group: mcp
     build:
       context: .
       dockerfile: docker/context7-mcp.Dockerfile
@@ -624,6 +636,8 @@ services:
   # VN Bridge: Connects the multi-agent system to the visual novel frontend.
   vn-bridge:
     image: ${DOCKER_HUB_USERNAME:-local}/kourai-khryseai:vn-bridge
+    labels:
+      dev.dozzle.group: infra
     build:
       context: .
       dockerfile: docker/host.Dockerfile

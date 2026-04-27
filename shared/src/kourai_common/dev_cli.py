@@ -430,6 +430,19 @@ TASK_GROUPS: tuple[tuple[str, tuple[tuple[str, Task], ...]], ...] = (
         ),
     ),
     (
+        "Observability",
+        (
+            (
+                "observe",
+                Task(
+                    description="Open observability UIs in browser (Jaeger, Prometheus, Dozzle)",
+                    command_factory=lambda: python_script("scripts", "observe.py"),
+                    timed=False,
+                ),
+            ),
+        ),
+    ),
+    (
         "Maintenance",
         (
             (
