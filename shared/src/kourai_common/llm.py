@@ -92,56 +92,81 @@ async def _execute_completion(timeout_seconds: float, **kwargs: Any) -> Any:
         return await litellm.acompletion(**kwargs)
 
 
-async def _manage_memory(context_id: str, agent_name: str) -> None:
-    """Progressively summarize older messages to maintain a lean working memory."""
+async def _manage_memory(context_id: str, agent_name: str, *, force: bool = False) -> int:
+    """Progressively summarize older messages to maintain a lean working memory.
+
+    Returns the count of messages folded into the semantic summary on this
+    call (0 if nothing was eligible). When ``force=True``, the
+    ``WORKING_MEMORY_LIMIT`` threshold is bypassed so the player-triggered
+    ``/compact`` slash command can consolidate even short conversations.
+    The "keep the last 2 unsummarized for immediate context fluidity" rule
+    holds either way.
+    """
     unsummarized = get_unsummarized_messages(context_id, agent_name)
-    if len(unsummarized) > WORKING_MEMORY_LIMIT:
-        # Keep the last 2 unsummarized (to maintain immediate context fluidity)
-        to_summarize = unsummarized[:-2]
-        max_idx = get_max_unsummarized_idx(context_id, agent_name) - 2
+    if not (force or len(unsummarized) > WORKING_MEMORY_LIMIT):
+        return 0
+    if len(unsummarized) <= 2:
+        return 0
+    # Keep the last 2 unsummarized (to maintain immediate context fluidity)
+    to_summarize = unsummarized[:-2]
+    max_idx = get_max_unsummarized_idx(context_id, agent_name) - 2
 
-        state = get_agent_state(context_id, agent_name)
+    state = get_agent_state(context_id, agent_name)
 
-        # Build prompt for summarization
-        text_to_summarize = "\n".join([f"{msg['role']}: {msg['content']}" for msg in to_summarize])
-        prompt = (
-            "Summarize the following conversation snippet concisely. "
-            "Focus on the user's intent, the agent's decisions, and any code/files modified. "
-            "If there is an existing summary, integrate this new information into it.\n\n"
+    # Build prompt for summarization
+    text_to_summarize = "\n".join([f"{msg['role']}: {msg['content']}" for msg in to_summarize])
+    prompt = (
+        "Summarize the following conversation snippet concisely. "
+        "Focus on the user's intent, the agent's decisions, and any code/files modified. "
+        "If there is an existing summary, integrate this new information into it.\n\n"
+    )
+    if state["semantic_summary"]:
+        prompt += f"Existing Summary:\n{state['semantic_summary']}\n\n"
+    prompt += f"New Conversation to Incorporate:\n{text_to_summarize}"
+
+    try:
+        # We use the same model but could theoretically use a cheaper/faster one
+        model = get_model(agent_name)
+        response = await _execute_completion(
+            timeout_seconds=60.0,
+            model=model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a memory condensation module.",
+                },
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.1,
+            max_tokens=1024,
         )
-        if state["semantic_summary"]:
-            prompt += f"Existing Summary:\n{state['semantic_summary']}\n\n"
-        prompt += f"New Conversation to Incorporate:\n{text_to_summarize}"
-
-        try:
-            # We use the same model but could theoretically use a cheaper/faster one
-            model = get_model(agent_name)
-            response = await _execute_completion(
-                timeout_seconds=60.0,
-                model=model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are a memory condensation module.",
-                    },
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=0.1,
-                max_tokens=1024,
+        new_summary = response.choices[0].message.content
+        if new_summary:
+            state["semantic_summary"] = new_summary
+            save_agent_state(context_id, agent_name, state)
+            mark_messages_summarized(context_id, agent_name, max_idx)
+            log.info(
+                "Summarized %d messages for %s in %s",
+                len(to_summarize),
+                agent_name,
+                context_id,
             )
-            new_summary = response.choices[0].message.content
-            if new_summary:
-                state["semantic_summary"] = new_summary
-                save_agent_state(context_id, agent_name, state)
-                mark_messages_summarized(context_id, agent_name, max_idx)
-                log.info(
-                    "Summarized %d messages for %s in %s",
-                    len(to_summarize),
-                    agent_name,
-                    context_id,
-                )
-        except Exception as e:  # pragma: no cover
-            log.warning("Failed to summarize memory for %s: %s", agent_name, e)
+            return len(to_summarize)
+    except Exception as e:  # pragma: no cover
+        log.warning("Failed to summarize memory for %s: %s", agent_name, e)
+    return 0
+
+
+async def compact_memory(context_id: str, agent_name: str) -> int:
+    """Public wrapper: force a player-triggered compaction for one agent.
+
+    Always runs regardless of ``WORKING_MEMORY_LIMIT``; returns the count
+    of messages folded into the semantic summary. Used by the CLI's
+    ``/compact`` slash command which iterates every agent that has
+    history under the current ``context_id`` and totals the counts for a
+    Mneme comms-window report.
+    """
+    return await _manage_memory(context_id, agent_name, force=True)
 
 
 def _mark_system_cacheable(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:

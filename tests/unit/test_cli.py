@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
@@ -11,6 +11,7 @@ from a2a.types import Message, Task, TaskArtifactUpdateEvent, TaskState, TaskSta
 pytest.importorskip("asyncclick")
 
 from hosts.cli.__main__ import (
+    _compact_session_memory,
     _format_affinity_bar,
     _format_greeting,
     _maybe_offer_feature_opt_in,
@@ -358,3 +359,104 @@ class TestGreetingFormat:
         plain = re.sub(r"\x1b\[[0-9;]*m", "", rendered)
         assert plain.index("Techne") < plain.index("( ⌐■_■)")
         assert plain.index("( ⌐■_■)") < plain.index('"Hey gorgeous~"')
+
+
+class TestCompactSessionMemory:
+    """``/compact`` slash command — player-triggered transcript compaction
+    via Mneme. Universal pattern across the post-leak OSS Claude Code
+    clones (ClawCode, Cline, OpenCode); tier-1 lift from the 2026-04-26
+    research sweep. The handler must (a) discover agents-with-history
+    for the live context_id without hard-coding the roster, (b) force-
+    compact each, and (c) emit a Mneme comms-window narrating what
+    happened — speech convention per M10 with a leading double-quote so
+    the box renders italic dialogue."""
+
+    @pytest.mark.asyncio
+    async def test_emits_mneme_comms_when_no_agents(self, monkeypatch):
+        # _echo writes to a pre-patched _raw_out stream so capsys can't see it
+        # — patch _echo directly per the established pattern in this codebase.
+        echoed: list[str] = []
+        monkeypatch.setattr(
+            "hosts.cli.__main__._echo",
+            lambda text="", nl=True: echoed.append(text),
+        )
+        with (
+            patch(
+                "hosts.cli.__main__.list_agents_with_history",
+                return_value=[],
+            ),
+            patch("hosts.cli.__main__.compact_memory") as mock_compact,
+        ):
+            await _compact_session_memory("ctx-empty")
+
+        out = "\n".join(echoed)
+        assert "MNEME" in out  # comms-window callsign for Mneme
+        assert "fresh" in out.lower()  # the empty-thread message
+        mock_compact.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_iterates_every_agent_and_totals_counts(self, monkeypatch):
+        echoed: list[str] = []
+        monkeypatch.setattr(
+            "hosts.cli.__main__._echo",
+            lambda text="", nl=True: echoed.append(text),
+        )
+        compact_calls: list[tuple[str, str]] = []
+
+        async def _fake_compact(ctx: str, agent: str) -> int:
+            compact_calls.append((ctx, agent))
+            return {"metis": 3, "techne": 2, "kallos": 0}[agent]
+
+        with (
+            patch(
+                "hosts.cli.__main__.list_agents_with_history",
+                return_value=["kallos", "metis", "techne"],
+            ),
+            patch(
+                "hosts.cli.__main__.compact_memory",
+                new=_fake_compact,
+            ),
+        ):
+            await _compact_session_memory("ctx-1")
+
+        out = "\n".join(echoed)
+        # All three agents asked, in the order list_agents_with_history returned them.
+        assert compact_calls == [
+            ("ctx-1", "kallos"),
+            ("ctx-1", "metis"),
+            ("ctx-1", "techne"),
+        ]
+        # Total = 5, only metis (3) + techne (2) listed in the roster.
+        assert "5" in out
+        assert "metis" in out
+        assert "techne" in out
+        # kallos returned 0 — should NOT appear in the folded roster.
+        dialogue_lines = [ln for ln in out.splitlines() if '"' in ln]
+        joined = " ".join(dialogue_lines)
+        assert "kallos" not in joined.lower()
+
+    @pytest.mark.asyncio
+    async def test_zero_total_emits_already_lean_message(self, monkeypatch):
+        echoed: list[str] = []
+        monkeypatch.setattr(
+            "hosts.cli.__main__._echo",
+            lambda text="", nl=True: echoed.append(text),
+        )
+
+        async def _fake_compact(ctx: str, agent: str) -> int:
+            return 0
+
+        with (
+            patch(
+                "hosts.cli.__main__.list_agents_with_history",
+                return_value=["metis"],
+            ),
+            patch(
+                "hosts.cli.__main__.compact_memory",
+                new=_fake_compact,
+            ),
+        ):
+            await _compact_session_memory("ctx-1")
+
+        out = "\n".join(echoed)
+        assert "lean" in out.lower()

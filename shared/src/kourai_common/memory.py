@@ -161,6 +161,22 @@ def get_max_unsummarized_idx(context_id: str, agent_name: str) -> int:
     return row[0] if row and row[0] is not None else -1
 
 
+def list_agents_with_history(context_id: str) -> list[str]:
+    """Return distinct ``agent_name`` values that have any messages stored
+    against ``context_id``.
+
+    Used by the player-triggered ``/compact`` slash command in the CLI to
+    discover which per-agent buckets to roll forward into semantic memory
+    without hard-coding the agent roster.
+    """
+    conn = _get_db()
+    cursor = conn.execute(
+        "SELECT DISTINCT agent_name FROM messages WHERE context_id = ? ORDER BY agent_name",
+        (context_id,),
+    )
+    return [row[0] for row in cursor.fetchall()]
+
+
 def add_message(context_id: str, agent_name: str, role: str, content: Any) -> None:
     """Add a message to the episodic history."""
     conn = _get_db()
