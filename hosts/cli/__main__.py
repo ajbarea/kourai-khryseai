@@ -108,6 +108,14 @@ def _apply_audio_settings(
             tts.cleanup()
         return None
 
+    # Apply per-stream volumes BEFORE play_* so newly-started streams
+    # come up at the player's chosen level. set_*_volume on already-
+    # playing streams updates them in-place (see AudioManager.set_*_volume).
+    audio.set_music_volume(settings.music_volume)
+    audio.set_ambient_volume(settings.ambient_volume)
+    audio.set_voice_volume(settings.voice_volume)
+    audio.set_sfx_volume(settings.sfx_volume)
+
     ambient = PROJECT_ROOT / "assets" / "audio" / "ambient" / "forge_loop.ogg"
     music_dir = PROJECT_ROOT / "assets" / "audio" / "music"
 
@@ -122,6 +130,10 @@ def _apply_audio_settings(
             audio.load_playlist(str(music_dir))
             audio.play_playlist()
     else:
+        # Stop the playlist daemon FIRST so it doesn't re-call
+        # play_next_track the moment the fade completes (audible
+        # resurrection on track 2). Then fade the current track.
+        audio.stop_playlist()
         audio.stop_music(fade_ms=300)
 
     if settings.voice_enabled:

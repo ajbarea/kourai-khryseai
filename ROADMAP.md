@@ -879,44 +879,28 @@ architectural moves; valuable but not the first lift.
 
 ### Surfaced 2026-04-27 during M16 live-smoke session
 
-- **CLI audio volume parity (`hosts/cli/settings.py:20`,
-  `hosts/cli/commands.py:127-128`).** `CLISettings` exposes only
-  `*_enabled` booleans (toggle on/off) for music / ambient / voice; the
-  `/settings` menu renders them as `ON/OFF`. The GUI's
-  `hosts/gui/settings_overlay.py:223` already exposes proper volume
-  sliders (`ambient_volume` etc., default 0.50) backed by the wired-up
-  `AudioManager.set_*_volume()` API in
-  `shared/src/kourai_common/audio.py:110-126` — the CLI just never
-  plumbed sliders through. Surfaced when ambient was loud enough during
-  a live-smoke that the only available relief was flipping it OFF
-  entirely. Fix: mirror the GUI shape in `CLISettings` (`music_volume /
-  ambient_volume / voice_volume / sfx_volume: float`, defaulting to the
-  GUI's defaults), surface in `/settings` with `+/-` (or direct numeric
-  input), call `audio.set_*_volume(settings.*_volume)` in
-  `_apply_audio_settings`. Closes the GUI/CLI parity gap.
+- ✅ **CLI audio volume parity** — shipped: `CLISettings` grew
+  `music_volume / ambient_volume / voice_volume / sfx_volume` floats
+  defaulting to the GUI's slider values (0.65 / 0.50 / 1.0 / 0.85);
+  `/settings` menu shows volumes inline and adds a `[v]` sub-flow that
+  prompts for each volume (Enter keeps current; decimals 0.0-1.0 or
+  percent 0-100 accepted). `_apply_audio_settings` calls
+  `audio.set_*_volume(settings.*_volume)` before any `play_*` so newly
+  started streams come up at the chosen level.
+
+- ✅ **Background-music toggle OFF skips to next track** — shipped:
+  `AudioManager` grew `_playlist_shutdown: threading.Event` +
+  `_playlist_thread` tracker; the daemon loop uses
+  `Event.wait(timeout=1.0)` so it exits within ~1s of a stop signal.
+  `play_playlist` is now idempotent (no-op if a thread is already
+  alive); new `stop_playlist()` method joins the daemon with a
+  timeout. `_apply_audio_settings` calls `stop_playlist()` BEFORE
+  `stop_music(fade_ms=300)` on `music_enabled=False` — daemon stops
+  before the fade completes so it can't audibly resurrect on track 2.
 
 - **VN Codex broken (`hosts/vn/kourai_vn/game/codex_data.rpy`,
   `screens_codex.rpy`).** Symptom and reproduction TBD; needs a
   debugging session next time the VN host (`make vn`) is exercised.
-
-- **Background-music toggle OFF skips to the next track instead of
-  stopping (`shared/src/kourai_common/audio.py:284-299`,
-  `hosts/cli/__main__.py:120-125`).** Toggling `[2] Background Music`
-  OFF in `/settings` calls `audio.stop_music(fade_ms=300)`, which fades
-  the current track out — but `play_playlist`'s daemon thread (a
-  `while True` polling `is_music_playing()` every 1s) then sees no
-  music playing and calls `play_next_track()`, audibly resurrecting
-  the playlist on track 2. Same mechanism leaks threads: every
-  `_apply_audio_settings` re-run while `music_enabled=True` calls
-  `play_playlist()` again, spawning another daemon thread that races
-  with the existing ones. Fix: add a `threading.Event` shutdown signal
-  the loop checks each iteration, expose it via a new
-  `AudioManager.stop_playlist()` method, call it in
-  `_apply_audio_settings`'s `music_enabled=False` branch (before
-  `stop_music`), and guard `play_playlist()` so it doesn't spawn a
-  second thread when one's already running. Pairs with the volume-
-  parity item above — both are CLI audio plumbing gaps that probably
-  share a follow-on PR.
 
 ---
 
@@ -924,6 +908,7 @@ architectural moves; valuable but not the first lift.
 
 One-liner per item, newest first. Detail moves out of this file when work lands.
 
+- 2026-04-27 — Two coupled CLI audio bugs fixed (M6 surfaced 2026-04-27 follow-on). (1) CLI volume parity: `CLISettings` grew `music_volume / ambient_volume / voice_volume / sfx_volume` floats mirroring the GUI's slider defaults (0.65 / 0.50 / 1.0 / 0.85); `/settings` shows volumes inline with each toggle and adds a `[v]` sub-flow that prompts for each volume (Enter keeps current; accepts decimals 0.0-1.0 or percent 0-100). `_apply_audio_settings` applies volumes before `play_*` so newly-started streams come up at the chosen level. (2) Music-toggle-OFF skips-to-next-track: `AudioManager` grew `_playlist_shutdown: threading.Event` checked between polling ticks via `Event.wait(timeout=1.0)` (responsive to stop signals within ~1s); `play_playlist` is now idempotent (no-op if a thread is already alive — fixes the prior bug where every `_apply_audio_settings` re-run spawned another daemon racing with the first); new `stop_playlist()` method joins the daemon with a timeout; `_apply_audio_settings` calls `stop_playlist()` BEFORE `stop_music(fade_ms=300)` on `music_enabled=False` so the daemon can't see "not playing" and resurrect the playlist on track 2 the moment the fade completes. 15 new tests across `test_gui_audio_tts_engine.py::TestPlaylistLifecycle` (4 — idempotency, stop signal latency, no-op when not running, restart after stop), `test_cli.py::TestCLISettingsVolumes` (5 — defaults match GUI, clamping, persistence, key validation), `TestAdjustVolumesFlow` (4 — Enter-keeps, decimal input, percent normalization, invalid-input skip), `TestApplyAudioSettingsMusicOff` (2 — call-order regression guard, volumes-before-play). Player-facing bug AJ hit during M16 smoke — the only available relief from too-loud ambient was flipping it OFF entirely, and toggling Music OFF audibly resurrected on track 2
 - 2026-04-27 — **M16 fully shipped — observability DX uplift end-to-end** (this PR + #47/#48/#49 across three sessions; the stack now runs `jaegertracing/jaeger:2.17.0` + `prom/prometheus:v3.10.0-distroless` with the `spanmetrics` connector emitting RED metrics on `:8889`). Eight pieces, one trajectory: (1) Mneme `_OtelTraceFilter` in `shared/src/kourai_common/log.py` reads `trace.get_current_span()` directly via the `opentelemetry-api` we already depend on — **did NOT** end up using `opentelemetry-instrumentation-logging`, whose record factory only injects `otelTraceID` / `otelSpanID` when `set_logging_format=True` (verified by reading the source — both the attribute injection and the `basicConfig` call are gated on the same flag), which would clash with `log.py`'s explicit handler setup. (2) `_TraceAwareFormatter` switches between two format strings per-record so non-traced lines (startup chatter, pre-request setup) skip the `[trace=...]` block entirely instead of padding 32 zeros — when present the trace ID renders as full 32-char hex (`[trace=750edeb816c2fa5eab9b2261945b1c10]`, copy-paste-grep-able from Jaeger). Both console + `RotatingFileHandler` carry the filter so trace IDs land in Dozzle live tail AND `logs/<agent>.log` archive. (3) `make observe` quickstart wired through `Makefile` + `shared/src/kourai_common/dev_cli.py` + new `scripts/observe.py` — cross-platform browser dispatch with explicit WSL2 handling (`webbrowser` falls back to `gio` which can't open `http://` without a real GNOME session, so we bypass to `wslview` from `wslu` when present, otherwise drop to `cmd.exe /c start` via WSL interop at `/mnt/c/Windows/System32/cmd.exe`). (4) `docs/observability.md` onboarding page wired into the Zensical nav under Architecture → Observability — mental-model table (trace=flow, metric=aggregate, log=narrative), `make observe` quickstart, cross-tool linking explainer covering the trace-ID-in-logs plumbing, four-pattern triage runbook ("agent looks stuck", "request finished but felt slow", "errors visible somewhere unclear which agent", "OOM / kept restarting"), container-groups table mapping the four `dev.dozzle.group` buckets, "what's currently populated, and what's not" honesty section flagging Prometheus as sparsely-populated today (so contributors don't go hunting for Monitor-tab data that isn't there yet), span naming convention table. (5) `dev.dozzle.group` labels added across `docker-compose.yml` (agents / observability / mcp / infra) so Dozzle's group rendering matches the docs page. (6) `docs/architecture/infrastructure.md` slimmed to a brief intro + link, fixing the **SPM overpromise** that page carried (it claimed the Monitor tab was populated; the audit showed it isn't, and that mismatch would have burned a new contributor). (7) Jaeger v1.60 → v2.17.0 migration via OTel-Collector–shape `docker/jaeger-config.yaml` (#48); env-var collapse (`COLLECTOR_OTLP_ENABLED`, `METRICS_STORAGE_TYPE`, `PROMETHEUS_SERVER_URL`, `PROMETHEUS_QUERY_SUPPORT_SPAN_UNIT`, `SPAN_STORAGE_TYPE`) into a single config file built on the OTel Collector framework. (8) `spanmetrics` connector + Prometheus `v3.10.0-distroless` + agent RED scrape (#49) — web-searching current best practice while bumping pins caught two details that would have shipped unnoticed: `dimensions_cache_size` is deprecated post-Jaeger-v2.16 in favor of the `dimensions_cache.max_size` shape, and the spanmetrics 60s default `metrics_flush_interval` is the post-deprecation default that wants explicit acknowledgment. Dozzle pin verified `v10.5.0` exactly current (released 2026-04-26 21:13 UTC; no bump). 4 new unit tests in `tests/unit/test_logging.py::TestOtelTraceInjection` (bare format outside span, trace ID rendered inside span, filter populates `otelTraceID` from active context, both handlers carry the filter); ruff format + ruff check + ty all green. M16 follow-ons queued separately in IMPL.md: live trace-ID-in-Dozzle smoke (unit-tested but worth eyeballing in a real `make up` + smoked pipeline), `.claude/skill-context.md` cross-link to `docs/observability.md`, `scripts/watch_protocols.py` `kind="docker-tag"` digester for `amir20/dozzle` / `jaegertracing/jaeger` / `prom/prometheus` so future image drift surfaces automatically. M16 detail block removed from above; this is the canonical record
 - 2026-04-26 — **M1 fully shipped — Round 6 live smoke validated end-to-end** (accept path 6a + discard path 6b, both clean). Provider tool-use loop replaces the `parse_and_apply_fixes` regex parser everywhere it ran. Validation: 22 `'type': 'tool_use'` frames in techne container logs (with `toolu_*` IDs proving real provider blocks); 11 `'type': 'tool_result'` frames closing the loop; **zero `parse_and_apply_fixes` hits** across all 6 agent containers (`techne`, `hephaestus`, `metis`, `dokimasia`, `kallos`, `mneme`). Wall-clock: 244.8s on 6a, 418.6s on 6b — both under the 462s v2 baseline; the provider tool-use loop is faster than the regex parser AND cleaner. Bonus emergent behavior: Aidos's slop-detection now actively *teaches* commit-message hygiene with `<FACT category="skill" confidence="medium">` markers tracking the player's improvement across runs (e.g., flagging "comprehensive" as repeated slop after the first run). M1 detail block removed from above; this is the canonical record
 - 2026-04-26 — `/clear` ANSI escape mangled by `prompt_toolkit.patch_stdout` (printed `?[2J?[1;1H` literally instead of clearing the viewport). Fix: new `hosts/cli/rendering._clear_screen()` helper writes the standard cursor-home + erase-screen sequence (`\x1b[H\x1b[2J`, matching Ubuntu's `clear`) directly to `_raw_out` (the pre-`patch_stdout` stream) — same pattern `_echo()` already uses to bypass the proxy. `hosts/cli/__main__.py` calls the new helper instead of `click.clear()`; click import retained for the rest of the CLI. Caught in AJ's REPL during M1 Round 6 smoke

@@ -123,15 +123,65 @@ _SETTINGS_LABELS: dict[str, str] = {
 
 def _print_settings_panel(settings: CLISettings) -> None:
     _echo(f"\n{_GOLD_BOLD}\u2501\u2501\u2501 Forge Settings \u2501\u2501\u2501{_RESET}")
-    _echo(f"  [1] Voice (TTS):    {'ON' if settings.voice_enabled else 'OFF'}")
-    _echo(f"  [2] Background Mus: {'ON' if settings.music_enabled else 'OFF'}")
-    _echo(f"  [3] Forge Ambience: {'ON' if settings.ambient_enabled else 'OFF'}")
+    _echo(
+        f"  [1] Voice (TTS):    {'ON' if settings.voice_enabled else 'OFF'}"
+        f"  {_DIM}vol {settings.voice_volume:.2f}{_RESET}"
+    )
+    _echo(
+        f"  [2] Background Mus: {'ON' if settings.music_enabled else 'OFF'}"
+        f"  {_DIM}vol {settings.music_volume:.2f}{_RESET}"
+    )
+    _echo(
+        f"  [3] Forge Ambience: {'ON' if settings.ambient_enabled else 'OFF'}"
+        f"  {_DIM}vol {settings.ambient_volume:.2f}{_RESET}"
+    )
     _echo(f"  [4] Romance System: {'ON' if settings.romance_enabled else 'OFF'}")
     _echo(f"  [5] Idle Gossip:    {'ON' if settings.gossip_enabled else 'OFF'}")
     _echo(f"  [6] Metrics Track:  {'ON' if settings.metrics_tracking_enabled else 'OFF'}")
     _echo(f"  [7] Romance Nudges: {'ON' if settings.romance_nudges_enabled else 'OFF'}")
     _echo(f"  [8] Gossip Nudges:  {'ON' if settings.gossip_nudges_enabled else 'OFF'}")
     _echo("  [9] Reset Progression Data")
+    _echo(f"  [v] Adjust volumes  {_DIM}(music / ambient / voice / sfx){_RESET}")
+
+
+_VOLUME_PROMPTS: tuple[tuple[str, str], ...] = (
+    ("music_volume", "Music"),
+    ("ambient_volume", "Ambient"),
+    ("voice_volume", "Voice"),
+    ("sfx_volume", "SFX"),
+)
+
+
+def _adjust_volumes(settings: CLISettings) -> bool:
+    """Walk through each volume prompt; press Enter to keep current.
+
+    Returns True if any volume changed (caller re-applies audio settings).
+    """
+    _echo(
+        f"\n  {_DIM}Adjust volumes \u2014 Enter to keep, decimals 0.0-1.0 "
+        f"(percentages 0-100 also accepted):{_RESET}"
+    )
+    changed = False
+    for key, label in _VOLUME_PROMPTS:
+        current = getattr(settings, key)
+        raw = input(f"  {_GOLD}{label:<7} [{current:.2f}]:{_RESET} ").strip()
+        if not raw:
+            continue
+        try:
+            value = float(raw)
+        except ValueError:
+            _echo(f"  {_DIM}Skipped {label}: not a number ({raw!r}).{_RESET}")
+            continue
+        # Accept 0-100 percent input as a convenience \u2014 anything > 1.0 is
+        # treated as percent. set_volume clamps to [0.0, 1.0] for us.
+        if value > 1.0:
+            value = value / 100.0
+        new_val = settings.set_volume(key, value)
+        _echo(f"  {_GOLD_BRIGHT}\u2728 {label} volume \u2192 {new_val:.2f}{_RESET}")
+        changed = True
+    if changed:
+        _echo(f"  {_DIM}Volumes saved.{_RESET}")
+    return changed
 
 
 def _apply_settings_choice(choice: str) -> bool:
@@ -149,6 +199,8 @@ def _apply_settings_choice(choice: str) -> bool:
     if choice == "9":
         _reset_progression_data()
         return True
+    if choice.lower() == "v":
+        return _adjust_volumes(settings)
     return False
 
 
