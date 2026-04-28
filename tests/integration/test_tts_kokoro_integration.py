@@ -54,6 +54,10 @@ async def _safe_edge_synthesize(
             f"({type(exc).__name__}: {exc}); skipping rather than burning "
             "a CI rerun on an environmental flake"
         )
+        raise  # unreachable: pytest.skip raises Skipped. Explicit re-raise
+        # makes ty's flow analysis see the function as definitely-not-returning
+        # along this path — `pytest.skip` is annotated `-> NoReturn` upstream
+        # but ty doesn't propagate that through pytest's callable-class export.
 
 
 def _read_wav_duration(wav_bytes: bytes) -> float:
