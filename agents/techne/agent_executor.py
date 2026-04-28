@@ -97,10 +97,11 @@ class TechneAgentExecutor(BaseAgentExecutor):
                     templates = await read_files(paths)
                     file_contents.update(templates)
 
-            # Step 3: Get git context — stream output. Round 6 caught
-            # `git status --short` exiting 128 because the specialist
-            # container's default cwd (`/app`) isn't the worktree;
-            # threading the parsed project_root through fixes it.
+            # Step 3: Get git context — stream output. The specialist
+            # container's default cwd (`/app`) isn't the worktree, so
+            # `git status --short` would exit 128 without `cwd=` set;
+            # thread the parsed project_root through to land in the
+            # right repo.
             async def _git_status(line: str) -> None:
                 await send_working_status(updater, task, line, emoji="🔍")
 

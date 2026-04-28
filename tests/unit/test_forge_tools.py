@@ -145,11 +145,10 @@ class TestReadFile:
 
     @pytest.mark.asyncio
     async def test_rejects_directory_path(self, project_root: Path):
-        # Round 6 caught Techne repeatedly trying directory paths
-        # through read_file. The handler's `target.exists()` check
-        # used to pass for directories and read_file_with_context
-        # would then return garbage. Now the handler explicitly
-        # rejects directories with a clear error.
+        # Models pass directory paths through read_file often enough
+        # that the runtime guard is load-bearing. Without the explicit
+        # rejection, `target.exists()` would pass for directories and
+        # read_file_with_context would return garbage.
         (project_root / "src").mkdir(exist_ok=True)
         result = await read_file("src", project_root=project_root)
         assert result.startswith("ERROR:")

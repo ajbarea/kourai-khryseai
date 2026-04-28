@@ -204,10 +204,10 @@ class TestMetisExecutor:
 
     @pytest.mark.asyncio
     async def test_get_project_context_called_with_project_root(self):
-        """Round 6 caught `git status --short` exiting 128 from the
-        Metis container because the default cwd (`/app`) isn't the
-        worktree. The executor now parses [project_root: ...] and
-        threads it through to get_project_context."""
+        """`git status --short` exits 128 from the Metis container
+        because the default cwd (`/app`) isn't the worktree. The
+        executor parses [project_root: ...] and threads it through to
+        get_project_context — this regression-guards that wiring."""
         from agents.metis.agent_executor import MetisAgentExecutor
 
         executor = MetisAgentExecutor()
@@ -329,10 +329,10 @@ class TestTechneExecutor:
 
     @pytest.mark.asyncio
     async def test_get_git_context_called_with_project_root_cwd(self):
-        """Round 6 caught `git status --short` exiting 128 because the
-        Techne container's default cwd (`/app`) isn't the worktree.
-        Ensure get_git_context now receives the parsed project_root as
-        cwd so the call lands in the right repo."""
+        """`git status --short` exits 128 from the Techne container
+        because the default cwd (`/app`) isn't the worktree. Ensure
+        get_git_context receives the parsed project_root as cwd so the
+        call lands in the right repo."""
         from agents.techne.agent_executor import TechneAgentExecutor
 
         executor = TechneAgentExecutor()

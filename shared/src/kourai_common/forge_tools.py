@@ -91,10 +91,10 @@ async def read_file(path: str, *, project_root: Path | str) -> str:
     """Tool handler — return line-numbered contents.
 
     Rejects directory paths explicitly so the model gets a clear error
-    rather than a silent garbage-result. Round 6 caught Techne
-    repeatedly trying directory paths through this handler; the schema
-    description has been tightened too, but the runtime guard makes
-    the error legible when the model still attempts it.
+    rather than a silent garbage-result. Models pass directory paths
+    through this handler often enough that the schema description has
+    been tightened too, but the runtime guard makes the error legible
+    when the model still attempts it.
     """
     try:
         target = _resolve(path, project_root)

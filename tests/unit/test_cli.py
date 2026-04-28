@@ -421,12 +421,13 @@ class TestMetricsFormatting:
 
 
 class TestGreetingFormat:
-    """Round 6: greeting must attribute the speaking maiden by name.
+    """Greeting must attribute the speaking maiden by name.
 
-    Original line rendered ``( ◡‿◡)✧ Structure IS beauty.`` — face plus
-    italic quote with no name. AJ flagged players had to memorize the
-    emoji-to-name map. Fix adds the name in front and wraps the line in
-    ``"..."`` so M10's italic-on-quoted-line speech convention applies."""
+    Without the name prefix the line renders as
+    ``( ◡‿◡)✧ Structure IS beauty.`` — face plus italic quote with no
+    name — forcing players to memorize the emoji-to-name map. Prepending
+    the name and wrapping the quote in ``"..."`` makes the
+    italic-on-quoted-line speech convention read naturally."""
 
     def test_includes_capitalized_name(self):
         rendered = _format_greeting("metis", "( ◡‿◡)✧", "Structure IS beauty.")

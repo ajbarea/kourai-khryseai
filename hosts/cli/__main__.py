@@ -322,11 +322,12 @@ def _handle_permissions_command(prompt_text: str, settings: CLISettings) -> None
 def _format_greeting(name: str, face: str, quote: str) -> str:
     """Render the startup greeting line with maiden attribution.
 
-    Round 6 caught the original line as ``( ◡‿◡)✧ Structure IS beauty.``
-    — kaomoji + italic line, no name. Players had to memorize the
-    emoji-to-name map to know who was speaking. This adds the name in
-    front and wraps the line in ``"..."`` so the speech-vs-action
-    convention from M10 (italic = dialogue) reads naturally.
+    Without the name prefix the line renders as
+    ``( ◡‿◡)✧ Structure IS beauty.`` — kaomoji + italic line, no name —
+    forcing players to memorize the emoji-to-name map to know who is
+    speaking. Prepending the capitalized name and wrapping the quote in
+    ``"..."`` makes the speech-vs-action convention (italic = dialogue)
+    read naturally.
     """
     return (
         f"  {_GOLD_BOLD}{name.capitalize()}{_RESET} "
