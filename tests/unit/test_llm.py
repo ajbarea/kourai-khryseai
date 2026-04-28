@@ -1139,3 +1139,60 @@ class TestChatWithToolsCachesPrefix:
             "name": "edit_file",
             "cache_control": {"type": "ephemeral"},
         }
+
+
+class TestExecuteCompletionForwardsRequestTimeout:
+    """Regression-guard for the `request_timeout=` kwarg on the LiteLLM call.
+
+    Without this, the only deadline enforcement is the outer
+    `asyncio.timeout(...)` wrapper — which works for normal request
+    completion paths but doesn't always cancel a stuck TCP connect
+    cleanly on older aiohttp transports. Forwarding the deadline as
+    `request_timeout` propagates into LiteLLM's httpx/aiohttp transport
+    so the connect-stage failure surfaces as a real Timeout instead of
+    burning the whole 120s budget on each retry attempt.
+    """
+
+    @pytest.mark.asyncio
+    async def test_request_timeout_passed_to_acompletion(self):
+        from kourai_common.llm import _execute_completion
+
+        seen_kwargs: dict = {}
+
+        async def _fake_acompletion(**kwargs):
+            seen_kwargs.update(kwargs)
+            return MagicMock()
+
+        with patch("kourai_common.llm.litellm.acompletion", side_effect=_fake_acompletion):
+            await _execute_completion(
+                timeout_seconds=42.0,
+                model="anthropic/claude-haiku-4-5-20251001",
+                messages=[{"role": "user", "content": "hi"}],
+            )
+
+        assert seen_kwargs["request_timeout"] == 42.0
+
+    @pytest.mark.asyncio
+    async def test_request_timeout_does_not_clobber_explicit_caller_value(self):
+        """`setdefault` semantics — if a caller passes their own
+        `request_timeout`, the wrapper respects it. Future-proofs against
+        callers (e.g. a streaming-aware path) that want a tighter
+        first-chunk deadline than the agent-level timeout.
+        """
+        from kourai_common.llm import _execute_completion
+
+        seen_kwargs: dict = {}
+
+        async def _fake_acompletion(**kwargs):
+            seen_kwargs.update(kwargs)
+            return MagicMock()
+
+        with patch("kourai_common.llm.litellm.acompletion", side_effect=_fake_acompletion):
+            await _execute_completion(
+                timeout_seconds=120.0,
+                model="anthropic/claude-haiku-4-5-20251001",
+                messages=[{"role": "user", "content": "hi"}],
+                request_timeout=15.0,
+            )
+
+        assert seen_kwargs["request_timeout"] == 15.0
