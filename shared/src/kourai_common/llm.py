@@ -24,7 +24,7 @@ from kourai_common.retry import with_retry
 from kourai_common.usage import record_usage
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterable, Awaitable, Callable, Sequence
+    from collections.abc import AsyncIterable, Awaitable, Callable, Mapping, Sequence
 
 log = logging.getLogger(__name__)
 
@@ -495,7 +495,7 @@ async def chat_with_tools(
     agent_name: str,
     messages: Sequence[dict[str, Any]],
     tools: list[dict[str, Any]],
-    tool_handlers: dict[str, Callable[..., Awaitable[str]]],
+    tool_handlers: Mapping[str, Callable[..., Awaitable[str]]],
     *,
     handler_context: dict[str, Any] | None = None,
     temperature: float = 0.2,
