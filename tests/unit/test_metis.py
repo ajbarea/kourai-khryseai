@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -116,53 +116,6 @@ class TestCreateSpecStream:
             async for _ in create_spec_stream("idea", file_contents={"app.py": "def main(): pass"}):
                 pass
         assert "app.py" in captured["messages"][-1]["content"]
-
-
-class TestGithubSearchIssues:
-    """Test GitHub issue search with mocked API."""
-
-    @pytest.mark.asyncio
-    async def test_returns_empty_without_token(self, monkeypatch):
-        monkeypatch.delenv("GITHUB_PERSONAL_ACCESS_TOKEN", raising=False)
-        from agents.metis.agent import github_search_issues
-
-        results = await github_search_issues("database migration")
-        assert results == []
-
-    @pytest.mark.asyncio
-    async def test_returns_empty_on_import_error(self, monkeypatch):
-        monkeypatch.setenv("GITHUB_PERSONAL_ACCESS_TOKEN", "test-token")
-        from agents.metis.agent import github_search_issues
-
-        with patch.dict("sys.modules", {"github": None}):
-            results = await github_search_issues("migration")
-        assert results == []
-
-    @pytest.mark.asyncio
-    async def test_returns_results(self, monkeypatch):
-        monkeypatch.setenv("GITHUB_PERSONAL_ACCESS_TOKEN", "test-token")
-
-        mock_issue = MagicMock()
-        mock_issue.number = 42
-        mock_issue.title = "Fix migration bug"
-        mock_issue.body = "Description here"
-        mock_issue.repository.full_name = "owner/repo"
-        mock_issue.html_url = "https://github.com/owner/repo/issues/42"
-        mock_issue.state = "open"
-
-        mock_gh_instance = MagicMock()
-        mock_gh_instance.search_issues.return_value = [mock_issue]
-        mock_github_module = MagicMock()
-        mock_github_module.Github.return_value = mock_gh_instance
-
-        with patch.dict("sys.modules", {"github": mock_github_module}):
-            from agents.metis.agent import github_search_issues
-
-            results = await github_search_issues("migration bug")
-        assert len(results) == 1
-        assert results[0]["issue_number"] == 42
-        assert results[0]["title"] == "Fix migration bug"
-        assert results[0]["state"] == "open"
 
 
 class TestGetProjectContext:

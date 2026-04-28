@@ -193,9 +193,9 @@ async def create_github_pr(
 ) -> str:
     """Create a GitHub PR with commit messages.
 
-    Framework for GitHub PR creation via MCP.
-    Returns a formatted choice event for HOTL confirmation.
-    Actual GitHub API call implemented in github_create_pull_request_impl().
+    Returns a formatted choice event for HOTL confirmation. Actual PR
+    creation against GitHub is not yet wired up — the executor decorates
+    the artifact with PR-ready metadata and stops there.
 
     Args:
         pr_metadata: Dict from parse_commits_for_pr() with title, body, etc.
@@ -235,94 +235,3 @@ async def create_github_pr(
         },
     }
     return json.dumps(choice_event)
-
-
-async def github_create_pull_request_impl(
-    repo_url: str,
-    pr_metadata: dict,
-    base_branch: str = "main",
-    github_token: str | None = None,
-    context_id: str | None = None,
-) -> dict:
-    """Actually create a PR on GitHub.
-
-    Called AFTER user confirms via HOTL choice event.
-    Uses GitHub API (PyGithub) with graceful fallback to MCP.
-
-    Args:
-        repo_url: GitHub repo URL (e.g., "https://github.com/owner/repo")
-        pr_metadata: Dict with title, body, commit_count, commit_types.
-        base_branch: Target branch for PR (default: main).
-        github_token: GitHub PAT (checks env if not provided).
-        context_id: Conversation context ID for tracing.
-
-    Returns:
-        Dict with keys: success (bool), pr_url (str), error (str if failed).
-    """
-    import os
-    import re
-
-    token = github_token or os.getenv("GITHUB_PERSONAL_ACCESS_TOKEN")
-    if not token:
-        return {
-            "success": False,
-            "error": "GITHUB_PERSONAL_ACCESS_TOKEN not set",
-        }
-
-    try:
-        # Parse repo owner/name from URL
-        # Supports: https://github.com/owner/repo, git@github.com:owner/repo.git, etc.
-        match = re.search(r"github\.com[:/]([^/]+)/([^/]+?)(?:\.git)?/?$", repo_url)
-        if not match:
-            return {
-                "success": False,
-                "error": f"Invalid GitHub repo URL: {repo_url}",
-            }
-
-        owner, repo_name = match.groups()
-
-        # Use PyGithub for API calls (graceful fallback pattern)
-        try:
-            from github import Github
-
-            gh = Github(token)
-            repo = gh.get_user(owner).get_repo(repo_name)
-
-            # Create PR on the target branch
-            # Assuming we're pushing from a feature branch (commits branch name)
-            head_branch = "commits-" + str(hash(pr_metadata["title"]))[:8]
-
-            pr = repo.create_pull(
-                title=pr_metadata["title"],
-                body=pr_metadata["body"],
-                head=head_branch,
-                base=base_branch,
-            )
-
-            log.info(
-                "Created PR #%d: %s → %s",
-                pr.number,
-                pr_metadata["title"][:60],
-                repo_url,
-            )
-
-            return {
-                "success": True,
-                "pr_url": pr.html_url,
-                "pr_number": pr.number,
-            }
-
-        except ImportError:
-            log.warning("PyGithub not installed — attempting MCP fallback")
-            # Would call MCP GitHub server here
-            return {
-                "success": False,
-                "error": ("PyGithub not installed. Install with: uv add PyGithub"),
-            }
-
-    except Exception as e:
-        log.error("Failed to create GitHub PR: %s", e)
-        return {
-            "success": False,
-            "error": str(e),
-        }
