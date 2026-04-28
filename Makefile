@@ -109,7 +109,7 @@ observe:                   ## Open observability UIs in browser (Jaeger, Prometh
 fix:                       ## Run every auto-fixer (ruff format, ruff check --fix); skip check pass
 	@$(UV_DEV) fix
 
-lint:                      ## Run code quality checks (ruff format, ruff check, ty)
+lint:                      ## Run code quality checks (ruff format --check, ruff check, ty); CI-equivalent, no mutation
 	@$(UV_DEV) lint
 
 validate:                  ## Quick validation: lint + unit tests only (fast feedback)
