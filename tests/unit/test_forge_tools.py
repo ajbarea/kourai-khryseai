@@ -13,8 +13,6 @@ from typing import TYPE_CHECKING
 import pytest
 
 from kourai_common.forge_tools import (
-    FORGE_TOOL_HANDLERS,
-    FORGE_TOOL_SCHEMAS,
     delete_file,
     edit_file,
     read_file,
@@ -29,29 +27,6 @@ if TYPE_CHECKING:
 def project_root(tmp_path: Path) -> Path:
     """Empty project root for handler tests."""
     return tmp_path
-
-
-class TestSchemaShape:
-    """The schemas must satisfy the OpenAI tool-use contract LiteLLM expects."""
-
-    def test_all_four_tools_registered(self):
-        names = {s["function"]["name"] for s in FORGE_TOOL_SCHEMAS}
-        assert names == {"write_file", "edit_file", "delete_file", "read_file"}
-
-    def test_handlers_match_schemas(self):
-        schema_names = {s["function"]["name"] for s in FORGE_TOOL_SCHEMAS}
-        assert set(FORGE_TOOL_HANDLERS.keys()) == schema_names
-
-    def test_each_schema_has_required_fields(self):
-        for schema in FORGE_TOOL_SCHEMAS:
-            assert schema["type"] == "function"
-            fn = schema["function"]
-            assert fn["name"]
-            assert fn["description"]
-            params = fn["parameters"]
-            assert params["type"] == "object"
-            assert "properties" in params
-            assert "required" in params
 
 
 class TestWriteFile:
@@ -182,15 +157,7 @@ class TestReadFile:
         # Hint nudges the model toward the right next move.
         assert "specific" in result or "list" in result
 
-    def test_schema_description_warns_against_directory_paths(self):
-        # Schema-level guard so the LLM gets the hint at request time.
-        # If the description is rephrased, this test names the contract:
-        # "directory" must appear so the model is told not to try it.
-        from kourai_common.forge_tools import FORGE_TOOL_SCHEMAS
-
-        read_schema = next(t for t in FORGE_TOOL_SCHEMAS if t["function"]["name"] == "read_file")
-        # Either the function-level description OR the path-param
-        # description should call out the directory restriction.
-        function_desc = read_schema["function"]["description"]
-        path_desc = read_schema["function"]["parameters"]["properties"]["path"]["description"]
-        assert "directory" in function_desc or "directory" in path_desc
+    # The schema-level "directory" hint contract moved to the MCP server's
+    # tool description after M2 Change 3 deleted FORGE_TOOL_SCHEMAS — see
+    # tests/unit/test_forge_mcp.py::test_read_file_description_warns_against_directory_paths
+    # for the new contract test.

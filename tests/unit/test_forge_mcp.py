@@ -62,6 +62,20 @@ async def test_server_registers_four_forge_tools():
     assert names == {"read_file", "write_file", "edit_file", "delete_file"}
 
 
+@pytest.mark.asyncio
+async def test_read_file_description_warns_against_directory_paths():
+    """Round 6 caught Techne repeatedly trying directory paths through the
+    in-process ``read_file`` handler; the schema description was tightened
+    to call out the regular-file-only contract. The MCP-served description
+    must preserve that hint so the model sees it at tool-discovery time
+    (not just when the runtime guard fails).
+    """
+    tools = await mcp.list_tools()
+    read_tool = next(t for t in tools if t.name == "read_file")
+    assert read_tool.description is not None
+    assert "directory" in read_tool.description.lower()
+
+
 # ── _resolve_project_root ────────────────────────────────────────────────────
 
 
