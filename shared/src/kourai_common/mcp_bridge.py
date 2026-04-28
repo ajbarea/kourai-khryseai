@@ -1,16 +1,13 @@
 """Bridges an MCP ``ClientSession`` to the ``chat_with_tools`` interface.
 
 ``chat_with_tools`` (``kourai_common.llm``) accepts ``tools: list[dict]``
-in OpenAI tool-use shape plus ``tool_handlers: dict[str, Callable]``. The
-in-process forge today supplies these from
-``kourai_common.forge_tools.FORGE_TOOL_SCHEMAS`` /
-``FORGE_TOOL_HANDLERS``. M2 Change 3 swaps that for an MCP-driven path:
-launch ``kourai-mcp-forge`` as a stdio subprocess, fetch ``tools/list``,
-and route each tool call through ``session.call_tool``.
-
-This module is purely additive — Change 3a establishes the bridge and
-its tests; specialist migration (Techne / Kallos / Dokimasia) lands in
-follow-on PRs that flip the in-process path to call this bridge.
+in OpenAI tool-use shape plus ``tool_handlers: dict[str, Callable]``.
+``forge_tool_bridge()`` produces both by launching ``kourai-mcp-forge``
+as a stdio subprocess, fetching ``tools/list``, converting each MCP
+``Tool`` to OpenAI shape via ``mcp_tool_to_openai_schema``, and wrapping
+``session.call_tool`` as the per-tool handler. The subprocess holds for
+the entire ``async with`` lifetime so its startup amortizes across
+every iteration of the agentic loop.
 """
 
 from __future__ import annotations
@@ -121,11 +118,12 @@ async def mcp_tool_bridge(
     """Launch an MCP server via stdio, open a kourai client session,
     fetch ``tools/list``, and yield an ``MCPToolBridge``.
 
-    The session declares ``roots`` via ``build_client_session`` (M2
-    Change 1), so a forge-style server can scope its file ops to the
-    player's project root via ``ctx.session.list_roots()``. Set
-    ``kourai_project_root_var`` before entering this context manager
-    (specialist executors do this in `parse_project_root` follow-on).
+    The session declares ``roots`` via ``build_client_session``, so a
+    forge-style server can scope its file ops to the player's project
+    root via ``ctx.session.list_roots()``. Set
+    ``kourai_project_root_var`` before entering this context manager —
+    specialist executors do this immediately after
+    ``parse_project_root(user_input)``.
     """
     from mcp.client.stdio import stdio_client
 

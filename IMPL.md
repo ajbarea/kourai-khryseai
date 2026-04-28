@@ -5,12 +5,21 @@ milestone lands, the matching detail block in [ROADMAP.md](./ROADMAP.md)
 collapses to a one-liner under "Shipped" and this file gets reset to the
 next milestone.
 
-Updated: 2026-04-27 · Working on:
+Updated: 2026-04-28 · Working on:
 [**M2 — Carve out `kourai-forge-mcp`**](./ROADMAP.md#m2--carve-out-kourai-forge-mcp) —
-unblocked since M1 shipped 2026-04-26. M16 (observability DX uplift)
-landed earlier today across PRs #47 / #48 / #49 + this PR (Mneme
-`_OtelTraceFilter`, `make observe` quickstart, `docs/observability.md`,
-`dev.dozzle.group` labels) — see ROADMAP `## Shipped` for the rollup.
+Changes 1 / 2 / 3 done; Change 4 (`elicitation` routing) the only
+remaining workstream. Today's session shipped two side-quests from the
+`plans/2026-04-28-live-smoke-handoff.md` queue: PR #65 bumped
+`prom/prometheus` v3.10.0 → v3.11.3 (security + OTLP fixes, both
+scrape targets healthy post-bump, full CI green, **merged**), PR #66
+fixes two Ren'Py 8.5 screen bugs that were blocking the codex path
+(`key "return"` → `K_RETURN` in `forge_input` + bare-identifier
+nested text-sub in the codex notification toast). Smoke 1 (live A2A pipeline through Hephaestus →
+Techne) deferred — `api.anthropic.com` outbound from the agent
+containers is timing out at ~60% on the WSL2 docker bridge today,
+purely environmental (host-side `curl` is fine; container-side
+~3-of-5 attempts time out). Picks back up next session when the network
+flake clears, or on a different machine.
 
 ---
 
@@ -219,11 +228,12 @@ perf concern dissolved once that landed.
   `test_executors.py`, `test_mcp_bridge.py` (incl. live forge
   subprocess roundtrip) green; full unit suite `2735 passed`;
   `make lint` ends `Found 0 diagnostics`.
-- [ ] `FORGE_TOOL_SCHEMAS` / `FORGE_TOOL_HANDLERS` static exports in
-  `kourai_common/forge_tools.py` are now imported nowhere outside
-  `tests/unit/test_forge_tools.py::TestSchemaShape`. Cleanup
-  (delete exports + the 3 `TestSchemaShape` tests) is its own
-  small PR — kept this one purely additive at the migration layer.
+- [x] **Cleanup (shipped 2026-04-27 in #60):** static
+  `FORGE_TOOL_SCHEMAS` / `FORGE_TOOL_HANDLERS` exports +
+  `TestSchemaShape` deleted. Stale references in `mcp_bridge.py` /
+  `forge_tools.py` / `agents/techne/agent{,_executor}.py` /
+  `tests/unit/test_techne.py` / `tests/unit/test_forge_tools.py`
+  docstrings + comments cleaned up in a follow-on deslop pass.
 - [ ] **Live verification (deferred):** specialist container connects
   to `kourai-mcp-forge` via stdio, declares
   `[project_root: ...]` mid-pipeline, and watches a forge tool

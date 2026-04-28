@@ -455,7 +455,7 @@ class TestHephaestusExecutor:
             await executor.cancel(_make_context(), _make_queue())
 
 
-# ── M2 Change 1 follow-on: contextvar wiring across executors ────────────────
+# ── kourai_project_root_var wiring across executors ──────────────────────────
 
 
 class TestExecutorsSetKouraiProjectRootVar:

@@ -219,9 +219,10 @@ async def apply_code_changes(
 ) -> tuple[str, list[dict[str, Any]]]:
     """Drive Techne's tool-use loop and apply changes via forge tools.
 
-    Each file write happens inside the agentic loop via
-    :data:`FORGE_TOOL_HANDLERS`, so the model literally cannot finish without
-    emitting a schema-validated tool call.
+    Each file write happens inside the agentic loop via the
+    ``kourai-mcp-forge`` stdio subprocess opened by
+    :func:`kourai_common.mcp_bridge.forge_tool_bridge`, so the model
+    literally cannot finish without emitting a schema-validated tool call.
 
     Args:
         task_description: What code to write/modify.

@@ -7,7 +7,8 @@ Three layers covered:
     3. Live integration: ``forge_tool_bridge()`` actually launches
        ``uv run kourai-mcp-forge`` as a stdio subprocess and roundtrips
        a write_file call. Slow (~few seconds for subprocess spawn) but
-       verifies the full M2 Change 1 + 2 + 3a stack end-to-end.
+       exercises the full client-roots → server-list_roots →
+       file-write → bridge-result-extraction path end-to-end.
 """
 
 from __future__ import annotations

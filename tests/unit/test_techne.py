@@ -149,13 +149,11 @@ async def _fake_forge_bridge(*_args, **_kwargs):
 
 
 class TestApplyCodeChanges:
-    """Test the tool-loop driver that replaced generate_code/generate_code_stream.
+    """Test the tool-loop driver behind Techne's apply_code_changes.
 
-    M2 Change 3b: now drives ``chat_with_tools`` through
-    ``forge_tool_bridge()`` (an MCP stdio subprocess) rather than the
-    static ``FORGE_TOOL_SCHEMAS`` / ``FORGE_TOOL_HANDLERS`` exports —
-    so each test patches ``forge_tool_bridge`` with a stub to avoid
-    launching the real subprocess.
+    Each test patches ``forge_tool_bridge`` with a stub yielding an
+    empty ``MCPToolBridge`` so the real ``kourai-mcp-forge`` subprocess
+    never launches inside the unit suite.
     """
 
     @pytest.mark.asyncio

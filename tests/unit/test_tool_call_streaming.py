@@ -25,9 +25,9 @@ import pytest
 
 @asynccontextmanager
 async def _fake_forge_bridge(*_args, **_kwargs):
-    """Stub `forge_tool_bridge` so M2 Change 3b/c migration tests don't
-    launch the `kourai-mcp-forge` subprocess. The chat_with_tools mock
-    under each test inspects the wired callback shape independently.
+    """Stub ``forge_tool_bridge`` so tests don't launch the
+    ``kourai-mcp-forge`` subprocess. The ``chat_with_tools`` mock under
+    each test inspects the wired callback shape independently.
     """
     from kourai_common.mcp_bridge import MCPToolBridge
 

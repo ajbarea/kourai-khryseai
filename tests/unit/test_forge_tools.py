@@ -157,7 +157,6 @@ class TestReadFile:
         # Hint nudges the model toward the right next move.
         assert "specific" in result or "list" in result
 
-    # The schema-level "directory" hint contract moved to the MCP server's
-    # tool description after M2 Change 3 deleted FORGE_TOOL_SCHEMAS — see
-    # tests/unit/test_forge_mcp.py::test_read_file_description_warns_against_directory_paths
-    # for the new contract test.
+    # The schema-level "directory" hint contract lives on the MCP server's
+    # tool description — see
+    # tests/unit/test_forge_mcp.py::test_read_file_description_warns_against_directory_paths.

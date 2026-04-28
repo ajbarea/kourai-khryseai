@@ -537,7 +537,7 @@ class TestMCPSpanEmission:
         assert any("memory" in name for name in span_names)
 
 
-# ── M2 Change 1: client capability declaration ───────────────────────────────
+# ── client capability declaration ────────────────────────────────────────────
 
 
 class TestBuildClientSession:
