@@ -7,7 +7,7 @@
 ## Responsibility
 
 Dokimasia is the second specialist in the standard "implement X"
-pipeline (after Techne). Her three modes are decided by keyword in
+pipeline (after Techne). Her two modes are decided by keyword in
 the user message:
 
 1. **Generate tests** (default) — writes pytest for the module
@@ -15,8 +15,6 @@ the user message:
 2. **Run tests** (`run tests`, `make test`, `pytest`, `run all`) —
    executes the test suite via subprocess, streams pytest output
    line-by-line, drives a fix loop on failure.
-3. **E2E** (`e2e`, `playwright`, `frontend test`, `browser test`,
-   `ui test`) — generates Playwright tests and runs them headless.
 
 ## A2A surface
 
@@ -27,12 +25,12 @@ the user message:
 | Streaming | Yes — pytest output line-by-line + per-tool-call events during fix loop |
 | `INPUT_REQUIRED` | Rare — emits if the failing test surface is ambiguous |
 | Project root | Required (pytest runs against the project's worktree) |
-| Image attachments | Yes — UI screenshots for E2E generation |
+| Image attachments | Yes — screenshots feed into test generation as visual context for the LLM |
 
-**Output artifact** — `test_results` (run-mode), `generated_tests`
-(write-mode), or `e2e_test_results` (E2E mode), each with a
-`TextPart` carrying the human-readable summary and a `DataPart`
-with the structured `PytestRunResult` fields.
+**Output artifact** — `test_results` (run-mode) or `generated_tests`
+(write-mode), each with a `TextPart` carrying the human-readable
+summary and (for run-mode) a `DataPart` with the structured
+`PytestRunResult` fields.
 
 ## Tools
 
@@ -57,10 +55,10 @@ chunked output as the artifact directly).
 - `agent.py` — `SYSTEM_PROMPT` (tester persona + output-format
   rules), `run_pytest()` (subprocess driver),
   `apply_test_fixes()` (agentic tool loop),
-  `generate_tests_stream()`, plus Playwright + database
-  introspection helpers.
-- `agent_executor.py` — A2A bridge. Three branches on user-input
-  keywords; wires `_on_tool` for live status during the fix loop.
+  `generate_tests_stream()`.
+- `agent_executor.py` — A2A bridge. Two branches on user-input
+  keywords (run vs. generate); wires `_on_tool` for live status
+  during the fix loop.
 - `__main__.py` — server entrypoint and AgentCard registration.
 
 ## Smoke recipe

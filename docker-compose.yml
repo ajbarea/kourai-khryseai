@@ -393,8 +393,6 @@ services:
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
       PORT: 10003
-      PLAYWRIGHT_BROWSERS_PATH: /home/kourai/.cache/ms-playwright
-      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "0"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:10003/.well-known/agent-card.json"]
       interval: 15s
