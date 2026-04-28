@@ -17,6 +17,10 @@ from agents.techne.agent import (
 from kourai_common.a2a_utils import extract_image_parts, parse_project_root
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
+from kourai_common.elicitation import (
+    kourai_elicitation_emitter_var,
+    kourai_elicitation_specialist_var,
+)
 from kourai_common.mcp_client import kourai_project_root_var
 from kourai_common.messaging import send_working_status
 from kourai_common.player import PlayerProfile
@@ -56,6 +60,19 @@ class TechneAgentExecutor(BaseAgentExecutor):
             user_input = context.get_user_input()
             project_root = parse_project_root(user_input)
             kourai_project_root_var.set(project_root)
+
+            # Wire elicitation: any forge tool that calls ctx.elicit()
+            # mid-tool-call surfaces the question via this emitter (rides
+            # the same streaming pipe Hephaestus is already consuming and
+            # forwarding to the CLI). The specialist name is embedded in
+            # the marker so the CLI knows which agent's HTTP endpoint to
+            # POST the answer back to. See kourai_common.elicitation for
+            # the round-trip story.
+            async def _emit_elicitation(marker: str) -> None:
+                await send_working_status(updater, task, marker)
+
+            kourai_elicitation_emitter_var.set(_emit_elicitation)
+            kourai_elicitation_specialist_var.set("techne")
 
             # Step 1: Parse file paths from the request
             file_paths = parse_file_paths(user_input)

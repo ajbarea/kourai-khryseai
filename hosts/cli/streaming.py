@@ -35,6 +35,8 @@ from hosts.cli.events import (
 )
 from hosts.cli.rendering import _comms_window, _echo, _render_markdown
 from hosts.cli.styling import _DIM, _GOLD, _GOLD_BRIGHT, _RED, _RESET
+from kourai_common.config import get_agent_url
+from kourai_common.elicitation import parse_outbound_marker
 from kourai_common.federation.host_helpers import build_pipeline_turn_entry
 
 if TYPE_CHECKING:
@@ -52,6 +54,66 @@ _last_result: str = ""
 def get_last_result() -> str:
     """Return the last artifact text from a completed pipeline run."""
     return _last_result
+
+
+async def _handle_elicitation(
+    elicitation_id: str,
+    specialist: str,
+    question: str,
+) -> None:
+    """Surface an MCP elicitation to the player and POST the answer back.
+
+    Called inline from the streaming loop when an ``[ELICIT:...]``
+    marker arrives in a specialist's working_status. The specialist's
+    forge tool is blocked awaiting an asyncio Future; POSTing to its
+    ``/internal/elicitation/{id}`` endpoint resolves that Future and
+    unblocks the tool. The streaming connection stays open the whole
+    time, so the eventual artifact still reaches us via Hephaestus.
+
+    Maps player input liberally:
+      - "y"/"yes"/"<enter>" → accept
+      - "n"/"no" → decline
+      - "/q"/"/cancel" → cancel
+    """
+    _echo(
+        f"\n{_GOLD}✨ {specialist.title()} needs your call:{_RESET}\n"
+        f"  {question}\n"
+        f"{_DIM}  [y]es / [n]o / /cancel{_RESET}"
+    )
+    raw: str = await click.prompt(
+        f"{_GOLD}↳ Your call{_RESET}",
+        default="y",
+        show_default=False,
+    )
+    answer = raw.strip().lower()
+    if answer in ("/q", "/quit", "/cancel"):
+        action = "cancel"
+    elif answer in ("n", "no"):
+        action = "decline"
+    else:
+        action = "accept"
+
+    url = f"{get_agent_url(specialist)}/internal/elicitation/{elicitation_id}"
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.post(url, json={"action": action})
+        if resp.status_code == 204:
+            _echo(f"{_DIM}⤷ forwarded “{action}” to {specialist}{_RESET}")
+        elif resp.status_code == 404:
+            # Specialist's pending Future already cleaned up — most likely
+            # the elicitation timed out on the agent side. Player's reply
+            # is moot but we already prompted them; tell them what happened.
+            _echo(
+                f"{_RED}⚠ {specialist}'s elicitation expired before "
+                f"your reply landed (id {elicitation_id[:8]}…){_RESET}"
+            )
+        else:
+            _echo(
+                f"{_RED}⚠ elicitation answer rejected by {specialist} "
+                f"(HTTP {resp.status_code}): {resp.text[:120]}{_RESET}"
+            )
+    except (httpx.ConnectError, httpx.TimeoutException) as exc:
+        _echo(f"{_RED}⚠ couldn't reach {specialist} at {url}: {exc}{_RESET}")
 
 
 # ---------------------------------------------------------------------------
@@ -142,6 +204,20 @@ async def send_and_stream(
                 final_state = update.status.state
                 text = _extract_status_text(update)
                 if text:
+                    # M2 Change 4: detect MCP-elicitation markers carried
+                    # over the streaming pipe. The text shape is "<emoji>
+                    # [ELICIT:{id}:{agent}] <question>"; parse_outbound_
+                    # marker accepts any prefix as long as it finds the
+                    # pattern. When detected, we render an inline prompt
+                    # and POST the answer to the specialist out-of-band —
+                    # the streaming task stays open so the eventual
+                    # artifact still reaches the player.
+                    elicit_idx = text.find("[ELICIT:")
+                    if elicit_idx >= 0:
+                        marker = parse_outbound_marker(text[elicit_idx:])
+                        if marker:
+                            await _handle_elicitation(*marker)
+                            continue
                     formatted, agent = _maidenify_status(text)
                     _echo(formatted)
                     if tts and agent:

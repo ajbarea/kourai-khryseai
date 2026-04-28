@@ -7,8 +7,8 @@ next milestone.
 
 Updated: 2026-04-28 · Working on:
 [**M2 — Carve out `kourai-forge-mcp`**](./ROADMAP.md#m2--carve-out-kourai-forge-mcp) —
-Changes 1 / 2 / 3 done; Change 4 (`elicitation` routing) the only
-remaining workstream. Today's session shipped two side-quests from the
+Changes 1 / 2 / 3 done; Change 4 lands in this session as the
+elicitation client capability + INPUT_REQUIRED bridge (PR pending). Today's session shipped two side-quests from the
 `plans/2026-04-28-live-smoke-handoff.md` queue: PR #65 bumped
 `prom/prometheus` v3.10.0 → v3.11.3 (security + OTLP fixes, both
 scrape targets healthy post-bump, full CI green, **merged**), PR #66
@@ -242,15 +242,122 @@ perf concern dissolved once that landed.
   subprocess → roots/list → forge tool roundtrip path under
   real LLM tool calls.
 
-### Change 4 — `INPUT_REQUIRED` over `elicitation`
+### Change 4 — Elicitation client capability + INPUT_REQUIRED bridge
 
-- [ ] M13's `CONFIRM_ORDER` pause migrates from the text-tag carrier
-  to the spec's `elicitation/create` request flow.
-- [ ] T4 follow-up from M13 (`[forge_intent]` block on user message
-  to specialists) lands as part of the elicitation payload rather
-  than a separate text-tag — single channel, less drift surface.
-- [ ] Player UX unchanged: same comms-window rendering, same
-  `[yolo:` bypass.
+**Reframed 2026-04-28.** The original "migrate CONFIRM_ORDER to
+`elicitation/create`" framing was a category mismatch — Hephaestus
+is an A2A endpoint and `INPUT_REQUIRED` is the correct A2A primitive
+for its pre-pipeline gate. MCP `elicitation/create` is for
+**server-to-client** asks during a tool call, so its right home is
+the forge MCP server (and future ones) wanting to ask the player
+mid-execution. CONFIRM_ORDER stays on A2A; this change builds the
+infrastructure for MCP-server-side elicitations to round-trip through
+kourai's existing INPUT_REQUIRED rendering layer.
+
+**Architecture (revised mid-design 2026-04-28).** First sketch routed
+the answer through Hephaestus and a fresh A2A task back to the
+specialist, but A2A's `INPUT_REQUIRED` is final-by-default and breaks
+the streaming relay — Hephaestus would disconnect from the original
+specialist task before the work completed, orphaning the artifact.
+
+The cleaner model: emit the elicitation as a normal streaming
+`working_status` (NOT `INPUT_REQUIRED`), let Hephaestus relay it
+unchanged, have the CLI render an inline prompt without ending the
+A2A task, and send the answer **directly to the specialist** via a
+new HTTP endpoint. The specialist's HTTP server is already running
+under uvicorn — adding one Starlette route for elicitation responses
+is cheap, and it sidesteps the stranded-task problem entirely
+because the original `execute()` never gives up its connection.
+
+```
+forge tool calls ctx.elicit("confirm delete?")
+  ↓ MCP elicitation/create
+specialist's _kourai_elicitation_callback
+  ↓ creates Future, registers in module-level dict by elicitation_id
+  ↓ emits streaming working_status: "[ELICIT:{id}:techne] confirm delete?"
+  ↓ awaits Future (5min timeout)
+Hephaestus's existing stream-relay forwards the working_status
+  ↓ no special handling — passes through as a normal status update
+CLI receives the streaming event, parses [ELICIT:{id}:techne],
+  ↓ renders inline yes/no prompt while still subscribed to the stream
+  ↓ player answers
+CLI POSTs to {specialist_url}/internal/elicitation/{id}
+  with body {"action": "accept" | "decline" | "cancel"}
+  ↓ Specialist URL resolved via get_agent_url("techne")
+specialist's Starlette route resolves _PENDING_ELICITATIONS[{id}]
+  ↓ no new A2A task, no Hephaestus involvement on resume
+The original (still-running) execute()'s Future resolves
+  ↓ callback returns ElicitResult to MCP server
+forge tool proceeds with the (now-confirmed) action
+  ↓ work continues, artifact streams back through Hephaestus to CLI
+```
+
+**Why this works where the first sketch didn't.** A2A has no
+mid-handler pause primitive — once `execute()` enters, it must run to
+completion or return. Sending `INPUT_REQUIRED final=True` mid-task
+ends Hephaestus's connection to the specialist, so any work after the
+elicitation never reaches the player. The HTTP-side-channel pattern
+keeps the specialist's `execute()` running (just blocked on the
+Future), the streaming connection stays open, and the answer arrives
+out-of-band via a different request handler on the same uvicorn
+instance.
+
+**Workstreams (this PR).**
+
+- [x] `shared/src/kourai_common/elicitation.py` — module-level
+  `_PENDING_ELICITATIONS` registry, `_kourai_elicitation_callback`,
+  `resolve_elicitation` API, `kourai_elicitation_emitter_var` +
+  `kourai_elicitation_specialist_var` ContextVars,
+  `attach_elicitation_route` Starlette helper, marker codec.
+- [x] `shared/src/kourai_common/mcp_client.py` — wires the callback
+  into `build_client_session()`; section comment updated.
+- [x] `tests/unit/test_mcp_client.py` — flipped: elicitation IS
+  supplied; sampling test split out separately.
+- [x] `tests/unit/test_elicitation.py` — 33 tests covering marker
+  codec, registry lifecycle, callback paths (URL/schema/empty),
+  timeout cleanup, two-pending concurrency, HTTP route 204/400/404
+  paths, and an end-to-end round-trip exercising callback +
+  `attach_elicitation_route` together.
+- [x] Specialist executors (techne / kallos / dokimasia) — set
+  the two contextvars before the LLM loop; emitter wraps
+  `send_working_status` so the elicitation marker rides the same
+  streaming pipe Hephaestus is already consuming.
+- [x] Specialist `__main__.py` (techne / kallos / dokimasia) —
+  call `attach_elicitation_route(app)` after `server.build()` so
+  the CLI's POST to `/internal/elicitation/{id}` resolves the
+  pending Future. Returns 204 hit / 404 stale / 400 malformed.
+- [x] `hosts/cli/streaming.py` — detect `[ELICIT:{id}:{agent}]` in
+  streaming `working_status` text (any prefix tolerated; the marker
+  is found via `text.find("[ELICIT:")`). Render inline yes/no with
+  `[y/n/cancel]`, POST the answer to
+  `{get_agent_url(agent)}/internal/elicitation/{id}`. Stream stays
+  open the whole time, so the eventual artifact still reaches the
+  player.
+- [x] **No changes to Hephaestus.** Its existing relay
+  (`agent_executor.py:277-282`) forwards specialist `working_status`
+  unchanged, which is exactly what we need.
+
+**Out of scope (deferred to a follow-on PR).**
+
+- No forge MCP server tool currently calls `ctx.elicit()`. The
+  bridge is fully landed but unused in production until the first
+  caller arrives — a natural candidate is `delete_file` confirming
+  destructive deletes against an uncommitted-changes guard, or a
+  future deploy MCP server confirming a release. The end-to-end
+  test in `test_elicitation.py::TestEndToEnd` proves the round-trip
+  works without needing a live forge subprocess.
+
+**Out of scope (later PRs).**
+
+- No forge MCP server tools currently call `ctx.elicit()`. Wiring the
+  first real caller (e.g., `delete_file` confirming destructive
+  deletes against uncommitted changes) is a follow-on PR. The bridge
+  in this PR is end-to-end testable via a synthetic caller in
+  `tests/unit/test_elicitation.py`.
+- M13's `CONFIRM_ORDER` stays on A2A; not migrated.
+- Form-schema mode (`requestedSchema` with structured input fields)
+  is supported by the SDK but the CLI bridge in this PR handles only
+  plain-text-confirm elicitations. URL-mode is decline-only.
 
 ---
 

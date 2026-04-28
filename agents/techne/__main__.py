@@ -16,6 +16,7 @@ from a2a.types import AgentCard, AgentSkill
 from agents.techne.agent_executor import TechneAgentExecutor
 from kourai_common.agent_cards import build_card
 from kourai_common.config import AGENT_PORTS, OTEL_ENDPOINT
+from kourai_common.elicitation import attach_elicitation_route
 from kourai_common.log import setup_logging
 from kourai_common.tracing import setup_tracing
 
@@ -68,8 +69,14 @@ def main() -> None:
         http_handler=request_handler,
     )
 
+    app = server.build()
+    # M2 Change 4: receives CLI elicitation answers out-of-band so
+    # forge tools that call ctx.elicit() get unblocked without needing
+    # Hephaestus to disconnect from the streaming task.
+    attach_elicitation_route(app)
+
     log.info("⚙️ Techne starting on %s:%d", HOST, PORT)
-    uvicorn.run(server.build(), host=HOST, port=PORT)
+    uvicorn.run(app, host=HOST, port=PORT)
 
 
 if __name__ == "__main__":

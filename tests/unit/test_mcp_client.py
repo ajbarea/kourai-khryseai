@@ -558,19 +558,28 @@ class TestBuildClientSession:
         assert session._list_roots_callback is _kourai_list_roots
         assert session._list_roots_callback is not _default_list_roots_callback
 
-    def test_factory_does_not_supply_elicitation_or_sampling_callbacks(self):
-        """Elicitation and sampling callbacks must remain at SDK defaults
-        so the SDK does not declare those capabilities. Each lands when
-        its real implementation does (Change 4 for elicitation; future
-        caller for sampling) — we don't lie about supporting them.
+    def test_factory_wires_kourai_elicitation_callback(self):
+        """Change 4 landed: `_kourai_elicitation_callback` is supplied so
+        the SDK declares the `elicitation` capability in the initialize
+        handshake. The callback bridges MCP `elicitation/create` to the
+        active specialist's A2A INPUT_REQUIRED rendering.
         """
-        from mcp.client.session import (
-            _default_elicitation_callback,
-            _default_sampling_callback,
-        )
+        from mcp.client.session import _default_elicitation_callback
+
+        from kourai_common.elicitation import _kourai_elicitation_callback
 
         session = build_client_session(MagicMock(), MagicMock())
-        assert session._elicitation_callback is _default_elicitation_callback
+        assert session._elicitation_callback is _kourai_elicitation_callback
+        assert session._elicitation_callback is not _default_elicitation_callback
+
+    def test_factory_does_not_supply_sampling_callback(self):
+        """Sampling has no caller in the kourai codebase yet — lands when
+        the first one appears. Until then, the SDK default keeps the
+        capability undeclared so we don't lie about supporting it.
+        """
+        from mcp.client.session import _default_sampling_callback
+
+        session = build_client_session(MagicMock(), MagicMock())
         assert session._sampling_callback is _default_sampling_callback
 
     def test_factory_supplies_kourai_client_info(self):

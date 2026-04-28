@@ -212,9 +212,11 @@ def _initialize_default_registry(toolkit: MCPToolkit) -> None:
 # (mcp/client/session.py:148-188). Default callbacks return ErrorData
 # saying "...not supported", so an all-three-with-stubs approach would
 # declare capabilities while lying about supporting them. We declare
-# only what we actually back: ``roots`` today (real callback below);
-# ``elicitation`` will land alongside the INPUT_REQUIRED → elicitation
-# migration; ``sampling`` lands when its first caller appears.
+# only what we actually back: ``roots`` (real callback below) and
+# ``elicitation`` (callback in ``kourai_common.elicitation`` —
+# round-trips ``elicitation/create`` through the active specialist's
+# A2A stream into INPUT_REQUIRED rendering at the CLI). ``sampling``
+# lands when its first caller appears.
 
 
 async def _kourai_list_roots(
@@ -241,18 +243,25 @@ def build_client_session(
 ) -> ClientSession:
     """Construct a ``ClientSession`` with kourai's standard client capabilities.
 
-    Today: declares ``roots`` (via ``_kourai_list_roots`` + the
-    ``kourai_project_root_var`` contextvar) and ships ``client_info``
-    identifying the host as kourai-khryseai. Elicitation and sampling
-    are intentionally NOT wired — see the section comment above for why.
+    Declares ``roots`` (via ``_kourai_list_roots`` + the
+    ``kourai_project_root_var`` contextvar) and ``elicitation`` (via
+    ``_kourai_elicitation_callback`` from ``kourai_common.elicitation``,
+    which routes ``elicitation/create`` requests through the active
+    specialist's A2A stream into the player's INPUT_REQUIRED rendering
+    layer). Ships ``client_info`` identifying the host as
+    kourai-khryseai. ``sampling`` is intentionally NOT wired — see the
+    section comment above for why.
     """
     from mcp import ClientSession
     from mcp.types import Implementation
+
+    from kourai_common.elicitation import _kourai_elicitation_callback
 
     return ClientSession(
         read,
         write,
         list_roots_callback=_kourai_list_roots,
+        elicitation_callback=_kourai_elicitation_callback,
         client_info=Implementation(
             name=_KOURAI_CLIENT_INFO_NAME,
             version=_KOURAI_CLIENT_INFO_VERSION,
