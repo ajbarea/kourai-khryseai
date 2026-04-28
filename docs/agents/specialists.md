@@ -2,7 +2,7 @@
 
 ## 📐 Metis — Planner
 
-<img src="../../assets/avatars/metis_neutral.png" class="specialist-avatar" alt="Metis — Architect of Intent">
+<img src="../assets/avatars/metis_neutral.png" class="specialist-avatar" alt="Metis — Architect of Intent">
 
 **Port `10001`** · Model varies by [tier](../configuration.md#llm-models) (Opus on `smart`) · [`agents/metis/`](https://github.com/ajbarea/kourai_khryseai/tree/main/agents/metis)
 
@@ -39,7 +39,7 @@ This context is injected into the LLM prompt so specs are grounded in the actual
 
 ## ⚙️ Techne — Coder
 
-<img src="../../assets/avatars/techne_neutral.png" class="specialist-avatar" alt="Techne — Artisan of Code">
+<img src="../assets/avatars/techne_neutral.png" class="specialist-avatar" alt="Techne — Artisan of Code">
 
 **Port `10002`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/techne/`](https://github.com/ajbarea/kourai_khryseai/tree/main/agents/techne)
 
@@ -88,7 +88,7 @@ Supported actions: `CREATE`, `EDIT`, `DELETE`.
 
 ## 🧪 Dokimasia — Tester
 
-<img src="../../assets/avatars/dokimasia_neutral.png" class="specialist-avatar" alt="Dokimasia — Guardian of Standards">
+<img src="../assets/avatars/dokimasia_neutral.png" class="specialist-avatar" alt="Dokimasia — Guardian of Standards">
 
 **Port `10003`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/dokimasia/`](https://github.com/ajbarea/kourai_khryseai/tree/main/agents/dokimasia)
 
@@ -119,7 +119,7 @@ Target: **80%+ code coverage**.
 
 ## ✨ Kallos — Stylist
 
-<img src="../../assets/avatars/kallos_neutral.png" class="specialist-avatar" alt="Kallos — Eye of Elegance">
+<img src="../assets/avatars/kallos_neutral.png" class="specialist-avatar" alt="Kallos — Eye of Elegance">
 
 **Port `10004`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/kallos/`](https://github.com/ajbarea/kourai_khryseai/tree/main/agents/kallos)
 
@@ -167,7 +167,7 @@ flowchart LR
 
 ## 📜 Mneme — Scribe
 
-<img src="../../assets/avatars/mneme_neutral.png" class="specialist-avatar" alt="Mneme — Keeper of Memory">
+<img src="../assets/avatars/mneme_neutral.png" class="specialist-avatar" alt="Mneme — Keeper of Memory">
 
 **Port `10005`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/mneme/`](https://github.com/ajbarea/kourai_khryseai/tree/main/agents/mneme)
 
@@ -203,7 +203,7 @@ Files: path/to/changed/file.py, path/to/other.py
 
 ## 🎭 Puck — Companion Spirit
 
-<img src="../../assets/avatars/puck_neutral.png" class="specialist-avatar" alt="Puck — Voice of Reason">
+<img src="../assets/avatars/puck_neutral.png" class="specialist-avatar" alt="Puck — Voice of Reason">
 
 **Port `10006`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/puck/`](https://github.com/ajbarea/kourai_khryseai/tree/main/agents/puck)
 
@@ -229,7 +229,7 @@ A mischievous daimon who guides the player experience. Not a development agent �
 
 ## 💘 Cupid — Romance Spirit
 
-<img src="../../assets/avatars/cupid_neutral.png" class="specialist-avatar" alt="Cupid — Aspect of Love">
+<img src="../assets/avatars/cupid_neutral.png" class="specialist-avatar" alt="Cupid — Aspect of Love">
 
 **Port `10007`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/cupid/`](https://github.com/ajbarea/kourai_khryseai/tree/main/agents/cupid)
 
@@ -256,7 +256,7 @@ An eros spirit who coaches the player through romantic progression with the maid
 
 ## 🪞 Aidos — Anti-Slop Validator
 
-<img src="../../assets/avatars/aidos_neutral.png" class="specialist-avatar" alt="Aidos — The Honest Mirror">
+<img src="../assets/avatars/aidos_neutral.png" class="specialist-avatar" alt="Aidos — The Honest Mirror">
 
 **Port `10008`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/aidos/`](https://github.com/ajbarea/kourai_khryseai/tree/main/agents/aidos)
 
@@ -287,7 +287,7 @@ Detects and eliminates vague, corporate, and passive language from agent output.
 
 ## 📚 Aletheia — Research Validator
 
-<img src="../../assets/avatars/aletheia_neutral.png" class="specialist-avatar" alt="Aletheia — Seeker of Truth">
+<img src="../assets/avatars/aletheia_neutral.png" class="specialist-avatar" alt="Aletheia — Seeker of Truth">
 
 **Port `10009`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/aletheia/`](https://github.com/ajbarea/kourai_khryseai/tree/main/agents/aletheia)
 
