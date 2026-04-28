@@ -6,19 +6,24 @@ collapses to a one-liner under "Shipped" and this file gets reset to the
 next milestone.
 
 Updated: 2026-04-28 · Working on: **no active milestone** — today's
-session was a UX/DX cleanup pass between milestones. Four PRs merged:
+session was a UX/DX cleanup pass between milestones. Five PRs:
 [#71](https://github.com/ajbarea/kourai-khryseai/pull/71)
-(prompt fix to block Haiku's `read_file(".")` failure mode),
+(prompt fix to block Haiku's `read_file(".")` failure mode) **merged**,
 [#72](https://github.com/ajbarea/kourai-khryseai/pull/72)
 (deslop 195 lines of unused `github_search_code` /
-`introspect_database` scaffolds),
+`introspect_database` scaffolds) **merged**,
 [#73](https://github.com/ajbarea/kourai-khryseai/pull/73)
 (restore `Found 0 diagnostics` baseline via `Mapping` covariance for
-read-only `tool_handlers`),
+read-only `tool_handlers`) **merged**,
 [#75](https://github.com/ajbarea/kourai-khryseai/pull/75)
 (audio test isolation — resolve `AudioManager` via live module so
 `importlib.reload` in `test_audio_env.py` stops poisoning the
-`test_gui_audio_tts_engine.py` namespace).
+`test_gui_audio_tts_engine.py` namespace) **merged**,
+[#76](https://github.com/ajbarea/kourai-khryseai/pull/76)
+(skip TTS integration tests on third-party network outage — wrap
+Edge-TTS synth calls so `aiohttp.ClientConnectionError` to
+`wss://speech.platform.bing.com` skips the test instead of burning
+a CI rerun) **awaiting CI**.
 
 M2 effectively closed: Changes 1/2/3 shipped previously
 ([roots](./ROADMAP.md#shipped) + the kourai-mcp-forge stdio server +
@@ -53,11 +58,7 @@ default between architectural milestones.
   (`K_RETURN` keysym + codex notification text-sub). `renpy lint` is
   clean; the live re-run is the only thing missing before that bug
   fully closes out.
-- **TTS integration test flake** — `test_tts_kokoro_integration.py::
-  TestBackendInteroperability::test_different_backends_same_voice_
-  config` times out reaching `wss://speech.platform.bing.com` from CI.
-  A `@pytest.mark.requires_external_tts` marker + a CI environment
-  flag would skip it on network failure rather than burn a rerun.
+- ~~**TTS integration test flake**~~ — addressed in PR #76 above.
 - **`docs/architecture/puck-first-run-tutorial.md`** — sitting
   untracked in the working tree; if it's player-tutorial work AJ
   started, it pairs with the M6 player-onboarding theme.
