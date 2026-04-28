@@ -23,7 +23,7 @@ read-only `tool_handlers`) **merged**,
 (skip TTS integration tests on third-party network outage — wrap
 Edge-TTS synth calls so `aiohttp.ClientConnectionError` to
 `wss://speech.platform.bing.com` skips the test instead of burning
-a CI rerun) **awaiting CI**.
+a CI rerun) **merged**.
 
 M2 effectively closed: Changes 1/2/3 shipped previously
 ([roots](./ROADMAP.md#shipped) + the kourai-mcp-forge stdio server +
