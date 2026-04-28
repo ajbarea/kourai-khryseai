@@ -44,10 +44,11 @@ class MetisAgentExecutor(BaseAgentExecutor):
         """Metis-specific: create implementation specs."""
         with create_span("metis.execute", {"a2a.method": "execute"}):
             user_input = context.get_user_input()
-            # Round 6 caught `git status --short` exiting 128 from the
-            # specialist container because the default cwd (`/app`) isn't
-            # the worktree. parse_project_root falls back to cwd when the
-            # tag is missing, so internal/test invocations are unaffected.
+            # The specialist container's default cwd (`/app`) isn't the
+            # worktree, so `git status --short` exits 128 without `cwd=`
+            # set. parse_project_root falls back to cwd when the
+            # [project_root: ...] tag is missing, so internal / test
+            # invocations are unaffected.
             project_root = parse_project_root(user_input)
             kourai_project_root_var.set(project_root)
 

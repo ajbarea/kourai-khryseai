@@ -39,8 +39,8 @@ class CLISettings:
     # when True, Hephaestus skips CONFIRM_ORDER for read-only / planning-only
     # pipelines (Metis-only, Mneme-only, CHAT) and still gates anything
     # that would touch disk (Techne / Kallos / Dokimasia). Inspired by
-    # Cline + ClawCode's per-tool gating; tier-2 lift from the OSS-CC
-    # research sweep (#37). Default OFF — matches the always-on gate.
+    # Cline + ClawCode's per-tool gating. Default OFF — matches the
+    # always-on gate.
     auto_approve_reads: bool = False
     # Per-stream volume. Defaults mirror `hosts/gui/settings_overlay.py`'s
     # values so a player who learned the GUI sliders gets the same

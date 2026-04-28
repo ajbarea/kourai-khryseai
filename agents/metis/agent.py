@@ -82,15 +82,14 @@ async def get_project_context(
     """Gather project structure and git context for planning.
 
     Args:
-        project_root: Root directory to analyze.
+        project_root: Root directory to analyze — the Metis executor
+            passes the player's parsed project root from the
+            ``[project_root: ...]`` tag.
         status_callback: Optional async callback forwarding git output lines
             to the player scratchpad for transparency.
 
     Returns:
         String with project structure and recent git history.
-
-    TODO: When supporting player projects, pass project_root from task context.
-    Currently defaults to workspace root (Kourai codebase).
     """
     parts = []
 

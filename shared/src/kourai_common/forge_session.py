@@ -284,10 +284,9 @@ def _worktree_is_dirty(cwd: Path) -> bool:
 
 # Allowed in branch slugs — lowercase letters, digits, hyphen. Anything
 # else gets squashed to '-' so git's check-ref-format doesn't reject the
-# `git worktree add -b forge/<slug>` call. Round 6 produced
-# `please-add-a-function-`d` from a prompt with a backtick; the old
-# logic only handled spaces. Conservative whitelist over enumerating
-# git's blocklist.
+# `git worktree add -b forge/<slug>` call. A prompt containing a backtick
+# can otherwise produce a slug like `please-add-a-function-`d` — git
+# rejects that. Conservative whitelist over enumerating git's blocklist.
 _SLUG_DISALLOWED = re.compile(r"[^a-z0-9-]+")
 
 

@@ -114,14 +114,12 @@ async def run_make_lint(
     """Run ruff + ty.
 
     Args:
-        cwd: Working directory (defaults to process cwd).
+        cwd: Working directory (defaults to process cwd). The Kallos
+            executor passes the player's parsed project root so lint
+            commands run against the project's own ``pyproject.toml``.
         status_callback: Optional async callback for live subprocess output.
             When provided, each stdout line is forwarded to the caller so it
             can surface tool I/O in the player scratchpad.
-
-    TODO: When supporting player projects, cwd should come from task context
-    and must use the project's own pyproject.toml via [tool.ty] config.
-    Currently runs against workspace root (Kourai codebase).
     """
     import sys
 

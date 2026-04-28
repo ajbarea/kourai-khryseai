@@ -146,16 +146,16 @@ def test_accept_fails_when_main_diverged():
 
 
 # ---------------------------------------------------------------------------
-# _sanitize_branch_slug — Round 6 caught backticks slipping through
+# _sanitize_branch_slug — handles shell-meta / quotes / backticks
 # ---------------------------------------------------------------------------
 
 
 class TestSanitizeBranchSlug:
     """Branch slugs must satisfy ``git check-ref-format`` to avoid the
-    ``git worktree add -b forge/<slug>`` call rejecting. Round 6 produced
-    ``please-add-a-function-`d`` from a prompt with a backtick — the old
-    logic only stripped spaces. Conservative whitelist ``[a-z0-9-]``
-    handles every shell-meta and quote character at once."""
+    ``git worktree add -b forge/<slug>`` call rejecting. A prompt with a
+    backtick produces a slug like ``please-add-a-function-`d`` if only
+    spaces are stripped. Conservative whitelist ``[a-z0-9-]`` handles
+    every shell-meta and quote character at once."""
 
     def test_simple_label_lowercased_and_hyphenated(self):
         from kourai_common.forge_session import _sanitize_branch_slug
@@ -163,7 +163,7 @@ class TestSanitizeBranchSlug:
         assert _sanitize_branch_slug("Add a function") == "add-a-function"
 
     def test_backtick_replaced_with_hyphen(self):
-        # The exact Round 6 case: prompt had a backtick.
+        # Real-world repro: a prompt containing a backtick.
         from kourai_common.forge_session import _sanitize_branch_slug
 
         result = _sanitize_branch_slug("please add a function `d`")

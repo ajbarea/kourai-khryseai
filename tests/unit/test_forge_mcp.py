@@ -64,9 +64,9 @@ async def test_server_registers_four_forge_tools():
 
 @pytest.mark.asyncio
 async def test_read_file_description_warns_against_directory_paths():
-    """Round 6 caught Techne repeatedly trying directory paths through the
-    in-process ``read_file`` handler; the schema description was tightened
-    to call out the regular-file-only contract. The MCP-served description
+    """Models pass directory paths through ``read_file`` often enough
+    that the schema description is tightened to call out the
+    regular-file-only contract explicitly. The MCP-served description
     must preserve that hint so the model sees it at tool-discovery time
     (not just when the runtime guard fails).
     """
