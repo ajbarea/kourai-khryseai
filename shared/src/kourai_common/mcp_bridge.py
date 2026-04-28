@@ -84,6 +84,12 @@ def _make_mcp_tool_handler(
     """Build an async handler that proxies kwargs through to
     ``session.call_tool(tool_name, kwargs)`` and returns the extracted text.
 
+    The handler injects W3C trace context (``traceparent`` / ``tracestate``)
+    into ``params._meta`` per the OpenTelemetry MCP semconv so the server's
+    per-tool spans nest under the calling agent's parent span — without
+    this, the forge subprocess's spans land as disconnected roots in
+    Jaeger and the trace becomes harder to read.
+
     Server-side errors come back as ``CallToolResult(isError=True, ...)``;
     the handler surfaces the error text verbatim so the existing tool-loop
     error path (which inspects ``"ERROR:"`` prefixes) keeps working — the
@@ -92,7 +98,14 @@ def _make_mcp_tool_handler(
     """
 
     async def handler(**kwargs: Any) -> str:
-        result = await session.call_tool(tool_name, kwargs)
+        from kourai_common.tracing import get_trace_context
+
+        # `get_trace_context()` returns an empty dict when no span is
+        # active. Passing an empty dict would still construct a Meta
+        # object with no usable trace context — pass `None` instead so
+        # the server's extractor falls back to ambient context.
+        trace_meta = get_trace_context() or None
+        result = await session.call_tool(tool_name, kwargs, meta=trace_meta)
         text = _extract_text(result.content)
         if result.isError and not text.startswith("ERROR:"):
             return f"ERROR: {text}" if text else "ERROR: tool call failed"

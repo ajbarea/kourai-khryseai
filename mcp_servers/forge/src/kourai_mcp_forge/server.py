@@ -33,7 +33,7 @@ from urllib.parse import unquote, urlparse
 from mcp.server.fastmcp import Context, FastMCP
 
 from kourai_common import forge_tools
-from kourai_common.tracing import create_span
+from kourai_common.tracing import create_span_with_remote_parent
 
 log = logging.getLogger(__name__)
 
@@ -46,6 +46,26 @@ _NO_ROOTS_ERROR = (
     "(see M2 Change 1 follow-on; specialist executors set it from "
     "[project_root: ...] tags)."
 )
+
+
+def _trace_carrier_from_ctx(ctx: Context) -> dict[str, str] | None:
+    """Extract the W3C trace-context carrier dict from the incoming MCP
+    request's ``params._meta``. ``RequestParams.Meta`` has
+    ``model_config = ConfigDict(extra="allow")``, so the bridge's
+    injected ``traceparent`` / ``tracestate`` keys round-trip as extras.
+
+    Returns ``None`` if no meta was sent — handler falls back to ambient
+    context, which is correct when the caller isn't tracing or when an
+    out-of-tree client invokes the server without the bridge.
+    """
+    meta = ctx.request_context.meta
+    if meta is None:
+        return None
+    dumped = meta.model_dump(exclude_none=True)
+    # Filter to W3C trace-context keys to avoid passing unrelated meta
+    # (progressToken, task, etc.) into OTel's propagator.
+    trace_keys = ("traceparent", "tracestate", "baggage")
+    return {k: v for k, v in dumped.items() if k in trace_keys and isinstance(v, str)} or None
 
 
 async def _resolve_project_root(ctx: Context) -> Path | str:
@@ -84,7 +104,9 @@ async def read_file(path: str, ctx: Context) -> str:
     project_root = await _resolve_project_root(ctx)
     if isinstance(project_root, str):
         return project_root
-    with create_span("forge.read_file", {"forge.path": path}):
+    with create_span_with_remote_parent(
+        "forge.read_file", {"forge.path": path}, _trace_carrier_from_ctx(ctx)
+    ):
         return await forge_tools.read_file(path, project_root=project_root)
 
 
@@ -94,9 +116,10 @@ async def write_file(path: str, content: str, ctx: Context) -> str:
     project_root = await _resolve_project_root(ctx)
     if isinstance(project_root, str):
         return project_root
-    with create_span(
+    with create_span_with_remote_parent(
         "forge.write_file",
         {"forge.path": path, "forge.content_chars": str(len(content))},
+        _trace_carrier_from_ctx(ctx),
     ):
         return await forge_tools.write_file(path, content, project_root=project_root)
 
@@ -116,13 +139,14 @@ async def edit_file(
     project_root = await _resolve_project_root(ctx)
     if isinstance(project_root, str):
         return project_root
-    with create_span(
+    with create_span_with_remote_parent(
         "forge.edit_file",
         {
             "forge.path": path,
             "forge.old_chars": str(len(old_string)),
             "forge.new_chars": str(len(new_string)),
         },
+        _trace_carrier_from_ctx(ctx),
     ):
         return await forge_tools.edit_file(path, old_string, new_string, project_root=project_root)
 
@@ -133,5 +157,7 @@ async def delete_file(path: str, ctx: Context) -> str:
     project_root = await _resolve_project_root(ctx)
     if isinstance(project_root, str):
         return project_root
-    with create_span("forge.delete_file", {"forge.path": path}):
+    with create_span_with_remote_parent(
+        "forge.delete_file", {"forge.path": path}, _trace_carrier_from_ctx(ctx)
+    ):
         return await forge_tools.delete_file(path, project_root=project_root)

@@ -101,8 +101,11 @@ class TestMakeMcpToolHandler:
 
         result = await handler(path="foo.py", content="x = 1")
 
+        # `meta=None` is the bridge's empty-trace-context signal; ambient-
+        # context spans don't yield a propagatable header outside an
+        # active span (test runs without one), so we expect None here.
         session.call_tool.assert_awaited_once_with(
-            "write_file", {"path": "foo.py", "content": "x = 1"}
+            "write_file", {"path": "foo.py", "content": "x = 1"}, meta=None
         )
         assert result == "Wrote foo.py (5 chars)."
 
