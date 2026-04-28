@@ -10,10 +10,10 @@ resolution.
 Roots scoping: every file-touching tool calls
 ``ctx.session.list_roots()`` to discover the player's project root on
 demand. The kourai client declares ``roots`` capability via
-``build_client_session`` (M2 Change 1) and populates
-``kourai_project_root_var`` from each specialist executor (Change 1
-follow-on), so the round-trip lands the same project root that the
-in-process forge tools see today.
+``build_client_session`` and populates ``kourai_project_root_var`` from
+each specialist executor right after ``parse_project_root(user_input)``,
+so the round-trip lands the same project root the player typed in their
+``[project_root: ...]`` tag.
 
 Multiple roots = first wins with a log warning. Empty roots = clear
 error pointing the client at ``kourai_project_root_var`` so a
@@ -42,9 +42,9 @@ mcp = FastMCP("kourai-forge")
 
 _NO_ROOTS_ERROR = (
     "ERROR: no project root scoped — host returned empty roots/list. "
-    "Check that `kourai_project_root_var` is set on the calling session "
-    "(see M2 Change 1 follow-on; specialist executors set it from "
-    "[project_root: ...] tags)."
+    "Check that `kourai_project_root_var` is set on the calling session — "
+    "specialist executors populate it from the player's "
+    "[project_root: ...] tag."
 )
 
 

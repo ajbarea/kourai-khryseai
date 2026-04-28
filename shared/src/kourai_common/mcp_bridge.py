@@ -118,11 +118,12 @@ async def mcp_tool_bridge(
     """Launch an MCP server via stdio, open a kourai client session,
     fetch ``tools/list``, and yield an ``MCPToolBridge``.
 
-    The session declares ``roots`` via ``build_client_session`` (M2
-    Change 1), so a forge-style server can scope its file ops to the
-    player's project root via ``ctx.session.list_roots()``. Set
-    ``kourai_project_root_var`` before entering this context manager
-    (specialist executors do this in `parse_project_root` follow-on).
+    The session declares ``roots`` via ``build_client_session``, so a
+    forge-style server can scope its file ops to the player's project
+    root via ``ctx.session.list_roots()``. Set
+    ``kourai_project_root_var`` before entering this context manager —
+    specialist executors do this immediately after
+    ``parse_project_root(user_input)``.
     """
     from mcp.client.stdio import stdio_client
 

@@ -10,17 +10,14 @@ from kourai_mcp_forge.server import mcp
 
 def main() -> None:
     # Initialize OTel so the per-tool spans (`forge.read_file`,
-    # `forge.write_file`, …) added in M2 Change 2/3 reach the
-    # configured OTLP endpoint instead of a no-op tracer. The
-    # subprocess inherits OTEL_EXPORTER_OTLP_ENDPOINT from the
-    # launching agent's environment, so a Techne tool call writes
-    # `forge.*` spans into the same Jaeger backend the agent itself
-    # reports to.
-    #
-    # Trace-context propagation across the MCP subprocess boundary is
-    # a separate follow-up — without it, forge spans land as their
-    # own roots rather than children of techne.execute, but they're
-    # still visible at `kourai-forge` in Jaeger's service list.
+    # `forge.write_file`, …) reach the configured OTLP endpoint instead
+    # of a no-op tracer. The subprocess inherits
+    # OTEL_EXPORTER_OTLP_ENDPOINT from the launching agent's environment
+    # via the bridge's env safe-list, so spans land in the same Jaeger
+    # backend the agent itself reports to. Trace context propagates
+    # through MCP `params._meta`, so `forge.*` spans nest under the
+    # calling `techne.execute` / `kallos.execute` / `dokimasia.execute`
+    # span as one continuous trace.
     endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
     provider = setup_tracing("kourai-forge", endpoint)
     try:

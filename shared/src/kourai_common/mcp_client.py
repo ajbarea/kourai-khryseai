@@ -18,7 +18,7 @@ MCP Servers in Kourai Khryseai:
     - Shell: pytest, ruff, npx, node (kourai_mcp_shell over stdio)
     - Forge: read_file / write_file / edit_file / delete_file scoped to the
       player's project root via the host-declared ``roots`` capability
-      (kourai_mcp_forge over stdio; M2 Change 2)
+      (kourai_mcp_forge over stdio)
     - Playwright: Frontend E2E testing (direct subprocess)
     - Brave Search: Web search (direct curl subprocess)
 """
@@ -204,7 +204,7 @@ def _initialize_default_registry(toolkit: MCPToolkit) -> None:
     log.info("Initialized default MCP registry with %d servers", len(toolkit.server_registry))
 
 
-# ── Client-side capability declarations (M2 Change 1) ────────────────────────
+# ── Client-side capability declarations ──────────────────────────────────────
 #
 # The MCP Python SDK gates capability declaration on callback presence:
 # ClientSession.initialize() declares ``roots`` / ``elicitation`` /
@@ -213,8 +213,8 @@ def _initialize_default_registry(toolkit: MCPToolkit) -> None:
 # saying "...not supported", so an all-three-with-stubs approach would
 # declare capabilities while lying about supporting them. We declare
 # only what we actually back: ``roots`` today (real callback below);
-# ``elicitation`` lands with M2 Change 4 (INPUT_REQUIRED routing);
-# ``sampling`` lands when its first caller appears.
+# ``elicitation`` will land alongside the INPUT_REQUIRED → elicitation
+# migration; ``sampling`` lands when its first caller appears.
 
 
 async def _kourai_list_roots(
