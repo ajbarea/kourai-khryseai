@@ -6,7 +6,7 @@ collapses to a one-liner under "Shipped" and this file gets reset to the
 next milestone.
 
 Updated: 2026-04-28 · Working on: **no active milestone** — today's
-session was a UX/DX cleanup pass between milestones. Seven PRs:
+session was a UX/DX cleanup pass between milestones. Eight PRs:
 [#71](https://github.com/ajbarea/kourai-khryseai/pull/71)
 (prompt fix to block Haiku's `read_file(".")` failure mode) **merged**,
 [#72](https://github.com/ajbarea/kourai-khryseai/pull/72)
@@ -32,7 +32,17 @@ task-context comments — 18 edits, 7 files, zero behavior change)
 (ty re-raise after `pytest.skip` in `_safe_edge_synthesize` —
 warning slipped past `make lint` rc=0 because warnings don't fail
 the rc; closes the loophole that gave back the "any new ty warning
-is visibly the cause" property #73 just re-established) **merged**.
+is visibly the cause" property #73 just re-established) **merged**,
+[#79](https://github.com/ajbarea/kourai-khryseai/pull/79)
+(deslop the broken Playwright e2e flow end-to-end — `run_playwright`
+has been a stub returning empty `PytestRunResult()` since the
+2026-03-31 "implement accessibility snapshots" commit gutted the
+function body; `get_accessibility_snapshot` calls a Playwright API
+that's been removed post-deprecation; both helpers + the
+`is_e2e_request` branch + the supporting Chromium install in the
+Dockerfile + the `playwright>=1.40` dep + `dbhub` / `playwright`
+phantom MCP registrations + four docs that described the dead path
+all gone in 288-line deletion) **merged**.
 
 M2 effectively closed: Changes 1/2/3 shipped previously
 ([roots](./ROADMAP.md#shipped) + the kourai-mcp-forge stdio server +
