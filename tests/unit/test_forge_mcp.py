@@ -221,11 +221,11 @@ class TestForgeSpans:
         captured: list[tuple[str, dict]] = []
 
         @contextmanager
-        def capturing_span(name: str, attributes: dict | None = None):
+        def capturing_span(name: str, attributes: dict | None = None, _carrier: dict | None = None):
             captured.append((name, attributes or {}))
             yield MagicMock()
 
-        with patch("kourai_mcp_forge.server.create_span", capturing_span):
+        with patch("kourai_mcp_forge.server.create_span_with_remote_parent", capturing_span):
             await write_file("traced.py", "x = 1", _ctx_for_root(tmp_path))
 
         assert "forge.write_file" in [n for n, _ in captured]
@@ -245,11 +245,11 @@ class TestForgeSpans:
         captured: list[str] = []
 
         @contextmanager
-        def capturing_span(name: str, attributes: dict | None = None):
+        def capturing_span(name: str, attributes: dict | None = None, _carrier: dict | None = None):
             captured.append(name)
             yield MagicMock()
 
-        with patch("kourai_mcp_forge.server.create_span", capturing_span):
+        with patch("kourai_mcp_forge.server.create_span_with_remote_parent", capturing_span):
             await write_file(
                 "x.py", "y = 1", _make_ctx(__import__("mcp").types.ListRootsResult(roots=[]))
             )

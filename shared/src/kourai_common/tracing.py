@@ -6,7 +6,7 @@ import os
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
-from opentelemetry import trace
+from opentelemetry import context as otel_context, trace
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.propagate import extract, inject
 from opentelemetry.sdk.resources import Resource
@@ -102,3 +102,34 @@ def get_trace_context() -> dict[str, str]:
 def extract_trace_context(headers: dict[str, str]) -> Context:
     """Restore trace context from incoming A2A message metadata."""
     return extract(headers)
+
+
+@contextmanager
+def create_span_with_remote_parent(
+    name: str,
+    attributes: dict[str, str] | None,
+    remote_carrier: dict[str, str] | None,
+) -> Generator[trace.Span, None, None]:
+    """Like ``create_span`` but attaches a remote parent context first.
+
+    The MCP server-side analogue of ``get_trace_context()``: an MCP tool
+    handler that received ``traceparent`` / ``tracestate`` in
+    ``params._meta`` calls this so the resulting span nests under the
+    client's parent (e.g. a Techne ``chat_with_tools`` loop) instead of
+    landing as a disconnected root span. ``remote_carrier`` is the
+    extracted-meta dict (W3C-trace-context-shaped); ``None`` or empty
+    falls back to the current ambient context, matching plain
+    ``create_span`` semantics.
+    """
+    if not remote_carrier:
+        with create_span(name, attributes) as span:
+            yield span
+        return
+
+    parent = extract(remote_carrier)
+    token = otel_context.attach(parent)
+    try:
+        with create_span(name, attributes) as span:
+            yield span
+    finally:
+        otel_context.detach(token)
