@@ -6,7 +6,7 @@ collapses to a one-liner under "Shipped" and this file gets reset to the
 next milestone.
 
 Updated: 2026-04-28 · Working on: **no active milestone** — today's
-session was a UX/DX cleanup pass between milestones. Eight PRs:
+session was a UX/DX cleanup pass between milestones. Nine PRs:
 [#71](https://github.com/ajbarea/kourai-khryseai/pull/71)
 (prompt fix to block Haiku's `read_file(".")` failure mode) **merged**,
 [#72](https://github.com/ajbarea/kourai-khryseai/pull/72)
@@ -42,7 +42,19 @@ that's been removed post-deprecation; both helpers + the
 `is_e2e_request` branch + the supporting Chromium install in the
 Dockerfile + the `playwright>=1.40` dep + `dbhub` / `playwright`
 phantom MCP registrations + four docs that described the dead path
-all gone in 288-line deletion) **merged**.
+all gone in 288-line deletion) **merged**,
+[#80](https://github.com/ajbarea/kourai-khryseai/pull/80)
+(sibling deslop of three more PyGithub helpers that fall through
+ImportError on every code path because PyGithub isn't a declared
+dep — `github_search_repositories` in hephaestus, `github_search_issues`
+in metis (+ its 3-case `TestGithubSearchIssues` test class),
+`github_create_pull_request_impl` in mneme; plus stale
+`docs/configuration.md` claim about which 4 agents use the GitHub
+PAT (only Mneme still does, half-wired), `mcp_client.py` module
+docstring's "GitHub: Issue/PR/repo operations (direct PyGithub)" +
+"Playwright: Frontend E2E testing (direct subprocess)" lines, and
+the `github.**` entry in pyproject.toml's `replace-imports-with-any`
+that no longer suppresses anything — 285-line deletion) **merged**.
 
 M2 effectively closed: Changes 1/2/3 shipped previously
 ([roots](./ROADMAP.md#shipped) + the kourai-mcp-forge stdio server +
