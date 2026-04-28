@@ -6,7 +6,7 @@ collapses to a one-liner under "Shipped" and this file gets reset to the
 next milestone.
 
 Updated: 2026-04-28 · Working on: **no active milestone** — today's
-session was a UX/DX cleanup pass between milestones. Five PRs:
+session was a UX/DX cleanup pass between milestones. Seven PRs:
 [#71](https://github.com/ajbarea/kourai-khryseai/pull/71)
 (prompt fix to block Haiku's `read_file(".")` failure mode) **merged**,
 [#72](https://github.com/ajbarea/kourai-khryseai/pull/72)
@@ -23,7 +23,16 @@ read-only `tool_handlers`) **merged**,
 (skip TTS integration tests on third-party network outage — wrap
 Edge-TTS synth calls so `aiohttp.ClientConnectionError` to
 `wss://speech.platform.bing.com` skips the test instead of burning
-a CI rerun) **merged**.
+a CI rerun) **merged**,
+[#77](https://github.com/ajbarea/kourai-khryseai/pull/77)
+(deslop signature-restate docstrings + stale "surveyed 2026-04-26"
+task-context comments — 18 edits, 7 files, zero behavior change)
+**merged**,
+[#78](https://github.com/ajbarea/kourai-khryseai/pull/78)
+(ty re-raise after `pytest.skip` in `_safe_edge_synthesize` —
+warning slipped past `make lint` rc=0 because warnings don't fail
+the rc; closes the loophole that gave back the "any new ty warning
+is visibly the cause" property #73 just re-established) **merged**.
 
 M2 effectively closed: Changes 1/2/3 shipped previously
 ([roots](./ROADMAP.md#shipped) + the kourai-mcp-forge stdio server +
