@@ -83,9 +83,6 @@ default between architectural milestones.
 - **M16 follow-ons:**
   - Live trace-ID-in-Dozzle smoke (unit-tested but worth eyeballing
     in a real `make up` + smoked pipeline).
-  - `.claude/skill-context.md` cross-link to `docs/observability.md`.
-  - `scripts/watch_protocols.py` `kind="docker-tag"` digester for
-    `amir20/dozzle` / `jaegertracing/jaeger` / `prom/prometheus`.
 
 ---
 

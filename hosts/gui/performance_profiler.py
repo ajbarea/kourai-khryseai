@@ -142,7 +142,7 @@ class PerformanceProfiler:
         return max(times) if times else 0.0
 
     def get_performance_report(self) -> dict:
-        """Get comprehensive performance report.
+        """Get performance report.
 
         Returns:
             Dictionary with performance metrics.

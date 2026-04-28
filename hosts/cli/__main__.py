@@ -227,10 +227,8 @@ async def _compact_session_memory(context_id: str) -> None:
     Iterates the agents that have any history under ``context_id``,
     forces each through ``compact_memory`` (bypasses the auto-compaction
     threshold), totals the messages folded into semantic memory, and
-    emits a Mneme comms-window narrating what just happened. Inspired by
-    the universal ``/compact`` primitive in every OSS Claude Code clone
-    surveyed 2026-04-26 (see ROADMAP M6 "Surfaced from external research"
-    → tier-1 priority).
+    emits a Mneme comms-window narrating what just happened. Mirrors the
+    ``/compact`` primitive other Claude Code variants ship.
     """
     agents = list_agents_with_history(context_id)
     if not agents:
@@ -280,10 +278,8 @@ def _handle_permissions_command(prompt_text: str, settings: CLISettings) -> None
     """Show or toggle pipeline-gating permissions.
 
     Bare ``/permissions`` prints the current state of every gate;
-    ``/permissions <name>`` flips the named one and persists. Inspired
-    by Cline + ClawCode's per-tool gating UIs surveyed 2026-04-26 (see
-    ROADMAP M6 "Surfaced from external research" → tier-2 priority).
-    Unified entry point keeps the surface scannable as new gates land.
+    ``/permissions <name>`` flips the named one and persists. Single
+    entry point keeps the surface scannable as new gates land.
     """
     parts = prompt_text.split(maxsplit=1)
     arg = parts[1].strip().lower() if len(parts) > 1 else ""

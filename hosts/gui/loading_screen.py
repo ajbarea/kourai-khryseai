@@ -1,7 +1,7 @@
 """Cinematic title screen — generator-based loading with studio splash.
 
-Uses the **generator method** (modern Pygame-CE best practice) to keep the
-event pump alive during initialization.  The main loop calls ``next()`` on
+Uses the **generator method** to keep the event pump alive during
+initialization.  The main loop calls ``next()`` on
 the loading generator each frame while rendering a multi-phase cinematic:
 
 Flow:
