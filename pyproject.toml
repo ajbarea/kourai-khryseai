@@ -22,22 +22,20 @@ dev = [
 
 [tool.uv]
 package = false
-# override-dependencies: transitives in the litellm chain pin older
-# versions of packages with known advisories; we force the patched
-# versions globally and accept overriding upstream pins. Revisit
-# periodically — when litellm relaxes its own pins, drop the matching
-# override here. Verification recipe: remove a line, run `uv lock`,
+# override-dependencies: transitives in the litellm chain occasionally
+# pin older versions of packages with known advisories; we force the
+# patched versions globally and accept overriding upstream pins.
+# Revisit periodically — when litellm pins a version we're already
+# happy with, the matching override line stops doing useful work and
+# can be dropped. Verification recipe: remove a line, run `uv lock`,
 # check the resolved version + `uv audit` for CVE status.
 #
-# - aiohttp: a litellm transitive pulled a CVE-affected version.
-# - python-dotenv: litellm 1.83.7 pins ==1.0.1; 1.2.2 fixes
-#   GHSA-mf9w-mj56-hr94 (set_key symlink-following arbitrary file
-#   overwrite). The 1.0.1 -> 1.2.2 breaking changes only affect
-#   set_key/unset_key writer behaviour, and litellm uses dotenv as a
-#   reader, so the override is safe.
+# - aiohttp: litellm 1.83.14 pins ==3.13.4; the override allows the
+#   3.13.5 patch (currently the latest) to resolve. Drop this override
+#   when litellm's pin catches up to whatever 3.13.x line we want to
+#   ride.
 override-dependencies = [
     "aiohttp>=3.13.4",
-    "python-dotenv>=1.2.2",
 ]
 
 [tool.uv.workspace]

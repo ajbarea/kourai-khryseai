@@ -25,10 +25,7 @@ members = [
     "kourai-puck",
     "kourai-techne",
 ]
-overrides = [
-    { name = "aiohttp", specifier = ">=3.13.4" },
-    { name = "python-dotenv", specifier = ">=1.2.2" },
-]
+overrides = [{ name = "aiohttp", specifier = ">=3.13.4" }]
 
 [[package]]
 name = "a2a-sdk"
