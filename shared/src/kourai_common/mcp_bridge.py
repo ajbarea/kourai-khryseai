@@ -134,6 +134,43 @@ async def mcp_tool_bridge(
         yield MCPToolBridge(tools=tools, tool_handlers=tool_handlers)
 
 
+_FORGE_INHERITED_ENV_PREFIXES: tuple[str, ...] = ("OTEL_",)
+_FORGE_INHERITED_ENV_KEYS: tuple[str, ...] = (
+    "ENVIRONMENT",
+    "SERVICE_VERSION",
+    "KOURAI_LOG_LEVEL",
+)
+
+
+def _forge_subprocess_env() -> dict[str, str]:
+    """Build the env dict the bridge passes to ``StdioServerParameters``.
+
+    `mcp.client.stdio` deliberately ships a tiny safe-list
+    (``DEFAULT_INHERITED_ENV_VARS`` = HOME/LOGNAME/PATH/SHELL/TERM/USER on
+    Linux) so a subprocess can't accidentally leak the parent's secrets.
+    That excludes the OTel exporter config — without it the forge
+    subprocess's spans fall back to the SDK default
+    ``http://localhost:4318`` and never reach Jaeger (verified live —
+    spans showed "connection refused" against localhost from inside the
+    agent container even though the parent had ``OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318``).
+
+    We add OTel-relevant vars explicitly. Also kourai-specific ones the
+    forge process honors (`KOURAI_LOG_LEVEL` for log verbosity).
+    """
+    import os
+
+    from mcp.client.stdio import get_default_environment
+
+    env = get_default_environment()
+    for key, val in os.environ.items():
+        if (
+            any(key.startswith(prefix) for prefix in _FORGE_INHERITED_ENV_PREFIXES)
+            or key in _FORGE_INHERITED_ENV_KEYS
+        ):
+            env[key] = val
+    return env
+
+
 @asynccontextmanager
 async def forge_tool_bridge() -> AsyncIterator[MCPToolBridge]:
     """Convenience wrapper: open an ``mcp_tool_bridge`` for kourai-mcp-forge.
@@ -154,6 +191,7 @@ async def forge_tool_bridge() -> AsyncIterator[MCPToolBridge]:
     params = StdioServerParameters(
         command=sys.executable,
         args=["-m", "kourai_mcp_forge"],
+        env=_forge_subprocess_env(),
     )
     async with mcp_tool_bridge(params) as bridge:
         yield bridge
