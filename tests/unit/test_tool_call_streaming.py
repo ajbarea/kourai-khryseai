@@ -17,9 +17,21 @@ These tests assert the wiring at two layers:
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
+
+@asynccontextmanager
+async def _fake_forge_bridge(*_args, **_kwargs):
+    """Stub `forge_tool_bridge` so M2 Change 3b/c migration tests don't
+    launch the `kourai-mcp-forge` subprocess. The chat_with_tools mock
+    under each test inspects the wired callback shape independently.
+    """
+    from kourai_common.mcp_bridge import MCPToolBridge
+
+    yield MCPToolBridge(tools=[], tool_handlers={})
 
 
 class TestApplyLintFixesForwardsCallback:
@@ -32,11 +44,14 @@ class TestApplyLintFixesForwardsCallback:
         async def my_callback(name, args, result):
             pass
 
-        with patch(
-            "agents.kallos.agent.chat_with_tools",
-            new_callable=AsyncMock,
-            return_value=("done", []),
-        ) as mock_chat:
+        with (
+            patch("agents.kallos.agent.forge_tool_bridge", _fake_forge_bridge),
+            patch(
+                "agents.kallos.agent.chat_with_tools",
+                new_callable=AsyncMock,
+                return_value=("done", []),
+            ) as mock_chat,
+        ):
             await apply_lint_fixes(
                 lint_output="ruff: E501",
                 file_paths=set(),
@@ -54,11 +69,14 @@ class TestApplyLintFixesForwardsCallback:
     async def test_default_callback_is_none(self, tmp_path):
         from agents.kallos.agent import apply_lint_fixes
 
-        with patch(
-            "agents.kallos.agent.chat_with_tools",
-            new_callable=AsyncMock,
-            return_value=("done", []),
-        ) as mock_chat:
+        with (
+            patch("agents.kallos.agent.forge_tool_bridge", _fake_forge_bridge),
+            patch(
+                "agents.kallos.agent.chat_with_tools",
+                new_callable=AsyncMock,
+                return_value=("done", []),
+            ) as mock_chat,
+        ):
             await apply_lint_fixes(
                 lint_output="",
                 file_paths=set(),
@@ -80,11 +98,14 @@ class TestApplyTestFixesForwardsCallback:
         async def my_callback(name, args, result):
             pass
 
-        with patch(
-            "agents.dokimasia.agent.chat_with_tools",
-            new_callable=AsyncMock,
-            return_value=("done", []),
-        ) as mock_chat:
+        with (
+            patch("agents.dokimasia.agent.forge_tool_bridge", _fake_forge_bridge),
+            patch(
+                "agents.dokimasia.agent.chat_with_tools",
+                new_callable=AsyncMock,
+                return_value=("done", []),
+            ) as mock_chat,
+        ):
             await apply_test_fixes(
                 pytest_output="FAILED tests/test_x.py::test_y",
                 file_paths=set(),
@@ -100,11 +121,14 @@ class TestApplyTestFixesForwardsCallback:
     async def test_default_callback_is_none(self, tmp_path):
         from agents.dokimasia.agent import apply_test_fixes
 
-        with patch(
-            "agents.dokimasia.agent.chat_with_tools",
-            new_callable=AsyncMock,
-            return_value=("done", []),
-        ) as mock_chat:
+        with (
+            patch("agents.dokimasia.agent.forge_tool_bridge", _fake_forge_bridge),
+            patch(
+                "agents.dokimasia.agent.chat_with_tools",
+                new_callable=AsyncMock,
+                return_value=("done", []),
+            ) as mock_chat,
+        ):
             await apply_test_fixes(
                 pytest_output="",
                 file_paths=set(),

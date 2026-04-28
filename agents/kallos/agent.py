@@ -7,23 +7,23 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from anyio import Path as AnyioPath
 
 from kourai_common.forge_tools import (
-    FORGE_TOOL_HANDLERS,
-    FORGE_TOOL_SCHEMAS,
     count_successful_writes,
 )
 from kourai_common.llm import chat_with_tools
+from kourai_common.mcp_bridge import forge_tool_bridge
+from kourai_common.mcp_client import kourai_project_root_var
 from kourai_common.player import get_enriched_system_prompt
 from kourai_common.prompts import CURRENT_DATE, build_system_prompt
 from kourai_common.subprocess import StatusCallback, run_command
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
-    from pathlib import Path
 
 log = logging.getLogger(__name__)
 
@@ -216,18 +216,25 @@ async def apply_lint_fixes(
             ),
         },
     ]
-    _, tool_log = await chat_with_tools(
-        "kallos",
-        messages,
-        tools=FORGE_TOOL_SCHEMAS,
-        tool_handlers=FORGE_TOOL_HANDLERS,
-        handler_context={"project_root": project_root},
-        temperature=0.2,
-        max_tokens=4096,
-        max_iters=10,
-        context_id=context_id,
-        on_tool_call=on_tool_call,
-    )
+    # Defensive contextvar set so the forge MCP server's roots/list call
+    # returns this project_root regardless of how `apply_lint_fixes` was
+    # invoked (executor path sets it; tests / direct callers might not).
+    token = kourai_project_root_var.set(Path(project_root))
+    try:
+        async with forge_tool_bridge() as bridge:
+            _, tool_log = await chat_with_tools(
+                "kallos",
+                messages,
+                tools=bridge.tools,
+                tool_handlers=bridge.tool_handlers,
+                temperature=0.2,
+                max_tokens=4096,
+                max_iters=10,
+                context_id=context_id,
+                on_tool_call=on_tool_call,
+            )
+    finally:
+        kourai_project_root_var.reset(token)
     return count_successful_writes(tool_log)
 
 

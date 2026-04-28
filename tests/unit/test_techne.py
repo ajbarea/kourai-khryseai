@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import tempfile
+from contextlib import asynccontextmanager
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from anyio import Path as AnyioPath
@@ -135,27 +136,100 @@ class TestFileOperations:
             assert result[p2] == "b = 2"
 
 
+@asynccontextmanager
+async def _fake_forge_bridge(*_args, **_kwargs):
+    """Stub `forge_tool_bridge` for tests so they don't launch the
+    `kourai-mcp-forge` subprocess. Yields a bridge with empty tools +
+    handlers — the `chat_with_tools` mock under each test inspects
+    those references separately if the test cares.
+    """
+    from kourai_common.mcp_bridge import MCPToolBridge
+
+    yield MCPToolBridge(tools=[], tool_handlers={})
+
+
 class TestApplyCodeChanges:
-    """Test the tool-loop driver that replaced generate_code/generate_code_stream."""
+    """Test the tool-loop driver that replaced generate_code/generate_code_stream.
+
+    M2 Change 3b: now drives ``chat_with_tools`` through
+    ``forge_tool_bridge()`` (an MCP stdio subprocess) rather than the
+    static ``FORGE_TOOL_SCHEMAS`` / ``FORGE_TOOL_HANDLERS`` exports —
+    so each test patches ``forge_tool_bridge`` with a stub to avoid
+    launching the real subprocess.
+    """
 
     @pytest.mark.asyncio
-    async def test_calls_chat_with_tools_with_forge_tools(self):
-        with patch("agents.techne.agent.chat_with_tools", new_callable=AsyncMock) as mock_loop:
-            mock_loop.return_value = ("done", [])
+    async def test_drives_chat_with_tools_through_forge_bridge(self):
+        from kourai_common.mcp_bridge import MCPToolBridge
+
+        captured_kwargs: dict = {}
+
+        async def _fake_chat(*args, **kwargs):
+            captured_kwargs.update(kwargs)
+            captured_kwargs["agent_arg"] = args[0]
+            return ("done", [])
+
+        bridge_marker_tools = [{"type": "function", "function": {"name": "marker"}}]
+        bridge_marker_handlers = {"marker": MagicMock()}
+
+        @asynccontextmanager
+        async def _bridge(*_a, **_kw):
+            yield MCPToolBridge(tools=bridge_marker_tools, tool_handlers=bridge_marker_handlers)
+
+        with (
+            patch("agents.techne.agent.forge_tool_bridge", _bridge),
+            patch("agents.techne.agent.chat_with_tools", side_effect=_fake_chat),
+            patch(
+                "kourai_common.doc_lookup.lookup_documentation",
+                new_callable=AsyncMock,
+                return_value="",
+            ),
+        ):
             from agents.techne.agent import apply_code_changes
-            from kourai_common.forge_tools import (
-                FORGE_TOOL_HANDLERS,
-                FORGE_TOOL_SCHEMAS,
-            )
 
             text, log = await apply_code_changes("fix auth.py", project_root="/work")
+
         assert text == "done"
         assert log == []
-        kwargs = mock_loop.call_args.kwargs
-        assert mock_loop.call_args.args[0] == "techne"
-        assert kwargs["tools"] is FORGE_TOOL_SCHEMAS
-        assert kwargs["tool_handlers"] is FORGE_TOOL_HANDLERS
-        assert kwargs["handler_context"] == {"project_root": "/work"}
+        assert captured_kwargs["agent_arg"] == "techne"
+        # Bridge tools/handlers flow through to chat_with_tools — single-source.
+        assert captured_kwargs["tools"] is bridge_marker_tools
+        assert captured_kwargs["tool_handlers"] is bridge_marker_handlers
+        # No more handler_context: project_root reaches the forge server via
+        # roots/list (the bridge's _kourai_list_roots reads the contextvar
+        # set by apply_code_changes itself).
+        assert "handler_context" not in captured_kwargs
+
+    @pytest.mark.asyncio
+    async def test_sets_kourai_project_root_var_for_forge_subprocess(self):
+        """The forge MCP server reads project_root from the host's
+        roots/list response, which `_kourai_list_roots` sources from
+        ``kourai_project_root_var``. Verify ``apply_code_changes`` sets
+        it during the bridge call so a standalone caller (not via an
+        executor) still gets correct scoping.
+        """
+        from kourai_common.mcp_client import kourai_project_root_var
+
+        captured: list[Path | None] = []
+
+        async def _fake_chat(*_args, **_kwargs):
+            captured.append(kourai_project_root_var.get())
+            return ("done", [])
+
+        with (
+            patch("agents.techne.agent.forge_tool_bridge", _fake_forge_bridge),
+            patch("agents.techne.agent.chat_with_tools", side_effect=_fake_chat),
+            patch(
+                "kourai_common.doc_lookup.lookup_documentation",
+                new_callable=AsyncMock,
+                return_value="",
+            ),
+        ):
+            from agents.techne.agent import apply_code_changes
+
+            await apply_code_changes("fix auth.py", project_root="/work")
+
+        assert captured[0] == Path("/work")
 
     @pytest.mark.asyncio
     async def test_includes_file_context_in_user_message(self):
@@ -165,7 +239,15 @@ class TestApplyCodeChanges:
             captured["messages"] = args[1]
             return ("done", [])
 
-        with patch("agents.techne.agent.chat_with_tools", side_effect=_fake):
+        with (
+            patch("agents.techne.agent.forge_tool_bridge", _fake_forge_bridge),
+            patch("agents.techne.agent.chat_with_tools", side_effect=_fake),
+            patch(
+                "kourai_common.doc_lookup.lookup_documentation",
+                new_callable=AsyncMock,
+                return_value="",
+            ),
+        ):
             from agents.techne.agent import apply_code_changes
 
             await apply_code_changes(
@@ -190,7 +272,15 @@ class TestApplyCodeChanges:
             return ("done", [])
 
         img = {"type": "image_url", "image_url": {"url": "data:image/png;base64,xyz"}}
-        with patch("agents.techne.agent.chat_with_tools", side_effect=_fake):
+        with (
+            patch("agents.techne.agent.forge_tool_bridge", _fake_forge_bridge),
+            patch("agents.techne.agent.chat_with_tools", side_effect=_fake),
+            patch(
+                "kourai_common.doc_lookup.lookup_documentation",
+                new_callable=AsyncMock,
+                return_value="",
+            ),
+        ):
             from agents.techne.agent import apply_code_changes
 
             await apply_code_changes("look at this", project_root="/work", image_parts=[img])
@@ -211,7 +301,15 @@ class TestApplyCodeChanges:
         async def _hook(name, args, result):
             pass
 
-        with patch("agents.techne.agent.chat_with_tools", side_effect=_fake):
+        with (
+            patch("agents.techne.agent.forge_tool_bridge", _fake_forge_bridge),
+            patch("agents.techne.agent.chat_with_tools", side_effect=_fake),
+            patch(
+                "kourai_common.doc_lookup.lookup_documentation",
+                new_callable=AsyncMock,
+                return_value="",
+            ),
+        ):
             from agents.techne.agent import apply_code_changes
 
             await apply_code_changes("x", project_root="/work", on_tool_call=_hook)

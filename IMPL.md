@@ -182,35 +182,55 @@ one specialist surfaces in isolation.
 - [ ] Purely additive: no specialist callers wired yet — both code
   paths coexist on main until 3b/3c/3d.
 
-#### Change 3b — Migrate Techne to the MCP bridge
+#### Change 3b/c/d — Migrate Techne / Kallos / Dokimasia to the MCP bridge ✅ 2026-04-27
 
-- [ ] `agents/techne/agent.py::apply_code_changes` swaps
-  `tools=FORGE_TOOL_SCHEMAS, tool_handlers=FORGE_TOOL_HANDLERS` for
+Combined into a single PR after web research (April 2026 MCP best
+practice) confirmed that STDIO sessions are inherently stateful — one
+`forge_tool_bridge()` `async with` block holds the subprocess for the
+entire `chat_with_tools` lifetime (typically 10+ tool calls across a
+multi-iteration LLM loop), so the subprocess startup amortizes across
+all tool calls in that loop. The original "subprocess-per-tool-call"
+perf concern dissolved once that landed.
+
+- [x] `agents/techne/agent.py::apply_code_changes` swaps
+  `tools=FORGE_TOOL_SCHEMAS, tool_handlers=FORGE_TOOL_HANDLERS,
+  handler_context={"project_root": project_root}` for
   `tools=bridge.tools, tool_handlers=bridge.tool_handlers` inside
-  an `async with forge_tool_bridge() as bridge:` block.
-- [ ] `handler_context={"project_root": ...}` no longer needed —
-  the MCP server gets `project_root` via `roots/list`. Remove the
-  injection so the model doesn't see a redundant kw.
-- [ ] Live smoke per Round-7-style scenario: Techne writes a file
-  via the bridge, the file lands in the player's project root
-  (not `/app`), the trace ID propagates from kourai through the
-  forge subprocess via OTel context (verify in Jaeger).
-
-#### Change 3c — Migrate Kallos to the MCP bridge
-
-- [ ] Same swap in `agents/kallos/agent.py::apply_lint_fixes`.
-- [ ] Verify the Kallos lint-fix loop still terminates inside the
-  bridge's session lifetime; if a single lint loop spans many
-  iterations, the subprocess stays warm under one `async with`.
-
-#### Change 3d — Migrate Dokimasia to the MCP bridge
-
-- [ ] Same swap in `agents/dokimasia/agent.py::apply_test_fixes`.
-- [ ] After 3d lands, delete `FORGE_TOOL_SCHEMAS` /
-  `FORGE_TOOL_HANDLERS` (still imported nowhere) — single-source
-  the schemas via the MCP server. `kourai_common.forge_tools`
-  keeps the async handler functions because the MCP server itself
-  imports them.
+  an `async with forge_tool_bridge() as bridge:` block. Same shape
+  applied to `agents/kallos/agent.py::apply_lint_fixes` and
+  `agents/dokimasia/agent.py::apply_test_fixes`.
+- [x] Each migrated function defensively sets
+  `kourai_project_root_var` from its `project_root` parameter
+  before opening the bridge, so a standalone caller (test / direct
+  invocation) gets correct scoping even if no executor populated
+  the contextvar from `[project_root: ...]`.
+- [x] `handler_context` removed entirely — the MCP server reads
+  `project_root` via `roots/list` (Change 1's `_kourai_list_roots`
+  reads the contextvar). Single-source: project_root flows through
+  one channel, not two.
+- [x] Test mocks updated — 4 `TestApplyCodeChanges` tests in
+  `test_techne.py` rewritten to also patch `forge_tool_bridge` with
+  a stub yielding `MCPToolBridge(tools=[], tool_handlers={})`;
+  4 `TestApply{Lint,Test}FixesForwardsCallback` tests in
+  `test_tool_call_streaming.py` similarly. New `test_techne.py::
+  TestApplyCodeChanges::test_sets_kourai_project_root_var_for_forge_subprocess`
+  regression-guards the defensive contextvar set.
+- [x] All tests in `test_techne.py`, `test_tool_call_streaming.py`,
+  `test_executors.py`, `test_mcp_bridge.py` (incl. live forge
+  subprocess roundtrip) green; full unit suite `2735 passed`;
+  `make lint` ends `Found 0 diagnostics`.
+- [ ] `FORGE_TOOL_SCHEMAS` / `FORGE_TOOL_HANDLERS` static exports in
+  `kourai_common/forge_tools.py` are now imported nowhere outside
+  `tests/unit/test_forge_tools.py::TestSchemaShape`. Cleanup
+  (delete exports + the 3 `TestSchemaShape` tests) is its own
+  small PR — kept this one purely additive at the migration layer.
+- [ ] **Live verification (deferred):** specialist container connects
+  to `kourai-mcp-forge` via stdio, declares
+  `[project_root: ...]` mid-pipeline, and watches a forge tool
+  call flow end-to-end. Today's tests cover the wiring; live
+  smoke covers the full A2A → executor → contextvar → bridge →
+  subprocess → roots/list → forge tool roundtrip path under
+  real LLM tool calls.
 
 ### Change 4 — `INPUT_REQUIRED` over `elicitation`
 
