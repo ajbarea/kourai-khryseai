@@ -138,16 +138,22 @@ async def mcp_tool_bridge(
 async def forge_tool_bridge() -> AsyncIterator[MCPToolBridge]:
     """Convenience wrapper: open an ``mcp_tool_bridge`` for kourai-mcp-forge.
 
-    Launches ``uv run --no-active kourai-mcp-forge`` as a stdio
-    subprocess. The same path the specialist containers use today for
-    ``kourai-mcp-shell`` — workspace package, console-script entry,
-    process-bound transport.
+    Launches ``<sys.executable> -m kourai_mcp_forge`` as a stdio
+    subprocess — the same Python interpreter that's running the bridge
+    spawns the forge server. This works both on the dev host (where
+    ``sys.executable`` is the workspace venv's Python) and inside the
+    agent containers (where it's ``/app/.venv/bin/python3``). Avoids
+    the dev-vs-container split that ``uv run kourai-mcp-forge`` would
+    introduce — the runtime container images don't carry ``uv``,
+    only the venv it produced at build time.
     """
+    import sys
+
     from mcp.client.stdio import StdioServerParameters
 
     params = StdioServerParameters(
-        command="uv",
-        args=["run", "--no-active", "kourai-mcp-forge"],
+        command=sys.executable,
+        args=["-m", "kourai_mcp_forge"],
     )
     async with mcp_tool_bridge(params) as bridge:
         yield bridge

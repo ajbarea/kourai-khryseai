@@ -29,8 +29,14 @@ ARG PACKAGE_NAME
 # Copies all agent/host source but only installs the target package via --package.
 COPY --link agents/ agents/
 COPY --link hosts/ hosts/
+# kourai-mcp-forge is launched as a stdio subprocess by Techne / Kallos /
+# Dokimasia via `forge_tool_bridge()` (M2 Change 3b/c/d). Installing it
+# alongside the per-package install gives the `kourai-mcp-forge` console
+# script to every agent container — cheap (~5MB) and avoids a conditional
+# install that branches on PACKAGE_NAME.
+COPY --link mcp_servers/ mcp_servers/
 
-RUN uv sync --package kourai-${PACKAGE_NAME} --no-dev --frozen
+RUN uv sync --package kourai-${PACKAGE_NAME} --package kourai-mcp-forge --no-dev --frozen
 
 # Pre-create non-root user in builder
 RUN useradd -m -u 1000 kourai
@@ -129,6 +135,7 @@ COPY --chown=1000:1000 --link agents/ agents/
 COPY --chown=1000:1000 --link hosts/ hosts/
 COPY --chown=1000:1000 --link shared/ shared/
 COPY --chown=1000:1000 --link scripts/ scripts/
+COPY --chown=1000:1000 --link mcp_servers/ mcp_servers/
 COPY --chown=1000:1000 --link assets/ assets/
 COPY --chown=1000:1000 --link templates/ templates/
 COPY --chown=1000:1000 --link docker/entrypoint.sh /app/entrypoint.sh
