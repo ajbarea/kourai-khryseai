@@ -1,20 +1,59 @@
 """Full integration tests: Kokoro + Edge-TTS backends with audio validation."""
 
+import asyncio
 import io
 import os
 import wave
 
+import aiohttp
 import pytest
 
-from kourai_common.tts_backend import AGENT_VOICE_MAP, TTSVoiceConfig
+from kourai_common.tts_backend import AGENT_VOICE_MAP, TTSBackend, TTSVoiceConfig
 
 _IN_CI = os.getenv("CI", "").strip().lower() in {"1", "true", "yes"}
+
+# Edge-TTS reaches Microsoft's Bing speech WebSocket
+# (``wss://speech.platform.bing.com/...``). When CI's egress to that
+# endpoint flakes, the synth call surfaces as
+# ``aiohttp.ConnectionTimeoutError`` (or a bare ``asyncio.TimeoutError``
+# on the inner coroutine). That's environmental, not a kourai bug, so
+# we skip rather than burn a rerun cycle. ``_skip_or_fail_unavailable``
+# stays unchanged — its CI-fails-on-missing-dep semantic catches real
+# regressions where ``edge-tts`` itself isn't installed.
+_THIRD_PARTY_NETWORK_ERRORS: tuple[type[BaseException], ...] = (
+    aiohttp.ClientConnectionError,
+    aiohttp.ClientConnectorError,
+    aiohttp.ClientPayloadError,
+    aiohttp.ClientResponseError,
+    aiohttp.ClientSSLError,
+    aiohttp.ServerDisconnectedError,
+    asyncio.TimeoutError,
+)
 
 
 def _skip_or_fail_unavailable(reason: str) -> None:
     if _IN_CI:
         pytest.fail(reason)
     pytest.skip(reason)
+
+
+async def _safe_edge_synthesize(
+    backend: TTSBackend,
+    text: str,
+    voice: TTSVoiceConfig,
+) -> bytes:
+    """Wrap ``backend.synthesize`` so an unreachable Microsoft endpoint
+    skips the test instead of failing it. Real backend bugs still
+    surface — only the network-class exceptions trigger the skip.
+    """
+    try:
+        return await backend.synthesize(text, voice)
+    except _THIRD_PARTY_NETWORK_ERRORS as exc:
+        pytest.skip(
+            f"Microsoft Bing speech endpoint unreachable from this runner "
+            f"({type(exc).__name__}: {exc}); skipping rather than burning "
+            "a CI rerun on an environmental flake"
+        )
 
 
 def _read_wav_duration(wav_bytes: bytes) -> float:
@@ -164,7 +203,7 @@ class TestEdgeTTSIntegration:
         # Test a few agent voices map to Edge-specific IDs
         for agent_name in ["hephaestus", "metis", "kallos"]:
             voice = AGENT_VOICE_MAP[agent_name]
-            audio = await edge_backend.synthesize(f"Test from {agent_name}", voice)
+            audio = await _safe_edge_synthesize(edge_backend, f"Test from {agent_name}", voice)
 
             assert len(audio) > 0, f"{agent_name} produced no audio via Edge-TTS"
 
@@ -177,7 +216,7 @@ class TestEdgeTTSIntegration:
         ]
 
         for voice_cfg in voice_configs:
-            audio = await edge_backend.synthesize("Test message", voice_cfg)
+            audio = await _safe_edge_synthesize(edge_backend, "Test message", voice_cfg)
             assert len(audio) > 0
 
 
@@ -194,7 +233,9 @@ class TestBackendInteroperability:
         assert backend is not None
 
         voice = TTSVoiceConfig("Sarah", "af_sarah")
-        audio = await backend.synthesize("Test fallback", voice)
+        # Fallback may resolve to Edge-TTS (Bing speech WebSocket); wrap
+        # so a Microsoft-side outage skips the test rather than failing.
+        audio = await _safe_edge_synthesize(backend, "Test fallback", voice)
 
         assert len(audio) > 0
 
@@ -228,5 +269,5 @@ class TestBackendInteroperability:
             assert len(audio_kokoro) > 0
 
         if has_edge and edge is not None:
-            audio_edge = await edge.synthesize("Test", voice)
+            audio_edge = await _safe_edge_synthesize(edge, "Test", voice)
             assert len(audio_edge) > 0
