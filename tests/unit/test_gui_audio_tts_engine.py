@@ -18,7 +18,15 @@ from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 
-from kourai_common.audio import AudioManager
+# Imported as a module reference so we always resolve ``AudioManager``
+# against the live ``kourai_common.audio`` — ``test_audio_env.py``'s
+# ``importlib.reload(audio)`` swaps in a fresh class object, and a
+# top-level ``from kourai_common.audio import AudioManager`` would
+# pin the stale class for the rest of this file's run, leaving the
+# fixture resetting one class while the tests instantiated another.
+# The fixture resolves ``audio.AudioManager`` at fixture time so it
+# always sees whatever's current in the module.
+from kourai_common import audio
 
 pytest.importorskip("pygame")
 
@@ -290,7 +298,7 @@ def mock_audio_mixer():
 
 class TestAudioManagerInit:
     def test_init(self, mock_audio_mixer):
-        am = AudioManager()
+        am = audio.AudioManager()
         assert am._initialized is True
         assert am.music_volume == 0.25
         assert am.ambient_volume == 0.5
@@ -301,7 +309,7 @@ class TestAudioManagerInit:
 class TestAudioManagerVolume:
     def test_set_music_volume(self, mock_audio_mixer):
         _, mock_music, _ = mock_audio_mixer
-        am = AudioManager()
+        am = audio.AudioManager()
         mock_music.get_busy.return_value = True
         am.set_music_volume(0.5)
         assert am.music_volume == 0.5
@@ -309,29 +317,29 @@ class TestAudioManagerVolume:
 
     def test_set_music_volume_not_playing(self, mock_audio_mixer):
         _, mock_music, _ = mock_audio_mixer
-        am = AudioManager()
+        am = audio.AudioManager()
         mock_music.get_busy.return_value = False
         am.set_music_volume(0.3)
         assert am.music_volume == 0.3
 
     def test_set_ambient_volume(self, mock_audio_mixer):
         mock_channel, _, _ = mock_audio_mixer
-        am = AudioManager()
+        am = audio.AudioManager()
         am.set_ambient_volume(0.7)
         assert am.ambient_volume == 0.7
 
     def test_set_voice_volume(self, mock_audio_mixer):
-        am = AudioManager()
+        am = audio.AudioManager()
         am.set_voice_volume(0.9)
         assert am.voice_volume == 0.9
 
     def test_set_sfx_volume(self, mock_audio_mixer):
-        am = AudioManager()
+        am = audio.AudioManager()
         am.set_sfx_volume(0.6)
         assert am.sfx_volume == 0.6
 
     def test_volume_clamps(self, mock_audio_mixer):
-        am = AudioManager()
+        am = audio.AudioManager()
         am.set_music_volume(2.0)
         assert am.music_volume == 1.0
         am.set_music_volume(-1.0)
@@ -341,7 +349,7 @@ class TestAudioManagerVolume:
 class TestAudioManagerMusic:
     def test_play_music(self, mock_audio_mixer):
         _, mock_music, _ = mock_audio_mixer
-        am = AudioManager()
+        am = audio.AudioManager()
         am.play_music("/fake/music.ogg")
         mock_music.load.assert_called_once()
         mock_music.play.assert_called_once()
@@ -349,29 +357,29 @@ class TestAudioManagerMusic:
     def test_play_music_error(self, mock_audio_mixer):
         _, mock_music, _ = mock_audio_mixer
         mock_music.load.side_effect = Exception("file not found")
-        am = AudioManager()
+        am = audio.AudioManager()
         am.play_music("/fake/missing.ogg")  # should not raise
 
     def test_fade_to_music(self, mock_audio_mixer):
         _, mock_music, _ = mock_audio_mixer
-        am = AudioManager()
+        am = audio.AudioManager()
         am.fade_to_music("/fake/next.ogg", fade_ms=500)
 
     def test_stop_music(self, mock_audio_mixer):
         _, mock_music, _ = mock_audio_mixer
-        am = AudioManager()
+        am = audio.AudioManager()
         am.stop_music()
         mock_music.stop.assert_called_once()
 
     def test_stop_music_fadeout(self, mock_audio_mixer):
         _, mock_music, _ = mock_audio_mixer
-        am = AudioManager()
+        am = audio.AudioManager()
         am.stop_music(fade_ms=1000)
         mock_music.fadeout.assert_called_once_with(1000)
 
     def test_pause_resume_music(self, mock_audio_mixer):
         _, mock_music, _ = mock_audio_mixer
-        am = AudioManager()
+        am = audio.AudioManager()
         am.pause_music()
         mock_music.pause.assert_called_once()
         am.resume_music()
@@ -381,28 +389,28 @@ class TestAudioManagerMusic:
 class TestAudioManagerAmbient:
     def test_play_ambient_with_path(self, mock_audio_mixer):
         mock_channel, _, mock_sound_cls = mock_audio_mixer
-        am = AudioManager()
+        am = audio.AudioManager()
         am.play_ambient("/fake/ambient.wav")
         mock_sound_cls.assert_called()
         mock_channel.play.assert_called()
 
     def test_play_ambient_generative(self, mock_audio_mixer):
         mock_channel, _, mock_sound_cls = mock_audio_mixer
-        am = AudioManager()
+        am = audio.AudioManager()
         am.play_ambient()  # No path — uses generated synth
         mock_channel.play.assert_called()
 
     def test_play_ambient_error(self, mock_audio_mixer):
         mock_channel, _, mock_sound_cls = mock_audio_mixer
         mock_sound_cls.side_effect = Exception("audio error")
-        am = AudioManager()
+        am = audio.AudioManager()
         am.play_ambient("/fake/bad.wav")  # should not raise
 
 
 class TestAudioManagerSFX:
     def test_play_sfx_generated(self, mock_audio_mixer):
         mock_channel, _, _ = mock_audio_mixer
-        am = AudioManager()
+        am = audio.AudioManager()
         am.play_sfx()  # No path — generated blip
         mock_channel.play.assert_called()
 
@@ -410,21 +418,21 @@ class TestAudioManagerSFX:
         mock_channel, _, mock_sound_cls = mock_audio_mixer
         mock_sound = MagicMock()
         mock_sound_cls.return_value = mock_sound
-        am = AudioManager()
+        am = audio.AudioManager()
         am.play_sfx("/fake/click.wav")
         am.play_sfx("/fake/click.wav")  # second call should use cache
 
     def test_play_sfx_error(self, mock_audio_mixer):
         mock_channel, _, mock_sound_cls = mock_audio_mixer
         mock_sound_cls.side_effect = Exception("error")
-        am = AudioManager()
+        am = audio.AudioManager()
         am.play_sfx("/fake/bad.wav")  # should not raise
 
 
 class TestAudioManagerCleanup:
     def test_cleanup(self, mock_audio_mixer):
         mock_channel, mock_music, _ = mock_audio_mixer
-        am = AudioManager()
+        am = audio.AudioManager()
         am.cleanup()
         mock_music.stop.assert_called()
         mock_channel.stop.assert_called()
@@ -433,7 +441,7 @@ class TestAudioManagerCleanup:
 
 class TestAudioManagerGenerateWave:
     def test_generate_ambient_wave(self, mock_audio_mixer):
-        am = AudioManager()
+        am = audio.AudioManager()
         wav = am._generate_ambient_wave()
         assert isinstance(wav, bytes)
         assert len(wav) > 44  # WAV header minimum
@@ -625,9 +633,8 @@ class TestPlaylistLifecycle:
         """Second call while the first daemon is still alive must NOT
         spawn a second thread (the original bug raced two daemons).
         """
-        from kourai_common.audio import AudioManager
 
-        am = AudioManager()
+        am = audio.AudioManager()
         am._playlist = ["/dev/null/track1.ogg", "/dev/null/track2.ogg"]
 
         am.play_playlist()
@@ -646,9 +653,8 @@ class TestPlaylistLifecycle:
         signal — the loop now uses `Event.wait(timeout=1.0)` which
         returns immediately when the event is set.
         """
-        from kourai_common.audio import AudioManager
 
-        am = AudioManager()
+        am = audio.AudioManager()
         am._playlist = ["/dev/null/track.ogg"]
 
         am.play_playlist()
@@ -663,9 +669,8 @@ class TestPlaylistLifecycle:
         """Safe to call before any `play_playlist` — covers the
         `_apply_audio_settings` case where music was OFF at startup.
         """
-        from kourai_common.audio import AudioManager
 
-        am = AudioManager()
+        am = audio.AudioManager()
         am.stop_playlist()  # Should not raise
         assert am._playlist_thread is None
 
@@ -674,9 +679,8 @@ class TestPlaylistLifecycle:
         `_playlist_shutdown.set()` from the previous stop would block
         the new loop forever otherwise.
         """
-        from kourai_common.audio import AudioManager
 
-        am = AudioManager()
+        am = audio.AudioManager()
         am._playlist = ["/dev/null/track.ogg"]
 
         am.play_playlist()
