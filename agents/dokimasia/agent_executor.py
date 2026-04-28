@@ -9,9 +9,7 @@ from a2a.types import DataPart, Part, Task, TextPart, UnsupportedOperationError
 from a2a.utils.errors import ServerError
 
 from agents.dokimasia.agent import (
-    generate_playwright_tests,
     generate_tests_stream,
-    run_playwright,
 )
 from kourai_common.a2a_utils import extract_image_parts, parse_project_root
 from kourai_common.base_executor import BaseAgentExecutor
@@ -57,68 +55,8 @@ class DokimasiaAgentExecutor(BaseAgentExecutor):
             is_run_request = any(
                 kw in input_lower for kw in ["run test", "make test", "pytest", "run all"]
             )
-            is_e2e_request = any(
-                kw in input_lower
-                for kw in ["e2e", "playwright", "frontend test", "browser test", "ui test"]
-            )
 
-            if is_e2e_request:
-                # Playwright E2E testing
-                await send_working_status(
-                    updater,
-                    task,
-                    "Generating Playwright E2E tests...",
-                    emoji="🎭",
-                )
-
-                # Generate E2E tests based on user input (feature description)
-                await generate_playwright_tests(
-                    page_source=user_input,
-                    page_name="e2e",
-                    context_id=task.context_id,
-                )
-
-                await send_working_status(
-                    updater,
-                    task,
-                    "Running Playwright tests in headless browser...",
-                    emoji="🎭",
-                )
-
-                # Run the generated tests
-                test_results = await run_playwright(
-                    test_path=user_input
-                    if user_input.endswith((".spec.ts", ".test.ts"))
-                    else "e2e.spec.ts",
-                    cwd=str(project_root),
-                    extra_args=["--reporter=json"],
-                )
-
-                final_output = f"🎭 Playwright E2E Test Results\n\n{test_results}"
-                await updater.add_artifact(
-                    [
-                        Part(root=TextPart(text=final_output)),
-                        Part(
-                            root=DataPart(
-                                data={
-                                    "test_type": "e2e",
-                                    "framework": "playwright",
-                                    "output": test_results,
-                                }
-                            )
-                        ),
-                    ],
-                    name="e2e_test_results",
-                )
-                await updater.complete()
-                log.info("Dokimasia completed — ran Playwright E2E tests")
-
-                # Virtue update: E2E test run → arete
-                _profile = PlayerProfile.load()
-                if _profile:
-                    update_virtue(_profile.player_id, "arete", 0.01)
-
-            elif is_run_request:
+            if is_run_request:
                 from typing import Any
 
                 from agents.dokimasia.agent import (
