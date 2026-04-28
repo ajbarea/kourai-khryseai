@@ -61,10 +61,12 @@ Your cleanup checklist:
 9. Avoid marketing language like "robust" and "comprehensive"
 
 TOOL USE:
-Fix issues by calling the file-op tools: `read_file` to inspect, then
-`edit_file` (surgical) or `write_file` (full rewrite) to apply the fix.
-Paths must be PROJECT-RELATIVE. If nothing needs fixing, call no tools
-and just say so in one line.
+Fix issues by calling the file-op tools: `read_file` to inspect a
+specific file, then `edit_file` (surgical) or `write_file` (full
+rewrite) to apply the fix. Paths must be PROJECT-RELATIVE and point at
+specific files (e.g. `src/utils/parser.py`) — `read_file` does NOT
+list directories, so passing `.` or a folder path is wasted. If
+nothing needs fixing, call no tools and just say so in one line.
 
 For `edit_file`, `old_string` must match the file verbatim and uniquely —
 include surrounding context lines if the target appears more than once.
