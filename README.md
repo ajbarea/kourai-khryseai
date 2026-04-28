@@ -326,7 +326,6 @@ make help       # Show all available commands
 - **LLM** — [LiteLLM](https://docs.litellm.ai/) (pluggable: Claude, Gemini, Ollama, etc.)
 - **TTS** — **Kokoro-82M** (Local) / **Edge-TTS** (Cloud) with real-time streaming
 - **MCP** — [MCP](https://modelcontextprotocol.io/) (filesystem, git, shell, context7)
-- **Browser Context** — **Accessibility-Tree Snapshots** for token-efficient E2E reasoning
 - **Linting** — [Ruff](https://docs.astral.sh/ruff/) + [ty](https://docs.astral.sh/ty/) (Python)
 - **Packaging** — [uv](https://docs.astral.sh/uv/) workspaces
 - **Observability** — [OpenTelemetry](https://opentelemetry.io/) → [Jaeger](https://www.jaegertracing.io/) + [Prometheus](https://prometheus.io/)

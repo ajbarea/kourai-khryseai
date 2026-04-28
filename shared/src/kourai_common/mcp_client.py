@@ -180,9 +180,7 @@ def _initialize_default_registry(toolkit: MCPToolkit) -> None:
     toolkit.register_server("github", enabled=True)
     toolkit.register_server("memory", enabled=True)
     toolkit.register_server("shell", enabled=True)
-    toolkit.register_server("playwright", enabled=False)
     toolkit.register_server("brave_search", enabled=True)
-    toolkit.register_server("dbhub", enabled=False)
 
     toolkit.assign_servers("hephaestus", ["github"], fallback_mode="none")
     toolkit.assign_servers(
@@ -193,7 +191,7 @@ def _initialize_default_registry(toolkit: MCPToolkit) -> None:
         ["context7", "context_hub", "github", "shell"],
         fallback_mode="subprocess",
     )
-    toolkit.assign_servers("dokimasia", ["shell", "playwright"], fallback_mode="subprocess")
+    toolkit.assign_servers("dokimasia", ["shell"], fallback_mode="subprocess")
     toolkit.assign_servers("kallos", ["shell"], fallback_mode="subprocess")
     toolkit.assign_servers("mneme", ["github", "memory"], fallback_mode="none")
     toolkit.assign_servers("puck", ["memory"], fallback_mode="none")

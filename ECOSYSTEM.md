@@ -150,10 +150,9 @@ their own domain logic (planning, testing, style, etc.). A few have
 extra deps specific to their role:
 
 - **`agents/dokimasia`** (testing agent) — adds `pytest>=8.0` (it *runs*
-  pytest suites on behalf of the user) and `playwright>=1.40` (for
-  browser-based integration tests it authors). The `pytest>=8.0` floor
-  is looser than the workspace's `>=9.0.3` intentionally — dokimasia
-  targets whatever pytest the *user's* project is on.
+  pytest suites on behalf of the user). The `pytest>=8.0` floor is
+  looser than the workspace's `>=9.0.3` intentionally — dokimasia targets
+  whatever pytest the *user's* project is on.
 - **`agents/hephaestus`** (orchestrator) — adds `edge-tts>=0.30.0` with
   a comment:
   `# VN TTS: vn-bridge uses hephaestus deps (PACKAGE_NAME=hephaestus)`.
