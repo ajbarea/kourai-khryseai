@@ -75,8 +75,11 @@ async def _resolve_project_root(ctx: Context) -> Path | str:
 async def read_file(path: str, ctx: Context) -> str:
     """Read a regular file's contents (line-numbered) from the project root.
 
-    Path is project-relative — anything escaping the host's declared root
-    is rejected by the existing ``validate_file_path`` guard.
+    Use this before ``edit_file`` if you are not certain of the exact text to
+    match. The path must point to a regular file, not a directory — directory
+    listing is not supported by this tool. Path is project-relative; anything
+    escaping the host's declared root is rejected by the existing
+    ``validate_file_path`` guard.
     """
     project_root = await _resolve_project_root(ctx)
     if isinstance(project_root, str):

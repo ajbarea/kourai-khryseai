@@ -1,11 +1,18 @@
-"""Forge tool registry — provider tool-use schemas and handlers for file ops.
+"""Forge tool handlers — async file-op functions used by ``kourai-mcp-forge``.
 
-These are the OpenAI-style tool definitions that Techne, Dokimasia, and Kallos
-expose to the LLM via :func:`kourai_common.llm.chat_with_tools`. Each handler
-takes a ``project_root`` (injected via ``handler_context``) and routes file
-ops through :func:`validate_file_path` so the model cannot escape the
-worktree. Path translation (:func:`_translate_to_container`) handles the
+These are the underlying async functions (``read_file``, ``write_file``,
+``edit_file``, ``delete_file``) that the kourai-mcp-forge server delegates
+to. Each takes ``project_root`` as a kw-only arg and routes file ops
+through :func:`validate_file_path` so callers can't escape the worktree.
+Path translation (:func:`_translate_to_container`) handles the
 host-vs-container path mismatch when specialists run inside their own image.
+
+The static OpenAI-style ``FORGE_TOOL_SCHEMAS`` / ``FORGE_TOOL_HANDLERS``
+dicts that used to live here were deleted with M2 Change 3 — the bridge
+in ``kourai_common.mcp_bridge`` now sources both from
+``await session.list_tools()`` against ``kourai-mcp-forge``, so the
+forge tool surface is single-sourced via MCP rather than duplicated as
+a static export.
 """
 
 from __future__ import annotations
@@ -19,104 +26,6 @@ from kourai_common.file_ops import PathViolation, validate_file_path
 from kourai_common.subprocess import read_file_with_context
 
 log = logging.getLogger(__name__)
-
-
-FORGE_TOOL_SCHEMAS: list[dict[str, Any]] = [
-    {
-        "type": "function",
-        "function": {
-            "name": "write_file",
-            "description": (
-                "Create a new file or overwrite an existing one. Use for new "
-                "modules and full rewrites. Path is project-relative."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "path": {
-                        "type": "string",
-                        "description": "Project-relative file path (e.g. src/foo.py).",
-                    },
-                    "content": {
-                        "type": "string",
-                        "description": (
-                            "Full file content. A trailing newline is added if missing."
-                        ),
-                    },
-                },
-                "required": ["path", "content"],
-                "additionalProperties": False,
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "edit_file",
-            "description": (
-                "Replace exactly one occurrence of `old_string` with `new_string` "
-                "in an existing file. Fails if `old_string` is missing or "
-                "appears more than once — extend it with surrounding context "
-                "to make it unique. Use for surgical edits."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "path": {"type": "string", "description": "Project-relative path."},
-                    "old_string": {
-                        "type": "string",
-                        "description": ("Exact text to find. Must appear once and only once."),
-                    },
-                    "new_string": {"type": "string", "description": "Replacement text."},
-                },
-                "required": ["path", "old_string", "new_string"],
-                "additionalProperties": False,
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "delete_file",
-            "description": ("Remove a file from the project. No-op if the file does not exist."),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "path": {"type": "string", "description": "Project-relative path."},
-                },
-                "required": ["path"],
-                "additionalProperties": False,
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "read_file",
-            "description": (
-                "Read a regular file's contents to inspect what is already on disk "
-                "before editing. Returns line-numbered text. Use this before "
-                "edit_file if you are not certain of the exact text to match. "
-                "The path must point to a regular file, not a directory — "
-                "directory listing is not supported by this tool."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "path": {
-                        "type": "string",
-                        "description": (
-                            "Project-relative path to a regular file (NOT a "
-                            "directory). Example: 'src/utils.py'."
-                        ),
-                    },
-                },
-                "required": ["path"],
-                "additionalProperties": False,
-            },
-        },
-    },
-]
 
 
 def _resolve(path: str, project_root: Path | str) -> Path:
@@ -202,14 +111,6 @@ async def read_file(path: str, *, project_root: Path | str) -> str:
             "yourself before calling read_file."
         )
     return read_file_with_context(str(target))
-
-
-FORGE_TOOL_HANDLERS: dict[str, Any] = {
-    "write_file": write_file,
-    "edit_file": edit_file,
-    "delete_file": delete_file,
-    "read_file": read_file,
-}
 
 
 MUTATING_TOOL_NAMES: frozenset[str] = frozenset({"write_file", "edit_file", "delete_file"})
