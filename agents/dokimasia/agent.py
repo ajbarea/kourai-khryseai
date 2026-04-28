@@ -156,8 +156,11 @@ async def apply_test_fixes(
                 get_enriched_system_prompt(SYSTEM_PROMPT, "dokimasia")
                 + "\n\nFix failing tests or the underlying code by calling the "
                 "file-op tools (`read_file`, `write_file`, `edit_file`). Paths "
-                "must be PROJECT-RELATIVE. Plan briefly in one short paragraph "
-                "before calling any tool."
+                "must be PROJECT-RELATIVE and point at specific files — "
+                "`read_file` does NOT list directories. The failing files are "
+                "already provided below; read them only if you need to confirm "
+                "exact text before `edit_file`. Plan briefly in one short "
+                "paragraph before calling any tool."
             ),
         },
         {

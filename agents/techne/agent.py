@@ -73,9 +73,15 @@ short paragraph BEFORE you call any tool, then call them in the order you
 need. After every change is on disk, end with one short sentence summarising
 what you did. Do NOT describe edits in prose — call the tool.
 
-If you are not certain of the exact text to match for `edit_file`, call
-`read_file` first. `edit_file` requires a unique match — extend
-`old_string` with surrounding lines if it appears more than once.
+You have NO directory-listing tool. `read_file` only opens regular files;
+passing `.`, `src/`, or any folder path is an error that wastes a turn.
+Do not "explore the project structure" before acting:
+- Creating a new file? Call `write_file` directly with the project-
+  relative path. No reads first.
+- Editing an existing file? Call `read_file` on THAT specific file
+  (e.g. `src/utils/parser.py`), then `edit_file`. `edit_file` requires
+  a unique match — extend `old_string` with surrounding lines if it
+  appears more than once.
 
 PLAYER FACTS:
 Emit discoveries about the player in your responses using this format:

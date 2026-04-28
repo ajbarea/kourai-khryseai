@@ -104,9 +104,11 @@ async def read_file(path: str, *, project_root: Path | str) -> str:
         return f"ERROR: file not found: {path}"
     if target.is_dir():
         return (
-            f"ERROR: {path!r} is a directory; read_file expects a regular "
-            "file. Use a more specific path or list the directory contents "
-            "yourself before calling read_file."
+            f"ERROR: {path!r} is a directory; read_file only opens regular "
+            "files. There is no directory-listing tool — if you're starting "
+            "a new file, call write_file directly with a specific project-"
+            "relative path (e.g. 'src/hello.py'). If you're editing an "
+            "existing file, call read_file with that specific file path."
         )
     return read_file_with_context(str(target))
 
