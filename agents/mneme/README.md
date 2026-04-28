@@ -32,10 +32,12 @@ consumption (PR creation, etc.).
 ## Tools
 
 Mneme does NOT drive `chat_with_tools` — her output is prose, not
-file ops. She uses `chat_stream()` only. She has GitHub PR-creation
-helpers (`create_github_pr`, `github_create_pull_request_impl`) for
-HOTL-confirmed PR ship paths, but the pipeline doesn't auto-invoke
-them.
+file ops. She uses `chat_stream()` only. She decorates the artifact
+with PR-ready metadata (`parse_commits_for_pr`, `create_github_pr`)
+when a `GITHUB_PERSONAL_ACCESS_TOKEN` is set, but the actual PR
+creation against GitHub is not yet wired up — the executor stops at
+the "PR ready" header and the `gh` CLI / web UI takes it from
+there.
 
 ## Pipeline neighbors
 
@@ -51,8 +53,8 @@ them.
 - `agent.py` — `SYSTEM_PROMPT` (scribe persona + format rules),
   `generate_commit_messages()` and `_stream` variants,
   `parse_commits_for_pr()` (extracts PR title/body),
-  `create_github_pr()` (HOTL choice event for confirmation),
-  `github_create_pull_request_impl()` (the actual PyGithub call).
+  `create_github_pr()` (returns HOTL choice JSON; the actual PR
+  creation step from the choice back to GitHub remains unwired).
 - `agent_executor.py` — A2A bridge. Streams chunks back as
   `working_status` events.
 - `__main__.py` — server entrypoint and AgentCard registration.
