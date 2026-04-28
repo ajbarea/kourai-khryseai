@@ -83,7 +83,7 @@ services:
   # volume — the named-volume chown migration that the regular
   # busybox→distroless swap requires doesn't apply to us.
   prometheus:
-    image: prom/prometheus:v3.10.0-distroless
+    image: prom/prometheus:v3.11.3-distroless
     labels:
       dev.dozzle.group: observability
     volumes:
