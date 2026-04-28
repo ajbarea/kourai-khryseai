@@ -368,8 +368,11 @@ TASK_GROUPS: tuple[tuple[str, tuple[tuple[str, Task], ...]], ...] = (
             (
                 "lint",
                 Task(
-                    description="Run code quality checks (ruff format, ruff check, ty)",
-                    command_factory=lambda: python_script("scripts", "lint.py"),
+                    description=(
+                        "Run code quality checks (ruff format --check, ruff check, ty); "
+                        "no mutation — use `make fix` to auto-format"
+                    ),
+                    command_factory=lambda: [*python_script("scripts", "lint.py"), "--check-only"],
                 ),
             ),
             (

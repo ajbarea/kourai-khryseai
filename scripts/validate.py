@@ -55,8 +55,10 @@ def _run_validate() -> int:
 
     results: list[tuple[str, bool, str]] = []
 
+    # `--check-only` skips the auto-format pass so this matches CI's strict
+    # check exactly. `make fix` is the explicit auto-format path.
     passed, output = run_validate_step(
-        [sys.executable, str(LINT_SCRIPT)],
+        [sys.executable, str(LINT_SCRIPT), "--check-only"],
         "Lint",
     )
     if passed:

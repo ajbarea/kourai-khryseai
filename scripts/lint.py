@@ -1,11 +1,17 @@
 """Code quality checks and formatting.
 
-Fix-first, then check: every tool runs its auto-fixer, then a final check pass
-reports only what the tooling could not auto-resolve. Output streams live to
-the terminal and to ``logs/dev-latest.log`` (see scripts/dev_log.py).
+Two passes are available — ``fix`` (every auto-fixer) and ``check`` (every
+strict check, no mutation). The dev_cli ``lint`` task and ``validate.py``
+both invoke this script with ``--check-only`` so they mirror CI's strict
+``ruff format --check`` semantics; the ``fix`` task uses ``--fix-only``
+to apply auto-formatters without then verifying. Running the script with
+no flags runs both passes in order — useful for ad-hoc local cleanup.
+Output streams live to the terminal and to ``logs/dev-latest.log`` (see
+scripts/dev_log.py).
 
 Usage:
-    uv run kourai-dev lint
+    uv run kourai-dev lint        # check-only (CI-equivalent; via dev_cli)
+    uv run kourai-dev fix         # fix-only (via dev_cli)
     python scripts/lint.py [--check-only | --fix-only]
 """
 
