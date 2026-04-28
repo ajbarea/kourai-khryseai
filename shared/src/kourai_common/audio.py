@@ -99,6 +99,15 @@ class AudioManager:
 
         self._playlist: list[str] = []
         self._current_track_index = 0
+        # Background-playlist daemon thread + shutdown signal. The polling
+        # loop in `play_playlist` checks `_playlist_shutdown` between ticks
+        # so toggling Music OFF actually stops the playlist instead of
+        # audibly resurrecting on the next track. `_playlist_thread`
+        # tracks the running thread so `play_playlist` can stay
+        # idempotent (calling it while already running is a no-op rather
+        # than spawning a second daemon that races with the first).
+        self._playlist_shutdown: threading.Event = threading.Event()
+        self._playlist_thread: threading.Thread | None = None
         self._initialized = True
 
     def _mixer_ready(self) -> bool:
@@ -282,18 +291,42 @@ class AudioManager:
         return self._mixer_ready() and pygame is not None and pygame.mixer.music.get_busy()
 
     def play_playlist(self) -> None:
+        """Start the background-playlist daemon. Idempotent: a second call
+        while the first is still running is a no-op (otherwise toggles
+        re-applying ``music_enabled=True`` would spawn a second thread
+        racing the first).
+        """
         if not self._mixer_ready() or not self._playlist:
             return
+        if self._playlist_thread is not None and self._playlist_thread.is_alive():
+            return
 
-        def _play_loop():
-            while True:
+        self._playlist_shutdown.clear()
+
+        def _play_loop() -> None:
+            # `Event.wait(timeout=)` returns True immediately if the event
+            # is set, otherwise blocks for the timeout — much more
+            # responsive than `pygame.time.wait` to a stop signal, and
+            # respects the shutdown intent within ~1s of being signaled.
+            while not self._playlist_shutdown.is_set():
                 if not self.is_music_playing():
                     self.play_next_track()
-                if pygame is not None:
-                    pygame.time.wait(1000)
-                else:
-                    import time
+                if self._playlist_shutdown.wait(timeout=1.0):
+                    return
 
-                    time.sleep(1)
+        self._playlist_thread = threading.Thread(target=_play_loop, daemon=True)
+        self._playlist_thread.start()
 
-        threading.Thread(target=_play_loop, daemon=True).start()
+    def stop_playlist(self, timeout: float = 1.5) -> None:
+        """Signal the playlist daemon to stop and join it briefly.
+
+        Safe to call when no thread is running. Pair with
+        ``stop_music(fade_ms=...)`` when toggling music OFF: stopping the
+        daemon FIRST prevents it from re-calling ``play_next_track`` the
+        moment the fade completes (which would audibly resurrect the
+        playlist on the next track).
+        """
+        self._playlist_shutdown.set()
+        if self._playlist_thread is not None and self._playlist_thread.is_alive():
+            self._playlist_thread.join(timeout=timeout)
+        self._playlist_thread = None

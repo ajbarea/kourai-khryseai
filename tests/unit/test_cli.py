@@ -559,3 +559,195 @@ class TestCompactSessionMemory:
 
         out = "\n".join(echoed)
         assert "lean" in out.lower()
+
+
+# ===================================================================
+# CLI volume parity (M16 follow-on, surfaced 2026-04-27)
+# ===================================================================
+
+
+class TestCLISettingsVolumes:
+    """`CLISettings` previously exposed only `*_enabled` booleans; volumes
+    were GUI-only. Mirroring the GUI's slider defaults so the CLI player
+    has actual control over loudness instead of being forced to OFF.
+    """
+
+    def test_defaults_mirror_gui_slider_values(self):
+        """The CLI defaults must match `hosts/gui/settings_overlay.py`'s
+        slider initial values — a player who learned the GUI sliders
+        gets the same baseline in the CLI.
+        """
+        settings = CLISettings()
+        assert settings.music_volume == 0.65
+        assert settings.ambient_volume == 0.50
+        assert settings.voice_volume == 1.0
+        assert settings.sfx_volume == 0.85
+
+    def test_set_volume_clamps_to_unit_range(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("hosts.cli.settings._SETTINGS_FILE", tmp_path / "cli_settings.json")
+        settings = CLISettings()
+        assert settings.set_volume("music_volume", 1.5) == 1.0
+        assert settings.set_volume("music_volume", -0.2) == 0.0
+        assert settings.set_volume("music_volume", 0.42) == 0.42
+
+    def test_set_volume_persists_to_disk(self, tmp_path, monkeypatch):
+        path = tmp_path / "cli_settings.json"
+        monkeypatch.setattr("hosts.cli.settings._SETTINGS_FILE", path)
+        settings = CLISettings()
+        settings.set_volume("ambient_volume", 0.30)
+
+        reloaded = CLISettings.load()
+        assert reloaded.ambient_volume == 0.30
+
+    def test_set_volume_rejects_non_volume_key(self, tmp_path, monkeypatch):
+        """Typo guard: `set_volume("music_enabled", 0.5)` would silently
+        clobber a boolean toggle if we didn't gate by the `_volume`
+        suffix.
+        """
+        monkeypatch.setattr("hosts.cli.settings._SETTINGS_FILE", tmp_path / "cli_settings.json")
+        settings = CLISettings()
+        with pytest.raises(AttributeError, match="volume"):
+            settings.set_volume("music_enabled", 0.5)
+
+    def test_set_volume_rejects_unknown_volume_key(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("hosts.cli.settings._SETTINGS_FILE", tmp_path / "cli_settings.json")
+        settings = CLISettings()
+        with pytest.raises(AttributeError, match="volume"):
+            settings.set_volume("nonexistent_volume", 0.5)
+
+
+class TestAdjustVolumesFlow:
+    """The /settings menu's `[v]` option walks through each volume,
+    accepts decimals 0.0-1.0 (or percent 0-100 as a convenience), Enter
+    keeps the current value.
+    """
+
+    def test_enter_keeps_all_current_values(self, tmp_path, monkeypatch):
+        from hosts.cli.commands import _adjust_volumes
+
+        path = tmp_path / "cli_settings.json"
+        monkeypatch.setattr("hosts.cli.settings._SETTINGS_FILE", path)
+        settings = CLISettings()
+        original = (
+            settings.music_volume,
+            settings.ambient_volume,
+            settings.voice_volume,
+            settings.sfx_volume,
+        )
+
+        with patch("builtins.input", side_effect=["", "", "", ""]):
+            changed = _adjust_volumes(settings)
+
+        assert changed is False
+        assert (
+            settings.music_volume,
+            settings.ambient_volume,
+            settings.voice_volume,
+            settings.sfx_volume,
+        ) == original
+
+    def test_decimal_input_sets_each_volume(self, tmp_path, monkeypatch):
+        from hosts.cli.commands import _adjust_volumes
+
+        path = tmp_path / "cli_settings.json"
+        monkeypatch.setattr("hosts.cli.settings._SETTINGS_FILE", path)
+        settings = CLISettings()
+
+        with patch("builtins.input", side_effect=["0.30", "0.10", "0.80", "0.40"]):
+            changed = _adjust_volumes(settings)
+
+        assert changed is True
+        assert settings.music_volume == 0.30
+        assert settings.ambient_volume == 0.10
+        assert settings.voice_volume == 0.80
+        assert settings.sfx_volume == 0.40
+
+    def test_percent_input_normalized_to_unit(self, tmp_path, monkeypatch):
+        """Convenience: anything > 1.0 is treated as percent (0-100) so
+        a player typing `50` for half-volume gets 0.5 rather than the
+        clamped-to-1.0 result.
+        """
+        from hosts.cli.commands import _adjust_volumes
+
+        path = tmp_path / "cli_settings.json"
+        monkeypatch.setattr("hosts.cli.settings._SETTINGS_FILE", path)
+        settings = CLISettings()
+
+        with patch("builtins.input", side_effect=["50", "", "", ""]):
+            _adjust_volumes(settings)
+
+        assert settings.music_volume == 0.50
+
+    def test_invalid_input_skips_that_volume(self, tmp_path, monkeypatch):
+        """Player types `loud` for music; that volume stays at its
+        current value, the next prompt continues. No exception.
+        """
+        from hosts.cli.commands import _adjust_volumes
+
+        path = tmp_path / "cli_settings.json"
+        monkeypatch.setattr("hosts.cli.settings._SETTINGS_FILE", path)
+        settings = CLISettings()
+        original_music = settings.music_volume
+
+        with patch("builtins.input", side_effect=["loud", "0.10", "", ""]):
+            _adjust_volumes(settings)
+
+        assert settings.music_volume == original_music
+        assert settings.ambient_volume == 0.10
+
+
+class TestApplyAudioSettingsMusicOff:
+    """Toggling Music OFF should stop the playlist daemon BEFORE fading
+    out the current track — otherwise the daemon's polling loop sees
+    "not playing" the moment the fade completes and audibly resurrects
+    the playlist on the next track. Regression guard for the bug
+    surfaced 2026-04-27.
+    """
+
+    def test_music_off_stops_playlist_before_stop_music(self, tmp_path, monkeypatch):
+        from hosts.cli.__main__ import _apply_audio_settings
+
+        monkeypatch.setattr("hosts.cli.settings._SETTINGS_FILE", tmp_path / "cli_settings.json")
+        settings = CLISettings()
+        settings.toggle("music_enabled")  # flip from default ON to OFF
+        assert settings.music_enabled is False
+
+        audio = MagicMock()
+        audio.audio_available = True
+        audio.ambient_channel = MagicMock()
+
+        call_order: list[str] = []
+        audio.stop_playlist = MagicMock(
+            side_effect=lambda *a, **kw: call_order.append("stop_playlist")
+        )
+        audio.stop_music = MagicMock(side_effect=lambda *a, **kw: call_order.append("stop_music"))
+
+        _apply_audio_settings(audio, settings, tts=None)
+
+        assert call_order == ["stop_playlist", "stop_music"], (
+            f"music-OFF should stop the playlist daemon BEFORE the fade so it doesn't "
+            f"resurrect on next track; got order: {call_order}"
+        )
+
+    def test_volumes_applied_before_play_calls(self, tmp_path, monkeypatch):
+        """Volumes must hit `set_*_volume` before `play_ambient` /
+        `play_playlist` so a freshly-started stream comes up at the
+        chosen level, not the AudioManager's default.
+        """
+        from hosts.cli.__main__ import _apply_audio_settings
+
+        monkeypatch.setattr("hosts.cli.settings._SETTINGS_FILE", tmp_path / "cli_settings.json")
+        settings = CLISettings()
+        settings.set_volume("music_volume", 0.2)
+        settings.set_volume("ambient_volume", 0.1)
+
+        audio = MagicMock()
+        audio.audio_available = True
+        audio.ambient_channel = MagicMock()
+
+        _apply_audio_settings(audio, settings, tts=None)
+
+        audio.set_music_volume.assert_called_with(0.2)
+        audio.set_ambient_volume.assert_called_with(0.1)
+        audio.set_voice_volume.assert_called_with(settings.voice_volume)
+        audio.set_sfx_volume.assert_called_with(settings.sfx_volume)

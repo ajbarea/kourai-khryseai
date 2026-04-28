@@ -42,6 +42,15 @@ class CLISettings:
     # Cline + ClawCode's per-tool gating; tier-2 lift from the OSS-CC
     # research sweep (#37). Default OFF — matches the always-on gate.
     auto_approve_reads: bool = False
+    # Per-stream volume. Defaults mirror `hosts/gui/settings_overlay.py`'s
+    # values so a player who learned the GUI sliders gets the same
+    # baseline in the CLI. Surfaced 2026-04-27 when ambient was loud
+    # enough during a live-smoke that the only available relief was
+    # flipping it OFF entirely (the old binary toggle).
+    music_volume: float = 0.65
+    ambient_volume: float = 0.50
+    voice_volume: float = 1.0
+    sfx_volume: float = 0.85
 
     @classmethod
     def load(cls) -> CLISettings:
@@ -81,3 +90,17 @@ class CLISettings:
         setattr(self, key, not current)
         self.save()
         return getattr(self, key)
+
+    def set_volume(self, key: str, value: float) -> float:
+        """Set a ``*_volume`` setting (clamped to ``[0.0, 1.0]``) and save.
+
+        Returns the clamped value. Raises ``AttributeError`` if ``key``
+        isn't a known volume field — keeps callers honest when a typo
+        would otherwise silently land on a different attribute.
+        """
+        if not key.endswith("_volume") or not hasattr(self, key):
+            raise AttributeError(f"Unknown volume setting: {key}")
+        clamped = max(0.0, min(1.0, float(value)))
+        setattr(self, key, clamped)
+        self.save()
+        return clamped

@@ -606,3 +606,85 @@ class TestConnectionStatusDisplay:
         csd = ConnectionStatusDisplay(cm)
         surf = pygame.Surface((800, 600), pygame.SRCALPHA)
         csd.draw(surf, 10, 10)
+
+
+# ===================================================================
+# AudioManager — playlist daemon thread (M16 follow-on, 2026-04-27)
+# ===================================================================
+
+
+class TestPlaylistLifecycle:
+    """`play_playlist` was previously fire-and-forget — every call spawned
+    a fresh daemon, and toggling Music OFF audibly resurrected on track 2
+    because the daemon's 1s polling loop saw `is_music_playing=False`
+    just as the fade completed and called `play_next_track`. The fix
+    adds a `threading.Event` shutdown signal + idempotency guard.
+    """
+
+    def test_play_playlist_is_idempotent(self, mock_audio_mixer):
+        """Second call while the first daemon is still alive must NOT
+        spawn a second thread (the original bug raced two daemons).
+        """
+        from kourai_common.audio import AudioManager
+
+        am = AudioManager()
+        am._playlist = ["/dev/null/track1.ogg", "/dev/null/track2.ogg"]
+
+        am.play_playlist()
+        first_thread = am._playlist_thread
+        assert first_thread is not None
+        assert first_thread.is_alive()
+
+        am.play_playlist()
+        second_thread = am._playlist_thread
+        assert second_thread is first_thread, "play_playlist spawned a second daemon"
+
+        am.stop_playlist()
+
+    def test_stop_playlist_signals_daemon_to_exit(self, mock_audio_mixer):
+        """The daemon must exit within ~1 polling tick of the shutdown
+        signal — the loop now uses `Event.wait(timeout=1.0)` which
+        returns immediately when the event is set.
+        """
+        from kourai_common.audio import AudioManager
+
+        am = AudioManager()
+        am._playlist = ["/dev/null/track.ogg"]
+
+        am.play_playlist()
+        thread = am._playlist_thread
+        assert thread is not None and thread.is_alive()
+
+        am.stop_playlist(timeout=2.0)
+        assert not thread.is_alive(), "daemon did not exit within timeout"
+        assert am._playlist_thread is None
+
+    def test_stop_playlist_when_not_running_is_noop(self, mock_audio_mixer):
+        """Safe to call before any `play_playlist` — covers the
+        `_apply_audio_settings` case where music was OFF at startup.
+        """
+        from kourai_common.audio import AudioManager
+
+        am = AudioManager()
+        am.stop_playlist()  # Should not raise
+        assert am._playlist_thread is None
+
+    def test_play_playlist_can_restart_after_stop(self, mock_audio_mixer):
+        """Toggle OFF then ON must spawn a fresh daemon — a stale
+        `_playlist_shutdown.set()` from the previous stop would block
+        the new loop forever otherwise.
+        """
+        from kourai_common.audio import AudioManager
+
+        am = AudioManager()
+        am._playlist = ["/dev/null/track.ogg"]
+
+        am.play_playlist()
+        am.stop_playlist(timeout=2.0)
+
+        am.play_playlist()
+        new_thread = am._playlist_thread
+        assert new_thread is not None
+        assert new_thread.is_alive()
+
+        am.stop_playlist()
