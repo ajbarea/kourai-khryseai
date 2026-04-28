@@ -174,14 +174,16 @@ class TestApplyCodeChanges:
 
         @asynccontextmanager
         async def _bridge(*_a, **_kw):
-            yield MCPToolBridge(
-                tools=bridge_marker_tools, tool_handlers=bridge_marker_handlers
-            )
+            yield MCPToolBridge(tools=bridge_marker_tools, tool_handlers=bridge_marker_handlers)
 
         with (
             patch("agents.techne.agent.forge_tool_bridge", _bridge),
             patch("agents.techne.agent.chat_with_tools", side_effect=_fake_chat),
-            patch("kourai_common.doc_lookup.lookup_documentation", new_callable=AsyncMock, return_value=""),
+            patch(
+                "kourai_common.doc_lookup.lookup_documentation",
+                new_callable=AsyncMock,
+                return_value="",
+            ),
         ):
             from agents.techne.agent import apply_code_changes
 
@@ -217,7 +219,11 @@ class TestApplyCodeChanges:
         with (
             patch("agents.techne.agent.forge_tool_bridge", _fake_forge_bridge),
             patch("agents.techne.agent.chat_with_tools", side_effect=_fake_chat),
-            patch("kourai_common.doc_lookup.lookup_documentation", new_callable=AsyncMock, return_value=""),
+            patch(
+                "kourai_common.doc_lookup.lookup_documentation",
+                new_callable=AsyncMock,
+                return_value="",
+            ),
         ):
             from agents.techne.agent import apply_code_changes
 
@@ -236,7 +242,11 @@ class TestApplyCodeChanges:
         with (
             patch("agents.techne.agent.forge_tool_bridge", _fake_forge_bridge),
             patch("agents.techne.agent.chat_with_tools", side_effect=_fake),
-            patch("kourai_common.doc_lookup.lookup_documentation", new_callable=AsyncMock, return_value=""),
+            patch(
+                "kourai_common.doc_lookup.lookup_documentation",
+                new_callable=AsyncMock,
+                return_value="",
+            ),
         ):
             from agents.techne.agent import apply_code_changes
 
@@ -265,7 +275,11 @@ class TestApplyCodeChanges:
         with (
             patch("agents.techne.agent.forge_tool_bridge", _fake_forge_bridge),
             patch("agents.techne.agent.chat_with_tools", side_effect=_fake),
-            patch("kourai_common.doc_lookup.lookup_documentation", new_callable=AsyncMock, return_value=""),
+            patch(
+                "kourai_common.doc_lookup.lookup_documentation",
+                new_callable=AsyncMock,
+                return_value="",
+            ),
         ):
             from agents.techne.agent import apply_code_changes
 
@@ -290,7 +304,11 @@ class TestApplyCodeChanges:
         with (
             patch("agents.techne.agent.forge_tool_bridge", _fake_forge_bridge),
             patch("agents.techne.agent.chat_with_tools", side_effect=_fake),
-            patch("kourai_common.doc_lookup.lookup_documentation", new_callable=AsyncMock, return_value=""),
+            patch(
+                "kourai_common.doc_lookup.lookup_documentation",
+                new_callable=AsyncMock,
+                return_value="",
+            ),
         ):
             from agents.techne.agent import apply_code_changes
 
