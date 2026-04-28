@@ -7,12 +7,10 @@ through :func:`validate_file_path` so callers can't escape the worktree.
 Path translation (:func:`_translate_to_container`) handles the
 host-vs-container path mismatch when specialists run inside their own image.
 
-The static OpenAI-style ``FORGE_TOOL_SCHEMAS`` / ``FORGE_TOOL_HANDLERS``
-dicts that used to live here were deleted with M2 Change 3 — the bridge
-in ``kourai_common.mcp_bridge`` now sources both from
-``await session.list_tools()`` against ``kourai-mcp-forge``, so the
-forge tool surface is single-sourced via MCP rather than duplicated as
-a static export.
+The OpenAI-style tool surface specialists call against is sourced by
+``kourai_common.mcp_bridge`` via ``await session.list_tools()`` against
+``kourai-mcp-forge``, so the schema is single-sourced through MCP rather
+than duplicated as a static export.
 """
 
 from __future__ import annotations

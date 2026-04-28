@@ -121,7 +121,7 @@ class TechneAgentExecutor(BaseAgentExecutor):
                 await send_working_status(updater, task, f"{name} {target} ({ok})", emoji="🔧")
 
             # Step 4: Drive the agentic tool-use loop. Each tool call writes
-            # directly to disk via FORGE_TOOL_HANDLERS — no regex parse.
+            # directly to disk via the kourai-mcp-forge subprocess — no regex parse.
             with create_span("techne.tool_loop", {"task": user_input[:100]}):
                 result, tool_log = await apply_code_changes(
                     task_description=user_input,
