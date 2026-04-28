@@ -389,8 +389,8 @@ screen forge_input(prompt="You:"):
     default _input_text = ""
 
     ## Enter / numpad-Enter submit the form
-    key "return"   action Return(_input_text)
-    key "KP_ENTER" action Return(_input_text)
+    key "K_RETURN"   action Return(_input_text)
+    key "K_KP_ENTER" action Return(_input_text)
 
     ## Compute @mention autocomplete suggestions.
     ## Pre-builds SetScreenVariable action objects inside a list comprehension

@@ -267,7 +267,8 @@ screen codex_notification():
                         style "codex_notification_subtitle"
                         xalign 0.5
 
-                text "Category: [notification[category]]":
+                $ notif_category = notification.get("category", "")
+                text "Category: [notif_category]":
                     style "codex_notification_category"
                     xalign 0.5
 
