@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Any
 from kourai_common.mcp_client import build_client_session
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Awaitable, Callable
+    from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 
     from mcp import ClientSession
     from mcp.client.stdio import StdioServerParameters
@@ -40,7 +40,7 @@ class MCPToolBridge:
     """
 
     tools: list[dict[str, Any]]
-    tool_handlers: dict[str, Callable[..., Awaitable[str]]]
+    tool_handlers: Mapping[str, Callable[..., Awaitable[str]]]
 
 
 def mcp_tool_to_openai_schema(tool: Tool) -> dict[str, Any]:

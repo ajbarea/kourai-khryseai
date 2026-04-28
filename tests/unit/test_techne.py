@@ -5,7 +5,7 @@ from __future__ import annotations
 import tempfile
 from contextlib import asynccontextmanager
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from anyio import Path as AnyioPath
@@ -168,7 +168,11 @@ class TestApplyCodeChanges:
             return ("done", [])
 
         bridge_marker_tools = [{"type": "function", "function": {"name": "marker"}}]
-        bridge_marker_handlers = {"marker": MagicMock()}
+
+        async def _marker_handler(_args: dict) -> str:
+            return ""
+
+        bridge_marker_handlers = {"marker": _marker_handler}
 
         @asynccontextmanager
         async def _bridge(*_a, **_kw):
