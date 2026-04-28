@@ -88,6 +88,13 @@ async def _execute_completion(timeout_seconds: float, **kwargs: Any) -> Any:
         api_base = os.getenv("OLLAMA_API_BASE")
     if api_base and "api_base" not in kwargs:
         kwargs["api_base"] = api_base
+    # Belt-and-braces with the asyncio.timeout below: ``request_timeout`` is
+    # what propagates into LiteLLM's underlying httpx/aiohttp transport, so a
+    # stuck TCP connect actually surfaces as a Timeout instead of a hanging
+    # task that asyncio.timeout has to forcibly cancel. The wrapper stays as
+    # the outer guard for cases where the transport itself doesn't honor the
+    # deadline (older aiohttp versions had bugs around this).
+    kwargs.setdefault("request_timeout", timeout_seconds)
     async with asyncio.timeout(timeout_seconds):
         return await litellm.acompletion(**kwargs)
 
