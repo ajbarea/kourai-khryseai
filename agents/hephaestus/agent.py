@@ -220,8 +220,6 @@ def extract_auto_approve_reads(text: str) -> tuple[str, bool]:
     CONFIRM_ORDER gate: when set, Hephaestus skips the gate for
     read-only / planning-only pipelines (no Techne / Kallos / Dokimasia
     in the route) but still confirms anything that would touch disk.
-    Tier-2 lift from the 2026-04-26 OSS-CC research sweep (Cline +
-    ClawCode both ship per-tool gating).
 
     Returns ``(clean_text, auto_approve_reads_enabled)``.
     """

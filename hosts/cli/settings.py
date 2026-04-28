@@ -44,9 +44,8 @@ class CLISettings:
     auto_approve_reads: bool = False
     # Per-stream volume. Defaults mirror `hosts/gui/settings_overlay.py`'s
     # values so a player who learned the GUI sliders gets the same
-    # baseline in the CLI. Surfaced 2026-04-27 when ambient was loud
-    # enough during a live-smoke that the only available relief was
-    # flipping it OFF entirely (the old binary toggle).
+    # baseline in the CLI. Granular controls — the binary on/off toggle
+    # didn't let a too-loud stream be tamed without disabling it.
     music_volume: float = 0.65
     ambient_volume: float = 0.50
     voice_volume: float = 1.0

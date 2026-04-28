@@ -66,33 +66,25 @@ class GUIComponentsIntegration:
         self.settings.save()
 
     def get_settings_manager(self) -> SettingsManager:
-        """Get the settings manager."""
         return self.settings
 
     def get_font_scaler(self) -> FontScaler:
-        """Get the font scaler."""
         return self.font_scaler
 
     def get_status_bubbles(self) -> StatusBubblesGUIIntegration:
-        """Get the status bubbles integration."""
         return self.status_bubbles
 
     def get_pipeline_status(self) -> PipelineStatusGUIIntegration:
-        """Get the pipeline status integration."""
         return self.pipeline_status
 
     def get_scratchpad(self) -> ScratchpadGUIIntegration:
-        """Get the scratchpad integration."""
         return self.scratchpad
 
     def get_high_contrast(self) -> HighContrastGUIIntegration:
-        """Get the high contrast integration."""
         return self.high_contrast
 
     def get_agent_personalities(self) -> AgentPersonalityIndicators:
-        """Get the agent personality indicators."""
         return self.agent_personalities
 
     def get_agent_handoff(self) -> AgentHandoffPersonalityIntegration:
-        """Get the agent handoff personality integration."""
         return self.agent_handoff
