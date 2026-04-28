@@ -170,7 +170,6 @@ replace-imports-with-any = [
     "a2a.**",
     "litellm.**",
     "uvicorn.**",
-    "github.**",
     "kokoro",
     "kokoro.**",
 ]

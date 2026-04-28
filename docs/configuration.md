@@ -37,7 +37,10 @@ These are all optional. The system works without them — features that need a m
 
 ### GitHub
 
-Used by Mneme (PR generation), Techne (code search), Metis, and Hephaestus.
+Used by Mneme to flag a commit batch as PR-ready (the actual PR
+creation against GitHub is not wired up yet — Mneme decorates the
+artifact with PR-ready metadata; the gh CLI or web UI takes it from
+there).
 
 ```bash
 GITHUB_PERSONAL_ACCESS_TOKEN=github_pat_xxxx...
