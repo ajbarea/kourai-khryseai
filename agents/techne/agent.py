@@ -9,20 +9,21 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from anyio import Path as AnyioPath
 
 from kourai_common.file_ops import PathViolation, validate_file_path
-from kourai_common.forge_tools import FORGE_TOOL_HANDLERS, FORGE_TOOL_SCHEMAS
 from kourai_common.llm import chat_with_tools
+from kourai_common.mcp_bridge import forge_tool_bridge
+from kourai_common.mcp_client import kourai_project_root_var
 from kourai_common.player import get_enriched_system_prompt
 from kourai_common.prompts import CURRENT_DATE, build_system_prompt
 from kourai_common.subprocess import StatusCallback, run_command
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
-    from pathlib import Path
 
 log = logging.getLogger(__name__)
 
@@ -273,18 +274,26 @@ async def apply_code_changes(
     ]
 
     log.info("Driving Techne tool-use loop for: %.100s", task_description)
-    return await chat_with_tools(
-        "techne",
-        messages,
-        tools=FORGE_TOOL_SCHEMAS,
-        tool_handlers=FORGE_TOOL_HANDLERS,
-        handler_context={"project_root": project_root},
-        temperature=0.2,
-        max_tokens=8192,
-        max_iters=20,
-        context_id=context_id,
-        on_tool_call=on_tool_call,
-    )
+    # Defensive contextvar set: executors already populate this from the
+    # `[project_root: ...]` text-tag, but standalone callers (e.g., tests
+    # invoking apply_code_changes directly) might not. The forge MCP
+    # server reads this via roots/list to scope file ops.
+    token = kourai_project_root_var.set(Path(project_root))
+    try:
+        async with forge_tool_bridge() as bridge:
+            return await chat_with_tools(
+                "techne",
+                messages,
+                tools=bridge.tools,
+                tool_handlers=bridge.tool_handlers,
+                temperature=0.2,
+                max_tokens=8192,
+                max_iters=20,
+                context_id=context_id,
+                on_tool_call=on_tool_call,
+            )
+    finally:
+        kourai_project_root_var.reset(token)
 
 
 def parse_file_paths(user_input: str) -> list[str]:
