@@ -10,6 +10,7 @@ about: create from template, list, get, delete.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
 import shutil
@@ -57,6 +58,22 @@ def _slugify(name: str) -> str:
     if not slug:
         raise ProjectError(f"Project name {name!r} produces an empty slug")
     return slug
+
+
+def derive_project_id(project_root: str | Path) -> str:
+    """Derive a stable 16-char project id from a filesystem root path.
+
+    Hashes the absolute, normalised, symlink-resolved path with sha256
+    and returns the first 16 hex characters. Stable across invocations
+    on the same physical directory; survives the player moving the repo
+    on disk so long as the new location is referenced consistently.
+
+    Used as the `project_id` axis for `kourai_common.facts` so HOTL
+    answers can be scoped per-project without leaking host-absolute
+    paths into fact bodies or telemetry attributes.
+    """
+    canonical = str(Path(project_root).expanduser().resolve())
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
 
 
 def _get_db() -> sqlite3.Connection:
