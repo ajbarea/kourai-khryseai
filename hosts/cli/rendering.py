@@ -10,6 +10,7 @@ import secrets
 import shutil
 import sys
 import textwrap
+from datetime import datetime
 from typing import IO, TYPE_CHECKING, Any
 
 from hosts.cli.maidens import (
@@ -208,8 +209,9 @@ def _comms_window(agent_name: str, dialogue: str, *, style: str = "speak") -> st
 
     # Box width is the longest line length
     box_w = max(len(line) for line in wrapped_lines)
-    # Ensure header (name — title) fits
-    header_len = len(agent_name) + len(title) + 3
+    # Ensure header (timestamp + name — title) fits
+    ts_prefix = f"[{datetime.now().strftime('%H:%M:%S')}] "
+    header_len = len(ts_prefix) + len(agent_name) + len(title) + 3
     box_w = max(box_w, header_len)
 
     # Final clamping to terminal width
@@ -221,7 +223,7 @@ def _comms_window(agent_name: str, dialogue: str, *, style: str = "speak") -> st
     output = []
     output.append(f"  {border}\u256d{top_bar}\u256e{_RESET}")
     output.append(
-        f"  {border}\u2502{_RESET} {_GOLD_BOLD}{agent_name.upper()}{_RESET} \u2014 {_DIM}{title}{_RESET}{' ' * (box_w - header_len + 1)}{border}\u2502{_RESET}"
+        f"  {border}\u2502{_RESET} {_DIM}{ts_prefix}{_RESET}{_GOLD_BOLD}{agent_name.upper()}{_RESET} \u2014 {_DIM}{title}{_RESET}{' ' * (box_w - header_len + 1)}{border}\u2502{_RESET}"
     )
 
     for line in wrapped_lines:
