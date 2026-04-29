@@ -54,6 +54,11 @@ _last_result: str = ""
 
 
 _PROJECT_ROOT_TAG = re.compile(r"\[project_root:\s*([^\]]+)\]", re.IGNORECASE)
+# Explicit, project-stable id. Set by the REPL alongside ``[project_root: …]``
+# so the M17 fact axis stays stable across forge sessions whose ``workdir`` is
+# uuid'd per-turn. Specialists ignore this tag (their regex matches
+# ``project_root`` only); only the streaming-side fact synthesiser reads it.
+_PROJECT_ID_TAG = re.compile(r"\[project_id:\s*([^\]\s]+)\s*\]", re.IGNORECASE)
 
 
 def _strip_forge_tag_prefix(text: str, forge_tags: list[str] | None) -> str:
@@ -70,9 +75,20 @@ def _strip_forge_tag_prefix(text: str, forge_tags: list[str] | None) -> str:
 
 
 def _project_id_from_forge_tags(forge_tags: list[str] | None) -> str | None:
-    """Pull the project root from the bracket tag and derive its M17 id."""
+    """Resolve the M17 fact-axis project id from forge tags.
+
+    Prefers the explicit ``[project_id: <stable>]`` tag (carries the id
+    derived from the project's persistent root). Falls back to deriving
+    from ``[project_root: <path>]`` for callers that haven't been updated
+    to emit the explicit tag yet — note this fallback is unstable when
+    the path is a per-session forge worktree.
+    """
     if not forge_tags:
         return None
+    for tag in forge_tags:
+        match = _PROJECT_ID_TAG.search(tag)
+        if match:
+            return match.group(1).strip()
     for tag in forge_tags:
         match = _PROJECT_ROOT_TAG.search(tag)
         if match:

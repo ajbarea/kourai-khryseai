@@ -80,6 +80,31 @@ class TestProjectIdFromForgeTags:
         b = _project_id_from_forge_tags(["[project_root: /var/forge/proj-b]"])
         assert a is not None and b is not None and a != b
 
+    def test_explicit_project_id_tag_wins_over_project_root(self):
+        # M17 stability: [project_id: <stable>] is the canonical fact axis.
+        # When forge worktrees are wrapped per-turn, project_root carries the
+        # per-session workdir — deriving from it yields a different id every
+        # turn, breaking cross-session recall. The explicit tag carries the
+        # stable id derived from the project's persistent path.
+        forge = [
+            "[project_id: stable-abc123def4567890]",
+            "[project_root: /var/forge/proj/.forge/session-uuid-xyz]",
+        ]
+        assert _project_id_from_forge_tags(forge) == "stable-abc123def4567890"
+
+    def test_project_id_tag_alone_is_honoured(self):
+        forge = ["[project_id: stable-abc123def4567890]"]
+        assert _project_id_from_forge_tags(forge) == "stable-abc123def4567890"
+
+    def test_project_root_still_derives_when_no_explicit_id(self):
+        # Backward compatibility: turns that emit only project_root continue
+        # to derive a project_id. The instability is the caller's problem;
+        # the parser is not the place to fix it.
+        from kourai_common.projects import derive_project_id
+
+        forge = ["[project_root: /var/forge/example]"]
+        assert _project_id_from_forge_tags(forge) == derive_project_id("/var/forge/example")
+
 
 class TestTrySynthesisePauseFact:
     """The streaming-layer write hook — fires once the pause is answered."""

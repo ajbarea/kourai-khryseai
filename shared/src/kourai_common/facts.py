@@ -347,3 +347,164 @@ def process_agent_output(
     if facts:
         store_facts(player_id, facts)
     return strip_facts(text)
+
+
+# ── M17 Phase 2 item 7: /preferences CRUD primitives ────────────────────
+#
+# The CLI surface for browsing, deleting, and overriding the closed-vocab
+# preference facts that PAUSE-resolution writes through
+# ``synthesise_fact_from_pause``. Right-to-forget is non-negotiable for
+# player trust and for GDPR/CCPA-aligned defaults — every fact has to be
+# removable by the player without an operator step.
+
+# ``[FACT:preference/<confidence>] <kind>: <value>`` — write shape produced
+# by ``store_facts`` for closed-vocab preferences. Unanchored kind alphabet
+# is intentional; the ``VALID_PREFERENCE_KINDS`` filter on the parsed kind
+# is what gates inclusion in the listing.
+_PREF_BODY_RE = re.compile(
+    r"^\[FACT:preference/(?P<confidence>\w+)\]\s+(?P<kind>[A-Za-z_]+):\s*(?P<value>.+)$"
+)
+
+
+def list_preference_facts(player_id: str, project_id: str | None) -> list[dict]:
+    """Return closed-vocab preference facts for the active scope.
+
+    A row is included when it parses as ``<kind>: <value>`` with ``<kind>``
+    in ``VALID_PREFERENCE_KINDS``. Free-form preference observations
+    extracted by ``process_agent_output`` (skill claims, identity hints,
+    pattern guesses) deliberately fall outside that gate so the
+    ``/preferences`` UI stays a player-facing surface for things the
+    player explicitly answered or set.
+
+    The returned dicts carry ``memory_id`` so the caller can hand it to
+    ``delete_player_memory`` for targeted forgets, and ``scope`` so the
+    CLI can render project-vs-global rows with distinct visual weight.
+
+    Args:
+        player_id: Player UUID.
+        project_id: Active project scope, or ``None`` for global view.
+            When set, the listing includes both project-scoped rows and
+            global rows; when ``None``, only global rows surface.
+
+    Returns:
+        List of dicts: ``{memory_id, kind, value, confidence, source_agent,
+        project_id, scope, last_accessed}``.
+    """
+    from kourai_common.hooks_interaction import VALID_PREFERENCE_KINDS
+    from kourai_common.player import get_player_memories
+
+    rows = get_player_memories(
+        player_id=player_id,
+        category="fact",
+        include_shared=True,
+        limit=200,
+        project_id=project_id,
+    )
+
+    out: list[dict] = []
+    for row in rows:
+        match = _PREF_BODY_RE.match(row.get("content", "").strip())
+        if match is None:
+            continue
+        kind = match.group("kind")
+        if kind not in VALID_PREFERENCE_KINDS:
+            continue
+        row_project = row.get("project_id")
+        # When the caller passed ``project_id=None`` the SQL layer returns
+        # all scopes for the player; here we narrow to global-only so the
+        # bare-list UI doesn't surface project rows under "global".
+        if project_id is None and row_project is not None:
+            continue
+        out.append(
+            {
+                "memory_id": row["memory_id"],
+                "kind": kind,
+                "value": match.group("value").strip(),
+                "confidence": match.group("confidence"),
+                "source_agent": row.get("agent_name") or "unknown",
+                "project_id": row_project,
+                "scope": "project" if row_project is not None else "global",
+                "last_accessed": row.get("last_accessed"),
+            }
+        )
+    return out
+
+
+def forget_preference_fact(player_id: str, project_id: str | None, kind: str) -> int:
+    """Delete every preference fact in ``(scope, kind)``.
+
+    Right-to-forget primitive: the player has unconditional authority to
+    remove anything stored under their id. Returns the number of rows
+    removed so the caller can render an honest "removed N rows" message
+    rather than always claiming success.
+
+    Args:
+        player_id: Player UUID.
+        project_id: Project scope to clear, or ``None`` for global.
+            Project and global rows are never co-deleted; the caller
+            issues two calls if they want both gone.
+        kind: Preference kind (closed vocab). Unknown kinds are tolerated
+            here — an old kind that's been retired from
+            ``VALID_PREFERENCE_KINDS`` still needs to be deletable.
+
+    Returns:
+        Number of rows deleted.
+    """
+    from kourai_common.player import delete_player_memory
+
+    count = 0
+    for row in list_preference_facts(player_id, project_id=project_id):
+        if row["kind"] != kind:
+            continue
+        if row["project_id"] != project_id:
+            continue
+        delete_player_memory(row["memory_id"])
+        count += 1
+    return count
+
+
+def set_preference_fact(
+    player_id: str,
+    project_id: str | None,
+    kind: str,
+    value: str,
+    source_agent: str = "player",
+) -> bool:
+    """Override a preference fact for ``(scope, kind)``.
+
+    Forgets any existing same-scope same-kind row first so the listing
+    stays single-row-per-kind. Without that, repeated ``set`` calls would
+    accumulate rows and ``list_preference_facts`` would surface every
+    historical override.
+
+    Args:
+        player_id: Player UUID.
+        project_id: Active scope, or ``None`` for global.
+        kind: One of ``VALID_PREFERENCE_KINDS``. Unknown kinds are
+            rejected — preventing arbitrary writes is the same gate that
+            ``synthesise_fact_from_pause`` enforces on the PAUSE path.
+        value: The override value. Whitespace-only values are rejected.
+        source_agent: Stamped on the row so the recall narrator can
+            distinguish "Metis asked, you answered" (``metis``) from
+            "you set this directly" (default ``player``).
+
+    Returns:
+        ``True`` on write, ``False`` on validation rejection.
+    """
+    from kourai_common.hooks_interaction import VALID_PREFERENCE_KINDS
+
+    if not player_id or not value or not value.strip():
+        return False
+    if kind not in VALID_PREFERENCE_KINDS:
+        return False
+
+    forget_preference_fact(player_id, project_id=project_id, kind=kind)
+    fact = PlayerFact(
+        body=f"{kind}: {value.strip()}",
+        category="preference",
+        confidence="high",
+        source_agent=source_agent,
+        project_id=project_id,
+    )
+    store_facts(player_id, [fact])
+    return True

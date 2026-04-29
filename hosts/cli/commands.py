@@ -259,6 +259,23 @@ def _active_project(settings: CLISettings):  # type: ignore[no-untyped-def]
     return ProjectManager.get(settings.active_project_id)
 
 
+def _active_project_fact_id(settings: CLISettings) -> str | None:
+    """Resolve the M17 fact-axis id from the active project's stable path.
+
+    Bare ``settings.active_project_id`` is the registry uuid, NOT the
+    fact axis. The fact axis is ``derive_project_id(project.path)`` —
+    the same value the REPL stamps into the ``[project_id: …]`` forge
+    tag — so the same id reads back in ``/preferences`` as it was
+    written under during PAUSE-resolution.
+    """
+    project = _active_project(settings)
+    if project is None:
+        return None
+    from kourai_common.projects import derive_project_id
+
+    return derive_project_id(project.path)
+
+
 def _parse_template_flag(args: list[str]) -> tuple[list[str], str]:
     """Pull --template <value> out of a flat arg list. Default 'empty'."""
     template = "empty"
@@ -456,14 +473,149 @@ def _handle_project_command(prompt_text: str, settings: CLISettings) -> None:
     _echo(_PROJECT_USAGE)
 
 
+# ---------------------------------------------------------------------------
+# /preferences — M17 Phase 2 item 7
+# ---------------------------------------------------------------------------
+_PREFERENCES_USAGE = (
+    "  /preferences                list stored preference facts\n"
+    "  /preferences set <kind> <value>\n"
+    "  /preferences forget <kind>  forget the active scope's value for <kind>\n"
+    "  /preferences forget --all   forget every preference for the active scope\n"
+    "\n"
+    "  Aliases: /prefs"
+)
+
+
+def _handle_preferences_command(prompt_text: str, settings: CLISettings) -> None:
+    """Browse, override, and forget closed-vocab preference facts.
+
+    M17 Phase 2 item 7. Mirrors the ``/permissions`` shape: bare command
+    lists everything; named subcommands (``set`` / ``forget``) mutate.
+
+    The active scope is the M17 fact axis derived from the active
+    project's persistent path (NOT the per-session forge worktree).
+    Without an active project, scope falls back to global so a player
+    can still curate cross-project preferences.
+
+    Right-to-forget is non-negotiable here: every fact is removable by
+    the player, with no operator gate. ``forget --all`` clears every
+    preference fact for the active scope in one move.
+    """
+    from kourai_common.facts import (
+        forget_preference_fact,
+        list_preference_facts,
+        set_preference_fact,
+    )
+    from kourai_common.hooks_interaction import VALID_PREFERENCE_KINDS
+
+    parts = prompt_text.split()
+    sub = parts[1].lower() if len(parts) > 1 else ""
+    args = parts[2:]
+
+    player_id = _player_id()
+    if player_id is None:
+        _echo(f"  {_RED}No active player profile — run onboarding first.{_RESET}")
+        return
+
+    project_id = _active_project_fact_id(settings)
+    project = _active_project(settings)
+    scope_label = (
+        f"project '{project.name}'" if project is not None else "global (no active project)"
+    )
+
+    if sub in ("help", "-h", "--help"):
+        _echo(f"\n{_GOLD_BOLD}━━━ Preferences ━━━{_RESET}")
+        _echo(_PREFERENCES_USAGE)
+        _echo(f"\n  {_DIM}Closed vocabulary: {', '.join(sorted(VALID_PREFERENCE_KINDS))}{_RESET}")
+        return
+
+    if sub == "set":
+        if len(args) < 2:
+            _echo(f"  {_DIM}Usage: /preferences set <kind> <value>{_RESET}")
+            _echo(f"  {_DIM}Valid kinds: {', '.join(sorted(VALID_PREFERENCE_KINDS))}{_RESET}")
+            return
+        kind = args[0].lower()
+        value = " ".join(args[1:]).strip()
+        if kind not in VALID_PREFERENCE_KINDS:
+            _echo(f"  {_RED}Unknown preference kind: {kind!r}{_RESET}")
+            _echo(f"  {_DIM}Valid kinds: {', '.join(sorted(VALID_PREFERENCE_KINDS))}{_RESET}")
+            return
+        ok = set_preference_fact(
+            player_id=player_id,
+            project_id=project_id,
+            kind=kind,
+            value=value,
+        )
+        if not ok:
+            _echo(f"  {_RED}Could not store {kind} — value rejected.{_RESET}")
+            return
+        _echo(f"  {_GOLD_BRIGHT}✨ {kind} set to {value!r}{_RESET} {_DIM}({scope_label}){_RESET}")
+        return
+
+    if sub == "forget":
+        if not args:
+            _echo(f"  {_DIM}Usage: /preferences forget <kind|--all>{_RESET}")
+            return
+        if args[0] == "--all":
+            removed = 0
+            for kind in sorted(VALID_PREFERENCE_KINDS):
+                removed += forget_preference_fact(player_id, project_id, kind)
+            _echo(
+                f"  {_GOLD}Forgot {removed} preference{'s' if removed != 1 else ''}{_RESET}"
+                f" {_DIM}from {scope_label}.{_RESET}"
+            )
+            return
+        kind = args[0].lower()
+        # Tolerate a kind that's been retired from VALID_PREFERENCE_KINDS:
+        # right-to-forget must outlive vocab churn.
+        removed = forget_preference_fact(player_id, project_id, kind)
+        if removed == 0:
+            _echo(f"  {_DIM}No {kind} preference stored for {scope_label}.{_RESET}")
+            return
+        _echo(
+            f"  {_GOLD}Forgot {kind}{_RESET}"
+            f" {_DIM}({removed} row{'s' if removed != 1 else ''} from {scope_label}).{_RESET}"
+        )
+        return
+
+    if sub and sub != "list":
+        _echo(f"  {_DIM}Unknown /preferences subcommand: {sub!r}{_RESET}")
+        _echo(_PREFERENCES_USAGE)
+        return
+
+    # Bare /preferences (or /preferences list): show everything that
+    # would surface to specialists in the active scope.
+    rows = list_preference_facts(player_id, project_id=project_id)
+    _echo(f"\n  {_GOLD_BRIGHT}━━━ Preferences ━━━{_RESET}")
+    _echo(f"  {_DIM}Scope: {scope_label}{_RESET}")
+    if not rows:
+        _echo(
+            f"  {_DIM}No preferences stored yet — set one with "
+            f"/preferences set <kind> <value>.{_RESET}"
+        )
+        return
+    kind_width = max(len(r["kind"]) for r in rows) + 2
+    for row in rows:
+        marker = "*" if row["scope"] == "project" else " "
+        _echo(
+            f"  {marker} {_GOLD}{row['kind']:<{kind_width}}{_RESET}"
+            f"{row['value']}  {_DIM}({row['scope']}, "
+            f"from {row['source_agent']}){_RESET}"
+        )
+    _echo(f"\n  {_DIM}Forget with /preferences forget <kind> or /preferences forget --all.{_RESET}")
+
+
 # Re-export for tests/external use.
 __all__ = [
     "KNOWN_TEMPLATES",
+    "_PREFERENCES_USAGE",
     "_PROJECT_USAGE",
     "ForgeSession",
     "_active_project",
+    "_active_project_fact_id",
     "_build_key_bindings",
     "_copy_to_clipboard",
+    "_handle_preferences_command",
     "_handle_project_command",
     "_show_help",
     "_show_settings",

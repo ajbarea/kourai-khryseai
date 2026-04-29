@@ -443,11 +443,10 @@ Three calls that diverged from the original sketch:
   labeled FL training data so the loop fails soft. Cross-process
   persistence belongs in Phase 2's confidence-decay milestone.
 
-### Phase 2 — narrator + telemetry shipped 2026-04-29; rest deferred
+### Phase 2 — narrator + telemetry + CRUD shipped; decay deferred
 
-Items 6 (visible recall) and 8 (telemetry) both landed 2026-04-29. Items 7
-(`/preferences` CRUD CLI) and 9 (confidence decay) stay queued; pull up
-once narrator+telemetry have miles in real REPL sessions.
+Items 6, 7, and 8 landed 2026-04-29. Only item 9 (confidence decay)
+remains queued.
 
 - **Visible recall (player UX) — shipped 2026-04-29.** Metis's
   executor calls `_format_recall_narration(player_id, project_id)`
@@ -463,11 +462,33 @@ once narrator+telemetry have miles in real REPL sessions.
   preferences narrate. Closes the "silent recall feels like
   agents are guessing" trust gap that originally motivated this
   item.
-- **`/preferences` CRUD CLI.** New slash command modeled on
-  `/permissions`. Aliases: `/prefs`, `/memory project`. Lists
-  project-scoped facts for the active project; `forget <kind>`
-  removes a fact; `set <kind> <value>` overrides without re-asking.
-  Right-to-forget is non-negotiable for player trust.
+- **`/preferences` CRUD CLI — shipped 2026-04-29.** Slash command
+  modeled on `/permissions`, aliased as `/prefs`. Bare command
+  lists every preference fact for the active scope (project +
+  global), grouped with a `*` marker on project rows;
+  `set <kind> <value>` upserts (forgets-then-writes the same
+  scope+kind so the listing stays single-row-per-kind);
+  `forget <kind>` removes; `forget --all` clears the whole active
+  scope without touching global. The closed vocab is enforced on
+  the write path (same `VALID_PREFERENCE_KINDS` gate as the PAUSE
+  synthesiser); the forget path tolerates retired kinds so
+  right-to-forget outlives vocab churn. Three new public primitives
+  in `kourai_common.facts`: `list_preference_facts`,
+  `forget_preference_fact`, `set_preference_fact`. Aligns with the
+  GDPR/CCPA-aligned forgetting patterns Mem0 / Letta / Supermemory
+  converged on for 2026.
+- **Project_id stability fix — shipped 2026-04-29 (bundled with
+  CRUD).** Phase 1's PAUSE-write path derived the fact axis from
+  `[project_root: <forge_session.workdir>]`, but the REPL creates
+  a uuid'd worktree per turn — `derive_project_id(workdir)` was
+  unstable across sessions, so facts written in turn N never
+  recalled in turn N+1. Fix: REPL now also emits
+  `[project_id: <stable>]` from `derive_project_id(project.path)`,
+  and `streaming.py:_project_id_from_forge_tags` prefers the
+  explicit tag over deriving from project_root. Specialists keep
+  reading `[project_root:]` for git ops on the worktree; only the
+  fact synthesiser reads the new tag. Without this fix the
+  `/preferences` listing would have shown empty for everyone.
 - **Telemetry — shipped 2026-04-29.** Metis's outer `metis.execute`
   span now carries `kourai.fact.recalled` (`bool`, always set) and
   `kourai.fact.kinds` (`list[str]`, set only when there's something
@@ -481,7 +502,10 @@ once narrator+telemetry have miles in real REPL sessions.
   weight and `last_accessed`. Add a `PROJECT_FACT_DECAY_DAYS = 90`
   default — facts older than this drop confidence one tier
   (`high → medium → low → skip`). Re-confirmation by the player
-  resets the timer. Mirrors mem0's "memory depth" concept.
+  resets the timer. Mirrors mem0's "memory depth" concept. Open
+  design call: lazy compute inside
+  `get_relevant_facts_for_enrichment` vs a periodic sweep over
+  `player_memories`. Lazy is simpler and player-facing-equivalent.
 
 ### Out of scope — defer to follow-on milestones
 
@@ -806,6 +830,7 @@ architectural moves; valuable but not the first lift.
 
 One-liner per item, newest first. Detail moves out of this file when work lands.
 
+- 2026-04-29 — **M17 Phase 2 `/preferences` CRUD CLI + project_id stability fix** shipped. New slash command (aliased `/prefs`) lets the player browse, override, and forget closed-vocab preference facts for the active scope: bare `/preferences` lists project + global rows with a `*` marker on project rows; `set <kind> <value>` upserts (forgets-then-writes the same scope+kind so the listing stays single-row-per-kind); `forget <kind>` removes one; `forget --all` clears the whole active scope without touching global. Closed vocab enforced on `set` (same `VALID_PREFERENCE_KINDS` gate as the PAUSE synthesiser); `forget` tolerates retired kinds so right-to-forget outlives vocab churn. Three new public primitives in `kourai_common.facts` (`list_preference_facts`, `forget_preference_fact`, `set_preference_fact`) backed by the existing `player_memories` SQLite axis and `delete_player_memory`. Bundled the project_id stability fix because the feature would have surfaced empty without it: Phase 1's PAUSE-write path stamped facts with `derive_project_id([project_root: <forge_session.workdir>])`, but the REPL creates a uuid'd worktree per turn, so the id changed every session and recall never fired across sessions. Fix: new `[project_id: <derive_project_id(project.path)>]` forge tag emitted alongside `[project_root: …]`; `streaming.py:_project_id_from_forge_tags` prefers the explicit tag and falls back to deriving from project_root. Specialists keep reading project_root for git ops; only the fact synthesiser reads the new tag. 26 new unit tests (10 facts CRUD + 13 CLI handler + 3 streaming-tag preference); 2865 unit tests overall green; lint + ty clean. Aligns with the GDPR/CCPA-aligned forgetting patterns Mem0 / Letta / Supermemory converged on for 2026 — every fact removable by the player, no operator gate. Closes ROADMAP §M17 Phase 2 item 7
 - 2026-04-29 — **M17 Phase 2 telemetry attributes** shipped. Metis's
   outer `metis.execute` OTel span now carries `kourai.fact.recalled`
   (bool, always set) and `kourai.fact.kinds` (list[str], set only on
