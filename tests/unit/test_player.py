@@ -305,6 +305,54 @@ class TestPlayerMemory:
         assert len(memories) == 1
         assert memories[0]["project_id"] == "abc123def4567890"
 
+    def test_get_memories_no_project_filter_returns_all_scopes(self, profile):
+        """Without a project_id arg, all scopes are returned (backwards compatible)."""
+        add_player_memory(profile.player_id, "in proj A", "fact", project_id="proj-A")
+        add_player_memory(profile.player_id, "in proj B", "fact", project_id="proj-B")
+        add_player_memory(profile.player_id, "global fact", "fact", project_id=None)
+
+        all_mems = get_player_memories(profile.player_id)
+        assert len(all_mems) == 3
+        contents = {m["content"] for m in all_mems}
+        assert contents == {"in proj A", "in proj B", "global fact"}
+
+    def test_get_memories_with_project_id_includes_global(self, profile):
+        """Project-scoped query returns matching project AND global facts."""
+        add_player_memory(profile.player_id, "in proj A", "fact", project_id="proj-A")
+        add_player_memory(profile.player_id, "global fact", "fact", project_id=None)
+
+        scoped = get_player_memories(profile.player_id, project_id="proj-A")
+        contents = {m["content"] for m in scoped}
+        assert contents == {"in proj A", "global fact"}
+
+    def test_get_memories_with_project_id_excludes_other_projects(self, profile):
+        """Project-scoped query does NOT leak facts from other projects."""
+        add_player_memory(profile.player_id, "in proj A", "fact", project_id="proj-A")
+        add_player_memory(profile.player_id, "in proj B", "fact", project_id="proj-B")
+
+        scoped = get_player_memories(profile.player_id, project_id="proj-A")
+        contents = {m["content"] for m in scoped}
+        assert contents == {"in proj A"}
+
+    def test_get_memories_prefers_project_match_at_equal_importance(self, profile):
+        """At tied retrieval score, project-tagged rows beat global rows."""
+        # Add global first (older last_accessed) at importance 0.5
+        add_player_memory(profile.player_id, "global fact", "fact", importance=0.5, project_id=None)
+        # Add project-tagged second at the SAME importance — global's
+        # last_accessed is older, so without the project-boost the global
+        # row would tie or rank lower; with the boost project-tagged wins.
+        add_player_memory(
+            profile.player_id,
+            "project fact",
+            "fact",
+            importance=0.5,
+            project_id="proj-A",
+        )
+
+        scoped = get_player_memories(profile.player_id, project_id="proj-A")
+        assert scoped[0]["content"] == "project fact"
+        assert scoped[1]["content"] == "global fact"
+
 
 # ── Gossip Transfer Tests ──────────────────────────────────────────────
 

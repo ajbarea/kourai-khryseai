@@ -144,6 +144,7 @@ def get_player_memories(
     category: str | None = None,
     include_shared: bool = True,
     limit: int = 50,
+    project_id: str | None = None,
 ) -> list[dict[str, Any]]:
     """Retrieve player memories with optional filters.
 
@@ -153,6 +154,10 @@ def get_player_memories(
         category: Filter to this category.
         include_shared: Include system-wide (agent_name IS NULL) memories.
         limit: Max results.
+        project_id: Optional M17 project scope. When provided, results include matching-
+            project memories AND global (project_id IS NULL) memories, with matching-
+            project rows preferred at equal score. When None, no project filter is
+            applied (backwards compatible — returns all scopes for the player).
     """
     conn = _get_player_db()
     clauses = ["player_id = ?"]
@@ -170,15 +175,30 @@ def get_player_memories(
         clauses.append("category = ?")
         params.append(category)
 
+    if project_id is not None:
+        clauses.append("(project_id = ? OR project_id IS NULL)")
+        params.append(project_id)
+
+    # ORDER BY: when scoped, project-matching rows beat global rows at equal score.
+    if project_id is not None:
+        order_clause = (
+            "CASE WHEN project_id = ? THEN 1 ELSE 0 END DESC, importance DESC, last_accessed DESC"
+        )
+        order_params: list[Any] = [project_id]
+    else:
+        order_clause = "importance DESC, last_accessed DESC"
+        order_params = []
+
     where = " AND ".join(clauses)
     query = f"""
         SELECT memory_id, agent_name, category, content, importance,
                access_count, created_at, last_accessed, source, project_id
         FROM player_memories
         WHERE {where}
-        ORDER BY importance DESC, last_accessed DESC
+        ORDER BY {order_clause}
         LIMIT ?
     """  # noqa: S608
+    params.extend(order_params)
     params.append(limit)
 
     rows = conn.execute(query, tuple(params)).fetchall()
