@@ -5,109 +5,46 @@ milestone lands, the matching detail block in [ROADMAP.md](./ROADMAP.md)
 collapses to a one-liner under "Shipped" and this file gets reset to the
 next milestone.
 
-Updated: 2026-04-29 · Working on: **M17 Phase 1 — HOTL answer
-persistence (project-scoped facts)**
+Updated: 2026-04-29 · Working on: **between milestones — UX/DX wins
+default; explicit AJ nomination needed to pull from the queue**
 
-## Why
+## Recently shipped — M17 Phase 1 close-out
 
-Kourai is being extended with Federated Learning features per the
-research-advisor pivot — the orchestration layer needs to start
-gathering structured player data for FL training. M17's Phase 1 is the
-fast structured-recall layer that closes the loop between M13's
-`AgentInputRequired` (already shipped) and the `kourai_common.facts`
-knowledge graph (already shipped, currently unused for HOTL pauses).
-Phase 1 ships the project-scope axis so a clarifying answer in
-project A is recalled by Metis in project A — and is NOT recalled when
-the player switches to project B. That cross-session, cross-project
-discrimination is the property worth shipping. Memoir continues to be
-the FL training-data ground-truth in parallel; facts are the agent-
-facing recall surface.
+**The HOTL → facts loop is end-to-end live for one-time-per-project
+preferences.** A clarifying answer in project A persists, surfaces in
+Metis's planning prompt the next session for project A, and stays
+hidden when the player switches to project B. Shipped across six PRs
+(#81 / #82 / #84 / #85 / #86 / #87); 48 new unit tests; ROADMAP §M17
+trimmed to the Phase 2 scope only.
 
-ROADMAP M17 (lines 350-559) carries the full design rationale, anti-
-overclaim ledger, and Phase 1/2 split.
+What changed from the original sketch — three load-bearing notes worth
+remembering for Phase 2:
 
-## Decisions (re-anchored from ROADMAP)
-
-- **Reuse `facts.py`, not `player_memories`.** `kourai_common.facts`
-  already implements the right shape (`<FACT>` tag extraction,
-  `PlayerFact` / `KnowledgeGraphFact`, `store_facts`,
-  `get_relevant_facts_for_enrichment`, `build_fact_context`). Adding a
-  `project_id` axis is materially cheaper than building a parallel
-  project-preference layer on `player_memories`.
-- **Prompt enrichment, not pre-pause hooks.** `build_fact_context()`
-  already runs at planning time; adding a `project_id` filter there
-  gives every specialist project-scoped recall for free — no per-agent
-  patches.
-- **Phase 1 = items 1-5 only.** Items 6-9 (visible recall narrator,
-  `/preferences` CLI, telemetry attributes, confidence decay) defer to
-  Phase 2 once Phase 1 is in production and we know what's load-bearing.
-
-## Scope (Phase 1)
-
-1. **`project_id` axis on facts.** Optional `project_id: str | None`
-   field on `PlayerFact` + `KnowledgeGraphFact`. Extend the `<FACT>`
-   regex to parse a `project_id="..."` attribute. `store_facts()`
-   persists it; `get_relevant_facts_for_enrichment()` accepts a
-   `project_id` filter and prefers project-scoped facts over global at
-   the same retrieval score.
-2. **`derive_project_id(project_root)`** in `projects.py`. Stable
-   sha256 truncated to 16 hex of the absolute, normalised path. Avoids
-   leaking host-absolute paths into fact bodies, survives the player
-   moving the repo on disk, gives a clean tag value for telemetry.
-3. **HOTL → facts write path.** New helper
-   `synthesise_fact_from_pause(player_id, project_id, preference_kind,
-   player_response, source_agent)` in `hooks_interaction.py` (peer to
-   `extract_memories_from_interaction`). Wired into
-   `run_post_task_hooks` so it fires when the most recent task
-   resolved an `INPUT_REQUIRED` AND the originating agent tagged the
-   pause with a `preference_kind`. Synthesises a
-   `PlayerFact(category="preference", confidence="high",
-   project_id=..., body="<kind>: <answer>", source_agent=...)` and
-   calls `store_facts()`.
-4. **Pause-kind tagging.** Metis's `INPUT_REQUIRED` token grows a
-   `preference_kind` attribute (M13 `CONFIRM_ORDER: <tier>` mirror).
-   Phase 1 closed-set vocabulary: `coverage_target`, `python_version`,
-   `style_rules`, `commit_style`, `test_framework`. Broaden later.
-5. **Read path.** `build_fact_context()` filtered by active
-   `project_id`, prefers project-scoped over global facts at the same
-   retrieval score.
-
-## Out of scope (Phase 2 — separate milestone)
-
-- Visible recall narrator line ("📐 Metis: Using your stored coverage
-  target (80%).")
-- `/preferences` CRUD CLI (`/prefs`, `/memory project` aliases)
-- Telemetry span attributes (`kourai.fact.recalled`,
-  `kourai.fact.kinds`)
-- Confidence decay (`PROJECT_FACT_DECAY_DAYS = 90`)
-
-## Definition of done (Phase 1)
-
-A HOTL answer in project A persists, is recalled in the same agent on
-the next run for project A, AND is NOT recalled when the player
-switches to project B. End-to-end test exercising the full path
-(`AgentInputRequired` → `synthesise_fact_from_pause` → `store_facts` →
-next-session `build_fact_context` with project filter) demonstrates
-the property.
-
-## Order of execution
-
-1. **Item 2 first** (`derive_project_id`) — dependency-free pure
-   function with a clean test surface. Ship as standalone PR.
-2. **Item 1** (`project_id` axis on `PlayerFact` /
-   `KnowledgeGraphFact` / `<FACT>` regex / `store_facts`) — depends on
-   item 2 for the canonical id.
-3. **Item 5** (read-path filter on `get_relevant_facts_for_enrichment`
-   + `build_fact_context`) — extends item 1.
-4. **Item 4** (Metis `INPUT_REQUIRED` `preference_kind` attribute) —
-   independent of 1-3 on the agent side; can ship in parallel.
-5. **Item 3** (`synthesise_fact_from_pause` post-task hook) — the
-   integrator that needs items 1, 2, 4. Ship last with the end-to-end
-   property test.
-
-Each step ships as a PR with tests + `make lint` green + IMPL update.
-
----
+- **`run_post_task_hooks` had no production call sites.** Item 3's
+  ROADMAP plan ("wired into `run_post_task_hooks`…") was load-bearing
+  on a layer that isn't actually integrated into the agent execution
+  pipeline. The pragmatic answer: call `synthesise_fact_from_pause`
+  directly from `hosts/cli/streaming.py` at the top of every turn, where
+  Memoir already lives. Promoting it into a unified post-task hook
+  layer once that layer is wired is sibling work — flagged as a
+  follow-on under M5/M6 so it doesn't get lost.
+- **Metis didn't actually call `build_fact_context`.** The ROADMAP
+  Phase 1 design assumed every specialist's prompt was already
+  enriched through `facts.py` — true for Puck and Cupid, not for
+  Metis (who goes through `get_enriched_system_prompt` →
+  `build_player_context` → `retrieve_relevant_memories`, which never
+  touches facts.py). PR #87 closed that gap surgically by threading
+  `player_id` / `project_id` kwargs into `create_spec` /
+  `create_spec_stream`. Other specialists with the same shape
+  (Techne, Kallos, Dokimasia, Hephaestus) inherit the gap until
+  someone needs it — flagged as a follow-on, not blocking.
+- **PAUSE token cross-turn state lives in-process.** A
+  `kourai_common.pause_state` dict keyed by `context_id` carries the
+  preference_kind from the paused turn to the resumed turn. Agent
+  restart between pause and resume drops the classification; the
+  player's answer still lands in Memoir as labeled FL training data
+  so the loop fails soft, not silent. Cross-process persistence
+  belongs in Phase 2's confidence-decay milestone.
 
 ## Notes / open questions (carry-over from M2 + M16)
 
@@ -133,15 +70,35 @@ Each step ships as a PR with tests + `make lint` green + IMPL update.
   revision; today's wiring assumes that spec. Tool annotations being
   explicitly marked untrusted is a 2025-11-25 thing.
 
-## Up next (after Phase 1 lands)
+## Up next
 
-Other queued items remain in the prior IMPL "Up next" list — pulling
-them up requires explicit AJ nomination per UX/DX-default convention.
+UX/DX is the default between milestones. Pulling any of these up
+requires explicit AJ nomination per UX/DX-default convention.
 
+- **Live M17 Phase 1 smoke** — exercise the loop in a real `make up`
+  + REPL session: ask Metis to plan something where she'd reasonably
+  pause on `coverage_target`, answer, then start a new context for
+  the same project and see Metis quote the answer. Pairs with the
+  next interactive run; no automated CI surface.
+- **M17 Phase 2** — visible recall narrator (`📐 Metis: Using your
+  stored coverage target (80%).`), `/preferences` CRUD CLI, telemetry
+  span attributes (`kourai.fact.recalled` / `kourai.fact.kinds`),
+  confidence decay (`PROJECT_FACT_DECAY_DAYS = 90`). Defer until
+  Phase 1 has miles on it.
+- **`run_post_task_hooks` integration** — the layer exists and is
+  fully tested but no production code calls it. Wiring it into the
+  CLI streaming path (sibling of Memoir append) gives every hook
+  (`track_interaction`, `extract_memories_from_interaction`,
+  `score_alignment`, `detect_work_patterns`,
+  `try_advance_romance`, achievement checks) a real call site.
+  Pulls `synthesise_fact_from_pause` back out of `streaming.py` at
+  the same time.
+- **Specialist parity for fact recall.** Metis now reads
+  `build_fact_context` with project scope; Techne / Kallos /
+  Dokimasia / Hephaestus do not. Sibling work to PR #87 — same
+  five-line pattern per agent. Defer until a real PAUSE caller in a
+  non-Metis specialist surfaces.
 - **Live VN smoke** — `make vn` exercises both fixes from PR #66.
 - **`docs/architecture/puck-first-run-tutorial.md`** — pairs with the
   M6 player-onboarding theme (committed in `2ad93c1`).
-- **M17 Phase 2** — visible recall + `/preferences` + telemetry +
-  decay. Defer until Phase 1 has miles on it.
-- **M5 / M7 / M12 / M15 / M6 follow-ons** — see the prior IMPL or
-  ROADMAP for scope.
+- **M5 / M7 / M12 / M15 / M6 follow-ons** — see ROADMAP for scope.
