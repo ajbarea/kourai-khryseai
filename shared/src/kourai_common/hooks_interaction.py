@@ -17,6 +17,20 @@ from kourai_common.player import (
 
 log = logging.getLogger(__name__)
 
+
+# M17 Phase 1: closed vocabulary of HOTL pause kinds Metis is allowed to tag.
+# Broadened in Phase 2 once the integration has miles on it; today an unknown
+# kind logs a warning and skips synthesis rather than storing a malformed fact.
+VALID_PREFERENCE_KINDS = frozenset(
+    {
+        "coverage_target",
+        "python_version",
+        "style_rules",
+        "commit_style",
+        "test_framework",
+    }
+)
+
 # Base affinity delta per successful interaction
 BASE_AFFINITY_DELTA = 0.02
 # Additional affinity for tasks that reference the player by name
@@ -137,3 +151,60 @@ def extract_memories_from_interaction(
             break  # Only one achievement per interaction
 
     return created
+
+
+def synthesise_fact_from_pause(
+    player_id: str,
+    project_id: str | None,
+    preference_kind: str,
+    player_response: str,
+    source_agent: str,
+) -> bool:
+    """Synthesise a project-scoped preference fact from a resolved HOTL pause.
+
+    M17 Phase 1: when an agent's clarifying question has been answered by the
+    player, the answer is stored as a high-confidence ``preference`` fact tagged
+    with the active ``project_id``. On subsequent sessions for the same project,
+    ``build_fact_context`` injects the stored answer into the agent's system
+    prompt so the same question is not re-asked.
+
+    Args:
+        player_id: Player UUID.
+        project_id: Active project scope. ``None`` = global / cross-project.
+        preference_kind: One of ``VALID_PREFERENCE_KINDS``. Unknown kinds log a
+            warning and skip synthesis rather than poisoning the fact graph.
+        player_response: Player's answer to the agent's clarifying question.
+            Empty / whitespace-only responses are not synthesised.
+        source_agent: Name of the agent that asked the question.
+
+    Returns:
+        ``True`` if a fact was stored, ``False`` if the input was rejected
+        (unknown kind, empty response, or empty player_id).
+    """
+    if not player_id or not player_response or not player_response.strip():
+        return False
+    if preference_kind not in VALID_PREFERENCE_KINDS:
+        log.warning(
+            "synthesise_fact_from_pause: unknown preference_kind %r — skipping",
+            preference_kind,
+        )
+        return False
+
+    from kourai_common.facts import PlayerFact, store_facts
+
+    fact = PlayerFact(
+        body=f"{preference_kind}: {player_response.strip()}",
+        category="preference",
+        confidence="high",
+        source_agent=source_agent,
+        project_id=project_id,
+    )
+    store_facts(player_id, [fact])
+    log.info(
+        "Synthesised %s fact from %s pause for player %s (project=%s)",
+        preference_kind,
+        source_agent,
+        player_id[:8],
+        project_id or "global",
+    )
+    return True

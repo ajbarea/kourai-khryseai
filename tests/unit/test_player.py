@@ -354,6 +354,66 @@ class TestPlayerMemory:
         assert scoped[1]["content"] == "global fact"
 
 
+# ── M17 Phase 1: end-to-end property test ─────────────────────────────
+
+
+class TestM17Phase1Property:
+    """Definition of done for M17 Phase 1.
+
+    A HOTL answer in project A persists, is recalled in the same agent on the
+    next run for project A, AND is NOT recalled when the player switches to
+    project B. End-to-end: derive_project_id → synthesise_fact_from_pause →
+    build_fact_context with project filter.
+    """
+
+    def test_hotl_answer_recalled_in_same_project_not_in_different_project(self, profile):
+        from kourai_common.facts import build_fact_context
+        from kourai_common.hooks_interaction import synthesise_fact_from_pause
+
+        # Two distinct project ids — in production these come from
+        # `derive_project_id(project_root)` (see PR #81 / sibling branch);
+        # the integration is identity-agnostic, so opaque strings suffice
+        # to demonstrate cross-project isolation.
+        proj_a_id = "abc123def4567890"
+        proj_b_id = "fedcba9876543210"
+
+        # Metis pauses on project A; player answers "80%"
+        ok = synthesise_fact_from_pause(
+            player_id=profile.player_id,
+            project_id=proj_a_id,
+            preference_kind="coverage_target",
+            player_response="80%",
+            source_agent="metis",
+        )
+        assert ok is True
+
+        # On project A — Metis recalls the answer
+        context_a = build_fact_context(profile.player_id, agent_name="metis", project_id=proj_a_id)
+        assert "coverage_target: 80%" in context_a
+
+        # On project B — Metis does NOT recall (no leakage across projects)
+        context_b = build_fact_context(profile.player_id, agent_name="metis", project_id=proj_b_id)
+        assert "coverage_target: 80%" not in context_b
+
+    def test_global_facts_visible_from_any_project(self, profile):
+        """Facts stored without a project_id are global and visible everywhere."""
+        from kourai_common.facts import build_fact_context
+        from kourai_common.hooks_interaction import synthesise_fact_from_pause
+
+        proj_id = "abc123def4567890"
+
+        synthesise_fact_from_pause(
+            player_id=profile.player_id,
+            project_id=None,  # global
+            preference_kind="python_version",
+            player_response="3.12",
+            source_agent="metis",
+        )
+
+        context = build_fact_context(profile.player_id, agent_name="metis", project_id=proj_id)
+        assert "python_version: 3.12" in context
+
+
 # ── Gossip Transfer Tests ──────────────────────────────────────────────
 
 
