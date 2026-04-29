@@ -5,189 +5,292 @@ milestone lands, the matching detail block in [ROADMAP.md](./ROADMAP.md)
 collapses to a one-liner under "Shipped" and this file gets reset to the
 next milestone.
 
-Updated: 2026-04-29 · Working on: **M17 Phase 2 fully shipped — between
-milestones. UX/DX wins default; explicit AJ nomination needed to pull
-from the queue**
+Updated: 2026-04-29 · Working on: **2026-04-29 live smoke uncovered an
+architectural overhaul. Pre-release perfection stance: no workarounds.
+Sequence: M13 regression fix → M7 (a2a-sdk 1.0) → M18 (structured
+streaming with content-kind metadata) → M19 (audio backend separation
+for TTS). M17 itself ships clean once M13 unblocks the readout path.**
 
-## Recently shipped — M17 Phase 2 closure (item 9, confidence decay)
+## 2026-04-29 live smoke — what happened
 
-**Lazy confidence decay is live for project preference facts.**
-`PROJECT_FACT_DECAY_DAYS = 90`: a stored preference at `high` becomes
-`medium` after 90 days, `low` after 180, `skip` (filtered from recall)
-after 270. Decay is computed read-time on `created_at` — no scheduled
-sweep, no schema change, no extra writes. `last_accessed` deliberately
-does NOT reset the timer, so passive recall sessions don't keep stale
-preferences alive forever. Re-confirmation by the player (via
-`/preferences set` or PAUSE answer) writes a fresh row with a new
-`created_at`, which IS the timer reset.
+Two end-to-end runs (sessions `bd1e413a` and `0dbafe91`) demonstrated the
+M17 happy path **never executed** because Hephaestus drops the original
+prompt across the CONFIRM_ORDER → resume → route handoff. Metis only
+received the player's confirmation token (`"light it"` or `"y"`),
+generated questions-as-prose as her "spec," and the rest of the
+pipeline cascaded on garbage. Mneme's safety-net refusal ("I have
+nothing to commit") is the only thing that worked correctly.
+Pipeline still claimed `✨ Forged in 333.6s` with `commit_count: 0` —
+no soft-fail signal.
 
-`synthesise_fact_from_pause` now forget-then-writes (matching
-`set_preference_fact`) so re-PAUSE on the same scope+kind no longer
-stacks rows in `player_memories`. The /preferences listing surfaces
-both the original `confidence` and the `decayed_confidence` so a
-player can see decay state at a glance; the recall path drops
-`skip`-tier rows so Metis doesn't keep planning around an old answer.
+The smoke surfaced 23+ findings beyond M13 — UX truncation, audio
+chipmunk and crackling, agent-card poll storm, /yolo not bypassing
+CONFIRM_ORDER, FACT-tag leakage into streaming status, phonemizer
+warning spam, lazy-load latency on language switch, and the underlying
+fact that **TTS gating turns 60-90 seconds of pipeline work into 333
+seconds of wall-clock** because every status box awaits its narration.
+The cluster is not 23 independent bugs — most symptoms share a root
+cause in unstructured streaming. **The architectural answer is M18.**
 
-11 new unit tests (5 ladder helper + 3 listing integration + 2 recall
-filter + 1 PAUSE dedup property). Suite at 2876 passing total. M17
-Phase 2 is now 4-of-4 — narrator, telemetry, CRUD CLI, and decay all
-shipped.
+In-flight quick wins applied this session, intentionally narrow scope,
+no architectural commitment:
+- `hosts/cli/rendering.py` — `[HH:MM:SS]` dim prefix in every comms-
+  window header for per-step timing visibility.
+- `shared/src/kourai_common/audio.py` — pygame mixer buffer 512 → 2048
+  to address WSL2 + LLM-workload-induced underrun crackling. Verified
+  fixed by AJ.
+- `hosts/gui/tts_engine.py` — log full TTS text at INFO via `text=%r`
+  (was `text_len=N`) for parity-debugging audio vs visual content.
+- `hosts/gui/tts_engine.py` — wrap `chunk_bytes` in `BytesIO` for
+  pygame's WAV header parsing. **Initially reported NOT fixed by AJ;
+  empirically VERIFIED FIXED after `make rebuild` and clean CLI
+  restart (2026-04-29).** Important mental-model correction:
+  pygame-ce 2.5.7's `mixer.Sound(file=BytesIO(...))` path DOES
+  resample 24 kHz mono → 44.1 kHz stereo correctly, contrary to the
+  cautious docs caveats and the GitHub issues that web-search
+  surfaced. Either the docs were over-conservative, or the GitHub
+  issues described scenarios different from ours, or the rebuild
+  shook loose stale bytecode that was masking the fix.
+  **Implication: M19 (RealtimeTTS migration) remains architecturally
+  desirable for word-level timings, ElevenLabs-swap path, and
+  cleaner library boundaries — but it is NO LONGER URGENT.** The
+  chipmunk relief is here today via the BytesIO fix.
+- `shared/src/kourai_common/audio.py` — pygame mixer buffer
+  512 → 2048 → 4096. 512→2048 fixed initial pop/click crackling
+  from outright pygame underrun. 2048→4096 attempted but **did
+  not resolve the residual music crackling AJ continues to hear
+  on WSL2.** Diagnosed via `pactl info` on 2026-04-29: AJ's audio
+  path is `pygame → /mnt/wslg/PulseServer → RDPSink (WSLg RDP
+  relay)`, with `Latency: 31438 usec actual vs 2902 usec configured`
+  — 10× the configured latency, smoking gun for WSLg's RDP audio
+  relay being the bottleneck downstream of anything we can
+  configure inside the kourai process. Confirmed by web-search as
+  a widely-tracked WSLg-side issue (microsoft/wslg #908, #1257,
+  #607, plus 2025 reports). 4096 is at the upper end of what
+  application-side mitigation can do; bumping further (8192) only
+  adds latency. **The crackling is a WSL2 dev-environment
+  limitation, not a kourai code bug** — players running native
+  Linux or native Windows (with PortAudio/ASIO) will not
+  experience it. Long-term fixes are out-of-scope for kourai:
+  (a) install PulseAudio-for-Windows + configure WSL `PULSE_SERVER=
+  tcp:localhost:4713` (pre-WSLg pattern, requires Windows-side
+  setup AJ owns), (b) run kourai natively, (c) wait for the M6
+  ElevenLabs migration which changes the audio architecture
+  entirely.
 
-## Earlier this session — M17 Phase 2 item 7 (`/preferences` CLI)
+## Critical-path blocker: M13 CONFIRM_ORDER prompt-loss regression
 
-**Right-to-forget for project-scoped preference facts.** The
-player can list every stored preference for the active scope, set any
-closed-vocab kind without re-asking, forget one kind, or wipe the
-whole scope with `forget --all`. Aliased as `/prefs`. The CRUD writes
-through the same `kourai_common.facts` axis Metis recalls from, so
-overrides take effect on the next planning prompt without a restart.
+`agents/hephaestus/agent.py` (and the resume handoff path) loses the
+original development request when the player answers a CONFIRM_ORDER
+prompt. The followup A2A dispatch to Metis carries only the player's
+confirmation token, not the original ask. M13's ROADMAP entry says
+"Resume happens implicitly via context_id memory (no explicit metadata
+plumbing)" — that works for Hephaestus's own next-turn LLM call (where
+the SDK preserves conversation history) but **does not carry across the
+A2A boundary** when Hephaestus relays to a separate specialist process.
 
-**Project_id stability fix bundled in.** The Phase 1 implementation
-derived the fact axis from `[project_root: …]`, but the REPL stamps
-the per-session forge worktree there — `derive_project_id(workdir)`
-changes every turn, so PAUSE-resolved facts never recalled across
-sessions. New `[project_id: <stable>]` forge tag carries the project-
-rooted id alongside the worktree-rooted root tag. `streaming.py` now
-prefers the explicit tag and falls back to deriving from project_root
-for any caller that hasn't been updated. Without this fix the new
-CLI would have shown an empty list for everyone.
+Fix shape (do not implement until M7 lands so the metadata channel is
+clean): on resume, Hephaestus emits the original prompt as the first
+Part of the dispatch Message. Either explicit `original_request` field
+in `Message.metadata` (preferred — survives audit / replay), or as the
+Message's primary text content with the confirmation as metadata.
+Either way the pattern is: text bodies carry the player's request,
+metadata carries operational state.
 
-26 new unit tests (10 facts CRUD + 13 CLI handler + 3 streaming-tag
-preference).
+Symptom-level patch on 0.3 wire (text-tag style) is doable but deepens
+the very text-tag pattern M7 wants to retire. **Do not patch on 0.3.**
+Land M7 first, then fix M13 cleanly via Message.metadata.
 
-## Earlier in the same session — M17 Phase 1 close-out
+## Architectural sequence ahead
 
-**The HOTL → facts loop is end-to-end live for one-time-per-project
-preferences.** A clarifying answer in project A persists, surfaces in
-Metis's planning prompt the next session for project A, and stays
-hidden when the player switches to project B. Shipped across six PRs
-(#81 / #82 / #84 / #85 / #86 / #87); 48 new unit tests; ROADMAP §M17
-trimmed to the Phase 2 scope only.
+**M7 — a2a-sdk 1.0 migration (status elevated to critical-path).**
+Originally deferred "until M17 Phase 1 has miles." Phase 1 just
+shipped, and the smoke proved the bracket-tag workarounds
+(`[project_id: ...]`, `[yolo: on]`) cannot reliably propagate
+load-bearing context across A2A boundaries. v1.0's structured
+`Message.metadata` is the foundation for both M13 fix and M18.
+Six-phase plan in ROADMAP §M7 is current. Pin still tightened to
+`<1.0` until landed.
 
-What changed from the original sketch — three load-bearing notes worth
-remembering for Phase 2:
+**M18 — Structured streaming with content-kind metadata (new).**
+Each agent emission tags its content kind via `Message.metadata`:
+`dialogue` (TTS-eligible, italic) | `status` (visual only, no TTS,
+no gating) | `code` (monospace render, no TTS) | `spec` (markdown
+wide-render, no TTS). Host's `streaming.py` routes by metadata, not
+text parsing. Drops pipeline visual cadence back to ~60-90s by
+eliminating the universal TTS gate. Resolves: #16 (truncation), #19
+(captions semantics), #21 (TTS gating cadence). Builds on M7.
 
-- **`run_post_task_hooks` had no production call sites.** Item 3's
-  ROADMAP plan ("wired into `run_post_task_hooks`…") was load-bearing
-  on a layer that isn't actually integrated into the agent execution
-  pipeline. The pragmatic answer: call `synthesise_fact_from_pause`
-  directly from `hosts/cli/streaming.py` at the top of every turn, where
-  Memoir already lives. Promoting it into a unified post-task hook
-  layer once that layer is wired is sibling work — flagged as a
-  follow-on under M5/M6 so it doesn't get lost.
-- **Metis didn't actually call `build_fact_context`.** The ROADMAP
-  Phase 1 design assumed every specialist's prompt was already
-  enriched through `facts.py` — true for Puck and Cupid, not for
-  Metis (who goes through `get_enriched_system_prompt` →
-  `build_player_context` → `retrieve_relevant_memories`, which never
-  touches facts.py). PR #87 closed that gap surgically by threading
-  `player_id` / `project_id` kwargs into `create_spec` /
-  `create_spec_stream`. Other specialists with the same shape
-  (Techne, Kallos, Dokimasia, Hephaestus) inherit the gap until
-  someone needs it — flagged as a follow-on, not blocking.
-- **PAUSE token cross-turn state lives in-process.** A
-  `kourai_common.pause_state` dict keyed by `context_id` carries the
-  preference_kind from the paused turn to the resumed turn. Agent
-  restart between pause and resume drops the classification; the
-  player's answer still lands in Memoir as labeled FL training data
-  so the loop fails soft, not silent. Cross-process persistence
-  belongs in Phase 2's confidence-decay milestone.
+**M19 — Audio backend separation for TTS (new).**
+pygame.mixer cannot reliably resample (documented limitation). Today
+the mixer is initialized at 44100 Hz stereo to match music/ambient
+OGGs, but Kokoro produces 24000 Hz mono. Result: ~3.7× speed
+"VHS rewind" playback for TTS even with WAV header parsing. Right
+fix per deeper 2026 best-practice search: **adopt `RealtimeTTS[kokoro]`
+as the unified synth + playback pipeline**. Replaces both
+`tts_kokoro.py`/`tts_edge.py` synthesis AND pygame.mixer playback
+with one library that's the 2026 standard for streaming TTS.
+KokoroEngine supports all six of our agent voices natively, exposes
+`set_voice`/`set_speed` for per-agent dispatch, runs on PyAudio
+(`apt install portaudio19-dev` on Linux). M6 ElevenLabs migration
+becomes a one-line engine swap. pygame.mixer keeps music + ambient
++ SFX where rates are known and matched. Independent of M7/M18 —
+can be prosecuted in parallel.
 
-## Notes / open questions (carry-over from M2 + M16)
+**M20 — Audio-text synchronization across CLI / GUI / VN (new).**
+Surfaced 2026-04-29 post-rebuild CLI session. Text appears
+immediately, audio plays 9-14 seconds later (Kokoro cold-start +
+synthesis lag). Breaks the character-presence illusion. Right fix
+per VN/community best-practice and 2026 modern content-creation
+standards: pre-warm Kokoro per lang_code at startup, then audio-led
+text reveal — word-by-word in lockstep with audio when RealtimeTTS
+word-timings are available (English voices, M19's KokoroEngine
+exposes the API), held-until-first-chunk fallback otherwise.
+Three-surface implementation (CLI deferred render in
+`hosts/cli/streaming.py`, GUI typewriter sync in
+`tts_gui_integration.py`, Ren'Py `voice`+`cps` via the vn-bridge).
+Player toggle `dialogue_sync_mode` for `audio-led` vs `instant`.
+Depends on M19 (word-timing API) and M18 (content-kind metadata
+to route dialogue-only to the synced path). See ROADMAP §M20 for
+full scope, acceptance criteria, and tier-1/tier-2 fallback design.
 
-- **MCP elicitation deferred-by-design.** The MCP Python SDK gates
-  capability declaration on callback presence — declaring `elicitation`
-  with a stub callback violates the "host that lies" anti-pattern that
-  Change 1 was specifically built to avoid. Real-caller-driven only.
-  When the first forge MCP tool wants `ctx.elicit()`, the architectural
-  notes from the closed [PR #74](https://github.com/ajbarea/kourai-khryseai/pull/74)
-  diff capture the round-trip design (HTTP side-channel from CLI to
-  specialist via new Starlette route, asyncio Future registry,
-  contextvar emitter); that's the implementation reference, not a plan
-  to ship now.
-- **Smoke 1 deferred — environmental.** The 2026-04-28 attempt
-  reached "architecture verified" but missed the live LLM-driven
-  write because Haiku read `read_file(".")` as a permission lockout
-  and abandoned. PR #71 fixes that at every layer the model sees
-  (TOOL USE prompts in techne/kallos/dokimasia, MCP schema docstring,
-  runtime error message). Re-run is queued for whenever
-  `api.anthropic.com` outbound from agent containers stabilises.
-- **MCP spec version pinned to 2025-11-25.** The spec drift watcher
-  cron (`scripts/watch_protocols.py`) will flag any subsequent
-  revision; today's wiring assumes that spec. Tool annotations being
-  explicitly marked untrusted is a 2025-11-25 thing.
+**M19 staging shipped 2026-04-29 (this session):**
+- `RealtimeTTS[kokoro]>=0.4.0` added to `hosts/gui/pyproject.toml`
+  alongside the transitional `kokoro` / `soundfile` / `edge-tts` deps.
+- AJ pre-flight: `sudo apt install portaudio19-dev` (PyAudio system
+  dep) on host before `make setup`. WSL2 PulseAudio passthrough
+  already works for the existing pygame path, so this is additive.
+- Full migration next session — surveying the API surface revealed
+  `TTSEngine` has substantial GUI-side coupling (`tts_helper.py`,
+  `tts_gui_integration.py`, `speak_sync`, backend-swap, master-volume
+  attribute, `enable_effects` attribute) that a full migration touches.
+  Right move is fresh-session focus over end-of-session push.
+- Fresh-session plan:
+  - New module `kourai_common/tts_realtime.py` with `RealtimeTTSEngine`
+    holding one `KokoroEngine` + one `TextToAudioStream`; mirrors the
+    existing TTSEngine ABI (`speak`, `cleanup`, `set_master_volume`,
+    `is_playing`, `enable_effects`).
+  - `hosts/cli/__main__.py` and `hosts/cli/streaming.py` flip imports
+    from `hosts.gui.tts_engine` to `kourai_common.tts_realtime`.
+  - GUI Phase 2 follow-up: `hosts/gui/tts_gui_integration.py` and
+    `hosts/gui/tts_helper.py` migrate. Old `hosts/gui/tts_engine.py`
+    + `tts_kokoro.py` + `tts_edge.py` retire only after both hosts
+    are on the new module — no flag-toggle workarounds.
+  - Test surface: existing `tests/unit/test_gui_audio_tts_engine.py`,
+    `tests/unit/test_gui_tts.py`, `tests/unit/test_tts_backends.py`,
+    `tests/integration/test_tts_*` need rewrites against the new
+    module. Most existing pygame.mixer mocks can drop entirely.
 
-## Up next
+**M13 fix.** After M7 lands: emit the original request via
+Message.metadata on resume dispatch. Tested via re-run of the
+2026-04-29 smoke against `make up`.
 
-UX/DX is the default between milestones. Pulling any of these up
-requires explicit AJ nomination per UX/DX-default convention.
+Once that sequence is in, **M17 readout follows trivially**: the
+PAUSE-on-coverage_target flow already works in unit tests
+(2876 passing); it only needs Metis to receive a real planning
+prompt to fire end-to-end. The smoke that's currently blocked
+becomes a 5-minute exercise.
 
-- **Live M17 Phase 1 + Phase 2 smoke** — exercise the full loop end-to-
-  end: `make up` + REPL session, `/project use harbour`, ask Metis to
-  plan something where she'd PAUSE on `coverage_target`, answer in the
-  next turn, watch the visible recall narrator quote it back, see
-  `fact.recalled=true` land on the `metis.execute` span in Jaeger via
-  the trace-ID-in-Dozzle pivot from M16. `/preferences` browse + set +
-  forget; verify cross-session recall now that the stable project_id
-  fix is in. Confidence decay shipped lazy so it's invisible until age
-  > 90d — exercise it with a manual `UPDATE player_memories SET
-  created_at = '...' WHERE memory_id = ...` to confirm the listing
-  shows the decayed tier and recall drops skip-tier rows. AJ-driven;
-  no automated CI surface.
-- **`run_post_task_hooks` integration** — the layer exists and is
-  fully tested but no production code calls it. Wiring it into the
-  CLI streaming path (sibling of Memoir append) gives every hook
-  (`track_interaction`, `extract_memories_from_interaction`,
-  `score_alignment`, `detect_work_patterns`,
-  `try_advance_romance`, achievement checks) a real call site.
-  Pulls `synthesise_fact_from_pause` back out of `streaming.py` at
-  the same time.
-- **Specialist parity for fact recall.** Metis now reads
+## Smoke findings — categorized
+
+**Critical / blocking M17 readout:**
+- M13 CONFIRM_ORDER prompt-loss across A2A boundary (above)
+- /yolo only adds `[yolo: on]` tag; does NOT bypass CONFIRM_ORDER gate
+  (verified via litellm RAW response on session `0dbafe91`)
+
+**Architectural — solved by M18:**
+- Comms-window streaming chunks render as discrete narrow boxes
+  (truncation appearance) rather than coherent dialogue
+- Final-render wide box only fires for some agents (Mneme yes, Metis
+  no) — depends on artifact-vs-status emission path
+- TTS gates pipeline visual cadence (333s for 60-90s of work)
+- FACT tags leak into streaming status display (raw `<FACT
+  category="..."` markup pre-filter)
+- Mneme reads ENTIRE 905-char dialogue including markdown asterisks
+  and backticks aloud (no dialogue-only filter on TTS path)
+
+**Architectural — solved by M19:**
+- TTS chipmunk-pitch / "VHS rewind" (pygame can't resample 24kHz mono
+  → 44.1kHz stereo)
+- pygame.mixer buffer underrun crackling (mitigated 512 → 2048,
+  verified gone, but the right architecture decouples TTS from
+  pygame entirely)
+
+**Independent UX bugs — small focused PRs each:**
+- Pipeline reports `Pipeline complete` and `commit_count: 0` together
+  with no soft-fail surface (#17)
+- Per-agent CLI color coding via colored-background "badge" pattern
+  (Okabe-Ito CVD-safe, NO_COLOR-aware) (#10)
+- Music playlist sparse (2 tracks) — independent of ElevenLabs
+  migration (#11)
+- Agent-card poll storm — 30+ GET `/.well-known/agent-card.json` per
+  minute on idle agents; check Hephaestus capability discovery
+  interval and Prometheus scrape config (#12)
+- Context7 MCP integration broken: `MCP error -32602: Tool
+  get-library-docs not found` AND URL template emits literal
+  `[User]:` placeholder (#14)
+- Duplicate empty `Project root:` field at end of Metis enriched
+  prompt (#15)
+- Phonemizer warning spam ("words count mismatch on 100.0% of the
+  lines (1/1)") on every TTS call — downgrade to DEBUG (#22)
+- Pre-warm Kokoro per-language at TTSEngine init (avoid first-speak
+  pause when an agent in lang_code=b speaks for the first time) (#23)
+- Explicit captions / TTS subtitle toggle for accessibility — SPEECH
+  VS ACTION rule already provides de-facto captions; toggle would
+  make it intentional and surface SPEECH VS ACTION violations (#19)
+
+## Notes / open questions
+
+- **MCP elicitation deferred-by-design.** Unchanged from prior — real-
+  caller-driven only. When the first forge MCP tool wants
+  `ctx.elicit()`, the architectural notes from closed
+  [PR #74](https://github.com/ajbarea/kourai-khryseai/pull/74) capture
+  the round-trip design.
+- **Smoke 1 from 2026-04-28 still queued** — environmental, blocked
+  on `api.anthropic.com` egress stability from agent containers.
+- **MCP spec version pinned to 2025-11-25.** Spec drift watcher cron
+  (`scripts/watch_protocols.py`) will flag any subsequent revision.
+- **`run_post_task_hooks` orchestration unwired.** Layer is fully
+  tested but no production call sites; `synthesise_fact_from_pause`
+  lives directly in `streaming.py` as the pragmatic answer. Promotion
+  is sibling work flagged for M5/M6.
+- **Specialist parity for fact recall.** Today only Metis reads
   `build_fact_context` with project scope; Techne / Kallos /
-  Dokimasia / Hephaestus do not. Sibling work to PR #87 — same
-  five-line pattern per agent. Defer until a real PAUSE caller in a
-  non-Metis specialist surfaces.
-- **M7 — a2a-sdk 1.0.x migration.** Stable shipped 2026-04-20 (1.0.2
-  current). Bigger than the existing dual-shape firewall in
-  `shared/src/kourai_common/a2a_utils.py` anticipated — see that
-  module's docstring for the full delta. Real scope:
-  - Bump pin in 3 `pyproject.toml` files; bump
-    `A2A_PROTOCOL_VERSION` from `"0.3"` to `"1.0"`.
-  - Refactor every `__main__.py` (10 agents + vn-bridge) from
-    `A2AStarletteApplication` to `create_agent_card_routes` +
-    `create_jsonrpc_routes`; `A2AStarletteApplication` is removed.
-  - Replace every `Part(root=TextPart(text=...))` /
-    `Part(root=FilePart(file=FileWithBytes(...)))` construction with
-    the flat 1.0 shape (`Part(text=...)` / `Part(raw=bytes,
-    media_type="...")`); `TextPart` / `FilePart` / `DataPart` /
-    `FileWithBytes` / `FileWithUri` are all removed.
-  - Rename every `TaskState.<lower>` / `Role.<lower>` reference to
-    the new `TASK_STATE_<UPPER>` / `ROLE_<UPPER>` form.
-  - Update `RemoteAgentConnection.send()` and `streaming.py` event
-    matching from `AsyncIterator[ClientEvent | Message]` to
-    `AsyncIterator[StreamResponse]` with `HasField()` checks.
-  - Migrate `ClientFactory.create_client()` (sync, deprecated) to
-    `await create_client()`.
-  - Audit `AgentCard` construction: `url` removed at top level,
-    `examples` / `input_modes` / `output_modes` moved into
-    `AgentSkill.examples` / `default_input_modes` /
-    `default_output_modes`; `DefaultRequestHandler(...,
-    agent_card=...)` is now required.
-  - Server-side compat flag `enable_v0_3_compat=True` exists for
-    legacy clients but is gated behind the application-setup
-    refactor; not a bypass for the migration above.
-  - Reference: upstream guide at
-    `a2aproject/a2a-python/blob/main/docs/migrations/v1_0/`.
-  - Suggested phasing: (i) refactor application setup behind the
-    compat flag while still on 0.3 wire format, (ii) flip the pin
-    and version constant, (iii) walk Part construction sites, (iv)
-    walk enum renames, (v) migrate bracket-tag workarounds
-    (`[project_root: ...]` etc.) to `Message.metadata`, (vi) tie
-    `kourai_common.pause_state` migration to M17 Phase 2.
-  - Defer scheduling until M17 Phase 1 has miles on it; bundling
-    SDK churn next to a fresh Phase 1 doubles triage cost on any
-    pause-resume regression.
-- **Live VN smoke** — `make vn` exercises both fixes from PR #66.
-- **`docs/architecture/puck-first-run-tutorial.md`** — pairs with the
-  M6 player-onboarding theme (committed in `2ad93c1`).
-- **M5 / M12 / M15 / M6 follow-ons** — see ROADMAP for scope.
+  Dokimasia / Hephaestus inherit the gap. Defer until a non-Metis
+  PAUSE caller surfaces.
+
+## Up next — priority order
+
+UX/DX is the default between milestones, but the smoke session promoted
+M13/M7/M18/M19 above the queue. AJ's pre-release perfection stance
+applies — no workarounds, web-search 2026 best practice before any
+implementation, architectural fix over expedient patch.
+
+1. **M7 — a2a-sdk 1.0 migration.** Foundation for everything below.
+   Six-phase plan in ROADMAP §M7. No more deferral.
+2. **M13 fix on top of M7.** Original-request via Message.metadata
+   on CONFIRM_ORDER resume dispatch. Re-run smoke to verify.
+3. **M18 — Structured streaming with content-kind metadata.** New
+   milestone, builds on M7. See ROADMAP §M18 for the kind taxonomy
+   and per-agent rollout plan.
+4. **M19 — Audio backend separation for TTS.** Independent of
+   M7/M18. New milestone. See ROADMAP §M19. Can run parallel.
+5. **M20 — Audio-text synchronization across CLI / GUI / VN.**
+   Builds on M18 (content-kind routing) + M19 (RealtimeTTS word-
+   timing API). New milestone surfaced this session — the 9-14s
+   text-precedes-audio gap is a first-thing-player-notices UX
+   issue. See ROADMAP §M20.
+6. **Live M17 Phase 1+2 smoke (re-run).** Trivial once M13 unblocks
+   it. Original plan from this session unchanged: `make up`,
+   `/project use <python-template>`, fizzbuzz prompt, watch PAUSE
+   on coverage_target, answer next turn, watch narrator quote it
+   back, see `fact.recalled=true` on `metis.execute` span in Jaeger
+   via the M16 trace-ID-in-Dozzle pivot, exercise `/preferences`,
+   restart for cross-session recall, manual SQL backdate for decay.
+7. **Independent UX bugs from the smoke** (see "Smoke findings —
+   Independent UX bugs" section above) — sized for individual focused
+   PRs.
+8. **Live VN smoke** — `make vn` exercises both fixes from PR #66.
+9. **`docs/architecture/puck-first-run-tutorial.md`** — pairs with
+   the M6 player-onboarding theme (committed in `2ad93c1`).
+10. **M5 / M12 / M15 / M6 follow-ons** — see ROADMAP for scope.

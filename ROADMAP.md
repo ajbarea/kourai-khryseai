@@ -5,7 +5,7 @@ A public, living plan for where the forge is heading. Items here are either
 *currently working on* lives in [IMPL.md](./IMPL.md) — when it lands, the
 matching milestone here collapses to a single line under "Shipped".
 
-Last reviewed: 2026-04-27 (M1 fully shipped + 5 Round 6 M6-future bullets closed (#34/#35/#36/#38) + research-driven ROADMAP additions (#37) + four OSS-CC lifts shipped (#39/#40/#41); 2026-04-27 live smoke pass uncovered + fixed two infrastructure bugs: forge worktree gitdir resolves from container (#42) and CLI input_required follow-up preserves forge tags (#43); spec drift watcher cron lands (#44) — "track latest aggressively" automated rather than nudge-driven; skill-context migration (#45) prunes personal memory 17→5 entries by lifting per-repo facts to `.claude/skill-context.md` and cross-project rules to `~/.claude/CLAUDE.md`; ty warning baseline cleared (#46) — `Found 0 diagnostics` for the first time; observability triad complete (#47) — dozzle real-time per-container log dashboard joins Jaeger (per-trace flow) + Prometheus (rates/durations) at http://localhost:8888, scoped to the kourai-khryseai compose project; **`make observe` cross-platform launcher (in working tree, ready for PR)** — single command opens all three obs UIs in the dev's default browser via Python's stdlib `webbrowser` with a WSL2 fallback through `cmd.exe /c start` (no `wslu`/`xdg-open` required); each printed line carries its category + the question it answers ("traces — where did this go", "metrics — how often / how slow", "logs — what is THIS agent saying"); **Dozzle sidebar grouping (in working tree)** — `dev.dozzle.group` labels on the compose anchor + non-agent services partition the sidebar into agents (10) / mcp (2) / observability (3) / infra (1) so triage of "is this an agent issue or an infra issue" is one click; **M16 (Observability DX uplift) drafted + Changes 1/2/5 shipped (in working tree)** — `make observe` audit surfaced three load-bearing gaps (Jaeger v1 EOL'd 2025-12-31; Prometheus scrapes only Jaeger's own `:14269`, none of the 10 agents; Dozzle log lines lacked trace IDs, so no cross-pane jump from a slow span back to the agent's narration); five workstreams scoped, three landed today: (1) **trace-ID injection** via a 10-line `_OtelTraceFilter` + `_TraceAwareFormatter` in `kourai_common.log` reading `trace.get_current_span()` directly (skipped `opentelemetry-instrumentation-logging` once source-reading revealed it gates attribute injection on `set_logging_format=True` which would also call `basicConfig` and clash with our explicit handlers); (2) **`docs/observability.md`** with mental model, triage runbook, container-groups table, candid "what's populated, what's not" section flagging the Prometheus gap, span-naming convention; wired into nav under Architecture → Observability; slimmed the parallel section in `infrastructure.md` and corrected its overpromise about SPM's Monitor tab being populated; (5) **dozzle pin verified current** — v10.5.0 released 2026-04-26 21:13 UTC per the GitHub releases API, exactly current, no bump needed but discipline of always-checking is the durable win; Changes 3 (Jaeger v1.60 → v2.17 migration) and 4 (`spanmetrics` connector + Prometheus v3 + agent RED scrape) remain — both want a focused live-smoke session, not autonomous bundling; M7 scope grew the Message.metadata migration item informed by the v1.0 spec research; all the rest from the prior reviewed line still applies — see Shipped, revised M2/M7, and the M6 "Surfaced from external research" subsection)
+Last reviewed: 2026-04-29 (M17 Phase 2 fully shipped — `/preferences` CRUD CLI + project_id stability fix (#93), confidence decay (#94); 2026-04-29 live smoke against `make up` uncovered an architectural overhaul that supersedes "between milestones" UX/DX work: **M13 CONFIRM_ORDER prompt-loss regression** — Hephaestus drops the original development request when relaying to a specialist after the player's confirmation, so Metis received only `"light it"` / `"y"` as her spec body; pipeline cascaded on garbage and reported `✨ Forged in 333.6s` / `commit_count: 0` with no soft-fail signal across two end-to-end runs (sessions `bd1e413a` and `0dbafe91`); /yolo verified to only tag messages with `[yolo: on]` rather than bypass the gate, so the regression is independent of the yolo path. Beyond M13, the smoke surfaced 23+ findings clustering around two architectural gaps: unstructured streaming (every text update parsed as either narrow status box or wide artifact render with no metadata to distinguish dialogue, status, code, or spec — manifests as truncation, FACT-tag leakage, TTS reading 905-char Mneme dialogue including markdown asterisks aloud, TTS gating turning 60-90s of pipeline work into 333s of wall-clock) and audio playback architecture (pygame.mixer documented as not reliably resampling, so 24kHz mono Kokoro output through 44.1kHz stereo mixer renders as ~3.7× speed "VHS rewind" — BytesIO header-parsing patch verified ineffective by AJ; pygame buffer 512→2048 bumped to fix WSL2+LLM-load underrun crackling, verified gone). New milestones M18 (structured streaming with content-kind metadata in `Message.metadata`, builds on M7) and M19 (audio backend separation for TTS via miniaudio or sounddevice, independent of M7/M18) added below. M7 status elevated to critical-path: no longer "deferred until M17 Phase 1 has miles" — it's the foundation for M13 fix AND M18. Quick wins shipped in working tree without architectural commitment: `[HH:MM:SS]` dim prefix in every comms-window header for per-step timing visibility (`hosts/cli/rendering.py`), full TTS text logged at INFO via `text=%r` in `hosts/gui/tts_engine.py`, pygame buffer bump documented in `shared/src/kourai_common/audio.py` with the WSL2-trade-off comment so future PRs don't shrink it back. New memory `feedback_no_workarounds.md` captures the pre-release perfection stance: "April-2026 best practice no matter the cost; never frame as 'cheapest fix'; web-search before any implementation proposal." All the rest from the 2026-04-27 reviewed line still applies — see Shipped, revised M2/M7, and the M6 "Surfaced from external research" subsection)
 
 ---
 
@@ -74,8 +74,22 @@ Option 1 is cleanest if it doesn't break agent-internal deps that assume UID 100
 
 ## M7 — A2A v1.0 migration
 
-> Status: planned · Bigger-than-the-firewall-claimed (see 2026-04-26 finding) ·
-> Pyproject pinned to `<1.0` until M7 lands properly
+> Status: **critical-path** (elevated 2026-04-29) · Bigger-than-the-firewall-
+> claimed (see 2026-04-26 finding) · Pyproject pinned to `<1.0` until M7
+> lands properly · **Foundation for M13 regression fix and M18 structured
+> streaming**
+
+The 2026-04-29 live smoke proved that bracket-tag workarounds
+(`[project_id: ...]`, `[yolo: on]`) cannot reliably propagate
+load-bearing context across A2A boundaries. Hephaestus's CONFIRM_ORDER
+resume handoff dropped the original development request when relaying
+to Metis (M13 regression — Metis received only `"light it"` as her
+spec body). The right fix is not another text-tag patch; it's
+`Message.metadata` on the v1.0 wire. The original deferral ("until
+M17 Phase 1 has miles") is superseded by AJ's pre-release perfection
+stance — Phase 1 shipped, the bracket-tag pattern is actively
+breaking, and M18 (below) cannot land cleanly without v1.0's metadata
+channel.
 
 `a2a-sdk` 1.0.2 was on PyPI as of 2026-04-26 and `uv lock` cheerfully picked
 it up when resolution allowed `<2.0`. We bumped, ran the suite, and **broke
@@ -516,6 +530,49 @@ on a 90-day window.
   (matching `set_preference_fact`) so re-PAUSE on the same scope+kind
   no longer stacks rows in `player_memories`.
 
+### Live smoke 2026-04-29 — readout still blocked on M13
+
+Two end-to-end runs (sessions `bd1e413a` and `0dbafe91`) intended to
+exercise the M17 happy path — fizzbuzz prompt → Metis PAUSE on
+`coverage_target` → player answer → narrator quotes the resolved
+preference back → `fact.recalled=true` lands on the `metis.execute`
+span via the M16 trace-ID-in-Dozzle pivot — **never reached the
+PAUSE step.** Hephaestus drops the original prompt across the
+CONFIRM_ORDER → resume → route handoff (M13 regression — see
+ROADMAP §M7 elevation rationale and IMPL.md critical-path section).
+Metis received only the player's confirmation token (`"light it"`,
+`"y"`) as her spec body, generated questions-as-prose as her
+response, declared `Spec complete`, and the rest of the pipeline
+cascaded through Techne / Dokimasia / Kallos / Mneme on garbage —
+333.6 seconds of wall-clock for zero output. /yolo verified to only
+add the `[yolo: on]` text-tag rather than bypass the gate, so the
+regression is independent of the yolo path and survives both routes.
+
+**The M17 code path itself is correct.** 2876 unit tests pass; the
+PAUSE token vocabulary, `synthesise_fact_from_pause` dedup, decay
+ladder, recall narrator, telemetry attributes, `/preferences` CRUD
+CLI, and project_id stability fix are all verified at the unit
+level. The blocker is upstream — Metis simply needs to receive a
+real planning prompt for any of M17 to fire end-to-end.
+
+The smoke also surfaced an architectural cluster — comms-window
+truncation, FACT-tag leakage, TTS reading 905-character Mneme
+dialogue including markdown asterisks aloud, TTS gating turning
+60-90s of work into 333s wall-clock — all sharing the same root
+cause in unstructured streaming. **Captured as M18 below**, builds
+on M7. Audio playback architecture (pygame.mixer documented as not
+reliably resampling, so 24kHz mono Kokoro through 44.1kHz stereo
+mixer plays as ~3.7× speed "VHS rewind") **captured as M19 below**,
+independent of M7/M18.
+
+Re-run plan once M7 + M13 fix lands: same fizzbuzz prompt against a
+fresh `make up`, watch PAUSE on coverage_target, answer in next
+turn, watch the `📐` recall narrator emit "Recalling that you set
+coverage_target to …", verify `fact.recalled=true` on the span,
+exercise `/preferences` browse + set + forget, restart REPL to
+verify cross-session recall, manual SQL backdate of `created_at` to
+verify decay tier transitions in the listing.
+
 ### Out of scope — defer to follow-on milestones
 
 - *Memoir → facts batch synthesis.* autoDream territory below — the
@@ -549,6 +606,315 @@ Defensible *now* that Phase 1 has landed:
 > stays scoped — preferences for project A are NOT surfaced when the
 > player switches to project B. Scoping aligns with the four-scope
 > memory model formalised by Mem0 / Letta in 2026."*
+
+---
+
+## M18 — Structured streaming with content-kind metadata
+
+> Status: planned · Surfaced 2026-04-29 live smoke · Builds on M7
+> (depends on `Message.metadata` channel) · Resolves clustered UX
+> findings: comms-window truncation, FACT-tag leakage into status
+> stream, TTS reading entire markdown bodies aloud, TTS-gated
+> pipeline visual cadence
+
+### Why
+
+The 2026-04-29 smoke surfaced a cluster of seemingly-unrelated UX
+bugs that all trace to the same root cause: **kourai's agent ↔ host
+streaming carries text without a content-kind discriminator.** Every
+status update goes through one path, gets truncated to a narrow
+comms-window box, gets read aloud verbatim by TTS, and gates the
+next event on its narration completion. The 905-character Mneme
+"forge is empty" dialogue was read aloud including markdown asterisks
+and backticks and held the next pipeline event for 25 seconds.
+Pipelines that should take 60-90 seconds of model + tool work end up
+at 333 seconds of wall-clock because every box waits for its
+voiceover.
+
+The convergent 2026 best practice across A2A spec, SSML, Anthropic
+content blocks, and structured-streaming patterns in LangChain /
+LangGraph / OpenCode is **typed content with explicit metadata,
+parsed at protocol level rather than via prose conventions**. Kourai
+already runs on A2A — we just aren't using its native metadata
+channel for routing.
+
+### Scope
+
+**1. Content-kind taxonomy in `Message.metadata`.** Define a
+single source of truth in `kourai_common.streaming` (new module):
+
+| `kourai.content_kind` | Render path | TTS-eligible | Gate next event |
+|---|---|---|---|
+| `dialogue` | comms-window italic | yes (post-SSML) | yes |
+| `status` | comms-window plain | no | no (fire-and-forget) |
+| `code` | comms-window monospace | no | no |
+| `spec` | wide markdown render | no | no |
+
+Each agent's `agent_executor.py` tags every emitted event with the
+appropriate kind in `Message.metadata.kourai.content_kind`. Host's
+`hosts/cli/streaming.py` (and the GUI peer) routes by metadata, not
+by parsing text or first-emoji-prefix detection. **Every existing
+text-parsing branch in `_maidenify_status` retires.**
+
+**2. SSML inside dialogue bodies.** Each `dialogue` Part text body
+is an SSML document — `<speak>...<break time="200ms"/>...
+<emphasis>...</emphasis>...</speak>`. Standard W3C markup, supported
+declaratively by every major TTS provider (Google, Azure, Amazon,
+ElevenLabs). Kokoro doesn't natively consume SSML; we strip-then-
+synthesize as a transitional layer. ElevenLabs migration on M6
+unblocks full SSML downstream.
+
+**3. Visual rendering decoupled from TTS pacing.** Once content-kind
+drives routing, status events fire-and-render immediately with no
+TTS gate. Dialogue events block on TTS as appropriate. Host streaming
+loop changes from "always await tts.speak before next event" to
+"await iff this event is `dialogue`."
+
+### Out of scope (defer to follow-on)
+
+- **GUI renderer parity.** CLI-first; GUI lifts after CLI stabilises.
+- **VN bridge dialogue extraction.** The Ren'Py side already has a
+  separate dialogue protocol; coordinating both is M19-adjacent work.
+- **Per-agent persona-aware SSML** (e.g. Hephaestus's gruff prosody
+  vs Kallos's lilting cadence). Lift after the structural plumbing
+  is in.
+
+### Why now
+
+Pre-release perfection stance (memory: `feedback_no_workarounds`).
+The cluster of TTS / truncation / cadence findings cannot be fixed
+in isolation without embedding a parsing-layer workaround that M7
+will then need to delete. M7 → M18 in sequence is the cheapest
+total-cost path even though M18 is large.
+
+---
+
+## M19 — Audio backend separation for TTS
+
+> Status: planned · Surfaced 2026-04-29 live smoke · Independent of
+> M7/M18 (can prosecute in parallel) · Resolves verified-broken TTS
+> chipmunk + the underlying playback architecture
+
+### Why
+
+The 2026-04-29 smoke confirmed AJ's "VHS rewind" diagnosis: TTS
+plays at ~3.7× intended speed. Initial scoped patch wrapping
+`chunk_bytes` in `BytesIO` to trigger pygame's WAV header parsing
+**verified by AJ as not fixed**. Web-search confirmed the root
+cause is documented:
+
+> *"Pygame cannot perform Sound resampling, so the mixer should be
+> initialized to match the values of your audio resources."*
+> — [pygame.mixer docs](https://www.pygame.org/docs/ref/mixer.html);
+> see also
+> [pygame issue #2597](https://github.com/pygame/pygame/issues/2597),
+> [pygame-ce issue #1246](https://github.com/pygame-community/pygame-ce/issues/1246).
+
+The mixer is initialized at 44100 Hz stereo to match music + ambient
+OGG assets. Kokoro produces 24000 Hz mono. SDL_mixer's "limited
+resampling" is unreliable per the GitHub issues. **No amount of
+header parsing fixes this** — pygame's playback path doesn't
+resample the data, it just plays it at whatever rate the mixer was
+initialized at.
+
+### Scope
+
+**1. Adopt `RealtimeTTS` as the unified TTS pipeline.** Updated
+recommendation after deeper web-search surfaced the 2026 industry-
+standard library that supersedes the initial miniaudio-primary
+plan. RealtimeTTS bundles synthesis + playback in one streaming
+abstraction — it's not a workaround that combines two libraries,
+it's the right primitive layer for real-time TTS.
+
+| Library | Mechanism | Tradeoffs |
+|---|---|---|
+| **`RealtimeTTS[kokoro]`** | Streaming TTS pipeline (synthesis + playback) supporting Kokoro, OpenAI, ElevenLabs, Azure, Coqui, StyleTTS2, Piper, Edge TTS, Cartesia | Native KokoroEngine with all our six voices supported (`af_sarah`, `am_michael`, `bf_emma`, `af_jessica`, `af_bella`, `af_nicole`); `set_voice()` / `set_speed()` for per-agent dispatch mid-session; word-level timings exposed for English voices (free win for #19 captions); 24 kHz mono int16 native (matches Kokoro); PyAudio backend (`apt install portaudio19-dev` on Linux). **The M6 ElevenLabs migration becomes a one-line engine swap** since RealtimeTTS already supports ElevenLabs as a registered engine. |
+| `miniaudio` (`pyminiaudio`) | Single-source-file C lib | Initial first-pass recommendation. Lower-level than needed once RealtimeTTS surfaces — we'd be re-implementing the synth-to-playback queue that RealtimeTTS already provides. |
+| `sounddevice` | PortAudio binding | Same backend layer RealtimeTTS uses (PyAudio is also PortAudio). Lower-level than needed. |
+
+Rejected: hand-rolled kokoro/edge-tts backends + separate playback
+library — cleaner to consolidate on the single library that's the
+2026 best practice for this exact problem. `pygame.mixer` explicitly
+out of scope for TTS.
+
+**2. Replace our custom synthesis backends.** `shared/src/kourai_common/tts_kokoro.py`
+and `shared/src/kourai_common/tts_edge.py` retire. RealtimeTTS's
+KokoroEngine + EdgeEngine cover the same ground with a maintained
+upstream. `kourai_common.tts_backend.VOICE_ROSTER` keeps the per-
+agent voice mapping; just feeds RealtimeTTS engines instead of our
+own synth code.
+
+**3. New TTS engine module replaces `hosts/gui/tts_engine.py`.**
+Holds one `KokoroEngine` + one `TextToAudioStream`. `speak(text, agent)`
+becomes: `engine.set_voice(VOICE_ROSTER[agent].voice_id)`,
+`engine.set_speed(VOICE_ROSTER[agent].speed)`, `stream.feed(text)`,
+`stream.play_async()`. Pause / resume / stop via the stream's
+methods. No pygame.mixer involvement on the TTS path.
+
+**4. Clean separation of audio domains preserved.** Music + ambient
++ SFX stay on pygame.mixer at 44100 stereo, where rates are known
+and matched (post-buffer-bump 2048). TTS lives entirely on PyAudio
+via RealtimeTTS at 24 kHz mono. The two systems don't share state
+beyond the volume slider abstraction in `/settings`.
+
+**5. SSML-readiness preserved.** RealtimeTTS handles SSML where the
+underlying engine supports it (ElevenLabs full support, Azure full
+support, Kokoro through pre-processing). M6's ElevenLabs migration
+gets full SSML automatically by switching `KokoroEngine` →
+`ElevenLabsEngine` in the engine instantiation — no playback layer
+changes.
+
+**6. System dependency.** `portaudio19-dev` on Linux for PyAudio.
+WSL2 already has working audio passthrough for the existing pygame
+path, so this is additive, not new infrastructure. Add to
+`docker/host.Dockerfile` only if a container ever needs TTS — today
+TTS runs only on the host CLI/GUI process, so just `make setup` on
+AJ's machine pulls it via the new `hosts/gui/pyproject.toml` dep.
+
+### Why pygame can't be retrofitted
+
+We considered: (a) re-init pygame.mixer at 24000 mono just for TTS —
+breaks music/ambient which are 44100 stereo; (b) manually resample
+24000→44100 + duplicate mono→stereo in numpy before passing to
+pygame — embeds a "we did the resampling pygame can't" pattern
+that's exactly the kind of workaround AJ's perfection stance
+disallows; (c) two pygame.mixer instances — pygame doesn't support
+this (single global mixer). Real fix is to pick a different library
+for TTS.
+
+### Why now
+
+Audio quality has been "still terrible" through both 2026-04-29 smoke
+runs. Pre-release perfection. M19 is independent of M7/M18 so it
+can ship in parallel without dependency entanglement.
+
+---
+
+## M20 — Audio-text synchronization across CLI / GUI / VN
+
+> Status: planned · Surfaced 2026-04-29 (post-rebuild CLI session) ·
+> Depends on M19 (RealtimeTTS provides word-level timing callbacks
+> for Kokoro English voices) and M18 (content-kind metadata routes
+> dialogue-only to the synced reveal path) · Player- and developer-
+> experience improvement spanning all three player surfaces
+
+### Why
+
+A maiden's dialogue text appears in the CLI / GUI immediately, then
+TTS audio plays whenever Kokoro is ready. The first speak() per
+session pays a ~10-14 second cold-start (Kokoro lazy-loads pipelines
+per `lang_code` on first use); subsequent calls have ~1-2s synthesis
+lag for 50-100 char dialogue. Concrete 2026-04-29 example: AJ
+launched `make cli`, saw Hephaestus's opening line `"I didn't get
+thrown off Olympus to write bad software."` printed at 12:55:49,
+heard the same line at 12:55:58 — **9 seconds of "text shown but
+no audio" silence**, then 4 seconds of audible delivery.
+
+The visible+audible disconnect breaks the character-presence
+illusion the maidens depend on. Hephaestus's deadpan line lands in
+print before the player can hear his voice deliver it; by the time
+audio plays, the player has read past it. This is the exact failure
+mode VN best-practice writes against — community guidance from
+Fuwanovel and commercial VN engines (Ren'Py, Kirikiri, Visual Novel
+Maker) is consistent: **adjust text reveal speed to match voice line
+duration** so the player can't out-pace the actor.
+
+The 2026 modern content-creation standard for synced text+audio is
+**word-level timing**: each spoken word gets a precise audio
+timestamp, the visual layer reveals each word as it's spoken
+(karaoke-style highlighting). Used everywhere from TikTok captions
+to professional subtitle workflows. RealtimeTTS exposes this
+natively for Kokoro English voices via the engine's word-timing
+callbacks (Phase 1 of M19 unlocks the API).
+
+### Scope
+
+**1. Pre-warm Kokoro at startup, per language code.** Eliminates
+the 10-14s first-speak cold-start. `VOICE_ROSTER` enumerates every
+agent's voice + lang_code at TTSEngine init time — load each
+unique lang_code in a fire-and-forget background task before the
+greeting fires. Trades startup latency (deterministic, ~10s
+window where the player sees a "Tuning the forge…" progress
+indicator) for a smooth first-utterance.
+
+**2. Audio-led text reveal.** Replace immediate text rendering with
+deferred-render gated on TTS readiness. Two precision tiers:
+
+- **Tier 1 (English voices, RealtimeTTS word-timing supported):**
+  word-by-word reveal in lockstep with audio. Subscribe to the
+  RealtimeTTS word-timing callback; advance a word cursor on each
+  callback fire; render the next word into the visible region.
+  Karaoke-style — the audio defines the cadence.
+- **Tier 2 (no word timings — non-English Kokoro voices, Edge TTS,
+  future engines):** hold text rendering until the first audio
+  chunk is queued (i.e., synthesis has produced *something*
+  playable). Renders the full text at audio start. Less precise
+  but eliminates the "text precedes audio" disconnect. Falls back
+  to instant-render only when TTS is disabled entirely.
+
+**3. Three-surface implementation.**
+
+- **CLI (`hosts/cli/streaming.py` + `hosts/cli/rendering.py`):**
+  Replace immediate `_echo(_comms_window(...))` with a deferred-
+  render that holds the box content until either (a) first audio
+  chunk queued, or (b) word-timing callback fires. Box renders
+  progressively as words speak.
+- **GUI (`hosts/gui/tts_gui_integration.py` + the dialogue panel
+  renderer):** Pygame text-rendering loop already polls per-frame;
+  add a word-cursor that advances on TTS word-timing callbacks.
+  Existing typewriter mechanics stay; cadence is now audio-driven
+  rather than constant-rate.
+- **VN (Ren'Py via `agents/vn-bridge`):** Ren'Py natively supports
+  the `voice` statement with text-pacing through the `cps` (chars
+  per second) variable. Bridge feeds audio + word-timing metadata;
+  Ren'Py drives the typewriter natively. Per the 2022-2026 Ren'Py
+  audio docs, `.ogg` and `.mp3` are the only supported formats —
+  RealtimeTTS already produces compatible streams via the
+  `KokoroEngine` output path.
+
+**4. Settings toggles** (`/settings` in CLI, GUI dialog
+preferences, VN config menu — all three surface):
+- `dialogue_sync_mode`: `audio-led` (default — text reveals with
+  voice) | `instant` (legacy — text appears immediately, audio
+  catches up). Player preference; some readers want text first,
+  audio as flavor.
+- `text_speed_factor`: 0.5–2.0 multiplier on word-reveal speed
+  for accessibility. Doesn't change audio rate; only adjusts the
+  visual cursor when audio is muted or instant mode is selected.
+- `tts_everything`: also TTS unquoted status updates (off by
+  default — only quoted dialogue is voiced per SPEECH VS ACTION
+  rule). Opt-in for blind / low-vision players who want fuller
+  audio narration.
+
+### Out of scope (defer to follow-on)
+
+- Per-character mouth animation in GUI / VN (lip-sync to phonemes —
+  separate animation milestone).
+- Real-time STT for player voice input. RealtimeSTT exists in the
+  same library family but is a distinct concern.
+- Cross-language word-timing for non-English voices. Kokoro's word-
+  timing API is currently English-only per RealtimeTTS docs;
+  upstream feature, not ours to build.
+
+### Acceptance
+
+- CLI: maiden dialogue text reveals progressively in sync with audio
+  playback. First-line lag eliminated by Kokoro pre-warm.
+- GUI: dialogue panel typewriter matches voice cadence frame-by-frame.
+- VN: Ren'Py `voice` + `cps` driven by RealtimeTTS word-timing
+  metadata over the bridge.
+- `/settings` exposes `audio-led` vs `instant` modes; default is
+  `audio-led`. Player can switch.
+- The 2026-04-29 reproducer no longer applies: Hephaestus's opening
+  line text and audio appear together, not 9 seconds apart.
+
+### Why now
+
+UX/DX-default pre-release. The disconnect between text and audio is
+a first-thing-the-player-notices issue — visible the moment any
+maiden speaks. Pairs naturally with the M19 RealtimeTTS adoption
+since the word-timing primitive is the load-bearing API; building
+M20 on M18+M19 is one coordinated UX wave rather than three drips.
 
 ---
 
