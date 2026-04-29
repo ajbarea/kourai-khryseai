@@ -9,9 +9,16 @@ dependencies = [
     "pygame-ce>=2.5.0",  # Community edition with enhanced audio support
     "pillow>=10.0",
     "httpx>=0.27",
-    "kokoro>=0.4.0",       # Local neural TTS (Apache 2.0, 82M params)
-    "soundfile>=0.13.0",   # WAV I/O for Kokoro audio output
-    "edge-tts>=0.30.0",   # Fallback cloud TTS (remove once Kokoro is stable)
+    # M19 — RealtimeTTS bundles synthesis + playback as one streaming
+    # pipeline; supersedes our hand-rolled kokoro/edge-tts backends + pygame
+    # playback path. Native KokoroEngine with all six agent voices supported,
+    # set_voice/set_speed for per-agent dispatch, word-level timings (free
+    # win for #19 captions), and ElevenLabs migration becomes a one-line
+    # engine swap. Linux system dep: apt install portaudio19-dev (PyAudio).
+    "RealtimeTTS[kokoro]>=0.4.0",
+    "kokoro>=0.4.0",       # M19 transitional: kept until tts_kokoro.py retires
+    "soundfile>=0.13.0",   # M19 transitional: kept until tts_kokoro.py retires
+    "edge-tts>=0.30.0",    # M19 transitional: RealtimeTTS includes EdgeEngine
     "emoji>=2.15.0",
     "numpy>=1.26",
 ]
