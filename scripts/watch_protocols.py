@@ -107,7 +107,13 @@ WATCHES: tuple[Watch, ...] = (
         key="a2a-sdk-pypi",
         url="https://pypi.org/pypi/a2a-sdk/json",
         kind="pypi",
-        note="a2a-sdk on PyPI. Pyproject pinned <1.0 today; M7 cutover when stable 1.0.x lands.",
+        note=(
+            "a2a-sdk on PyPI. Stable 1.0.x landed 2026-04-20 (1.0.0); "
+            "1.0.2 current. Pyproject still pinned <1.0; M7 cutover is the "
+            "scoped-but-unstarted migration captured in IMPL.md → ROADMAP M7. "
+            "Future 1.0.x point releases bumping this digest are the safe "
+            "kind of drift; a 1.1.x or 2.x bump is a re-scope signal."
+        ),
     ),
     Watch(
         key="mcp-pypi",

@@ -2,16 +2,55 @@
 
 Centralizes common A2A message handling patterns used across multiple agents.
 
-A2A v1.0 migration
-    The v1.0 spec unifies TextPart/FilePart/DataPart into a single Part
-    type with member-based discrimination (``"text" in part``, ``"url" in
-    part``) and renames ``mimeType`` → ``mediaType``. Card payloads are
-    also backward-compatible, so a single SDK upgrade won't break us.
-    All Part inspection in this repo funnels through ``_is_file_part()``
-    and ``_get_file_bytes()`` — those two helpers are the v1.0 migration
-    surface. Pyproject pins permit ``a2a-sdk<2.0`` so ``uv lock`` can
-    pull 1.0.x once the upstream stable drops (ETA May-June 2026 per the
-    a2a-protocol.org announcement).
+A2A v1.0 migration — status as of 2026-04-29
+    a2a-sdk 1.0.0 stable shipped 2026-04-20; current is 1.0.2 (2026-04-24).
+    The migration is *bigger* than this firewall anticipated:
+
+    - Predicted: v1.0 would unify ``TextPart`` / ``FilePart`` / ``DataPart``
+      into a single Part type with member discrimination (``hasattr(root,
+      "bytes") and hasattr(root, "media_type")``).
+    - Reality: v1.0 *removed* ``TextPart`` / ``FilePart`` / ``DataPart`` /
+      ``FileWithBytes`` / ``FileWithUri`` entirely. Construction is now
+      ``Part(text="...")`` or ``Part(raw=bytes, media_type="...",
+      filename="...")`` — flat fields on Part itself, not member discrim
+      on a tagged-union root. The ``hasattr(root, "bytes")`` branch below
+      still works *by accident* because protobuf message attribute access
+      is permissive; the ``hasattr(root, "media_type")`` check matches the
+      actual v1.0 field name. So the firewall happens to fall through
+      correctly, but the prediction was wrong and a future reader should
+      rewrite the helpers against the actual v1.0 shape during M7 rather
+      than treating this code as load-bearing.
+
+    The bigger ticket items not addressed by this file:
+
+    - ``A2AStarletteApplication`` is removed; every agent's ``__main__.py``
+      needs rewriting against ``create_agent_card_routes`` +
+      ``create_jsonrpc_routes`` from ``a2a.server.routes``.
+    - All enums switched ``snake_case`` → ``SCREAMING_SNAKE_CASE``
+      (``TaskState.working`` → ``TASK_STATE_WORKING``,
+      ``Role.user`` → ``ROLE_USER``).
+    - ``ClientFactory.create_client()`` is sync-deprecated; new path is
+      ``await create_client(url_or_card)`` from ``a2a.client``.
+    - ``AgentCard`` overhaul: top-level ``url`` removed, ``examples`` /
+      ``input_modes`` / ``output_modes`` moved into ``AgentSkill`` /
+      ``default_input_modes`` / ``default_output_modes``.
+    - ``DefaultRequestHandler`` requires ``agent_card=`` now.
+    - Streaming: ``AsyncIterator[ClientEvent | Message]`` →
+      ``AsyncIterator[StreamResponse]`` with ``HasField('artifact_update'
+      | 'status_update' | 'task' | 'message')`` checks.
+    - Server-side ``enable_v0_3_compat=True`` flag exists on
+      ``create_jsonrpc_routes`` / ``create_rest_routes`` for legacy
+      clients; not reachable today since the application-setup refactor
+      is itself a precondition.
+
+    See ROADMAP §M7 for the milestone scope and the upstream migration
+    guide at ``a2aproject/a2a-python/blob/main/docs/migrations/v1_0/``.
+
+A2A protocol-version negotiation
+    Every outbound request carries an ``A2A-Version`` header per the
+    v1.0 spec. We declare 0.3 explicitly today so a 1.0.x server can
+    negotiate down rather than silently downgrading. ``A2A_PROTOCOL_VERSION``
+    is the single bump-site when M7 ships.
 """
 
 from __future__ import annotations
@@ -29,13 +68,10 @@ if TYPE_CHECKING:
 
 # ── A2A protocol version negotiation ──────────────────────────────────
 
-# The version we declare on every outbound A2A request via the
-# ``A2A-Version`` header. v1.0 of the spec made this header REQUIRED for
-# clients (servers assume 0.3 if absent — see
-# https://a2a-protocol.org/latest/specification/). We declare 0.3
-# explicitly so that when M7 lands an a2a-sdk 1.0.x server, the
-# negotiation is unambiguous: this client speaks 0.3 today. Bump this
-# constant in lockstep with the SDK pin in pyproject when M7 ships.
+# Single bump-site for M7. Today's clients declare 0.3 explicitly so a
+# 1.0.x server can negotiate down. Flipping this to ``"1.0"`` is one of
+# the last steps of the M7 cutover, paired with the pin bump in pyproject
+# and the application-setup refactor noted in this module's docstring.
 A2A_PROTOCOL_VERSION = "0.3"
 
 
@@ -128,33 +164,36 @@ def parse_project_root(text: str) -> Path:
     return Path.cwd()
 
 
-# ── Part inspection helpers (v1.0 migration firewall) ────────────────
+# ── Part inspection helpers (live 0.3.x; M7 will rewrite) ────────────
 
 
 def _is_file_part(root: Any) -> bool:
     """Return True if the Part root contains embedded file bytes.
 
-    Supports SDK 0.3.x (FilePart with ``root.file`` = FileWithBytes) today
-    and the v1.0 unified-Part shape (flat ``bytes`` + ``mediaType`` keys)
-    as a forward-compatibility stub — v1.0 is pinned-but-unused; live
-    traffic still travels the 0.3.x path.
+    Today's path: SDK 0.3.x ``FilePart`` with ``root.file`` = ``FileWithBytes``.
+
+    The second branch was a forward-compat stub that predicted the v1.0
+    Part shape would be a tagged union with ``bytes`` / ``media_type``
+    members; the real 1.0 shape is flat fields directly on ``Part``
+    (``Part(raw=bytes, media_type="...")``), no nested root. The check
+    happens to match anyway because protobuf attribute access is
+    permissive, but M7 should rewrite both helpers against the actual
+    v1.0 surface rather than relying on this accidental match.
     """
     if hasattr(root, "file") and isinstance(root.file, FileWithBytes):
         return True
-    # v1.0 unified Part forward-compat — activated when a2a-sdk ≥ 1.0 lands.
     return hasattr(root, "bytes") and hasattr(root, "media_type")
 
 
 def _get_file_bytes(root: Any) -> tuple[str, str]:
     """Extract (base64_bytes, mime_type) from a file Part root.
 
-    Returns ``(bytes_str, mime_type)`` for both SDK 0.3.x (``root.file.bytes``
-    + ``mime_type``) and the v1.0 unified Part (flat ``bytes`` +
-    ``media_type``). Mime defaults to ``image/png`` if unset.
+    Same caveat as ``_is_file_part`` — the v1.0 branch happens to work
+    against protobuf attribute access but assumes a tagged-union shape
+    that didn't ship. Rewrite both during M7.
     """
     if hasattr(root, "file") and isinstance(root.file, FileWithBytes):
         return root.file.bytes, root.file.mime_type or "image/png"
-    # v1.0 unified Part forward-compat.
     return root.bytes, getattr(root, "media_type", None) or "image/png"
 
 
