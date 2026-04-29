@@ -5,12 +5,14 @@ milestone lands, the matching detail block in [ROADMAP.md](./ROADMAP.md)
 collapses to a one-liner under "Shipped" and this file gets reset to the
 next milestone.
 
-Updated: 2026-04-29 · Working on: **2026-04-29 live smoke uncovered an
-architectural overhaul. Pre-release perfection stance: no workarounds.
-M19 fully shipped (Phases 1+2+3 all landed 2026-04-29). Remaining
-sequence: M13 regression fix → M7 (a2a-sdk 1.0) → M18 (structured
-streaming with content-kind metadata). M17 itself ships clean once M13
-unblocks the readout path.**
+Updated: 2026-04-29 · Working on: **M7 — a2a-sdk 1.0 migration.
+Six-phase execution plan drafted in ROADMAP §M7; Phase 1 next.
+Pre-release perfection stance: no workarounds. M19 fully shipped
+(Phases 1+2+3 all landed 2026-04-29). Remaining sequence: M7
+(a2a-sdk 1.0) → M13 regression fix on M7's `Message.metadata`
+channel → M18 (structured streaming with content-kind metadata) →
+M20 (audio-text sync). M17 itself ships clean once M13 unblocks the
+readout path.**
 
 ## 2026-04-29 live smoke — what happened
 

@@ -111,6 +111,112 @@ ROADMAP entry originally anticipated. Concretely:
 `hosts/cli/pyproject.toml`, `hosts/gui/pyproject.toml` so `uv lock` stops
 auto-adopting 1.0.x until M7 actually lands. Lockfile reverted to 0.3.26.
 
+**Six-phase execution plan.** Each phase is a separate landable commit
+on `main`; CI must stay green between commits and live `make up` smoke
+(driven via tmux + `docker logs`, not human paste) is required after
+Phase 3 (pin flip) and again after Phase 6 (cleanup). Phases 1-2 stay
+on `a2a-sdk<1.0`; Phase 3 is the big-bang pin flip; Phases 4-6 land on
+top of 1.0. The shared `kourai_common.messaging` and
+`kourai_common.agent_cards` helpers absorb the wire-format switch so
+the per-call-site diff in Phase 3 collapses to roughly the helpers
+themselves rather than every executor.
+
+1. **Phase 1 — Centralize Part / Message construction (still on 0.3).**
+   Add `kourai_common.messaging.text_part(text)`,
+   `file_part_from_bytes(b64, media_type, filename=None)`,
+   `data_part(data)`, and `user_message(text, role=...)` helpers that
+   emit the 0.3 shape today. Convert every `Part(root=TextPart(...))`,
+   `Part(root=FilePart(file=FileWithBytes(...)))`, and
+   `Message(role=..., parts=[...], kind=...)` call site across
+   `agents/`, `hosts/`, `shared/`, `tests/` to call the helpers. New
+   helpers gain dedicated unit tests; existing tests stay green
+   without modification. **Done when:** ripgrep finds zero
+   `Part(root=` outside `messaging.py` and `make validate` is green.
+
+2. **Phase 2 — Centralize server build + Part inspection (still on
+   0.3).** Add `kourai_common.server.build_a2a_app(card, executor,
+   task_store)` that wraps `A2AStarletteApplication` (today) — every
+   agent's `__main__.py` calls the helper instead of constructing
+   directly, collapsing ~10 near-identical boilerplate copies. Move
+   `_is_file_part` / `_get_file_bytes` from `a2a_utils.py` into
+   `messaging.py` as `is_file_part(part)` and `get_file_bytes(part)
+   -> (b64, media_type)`, dropping the speculative forward-compat
+   hatches (they predicted the wrong v1.0 shape per the 2026-04-29
+   discovery). AgentCard build already centralized in
+   `agent_cards.build_card()` from M7 prep work. **Done when:** every
+   agent `__main__.py` is one builder call, `a2a_utils.py` has no
+   firewall code, `make validate` green.
+
+3. **Phase 3 — Pin flip + helper-implementation flip (the big bang).**
+   Bump pin to `>=1.0,<2.0` in `shared/pyproject.toml`,
+   `hosts/cli/pyproject.toml`, `hosts/gui/pyproject.toml`. Flip
+   helper implementations: `text_part(text)` → `Part(text=text)`,
+   `file_part_from_bytes(...)` → `Part(raw=..., media_type=...,
+   filename=...)`, `user_message(...)` → `new_text_message(text,
+   role=Role.ROLE_USER)`. Flip `agent_cards.build_card()` to
+   `supported_interfaces=[AgentInterface(url=..., protocol_binding=
+   "JSONRPC", protocol_version="1.0"), AgentInterface(url=...,
+   protocol_binding="JSONRPC", protocol_version="0.3")]` — the v0.3
+   fallback is the transitional safety net for clients that haven't
+   migrated in Phase 4 yet. Flip `kourai_common.server.build_a2a_app`
+   to `create_agent_card_routes` + `create_jsonrpc_routes(...,
+   enable_v0_3_compat=True)`. Update `messaging.send_*_status` to
+   `new_text_status_update_event` + `TaskState.TASK_STATE_*`. Add
+   `agent_card=card` to every `DefaultRequestHandler(...)` (now
+   required). Bump `A2A_PROTOCOL_VERSION` in `a2a_utils.py` to
+   `"1.0"`. **Done when:** `make validate` green; live `make up`
+   smoke shows a `/yolo` fizzbuzz request flowing through the forge
+   (server speaks 1.0, clients still speak 0.3 via the compat flag).
+
+4. **Phase 4 — Client-side migration.** Migrate
+   `agents/hephaestus/remote_connections.py` (Hephaestus's
+   load-bearing client to every specialist) from
+   `ClientFactory.create_client()` (sync) to `await
+   create_client(url_or_card)`. Migrate `hosts/cli/{__main__,events,
+   headless,streaming}.py`, `hosts/gui/client.py`, `agents/vn_bridge.py`
+   — same flip. Streaming consumption: `AsyncIterator[ClientEvent
+   | Message]` → `AsyncIterator[StreamResponse]` with
+   `chunk.HasField('artifact_update' | 'status_update' | 'task' |
+   'message')`. Sweep enums: `TaskState.working` →
+   `TaskState.TASK_STATE_WORKING`, `Role.user` → `Role.ROLE_USER`
+   everywhere; drop `Message(kind=...)`. Update mocks in
+   `tests/unit/test_remote_connections.py`, `test_cli.py`,
+   `test_gui_attachment_send_path.py`. **Done when:** every client
+   speaks 1.0 natively and `make up` smoke is clean without
+   exercising the compat flag.
+
+5. **Phase 5 — text-tags → Message.metadata.** Replace
+   `[project_root: ...]`, `[yolo: on]`, `[auto_approve_reads: on]`,
+   `[relationship_tiers: ...]`, `[project_id: ...]` text-prefix
+   construction in `hosts/cli/__main__.py` (and any other call sites)
+   with structured `Message.metadata = {"project_root": ...,
+   "yolo": ..., ...}` on the outbound Message. Replace
+   `parse_project_root()` regex in `kourai_common.a2a_utils` with
+   `message.metadata.get("project_root")`. Replace text-tag readers
+   in `agents/hephaestus/agent.py`. Drop the `_PROJECT_ROOT_PATTERNS`
+   regex and the prepend/strip logic in `hosts/cli/streaming.py`.
+   Update `synthesise_fact_from_pause` callers to read `project_id`
+   from metadata. Update tests. **Done when:** `grep -rnE
+   '\[project_root:|\[yolo:|\[auto_approve_reads:|\[relationship_tiers:|\[project_id:' --include='*.py'`
+   returns zero construction sites; readers all pull from
+   `metadata`. Unblocks the M13 fix (which uses
+   `Message.metadata.original_request` for the resume dispatch).
+
+6. **Phase 6 — Drop compat flag + retire forward-compat hatches.**
+   Remove `enable_v0_3_compat=True` from
+   `kourai_common.server.build_a2a_app`. Remove the v0.3 fallback
+   `AgentInterface` from `agent_cards.build_card()`. Update
+   doc-comments in `a2a_utils.py` and `a2a_events.py` — the
+   dual-shape firewall is gone. Audit test mocks for 0.3-shape
+   leftovers (`tests/unit/test_a2a_utils.py`, `test_executors.py`,
+   `test_metis_*.py`, `test_remote_connections.py`,
+   `test_gui_attachment_send_path.py`). **Done when:** `make
+   validate` green; live `make up` end-to-end smoke shows the
+   fizzbuzz pipeline with M17 PAUSE-on-coverage_target running to
+   completion; v0.3 SDK imports absent from `uv.lock`.
+
+**Phase status.** Plan drafted 2026-04-29. Phase 1 next.
+
 **Scope (revised).**
 
 - Replace every `Part(root=TextPart(text=...))` construction site with the
