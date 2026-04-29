@@ -29,6 +29,7 @@ from hosts.cli.commands import (
     _active_project,
     _build_key_bindings,
     _copy_to_clipboard,
+    _handle_preferences_command,
     _handle_project_command,
     _show_help,
     _show_settings,
@@ -60,6 +61,7 @@ from kourai_common.llm import compact_memory
 from kourai_common.log import setup_logging
 from kourai_common.memory import list_agents_with_history
 from kourai_common.player import PlayerProfile, get_all_affinities
+from kourai_common.projects import derive_project_id
 from kourai_common.virtues import FORGE_VIRTUES, get_virtue_deltas, get_virtue_scores
 
 _COMPLETER_STYLE = Style.from_dict(
@@ -734,6 +736,13 @@ async def main(
                     _handle_permissions_command(prompt_text, settings)
                     continue
 
+                if prompt_text.startswith(("/preferences", "/prefs")):
+                    # Normalise the alias so the handler only sees one shape;
+                    # both subcommand and bare forms must dispatch through.
+                    normalised = prompt_text.replace("/prefs", "/preferences", 1)
+                    _handle_preferences_command(normalised, settings)
+                    continue
+
                 if prompt_text == "/metrics":
                     _show_metrics_dashboard()
                     continue
@@ -836,7 +845,14 @@ async def main(
                         forge_session = ForgeSession.start(project, label=prompt_text[:24])
                         forge_memoir = Memoir(forge_session.workdir)
                         forge_turn_number = 0
+                        # project_root carries the per-session worktree so
+                        # specialists can chdir there for git ops; project_id
+                        # carries the stable, project-rooted M17 fact axis so
+                        # writes survive forge-session boundaries. Without the
+                        # second tag, deriving project_id from workdir would
+                        # change every turn and break cross-session recall.
                         forge_tags.append(f"[project_root: {forge_session.workdir}]")
+                        forge_tags.append(f"[project_id: {derive_project_id(project.path)}]")
                         _echo(
                             f"{_DIM}\u2692 Forging in {project.name}"
                             f" \u00b7 session {forge_session.session_id[:8]}"

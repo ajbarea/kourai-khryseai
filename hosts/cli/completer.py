@@ -57,6 +57,12 @@ SLASH_COMMANDS: tuple[SlashCommand, ...] = (
         "Show or toggle pipeline-gating policies (yolo, reads)",
         arg_hint="[yolo|reads]",
     ),
+    SlashCommand(
+        "preferences",
+        "List, set, or forget project-scoped preference facts (HOTL recall)",
+        arg_hint="[set <kind> <value>|forget <kind|--all>]",
+    ),
+    SlashCommand("prefs", "Alias for /preferences"),
     SlashCommand("metrics", "Show alignment, affinity, and virtue metrics"),
     SlashCommand("maidens", "Meet the Golden Maidens", arg_hint="[name]"),
     SlashCommand("status", "Agent info: name, URL, model, context ID"),

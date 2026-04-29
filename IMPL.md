@@ -5,10 +5,33 @@ milestone lands, the matching detail block in [ROADMAP.md](./ROADMAP.md)
 collapses to a one-liner under "Shipped" and this file gets reset to the
 next milestone.
 
-Updated: 2026-04-29 · Working on: **between milestones — UX/DX wins
-default; explicit AJ nomination needed to pull from the queue**
+Updated: 2026-04-29 · Working on: **M17 Phase 2 — `/preferences` CRUD
+shipped with project_id stability fix; confidence decay is the only
+queued Phase 2 item**
 
-## Recently shipped — M17 Phase 1 close-out
+## Recently shipped — M17 Phase 2 item 7 (`/preferences` CLI)
+
+**Right-to-forget for project-scoped preference facts is live.** The
+player can now list every stored preference for the active scope, set
+any closed-vocab kind without re-asking, forget one kind, or wipe the
+whole scope with `forget --all`. Aliased as `/prefs`. The CRUD writes
+through the same `kourai_common.facts` axis Metis recalls from, so
+overrides take effect on the next planning prompt without a restart.
+
+**Project_id stability fix bundled in.** The Phase 1 implementation
+derived the fact axis from `[project_root: …]`, but the REPL stamps
+the per-session forge worktree there — `derive_project_id(workdir)`
+changes every turn, so PAUSE-resolved facts never recalled across
+sessions. New `[project_id: <stable>]` forge tag carries the project-
+rooted id alongside the worktree-rooted root tag. `streaming.py` now
+prefers the explicit tag and falls back to deriving from project_root
+for any caller that hasn't been updated. Without this fix the new
+CLI would have shown an empty list for everyone.
+
+26 new unit tests (10 facts CRUD + 13 CLI handler + 3 streaming-tag
+preference). Suite at 2865 passing total.
+
+## Earlier in the same session — M17 Phase 1 close-out
 
 **The HOTL → facts loop is end-to-end live for one-time-per-project
 preferences.** A clarifying answer in project A persists, surfaces in
@@ -80,18 +103,16 @@ requires explicit AJ nomination per UX/DX-default convention.
   pause on `coverage_target`, answer, then start a new context for
   the same project and see Metis quote the answer. Pairs with the
   next interactive run; no automated CI surface.
-- **M17 Phase 2** — partial. Visible recall narrator + telemetry
-  span attributes both landed 2026-04-29. Metis emits `📐 Using your
-  stored coverage_target (80%).` before drafting whenever project-
-  scoped preference facts exist; the outer `metis.execute` span
-  carries `kourai.fact.recalled` (bool) + `kourai.fact.kinds`
-  (list[str]) so a researcher can grep Dozzle for
-  `fact.recalled=true` and pivot into Jaeger via the trace ID.
-  Remaining items: `/preferences` CRUD CLI (lists, sets, forgets
-  project-scoped facts; right-to-forget); confidence decay
-  (`PROJECT_FACT_DECAY_DAYS = 90` — facts older drop one tier;
-  re-confirmation resets the timer). Pull up once narrator+telemetry
-  have miles in real REPL sessions.
+- **M17 Phase 2** — `/preferences` CRUD now shipped (this session).
+  Items 6 (visible recall), 7 (CRUD CLI), and 8 (telemetry) are all
+  live. Remaining: confidence decay (`PROJECT_FACT_DECAY_DAYS = 90`
+  — facts older than 90d drop one tier high → medium → low → skip;
+  re-confirmation resets the timer). Open design call when pulling
+  this up: lazy decay computed inside
+  `get_relevant_facts_for_enrichment` vs a periodic sweep over
+  `player_memories`. Lazy is simpler and player-facing-equivalent;
+  default to that unless a sweep gives free observability wins.
+  ~100 lines + tests.
 - **`run_post_task_hooks` integration** — the layer exists and is
   fully tested but no production code calls it. Wiring it into the
   CLI streaming path (sibling of Memoir append) gives every hook

@@ -420,3 +420,257 @@ def test_build_fact_context_passes_project_id():
         build_fact_context("p1", agent_name="metis", project_id="proj-A")
 
     assert captured_kwargs["project_id"] == "proj-A"
+
+
+# ── M17 Phase 2 item 7: /preferences CRUD primitives ────────────────────
+
+
+import sqlite3
+
+import pytest
+
+from kourai_common.player import _ensure_player_tables
+
+
+@pytest.fixture
+def _isolate_player_db(tmp_path, monkeypatch):
+    """Sandbox the SQLite player DB so CRUD tests touch nothing on disk."""
+    db_path = tmp_path / "test_memory.db"
+    conn = sqlite3.connect(str(db_path), check_same_thread=False)
+
+    import kourai_common.player as player_mod
+
+    player_mod._tables_initialized = False
+    _ensure_player_tables(conn)
+    monkeypatch.setattr(player_mod, "_get_player_db", lambda: conn)
+    yield conn
+    conn.close()
+
+
+class TestListPreferenceFacts:
+    """``list_preference_facts`` returns project-scoped preference rows."""
+
+    def test_empty_when_no_facts_stored(self, _isolate_player_db):
+        from kourai_common.facts import list_preference_facts
+
+        assert list_preference_facts("player-uuid", project_id="proj-A") == []
+
+    def test_returns_facts_in_active_project_and_global(self, _isolate_player_db):
+        from kourai_common.facts import PlayerFact, list_preference_facts, store_facts
+
+        store_facts(
+            "player-uuid",
+            [
+                PlayerFact(
+                    body="coverage_target: 80%",
+                    category="preference",
+                    confidence="high",
+                    source_agent="metis",
+                    project_id="proj-A",
+                ),
+                PlayerFact(
+                    body="python_version: 3.12",
+                    category="preference",
+                    confidence="high",
+                    source_agent="metis",
+                    project_id=None,  # global
+                ),
+                PlayerFact(
+                    body="coverage_target: 95%",
+                    category="preference",
+                    confidence="high",
+                    source_agent="metis",
+                    project_id="proj-B",  # other project — must not surface
+                ),
+            ],
+        )
+        out = list_preference_facts("player-uuid", project_id="proj-A")
+
+        kinds = {row["kind"] for row in out}
+        assert kinds == {"coverage_target", "python_version"}
+        # proj-A's coverage_target wins, not proj-B's.
+        coverage = next(r for r in out if r["kind"] == "coverage_target")
+        assert coverage["value"] == "80%"
+        assert coverage["scope"] == "project"
+        python = next(r for r in out if r["kind"] == "python_version")
+        assert python["scope"] == "global"
+
+    def test_filters_to_closed_vocab(self, _isolate_player_db):
+        # Free-form preference facts (skill, identity, observations from
+        # process_agent_output) must not surface as "preferences" — only the
+        # closed-vocab kinds Metis and the /preferences set path can emit.
+        from kourai_common.facts import PlayerFact, list_preference_facts, store_facts
+
+        store_facts(
+            "player-uuid",
+            [
+                PlayerFact(
+                    body="prefers verbose error messages",  # free-form, no kind:
+                    category="preference",
+                    confidence="medium",
+                    source_agent="techne",
+                    project_id="proj-A",
+                ),
+                PlayerFact(
+                    body="coverage_target: 80%",
+                    category="preference",
+                    confidence="high",
+                    source_agent="metis",
+                    project_id="proj-A",
+                ),
+            ],
+        )
+        out = list_preference_facts("player-uuid", project_id="proj-A")
+        assert {row["kind"] for row in out} == {"coverage_target"}
+
+
+class TestForgetPreferenceFact:
+    """``forget_preference_fact`` removes scope+kind rows; right-to-forget."""
+
+    def test_removes_matching_kind_in_project_only(self, _isolate_player_db):
+        from kourai_common.facts import (
+            PlayerFact,
+            forget_preference_fact,
+            list_preference_facts,
+            store_facts,
+        )
+
+        store_facts(
+            "player-uuid",
+            [
+                PlayerFact(
+                    body="coverage_target: 80%",
+                    category="preference",
+                    confidence="high",
+                    source_agent="metis",
+                    project_id="proj-A",
+                ),
+                PlayerFact(
+                    body="coverage_target: 95%",
+                    category="preference",
+                    confidence="high",
+                    source_agent="metis",
+                    project_id="proj-B",
+                ),
+            ],
+        )
+        deleted = forget_preference_fact("player-uuid", project_id="proj-A", kind="coverage_target")
+        assert deleted == 1
+
+        # proj-A's coverage_target gone; proj-B's coverage_target survives.
+        a = list_preference_facts("player-uuid", project_id="proj-A")
+        assert a == []
+        b = list_preference_facts("player-uuid", project_id="proj-B")
+        assert {row["kind"]: row["value"] for row in b} == {"coverage_target": "95%"}
+
+    def test_returns_zero_when_no_match(self, _isolate_player_db):
+        from kourai_common.facts import forget_preference_fact
+
+        assert (
+            forget_preference_fact("player-uuid", project_id="proj-A", kind="coverage_target") == 0
+        )
+
+    def test_removes_global_when_project_id_is_none(self, _isolate_player_db):
+        from kourai_common.facts import (
+            PlayerFact,
+            forget_preference_fact,
+            list_preference_facts,
+            store_facts,
+        )
+
+        store_facts(
+            "player-uuid",
+            [
+                PlayerFact(
+                    body="python_version: 3.12",
+                    category="preference",
+                    confidence="high",
+                    source_agent="metis",
+                    project_id=None,
+                ),
+                PlayerFact(
+                    body="python_version: 3.13",
+                    category="preference",
+                    confidence="high",
+                    source_agent="metis",
+                    project_id="proj-A",
+                ),
+            ],
+        )
+        deleted = forget_preference_fact("player-uuid", project_id=None, kind="python_version")
+        assert deleted == 1
+
+        # The global row is gone; the proj-A scoped row survives.
+        scoped = list_preference_facts("player-uuid", project_id="proj-A")
+        kinds = {r["kind"]: r["scope"] for r in scoped}
+        assert kinds == {"python_version": "project"}
+
+
+class TestSetPreferenceFact:
+    """``set_preference_fact`` upserts: replaces existing same-scope fact."""
+
+    def test_writes_new_fact_when_none_exists(self, _isolate_player_db):
+        from kourai_common.facts import (
+            list_preference_facts,
+            set_preference_fact,
+        )
+
+        ok = set_preference_fact(
+            player_id="player-uuid",
+            project_id="proj-A",
+            kind="coverage_target",
+            value="80%",
+        )
+        assert ok is True
+
+        out = list_preference_facts("player-uuid", project_id="proj-A")
+        assert len(out) == 1
+        assert out[0]["kind"] == "coverage_target"
+        assert out[0]["value"] == "80%"
+
+    def test_replaces_existing_fact_for_same_scope_and_kind(self, _isolate_player_db):
+        from kourai_common.facts import (
+            list_preference_facts,
+            set_preference_fact,
+        )
+
+        set_preference_fact(
+            player_id="player-uuid",
+            project_id="proj-A",
+            kind="coverage_target",
+            value="80%",
+        )
+        set_preference_fact(
+            player_id="player-uuid",
+            project_id="proj-A",
+            kind="coverage_target",
+            value="95%",
+        )
+        out = list_preference_facts("player-uuid", project_id="proj-A")
+        # Exactly one row — the override, not a duplicate.
+        assert len(out) == 1
+        assert out[0]["value"] == "95%"
+
+    def test_rejects_unknown_preference_kind(self, _isolate_player_db):
+        from kourai_common.facts import set_preference_fact
+
+        ok = set_preference_fact(
+            player_id="player-uuid",
+            project_id="proj-A",
+            kind="not_a_real_kind",
+            value="anything",
+        )
+        assert ok is False
+
+    def test_rejects_blank_value(self, _isolate_player_db):
+        from kourai_common.facts import set_preference_fact
+
+        assert (
+            set_preference_fact(
+                player_id="player-uuid",
+                project_id="proj-A",
+                kind="coverage_target",
+                value="   ",
+            )
+            is False
+        )
