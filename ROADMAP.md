@@ -443,10 +443,11 @@ Three calls that diverged from the original sketch:
   labeled FL training data so the loop fails soft. Cross-process
   persistence belongs in Phase 2's confidence-decay milestone.
 
-### Phase 2 — visible recall shipped 2026-04-29; rest deferred
+### Phase 2 — narrator + telemetry shipped 2026-04-29; rest deferred
 
-Visible recall narrator (item 6) landed 2026-04-29. Items 7-9 stay
-queued; pull up once Phase 1+narrator have miles in real REPL sessions.
+Items 6 (visible recall) and 8 (telemetry) both landed 2026-04-29. Items 7
+(`/preferences` CRUD CLI) and 9 (confidence decay) stay queued; pull up
+once narrator+telemetry have miles in real REPL sessions.
 
 - **Visible recall (player UX) — shipped 2026-04-29.** Metis's
   executor calls `_format_recall_narration(player_id, project_id)`
@@ -467,11 +468,15 @@ queued; pull up once Phase 1+narrator have miles in real REPL sessions.
   project-scoped facts for the active project; `forget <kind>`
   removes a fact; `set <kind> <value>` overrides without re-asking.
   Right-to-forget is non-negotiable for player trust.
-- **Telemetry.** Two new span attributes on every specialist span
-  that could-have-paused: `kourai.fact.recalled` (`bool`) and
-  `kourai.fact.kinds` (`list[str]`). Cross-pane linkage is automatic
-  per M16's trace-ID injection — researchers can grep Dozzle for
-  `fact.recalled=true` and find the matching Jaeger trace.
+- **Telemetry — shipped 2026-04-29.** Metis's outer `metis.execute`
+  span now carries `kourai.fact.recalled` (`bool`, always set) and
+  `kourai.fact.kinds` (`list[str]`, set only when there's something
+  to share). Cross-pane linkage is automatic per M16's trace-ID
+  injection — researchers grep Dozzle for `fact.recalled=true` and
+  pivot into Jaeger via the trace ID stamped on every span-bound log
+  line. The narrator and the span attributes derive from the same
+  parsed list (`_recalled_preferences`) so the player view and the
+  researcher view can never disagree about whether a recall fired.
 - **Confidence decay.** `facts.py` already carries `confidence`
   weight and `last_accessed`. Add a `PROJECT_FACT_DECAY_DAYS = 90`
   default — facts older than this drop confidence one tier
@@ -801,6 +806,21 @@ architectural moves; valuable but not the first lift.
 
 One-liner per item, newest first. Detail moves out of this file when work lands.
 
+- 2026-04-29 — **M17 Phase 2 telemetry attributes** shipped. Metis's
+  outer `metis.execute` OTel span now carries `kourai.fact.recalled`
+  (bool, always set) and `kourai.fact.kinds` (list[str], set only on
+  recall) so a researcher grepping Dozzle for `fact.recalled=true`
+  can pivot into Jaeger via the trace ID stamped on every span-bound
+  log line — the M16 trace-ID-in-logs pipeline pays off for the FL
+  research direction here. Plumbing-side refactor of
+  `_format_recall_narration` into three composable helpers
+  (`_recalled_preferences` / `_format_recall_line` / wrapper) so the
+  player view (visible narrator) and the researcher view (span
+  attrs) derive from a single parsed list and can never disagree
+  about whether a recall fired. 3 new unit tests in
+  `TestExecutorSetsTelemetryAttributes` (recalled-true with kinds,
+  recalled-false no kinds, recalled-false no project tag); 2839
+  unit tests overall green; lint clean. Closes ROADMAP §M17 item 8
 - 2026-04-29 — **M17 Phase 2 visible recall narrator** shipped.
   Metis's executor adds `_format_recall_narration(player_id,
   project_id)` that pops project-scoped preference facts via

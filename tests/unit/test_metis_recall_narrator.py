@@ -1,9 +1,11 @@
-"""Metis visible-recall narrator (M17 Phase 2).
+"""Metis visible-recall narrator + Phase 2 telemetry attributes.
 
 When project-scoped preference facts exist for the active project,
 Metis emits a status line announcing the recall so the player sees that
-her stored answer is being used instead of re-asked. Free-form
-``<FACT>`` observations and globals don't narrate.
+her stored answer is being used instead of re-asked, AND tags the outer
+``metis.execute`` OTel span with ``kourai.fact.recalled`` (bool) and
+``kourai.fact.kinds`` (list[str]) for researcher-side grep. Both views
+derive from the same parsed list so they can't disagree.
 """
 
 from __future__ import annotations
@@ -258,3 +260,142 @@ class TestExecutorEmitsRecallNarration:
             if "Using your stored" in call.args[2]
         ]
         assert recall_calls == []
+
+
+# ── Phase 2 telemetry: span attributes on metis.execute ──────────────────
+
+
+def _capture_outer_span(span_mock: MagicMock):
+    """Patch helper: ``create_span("metis.execute", ...)`` yields the mock.
+
+    Other ``create_span`` invocations inside the executor (``metis.context``,
+    ``metis.spec``) yield throwaway MagicMocks so their attribute calls
+    don't pollute the outer assertion.
+    """
+    from contextlib import contextmanager
+
+    @contextmanager
+    def _factory(name, attributes=None):
+        if name == "metis.execute":
+            yield span_mock
+        else:
+            yield MagicMock()
+
+    return _factory
+
+
+class TestExecutorSetsTelemetryAttributes:
+    """``metis.execute`` carries ``kourai.fact.recalled`` + ``kourai.fact.kinds``."""
+
+    @pytest.mark.asyncio
+    async def test_recalled_true_with_kinds_when_facts_present(self):
+        from agents.metis.agent_executor import MetisAgentExecutor
+
+        outer_span = MagicMock()
+        ctx = _make_context("[project_root: /var/forge/proj-a]\nplan a CSV exporter")
+        queue = _make_queue()
+        executor = MetisAgentExecutor()
+        pinned_pid = "deadbeefdeadbeef"
+
+        with (
+            patch("agents.metis.agent_executor.create_span", _capture_outer_span(outer_span)),
+            patch(
+                "agents.metis.agent_executor.get_project_context",
+                return_value="project ctx",
+            ),
+            patch(
+                "agents.metis.agent_executor.create_spec_stream",
+                return_value=_async_gen(["spec"]),
+            ),
+            patch("agents.metis.agent_executor.send_working_status", AsyncMock()),
+            patch(
+                "agents.metis.agent_executor._player_id_or_none",
+                return_value="player-uuid",
+            ),
+            patch(
+                "agents.metis.agent_executor.derive_project_id",
+                return_value=pinned_pid,
+            ),
+            patch(
+                "agents.metis.agent_executor.get_relevant_facts_for_enrichment",
+                return_value=[
+                    {"body": "coverage_target: 80%", "project_id": pinned_pid},
+                    {"body": "python_version: 3.13", "project_id": pinned_pid},
+                ],
+            ),
+        ):
+            await executor.execute(ctx, queue)
+
+        attrs = {call.args[0]: call.args[1] for call in outer_span.set_attribute.call_args_list}
+        assert attrs.get("kourai.fact.recalled") is True
+        assert attrs.get("kourai.fact.kinds") == ["coverage_target", "python_version"]
+
+    @pytest.mark.asyncio
+    async def test_recalled_false_no_kinds_when_no_facts(self):
+        from agents.metis.agent_executor import MetisAgentExecutor
+
+        outer_span = MagicMock()
+        ctx = _make_context("[project_root: /var/forge/proj-a]\nplan a CSV exporter")
+        queue = _make_queue()
+        executor = MetisAgentExecutor()
+
+        with (
+            patch("agents.metis.agent_executor.create_span", _capture_outer_span(outer_span)),
+            patch(
+                "agents.metis.agent_executor.get_project_context",
+                return_value="project ctx",
+            ),
+            patch(
+                "agents.metis.agent_executor.create_spec_stream",
+                return_value=_async_gen(["spec"]),
+            ),
+            patch("agents.metis.agent_executor.send_working_status", AsyncMock()),
+            patch(
+                "agents.metis.agent_executor._player_id_or_none",
+                return_value="player-uuid",
+            ),
+            patch(
+                "agents.metis.agent_executor.get_relevant_facts_for_enrichment",
+                return_value=[],
+            ),
+        ):
+            await executor.execute(ctx, queue)
+
+        attrs = {call.args[0]: call.args[1] for call in outer_span.set_attribute.call_args_list}
+        assert attrs.get("kourai.fact.recalled") is False
+        # ``kourai.fact.kinds`` should NOT be set when nothing was recalled —
+        # presence of the key implies "we have a list to share."
+        assert "kourai.fact.kinds" not in attrs
+
+    @pytest.mark.asyncio
+    async def test_recalled_false_when_no_project_tag(self):
+        from agents.metis.agent_executor import MetisAgentExecutor
+
+        outer_span = MagicMock()
+        # No ``[project_root: ...]`` tag → project_id_for_facts is None →
+        # _recalled_preferences returns []; the false attribute still fires.
+        ctx = _make_context("plan a CSV exporter")
+        queue = _make_queue()
+        executor = MetisAgentExecutor()
+
+        with (
+            patch("agents.metis.agent_executor.create_span", _capture_outer_span(outer_span)),
+            patch(
+                "agents.metis.agent_executor.get_project_context",
+                return_value="project ctx",
+            ),
+            patch(
+                "agents.metis.agent_executor.create_spec_stream",
+                return_value=_async_gen(["spec"]),
+            ),
+            patch("agents.metis.agent_executor.send_working_status", AsyncMock()),
+            patch(
+                "agents.metis.agent_executor._player_id_or_none",
+                return_value="player-uuid",
+            ),
+        ):
+            await executor.execute(ctx, queue)
+
+        attrs = {call.args[0]: call.args[1] for call in outer_span.set_attribute.call_args_list}
+        assert attrs.get("kourai.fact.recalled") is False
+        assert "kourai.fact.kinds" not in attrs
