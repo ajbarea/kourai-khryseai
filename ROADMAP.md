@@ -554,24 +554,6 @@ Defensible *now* that Phase 1 has landed:
 
 ## M6 — Future / unprioritized
 
-### Surfaced 2026-04-26 during M1 Round 6 validation
-
-- **Branch label sanitization (`forge_session.py`).**
-  `ForgeSession.start(label=prompt_text[:24])` slugifies the label but
-  doesn't strip backticks, slashes, or other special chars. Round 6a's
-  session branch was `forge/20260426-114210-please-add-a-function-\`d` —
-  git accepted it but the trailing backtick is ugly in `git branch -a`
-  and `/project status`. Strip non-alphanumeric (and non-hyphen) before
-  slugifying.
-
-- **`read_file` tool schema description tightening.** Both Round 6 runs
-  showed Techne misusing `read_file` on directory paths (`(fail)` returned
-  cleanly, but wasted tool turns and tokens). Tighten the JSON schema
-  description in `shared/src/kourai_common/forge_tools.py` to say "must
-  be a regular file path, not a directory" and add an explicit example.
-  The dispatch error path works; this is a model-behavior tightening only.
-
-
 ### Surfaced 2026-04-26 from external research (OSS Claude Code clones, Typer, MCP/A2A specs)
 
 AJ asked for a sweep of the post-leak open-source Claude Code rewrites
