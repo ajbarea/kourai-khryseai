@@ -5,15 +5,39 @@ milestone lands, the matching detail block in [ROADMAP.md](./ROADMAP.md)
 collapses to a one-liner under "Shipped" and this file gets reset to the
 next milestone.
 
-Updated: 2026-04-29 · Working on: **M17 Phase 2 — `/preferences` CRUD
-shipped with project_id stability fix; confidence decay is the only
-queued Phase 2 item**
+Updated: 2026-04-29 · Working on: **M17 Phase 2 fully shipped — between
+milestones. UX/DX wins default; explicit AJ nomination needed to pull
+from the queue**
 
-## Recently shipped — M17 Phase 2 item 7 (`/preferences` CLI)
+## Recently shipped — M17 Phase 2 closure (item 9, confidence decay)
 
-**Right-to-forget for project-scoped preference facts is live.** The
-player can now list every stored preference for the active scope, set
-any closed-vocab kind without re-asking, forget one kind, or wipe the
+**Lazy confidence decay is live for project preference facts.**
+`PROJECT_FACT_DECAY_DAYS = 90`: a stored preference at `high` becomes
+`medium` after 90 days, `low` after 180, `skip` (filtered from recall)
+after 270. Decay is computed read-time on `created_at` — no scheduled
+sweep, no schema change, no extra writes. `last_accessed` deliberately
+does NOT reset the timer, so passive recall sessions don't keep stale
+preferences alive forever. Re-confirmation by the player (via
+`/preferences set` or PAUSE answer) writes a fresh row with a new
+`created_at`, which IS the timer reset.
+
+`synthesise_fact_from_pause` now forget-then-writes (matching
+`set_preference_fact`) so re-PAUSE on the same scope+kind no longer
+stacks rows in `player_memories`. The /preferences listing surfaces
+both the original `confidence` and the `decayed_confidence` so a
+player can see decay state at a glance; the recall path drops
+`skip`-tier rows so Metis doesn't keep planning around an old answer.
+
+11 new unit tests (5 ladder helper + 3 listing integration + 2 recall
+filter + 1 PAUSE dedup property). Suite at 2876 passing total. M17
+Phase 2 is now 4-of-4 — narrator, telemetry, CRUD CLI, and decay all
+shipped.
+
+## Earlier this session — M17 Phase 2 item 7 (`/preferences` CLI)
+
+**Right-to-forget for project-scoped preference facts.** The
+player can list every stored preference for the active scope, set any
+closed-vocab kind without re-asking, forget one kind, or wipe the
 whole scope with `forget --all`. Aliased as `/prefs`. The CRUD writes
 through the same `kourai_common.facts` axis Metis recalls from, so
 overrides take effect on the next planning prompt without a restart.
@@ -29,7 +53,7 @@ for any caller that hasn't been updated. Without this fix the new
 CLI would have shown an empty list for everyone.
 
 26 new unit tests (10 facts CRUD + 13 CLI handler + 3 streaming-tag
-preference). Suite at 2865 passing total.
+preference).
 
 ## Earlier in the same session — M17 Phase 1 close-out
 
@@ -98,21 +122,18 @@ remembering for Phase 2:
 UX/DX is the default between milestones. Pulling any of these up
 requires explicit AJ nomination per UX/DX-default convention.
 
-- **Live M17 Phase 1 smoke** — exercise the loop in a real `make up`
-  + REPL session: ask Metis to plan something where she'd reasonably
-  pause on `coverage_target`, answer, then start a new context for
-  the same project and see Metis quote the answer. Pairs with the
-  next interactive run; no automated CI surface.
-- **M17 Phase 2** — `/preferences` CRUD now shipped (this session).
-  Items 6 (visible recall), 7 (CRUD CLI), and 8 (telemetry) are all
-  live. Remaining: confidence decay (`PROJECT_FACT_DECAY_DAYS = 90`
-  — facts older than 90d drop one tier high → medium → low → skip;
-  re-confirmation resets the timer). Open design call when pulling
-  this up: lazy decay computed inside
-  `get_relevant_facts_for_enrichment` vs a periodic sweep over
-  `player_memories`. Lazy is simpler and player-facing-equivalent;
-  default to that unless a sweep gives free observability wins.
-  ~100 lines + tests.
+- **Live M17 Phase 1 + Phase 2 smoke** — exercise the full loop end-to-
+  end: `make up` + REPL session, `/project use harbour`, ask Metis to
+  plan something where she'd PAUSE on `coverage_target`, answer in the
+  next turn, watch the visible recall narrator quote it back, see
+  `fact.recalled=true` land on the `metis.execute` span in Jaeger via
+  the trace-ID-in-Dozzle pivot from M16. `/preferences` browse + set +
+  forget; verify cross-session recall now that the stable project_id
+  fix is in. Confidence decay shipped lazy so it's invisible until age
+  > 90d — exercise it with a manual `UPDATE player_memories SET
+  created_at = '...' WHERE memory_id = ...` to confirm the listing
+  shows the decayed tier and recall drops skip-tier rows. AJ-driven;
+  no automated CI surface.
 - **`run_post_task_hooks` integration** — the layer exists and is
   fully tested but no production code calls it. Wiring it into the
   CLI streaming path (sibling of Memoir append) gives every hook
