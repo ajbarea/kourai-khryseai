@@ -13,7 +13,9 @@ from kourai_common.a2a_utils import extract_image_parts, parse_project_root
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
 from kourai_common.mcp_client import kourai_project_root_var
-from kourai_common.messaging import send_working_status
+from kourai_common.messaging import send_input_required, send_working_status
+from kourai_common.pause_state import stash_preference_kind
+from kourai_common.pause_tag import extract_pause_tag
 from kourai_common.stack import get_stack_context, looks_like_scaffolding
 from kourai_common.tracing import create_span
 
@@ -111,29 +113,48 @@ class MetisAgentExecutor(BaseAgentExecutor):
                 emoji="📐",
             )
 
+            # M17 Phase 1 — pull the trailing PAUSE tag, if Metis classified
+            # the spec as gated on a one-time-per-project preference. The
+            # parser fails closed on unknown kinds / malformed shapes, so
+            # the spec ships normally when the LLM emits garbage.
+            pause = extract_pause_tag(spec)
+            artifact_text = pause.clean_text if pause else spec
+
             # Step 3: Emit both human-readable text and machine-readable structured data
             # Parse spec sections for downstream routing
             sections = [
                 s.strip()
-                for s in spec.split("\n")
+                for s in artifact_text.split("\n")
                 if s.strip().startswith(("1.", "2.", "3.", "4.", "5.", "6.", "7."))
             ]
             await updater.add_artifact(
                 [
-                    Part(root=TextPart(text=spec)),
+                    Part(root=TextPart(text=artifact_text)),
                     Part(
                         root=DataPart(
                             data={
                                 "step_count": len(sections),
-                                "has_file_list": "files to modify" in spec.lower()
-                                or "files to create" in spec.lower(),
-                                "has_tests": "testing" in spec.lower(),
+                                "has_file_list": "files to modify" in artifact_text.lower()
+                                or "files to create" in artifact_text.lower(),
+                                "has_tests": "testing" in artifact_text.lower(),
+                                "preference_kind": pause.preference_kind if pause else None,
                             }
                         )
                     ),
                 ],
                 name="implementation_spec",
             )
+
+            if pause:
+                stash_preference_kind(task.context_id, pause.preference_kind)
+                await send_input_required(updater, task, pause.question)
+                log.info(
+                    "Metis paused for %s preference — context=%s",
+                    pause.preference_kind,
+                    task.context_id,
+                )
+                return
+
             await updater.complete()
             log.info("Metis completed — spec generated (%d steps)", len(sections))
 
