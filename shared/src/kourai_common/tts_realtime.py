@@ -1,17 +1,18 @@
 """RealtimeTTS-backed TTS engine — bundles Kokoro synth + PyAudio playback.
 
-Replaces the pygame.mixer-based TTS path on both the CLI and GUI hosts.
-pygame.mixer's documented inability to reliably resample 24 kHz mono →
-44.1 kHz stereo produced the "VHS rewind" chipmunk symptom; RealtimeTTS
-routes Kokoro's native 24 kHz mono through PyAudio with no resample
-step in the path.
+Replaces the pygame.mixer-based TTS path on the CLI and GUI hosts and the
+hand-rolled KokoroBackend/EdgeTTSBackend path on the VN bridge. pygame.mixer's
+documented inability to reliably resample 24 kHz mono → 44.1 kHz stereo
+produced the "VHS rewind" chipmunk symptom; RealtimeTTS routes Kokoro's
+native 24 kHz mono through PyAudio with no resample step in the path.
 
-The legacy ``kourai_common.tts_kokoro`` / ``tts_edge`` synth-only
-backends remain in the tree for ``agents/vn_bridge.py``, which feeds
-synthesised WAV bytes into Ren'Py's audio system rather than playing
-them itself. The vn_bridge migration is its own follow-on (it needs a
-``synthesise_to_wav(text, voice) -> bytes`` API that
-``RealtimeTTSEngine`` does not currently expose).
+Two public surfaces:
+
+- ``speak`` / ``speak_sync`` for CLI + GUI — synth + PyAudio playback bundled.
+- ``synthesize_to_wav`` for ``agents/vn_bridge.py`` — synth-only path that
+  drives ``TextToAudioStream`` with ``muted=True`` and an ``on_audio_chunk``
+  collector, then wraps the int16 PCM in one WAV header sized from
+  ``KokoroEngine.get_stream_info()``.
 
 Future ElevenLabs swap (M6) becomes a one-line engine change inside
 ``__init__``.
@@ -20,13 +21,16 @@ Future ElevenLabs swap (M6) becomes a one-line engine change inside
 from __future__ import annotations
 
 import asyncio
+import io
 import logging
+import wave
 from typing import TYPE_CHECKING
 
 # Module-level bindings (aliased with leading underscore) so tests can
 # monkeypatch them without instantiating PyAudio. RealtimeTTS is a hard
 # dep in hosts/gui/pyproject.toml; importing it pulls in pyaudio, which
 # requires portaudio19-dev on Linux (CI installs it via ed4d560).
+import pyaudio
 from RealtimeTTS import KokoroEngine as _KokoroEngine, TextToAudioStream as _TextToAudioStream
 
 from kourai_common.tts_backend import (
@@ -44,6 +48,17 @@ logger = logging.getLogger(__name__)
 VoiceConfig = TTSVoiceConfig
 VOICE_ROSTER = {v.voice_id: v for v in AGENT_VOICE_MAP.values()}
 AGENT_VOICES = {agent: cfg.voice_id for agent, cfg in AGENT_VOICE_MAP.items()}
+
+
+def _pcm_to_wav(pcm: bytes, *, channels: int, sample_rate: int, sample_width: int) -> bytes:
+    """Wrap raw signed PCM bytes in a canonical WAV header."""
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as wav:
+        wav.setnchannels(channels)
+        wav.setsampwidth(sample_width)
+        wav.setframerate(sample_rate)
+        wav.writeframes(pcm)
+    return buf.getvalue()
 
 
 class RealtimeTTSEngine:
@@ -175,6 +190,56 @@ class RealtimeTTSEngine:
             )
         finally:
             loop.close()
+
+    async def synthesize_to_wav(
+        self,
+        text: str,
+        agent_name: str | None = None,
+        voice_key: str | None = None,
+        speed: float | None = None,
+    ) -> bytes:
+        """Generate speech as a self-contained WAV without playback.
+
+        Drives ``TextToAudioStream`` with ``muted=True`` and an
+        ``on_audio_chunk`` collector — RealtimeTTS's documented bytes-only
+        path — then wraps the int16 PCM in one WAV header sized from
+        ``KokoroEngine.get_stream_info()``. Used by ``agents/vn_bridge.py``
+        which feeds WAV bytes into Ren'Py's audio system rather than
+        playing them itself.
+        """
+        if not text.strip():
+            return b""
+
+        # Voice resolution mirrors speak() so vn_bridge and the CLI/GUI
+        # hosts dispatch through the same precedence rules.
+        if voice_key is not None:
+            voice_cfg = VOICE_ROSTER.get(voice_key, get_voice_for_agent(None))
+        else:
+            voice_cfg = get_voice_for_agent(agent_name)
+        effective_speed = speed if speed is not None else voice_cfg.speed
+
+        chunks: list[bytes] = []
+
+        self._engine.set_voice(voice_cfg.voice_id)
+        self._engine.set_speed(effective_speed)
+        self._stream.feed(text)
+
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(
+            None,
+            lambda: self._stream.play(muted=True, on_audio_chunk=chunks.append),
+        )
+
+        if not chunks:
+            return b""
+
+        fmt, channels, sample_rate = self._engine.get_stream_info()
+        return _pcm_to_wav(
+            b"".join(chunks),
+            channels=channels,
+            sample_rate=sample_rate,
+            sample_width=pyaudio.get_sample_size(fmt),
+        )
 
     def stop(self) -> None:
         """Stop current playback gracefully."""

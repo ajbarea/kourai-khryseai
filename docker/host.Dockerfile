@@ -26,6 +26,19 @@ COPY --link scripts/ scripts/
 ARG HOST_TYPE
 ARG PACKAGE_NAME
 
+# CLI / GUI / VN bridge carry RealtimeTTS[kokoro], which pulls PyAudio.
+# PyPI ships PyAudio with Linux sdist only (no manylinux wheel as of
+# 0.2.14), so building it in python-slim needs build-essential for gcc
+# plus portaudio19-dev's headers. Mirrors CI's ed4d560 fix for the same
+# reason.
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    if [ "${HOST_TYPE}" = "cli" ] || [ "${HOST_TYPE}" = "gui" ] || [ "${HOST_TYPE}" = "vn_bridge" ]; then \
+    apt-get update && \
+    apt-get install -y --no-install-recommends build-essential portaudio19-dev && \
+    rm -rf /var/lib/apt/lists/*; \
+    fi
+
 # Copies all agent/host source but only installs the target package via --package.
 COPY --link agents/ agents/
 COPY --link hosts/ hosts/
@@ -79,6 +92,16 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     libsdl2-ttf-2.0-0 \
     libfreetype6 \
     espeak-ng && \
+    rm -rf /var/lib/apt/lists/*; \
+    fi
+
+# CLI / GUI / VN bridge: libportaudio2 lets PyAudio dlopen at runtime
+# (RealtimeTTS uses PyAudio for its TextToAudioStream output path).
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    if [ "${HOST_TYPE}" = "cli" ] || [ "${HOST_TYPE}" = "gui" ] || [ "${HOST_TYPE}" = "vn_bridge" ]; then \
+    apt-get update && \
+    apt-get install -y --no-install-recommends libportaudio2 && \
     rm -rf /var/lib/apt/lists/*; \
     fi
 

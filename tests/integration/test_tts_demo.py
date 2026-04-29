@@ -68,8 +68,7 @@ async def demo_custom_voice():
 
 
 if __name__ == "__main__":
-    logger.info("Make sure you have edge-tts and pygame installed:")
-    logger.info("  pip install edge-tts pygame\n")
+    logger.info("Requires RealtimeTTS[kokoro] + portaudio runtime libs.\n")
 
     asyncio.run(demo_all_voices())
     asyncio.run(demo_custom_voice())

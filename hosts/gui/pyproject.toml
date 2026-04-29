@@ -10,7 +10,7 @@ dependencies = [
     "pillow>=10.0",
     "httpx>=0.27",
     # M19 — RealtimeTTS bundles synthesis + playback as one streaming
-    # pipeline; supersedes our hand-rolled kokoro/edge-tts backends + pygame
+    # pipeline; supersedes the hand-rolled kokoro/edge-tts backends + pygame
     # playback path. Native KokoroEngine with all six agent voices supported,
     # set_voice/set_speed for per-agent dispatch, word-level timings (free
     # win for #19 captions), and ElevenLabs migration becomes a one-line
@@ -21,9 +21,6 @@ dependencies = [
     # backport; pydub PR #816 will add this transitively in a future
     # release, until then we declare it ourselves.
     "audioop-lts>=0.2.1; python_version >= '3.13'",
-    "kokoro>=0.4.0",       # M19 transitional: kept until tts_kokoro.py retires
-    "soundfile>=0.13.0",   # M19 transitional: kept until tts_kokoro.py retires
-    "edge-tts>=0.30.0",    # M19 transitional: RealtimeTTS includes EdgeEngine
     "emoji>=2.15.0",
     "numpy>=1.26",
 ]

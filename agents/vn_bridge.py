@@ -29,7 +29,7 @@ from a2a.types import (
 )
 from starlette.applications import Starlette
 from starlette.requests import Request
-from starlette.responses import JSONResponse, StreamingResponse
+from starlette.responses import JSONResponse, Response, StreamingResponse
 from starlette.routing import Route
 
 from kourai_common.a2a_events import (
@@ -41,7 +41,7 @@ from kourai_common.a2a_utils import make_a2a_http_client
 from kourai_common.companion import infer_portrait_state
 from kourai_common.config import get_agent_url
 from kourai_common.facts import process_agent_output
-from kourai_common.tts_backend import get_voice_for_agent
+from kourai_common.tts_realtime import RealtimeTTSEngine
 
 if TYPE_CHECKING:
     import httpx
@@ -92,20 +92,6 @@ def _paginate(text: str) -> list[str]:
     return [s.strip() for s in sentences if s.strip()]
 
 
-def _create_tts_backend():
-    """Create the TTS backend (Kokoro preferred, edge-tts fallback)."""
-    try:
-        from kourai_common.tts_kokoro import KokoroBackend
-
-        log.info("Using Kokoro-82M TTS backend")
-        return KokoroBackend()
-    except ImportError:
-        log.warning("Kokoro not available, falling back to edge-tts")
-        from kourai_common.tts_edge import EdgeTTSBackend
-
-        return EdgeTTSBackend()
-
-
 @contextlib.asynccontextmanager
 async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
     agent_url = get_agent_url("hephaestus")
@@ -122,36 +108,34 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
     except Exception as e:
         log.error(f"Failed to connect to Hephaestus: {e}")
         app.state.a2a_client = None
-    app.state.tts_backend = _create_tts_backend()
+    app.state.tts_engine = RealtimeTTSEngine()
     app.state.context_id = uuid4().hex
     yield
+    app.state.tts_engine.cleanup()
     await httpx_client.aclose()
 
 
-async def handle_tts(request: Request) -> StreamingResponse | JSONResponse:
-    """Generate audio stream from text using the configured TTS backend."""
+async def handle_tts(request: Request) -> Response | JSONResponse:
+    """Synthesize WAV bytes from text for Ren'Py's audio system."""
     data: dict = await request.json()
     text = data.get("text", "").strip()
     agent = data.get("agent", "").lower().strip()
     if not text:
         return JSONResponse({"error": "Missing 'text' field"}, status_code=400)
 
-    voice_cfg = get_voice_for_agent(agent)
-    backend = request.app.state.tts_backend
-    log.info(
-        f"TTS Streaming ({agent}): {text[:60]}... → {voice_cfg.voice_id} [{type(backend).__name__}]"
-    )
-
-    # Detect media type from backend type
-    backend_name = type(backend).__name__
-    media_type = "audio/wav" if "Kokoro" in backend_name else "audio/mpeg"
+    engine: RealtimeTTSEngine = request.app.state.tts_engine
+    log.info(f"TTS ({agent}): {text[:60]}...")
 
     try:
-        # stream_synthesize yields valid audio chunks (WAVs or MP3 frames)
-        return StreamingResponse(backend.stream_synthesize(text, voice_cfg), media_type=media_type)
+        wav_bytes = await engine.synthesize_to_wav(text, agent_name=agent)
     except Exception as e:
-        log.error(f"TTS streaming failed: {e}", exc_info=True)
+        log.error(f"TTS synthesis failed: {e}", exc_info=True)
         return JSONResponse({"error": f"TTS failed: {e}"}, status_code=500)
+
+    if not wav_bytes:
+        return JSONResponse({"error": "TTS produced no audio"}, status_code=500)
+
+    return Response(wav_bytes, media_type="audio/wav")
 
 
 async def handle_gossip(request: Request) -> JSONResponse:

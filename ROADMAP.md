@@ -691,102 +691,9 @@ total-cost path even though M18 is large.
 
 ## M19 — Audio backend separation for TTS
 
-> Status: planned · Surfaced 2026-04-29 live smoke · Independent of
-> M7/M18 (can prosecute in parallel) · Resolves verified-broken TTS
-> chipmunk + the underlying playback architecture
-
-### Why
-
-The 2026-04-29 smoke confirmed AJ's "VHS rewind" diagnosis: TTS
-plays at ~3.7× intended speed. Initial scoped patch wrapping
-`chunk_bytes` in `BytesIO` to trigger pygame's WAV header parsing
-**verified by AJ as not fixed**. Web-search confirmed the root
-cause is documented:
-
-> *"Pygame cannot perform Sound resampling, so the mixer should be
-> initialized to match the values of your audio resources."*
-> — [pygame.mixer docs](https://www.pygame.org/docs/ref/mixer.html);
-> see also
-> [pygame issue #2597](https://github.com/pygame/pygame/issues/2597),
-> [pygame-ce issue #1246](https://github.com/pygame-community/pygame-ce/issues/1246).
-
-The mixer is initialized at 44100 Hz stereo to match music + ambient
-OGG assets. Kokoro produces 24000 Hz mono. SDL_mixer's "limited
-resampling" is unreliable per the GitHub issues. **No amount of
-header parsing fixes this** — pygame's playback path doesn't
-resample the data, it just plays it at whatever rate the mixer was
-initialized at.
-
-### Scope
-
-**1. Adopt `RealtimeTTS` as the unified TTS pipeline.** Updated
-recommendation after deeper web-search surfaced the 2026 industry-
-standard library that supersedes the initial miniaudio-primary
-plan. RealtimeTTS bundles synthesis + playback in one streaming
-abstraction — it's not a workaround that combines two libraries,
-it's the right primitive layer for real-time TTS.
-
-| Library | Mechanism | Tradeoffs |
-|---|---|---|
-| **`RealtimeTTS[kokoro]`** | Streaming TTS pipeline (synthesis + playback) supporting Kokoro, OpenAI, ElevenLabs, Azure, Coqui, StyleTTS2, Piper, Edge TTS, Cartesia | Native KokoroEngine with all our six voices supported (`af_sarah`, `am_michael`, `bf_emma`, `af_jessica`, `af_bella`, `af_nicole`); `set_voice()` / `set_speed()` for per-agent dispatch mid-session; word-level timings exposed for English voices (free win for #19 captions); 24 kHz mono int16 native (matches Kokoro); PyAudio backend (`apt install portaudio19-dev` on Linux). **The M6 ElevenLabs migration becomes a one-line engine swap** since RealtimeTTS already supports ElevenLabs as a registered engine. |
-| `miniaudio` (`pyminiaudio`) | Single-source-file C lib | Initial first-pass recommendation. Lower-level than needed once RealtimeTTS surfaces — we'd be re-implementing the synth-to-playback queue that RealtimeTTS already provides. |
-| `sounddevice` | PortAudio binding | Same backend layer RealtimeTTS uses (PyAudio is also PortAudio). Lower-level than needed. |
-
-Rejected: hand-rolled kokoro/edge-tts backends + separate playback
-library — cleaner to consolidate on the single library that's the
-2026 best practice for this exact problem. `pygame.mixer` explicitly
-out of scope for TTS.
-
-**2. Replace our custom synthesis backends.** `shared/src/kourai_common/tts_kokoro.py`
-and `shared/src/kourai_common/tts_edge.py` retire. RealtimeTTS's
-KokoroEngine + EdgeEngine cover the same ground with a maintained
-upstream. `kourai_common.tts_backend.VOICE_ROSTER` keeps the per-
-agent voice mapping; just feeds RealtimeTTS engines instead of our
-own synth code.
-
-**3. New TTS engine module replaces `hosts/gui/tts_engine.py`.**
-Holds one `KokoroEngine` + one `TextToAudioStream`. `speak(text, agent)`
-becomes: `engine.set_voice(VOICE_ROSTER[agent].voice_id)`,
-`engine.set_speed(VOICE_ROSTER[agent].speed)`, `stream.feed(text)`,
-`stream.play_async()`. Pause / resume / stop via the stream's
-methods. No pygame.mixer involvement on the TTS path.
-
-**4. Clean separation of audio domains preserved.** Music + ambient
-+ SFX stay on pygame.mixer at 44100 stereo, where rates are known
-and matched (post-buffer-bump 2048). TTS lives entirely on PyAudio
-via RealtimeTTS at 24 kHz mono. The two systems don't share state
-beyond the volume slider abstraction in `/settings`.
-
-**5. SSML-readiness preserved.** RealtimeTTS handles SSML where the
-underlying engine supports it (ElevenLabs full support, Azure full
-support, Kokoro through pre-processing). M6's ElevenLabs migration
-gets full SSML automatically by switching `KokoroEngine` →
-`ElevenLabsEngine` in the engine instantiation — no playback layer
-changes.
-
-**6. System dependency.** `portaudio19-dev` on Linux for PyAudio.
-WSL2 already has working audio passthrough for the existing pygame
-path, so this is additive, not new infrastructure. Add to
-`docker/host.Dockerfile` only if a container ever needs TTS — today
-TTS runs only on the host CLI/GUI process, so just `make setup` on
-AJ's machine pulls it via the new `hosts/gui/pyproject.toml` dep.
-
-### Why pygame can't be retrofitted
-
-We considered: (a) re-init pygame.mixer at 24000 mono just for TTS —
-breaks music/ambient which are 44100 stereo; (b) manually resample
-24000→44100 + duplicate mono→stereo in numpy before passing to
-pygame — embeds a "we did the resampling pygame can't" pattern
-that's exactly the kind of workaround AJ's perfection stance
-disallows; (c) two pygame.mixer instances — pygame doesn't support
-this (single global mixer). Real fix is to pick a different library
-for TTS.
-
-### Why now
-
-Audio quality has been "still terrible" through both 2026-04-29 smoke
-runs. Pre-release perfection. M19 is independent of M7/M18 so it
-can ship in parallel without dependency entanglement.
+> Status: shipped 2026-04-29 (Phases 1+2+3 all landed) · See Shipped
+> section for the consolidated entry. Detail block intentionally
+> retired per the per-project IMPL/ROADMAP convention.
 
 ---
 
@@ -1178,6 +1085,7 @@ architectural moves; valuable but not the first lift.
 
 One-liner per item, newest first. Detail moves out of this file when work lands.
 
+- 2026-04-29 — **M19 audio backend separation for TTS** shipped end-to-end across all three phases. Phase 1 (CLI flip + `RealtimeTTSEngine` ABI-mirroring `TTSEngine` + 26 unit tests, commit `34f3d07`); audioop-lts hot-fix for Py3.13 (commit `e6e9cee`); Phase 2 (GUI flip + delete `hosts/gui/tts_engine.py`, -1092 LOC, commit `3ce88c0`); Phase 3 (vn_bridge migration via new `RealtimeTTSEngine.synthesize_to_wav(text, agent_name=…) -> bytes` driving `TextToAudioStream.play(muted=True, on_audio_chunk=collector)` — RealtimeTTS's documented bytes-only path — then wrapping the int16 PCM in one canonical WAV header sized from `KokoroEngine.get_stream_info()` returning `(paInt16, 1, 24000)`). pygame.mixer is out of the TTS path on every host; native 24 kHz mono Kokoro flows through PyAudio with no resample step, so the "VHS rewind" failure mode is gone by construction. Music + ambient + SFX stay on pygame.mixer at 44100 stereo; the two systems now share only the `/settings` volume slider abstraction. `kourai_common/tts_kokoro.py` + `tts_edge.py` deleted; `tts_backend.py` trimmed to `TTSVoiceConfig` + `AGENT_VOICE_MAP` + `get_voice_for_agent` (the `TTSBackend` ABC retired with its implementations). `agents/hephaestus/pyproject.toml` flipped from `edge-tts` to `RealtimeTTS[kokoro]` + `audioop-lts` so the vn_bridge container — which builds with `PACKAGE_NAME=hephaestus` — gets the right runtime deps; `hosts/gui/pyproject.toml` dropped the transitional `kokoro` / `soundfile` / `edge-tts` declarations (`RealtimeTTS[kokoro]` pulls them transitively where still needed). `docker/host.Dockerfile` got the matching system deps for cli/gui/vn_bridge (build-essential + portaudio19-dev in builder, libportaudio2 in runtime — closes the gap CI's `ed4d560` filled for Actions runners but Docker images never had). Real-Kokoro smoke produced 102 KB / 2.13 s WAV output for a five-word sentence with correct headers. The M6 ElevenLabs migration is now a one-line engine change inside `RealtimeTTSEngine.__init__`. Word-timing primitive (`on_word=` callback in `__init__`) in place for M20. 2838 unit tests green; lint + ty clean
 - 2026-04-29 — **M17 Phase 2 confidence decay** shipped (closes Phase 2 end-to-end). `PROJECT_FACT_DECAY_DAYS = 90` constant + `_decayed_confidence` ladder helper (`skip ← low ← medium ← high`) + `_age_days` + `_is_preference_decayed_to_skip` filter in `kourai_common.facts`. Lazy compute on `created_at` (NOT `last_accessed` — passive recall during a session must not reset the decay timer); only player-driven re-confirmation writes a fresh `created_at`. `list_preference_facts` returns a `decayed_confidence` field alongside the original `confidence` so the CLI can surface decay state without rewriting the stored row; `get_relevant_facts_for_enrichment` filters out preference facts that have decayed to `skip` so Metis stops planning around old answers. `synthesise_fact_from_pause` now forget-then-writes (matching `set_preference_fact`) so re-PAUSE on the same scope+kind no longer stacks rows — the listing stays single-row-per-(scope, kind) and re-confirmation correctly resets the timer. 11 new unit tests (5 ladder helper + 3 listing integration + 2 recall filter + 1 PAUSE dedup property); 2876 unit tests overall green; lint + ty clean. Mirrors mem0's "memory depth" concept without the embedding-vector dependency. Closes ROADMAP §M17 Phase 2 item 9 — M17 is now fully shipped end-to-end
 - 2026-04-29 — **M17 Phase 2 `/preferences` CRUD CLI + project_id stability fix** shipped. New slash command (aliased `/prefs`) lets the player browse, override, and forget closed-vocab preference facts for the active scope: bare `/preferences` lists project + global rows with a `*` marker on project rows; `set <kind> <value>` upserts (forgets-then-writes the same scope+kind so the listing stays single-row-per-kind); `forget <kind>` removes one; `forget --all` clears the whole active scope without touching global. Closed vocab enforced on `set` (same `VALID_PREFERENCE_KINDS` gate as the PAUSE synthesiser); `forget` tolerates retired kinds so right-to-forget outlives vocab churn. Three new public primitives in `kourai_common.facts` (`list_preference_facts`, `forget_preference_fact`, `set_preference_fact`) backed by the existing `player_memories` SQLite axis and `delete_player_memory`. Bundled the project_id stability fix because the feature would have surfaced empty without it: Phase 1's PAUSE-write path stamped facts with `derive_project_id([project_root: <forge_session.workdir>])`, but the REPL creates a uuid'd worktree per turn, so the id changed every session and recall never fired across sessions. Fix: new `[project_id: <derive_project_id(project.path)>]` forge tag emitted alongside `[project_root: …]`; `streaming.py:_project_id_from_forge_tags` prefers the explicit tag and falls back to deriving from project_root. Specialists keep reading project_root for git ops; only the fact synthesiser reads the new tag. 26 new unit tests (10 facts CRUD + 13 CLI handler + 3 streaming-tag preference); 2865 unit tests overall green; lint + ty clean. Aligns with the GDPR/CCPA-aligned forgetting patterns Mem0 / Letta / Supermemory converged on for 2026 — every fact removable by the player, no operator gate. Closes ROADMAP §M17 Phase 2 item 7
 - 2026-04-29 — **M17 Phase 2 telemetry attributes** shipped. Metis's

@@ -7,9 +7,10 @@ next milestone.
 
 Updated: 2026-04-29 · Working on: **2026-04-29 live smoke uncovered an
 architectural overhaul. Pre-release perfection stance: no workarounds.
-Sequence: M13 regression fix → M7 (a2a-sdk 1.0) → M18 (structured
-streaming with content-kind metadata) → M19 (audio backend separation
-for TTS). M17 itself ships clean once M13 unblocks the readout path.**
+M19 fully shipped (Phases 1+2+3 all landed 2026-04-29). Remaining
+sequence: M13 regression fix → M7 (a2a-sdk 1.0) → M18 (structured
+streaming with content-kind metadata). M17 itself ships clean once M13
+unblocks the readout path.**
 
 ## 2026-04-29 live smoke — what happened
 
@@ -209,26 +210,61 @@ full scope, acceptance criteria, and tier-1/tier-2 fallback design.
   `TestBackendInteroperability::test_backend_fallback_to_edge_tts`) —
   both depended on the deleted `hosts.gui.tts_engine._create_default_backend`.
 
-**M19 Phase 3 — vn_bridge migration + drop transitional deps (later):**
-- `agents/vn_bridge.py` is a third TTS consumer the original Phase 2
-  plan missed. It uses `kourai_common.tts_kokoro.KokoroBackend` /
-  `tts_edge.EdgeTTSBackend` to synthesise WAV bytes that Ren'Py plays
-  through Ren'Py's own audio system (vn_bridge does not own playback,
-  just synthesis). RealtimeTTSEngine has no `synthesise_to_wav(text,
-  voice) -> bytes` API today — playback is bundled.
-- Phase 3 needs either (a) a synthesis-only adapter on
-  `RealtimeTTSEngine` that pulls the queued audio chunks from
-  `_TextToAudioStream` without playing, or (b) calling KokoroEngine's
-  underlying `KPipeline` directly bypassing `TextToAudioStream`. (a) is
-  the cleaner API surface; (b) avoids re-implementing the chunk-merge
-  + WAV-header wrap that `tts_kokoro._to_wav` already does.
-- Until Phase 3 lands, `kourai_common/tts_kokoro.py`,
-  `kourai_common/tts_edge.py`, and `kourai_common/tts_backend.py`
-  (TTSBackend ABC + voice config) all remain, and the transitional
-  deps `kokoro` / `soundfile` / `edge-tts` stay in
-  `hosts/gui/pyproject.toml`. (`audioop-lts` for Py3.13 stays
-  unconditionally — pydub needs it whether it's reached via
-  RealtimeTTS or vn_bridge's KokoroBackend.)
+**M19 Phase 3 shipped 2026-04-29:**
+- `RealtimeTTSEngine.synthesize_to_wav(text, agent_name=None,
+  voice_key=None, speed=None) -> bytes` added. Drives
+  `TextToAudioStream.play(muted=True, on_audio_chunk=collector)` —
+  RealtimeTTS's documented bytes-only path — then wraps the int16 PCM
+  in one canonical WAV header sized from
+  `KokoroEngine.get_stream_info()` (paInt16 / 1 ch / 24 kHz). 9 new
+  unit tests in `test_tts_realtime.py` exercise the full surface
+  (empty text, voice resolution, voice_key/speed overrides, RIFF/WAVE
+  markers, header values match `get_stream_info`, no-chunks → b"").
+  Real-Kokoro smoke produced a 102 KB WAV (~2.13 s, mono 24 kHz) for
+  a five-word test sentence — correct duration, correct headers, no
+  resample step in the path.
+- `agents/vn_bridge.py` migrated. `_create_tts_backend()` retired;
+  `lifespan` constructs a single `RealtimeTTSEngine` and calls
+  `cleanup()` at shutdown (the legacy code never cleaned up).
+  `handle_tts` calls `await engine.synthesize_to_wav(text,
+  agent_name=agent)` and returns a `Response` with one WAV body —
+  cleaner than the previous `StreamingResponse` of multiple
+  WAV-headered chunks. The `get_voice_for_agent(agent)` site moved
+  inside the engine.
+- `kourai_common/tts_kokoro.py` + `tts_edge.py` deleted.
+  `tts_backend.py` trimmed to `TTSVoiceConfig` + `AGENT_VOICE_MAP` +
+  `get_voice_for_agent` (the `TTSBackend` ABC retired with its
+  implementations). `tests/integration/test_tts_kokoro_integration.py`
+  deleted; `tests/unit/test_tts_backends.py` trimmed to keep only the
+  voice-config + agent-mapping classes (the kokoro/edge backend test
+  classes followed their subjects out the door).
+- `agents/hephaestus/pyproject.toml` flipped from `edge-tts` to
+  `RealtimeTTS[kokoro]` + `audioop-lts; python_version >= '3.13'`.
+  hephaestus is the package vn_bridge's container builds with
+  (`PACKAGE_NAME=hephaestus`), so its deps are what reach the
+  vn_bridge runtime. Moving the dep matches what's actually imported.
+- `hosts/gui/pyproject.toml` dropped the transitional `kokoro` /
+  `soundfile` / `edge-tts` declarations. `RealtimeTTS[kokoro]` and
+  `audioop-lts` stay — `RealtimeTTS[kokoro]` pulls `kokoro` +
+  `soundfile` transitively.
+- `docker/host.Dockerfile` got the matching system deps.
+  Builder stage: `build-essential` + `portaudio19-dev` for
+  HOST_TYPE in {cli, gui, vn_bridge} so PyAudio (sdist-only on Linux
+  per its 0.2.14 PyPI release) compiles. Runtime stage: `libportaudio2`
+  for the same hosts so PyAudio dlopens. Closes the gap CI's
+  `ed4d560` had filled for Actions runners but Docker images never
+  got — affected GUI (Phase 2) and CLI (Phase 1) latently; Phase 3
+  fixes all three at once because the root cause is identical.
+- `make validate` green: 2838 unit tests (-12 backend tests removed
+  with the deleted classes, +9 new synthesize_to_wav tests, the rest
+  unchanged). Lint clean. ty's three pre-existing diagnostics
+  (image-pixel iteration, `await_args.args` on Mock) unchanged.
+- Net diff: ~10 modules touched, three deleted; net source loss
+  matches the legacy backends being subsumed by RealtimeTTS.
+  `kourai-common` no longer carries the `TTSBackend` ABC + Kokoro/Edge
+  pair, so the M6 ElevenLabs swap is now a one-line engine change in
+  `tts_realtime.RealtimeTTSEngine.__init__` (as the M19 architectural
+  promise stated).
 
 **M13 fix.** After M7 lands: emit the original request via
 Message.metadata on resume dispatch. Tested via re-run of the
@@ -322,28 +358,25 @@ implementation, architectural fix over expedient patch.
 3. **M18 — Structured streaming with content-kind metadata.** New
    milestone, builds on M7. See ROADMAP §M18 for the kind taxonomy
    and per-agent rollout plan.
-4. **M19 Phase 3 — vn_bridge synthesise-only API + drop transitional
-   deps.** Phases 1 (CLI) and 2 (GUI + delete `hosts/gui/tts_engine.py`)
-   shipped 2026-04-29. Phase 3 surfaces a `synthesise_to_wav` API for
-   `agents/vn_bridge.py` so Ren'Py keeps its WAV-bytes feed and the
-   `tts_kokoro` / `tts_edge` / `tts_backend` modules can finally retire.
-   See the M19 Phase 3 block above for the chunk-merge tradeoff.
-5. **M20 — Audio-text synchronization across CLI / GUI / VN.**
+4. **M20 — Audio-text synchronization across CLI / GUI / VN.**
    Builds on M18 (content-kind routing) + M19 (RealtimeTTS word-
-   timing API). New milestone surfaced this session — the 9-14s
-   text-precedes-audio gap is a first-thing-player-notices UX
-   issue. See ROADMAP §M20.
-6. **Live M17 Phase 1+2 smoke (re-run).** Trivial once M13 unblocks
+   timing API now wired via the `on_word=` callback in
+   `RealtimeTTSEngine.__init__`). New milestone surfaced this session
+   — the 9-14s text-precedes-audio gap is a first-thing-player-notices
+   UX issue. See ROADMAP §M20.
+5. **Live M17 Phase 1+2 smoke (re-run).** Trivial once M13 unblocks
    it. Original plan from this session unchanged: `make up`,
    `/project use <python-template>`, fizzbuzz prompt, watch PAUSE
    on coverage_target, answer next turn, watch narrator quote it
    back, see `fact.recalled=true` on `metis.execute` span in Jaeger
    via the M16 trace-ID-in-Dozzle pivot, exercise `/preferences`,
    restart for cross-session recall, manual SQL backdate for decay.
-7. **Independent UX bugs from the smoke** (see "Smoke findings —
+6. **Independent UX bugs from the smoke** (see "Smoke findings —
    Independent UX bugs" section above) — sized for individual focused
    PRs.
-8. **Live VN smoke** — `make vn` exercises both fixes from PR #66.
-9. **`docs/architecture/puck-first-run-tutorial.md`** — pairs with
+7. **Live VN smoke** — `make vn` exercises both fixes from PR #66 and
+   now the new vn_bridge `/tts` → `RealtimeTTSEngine.synthesize_to_wav`
+   path.
+8. **`docs/architecture/puck-first-run-tutorial.md`** — pairs with
    the M6 player-onboarding theme (committed in `2ad93c1`).
-10. **M5 / M12 / M15 / M6 follow-ons** — see ROADMAP for scope.
+9. **M5 / M12 / M15 / M6 follow-ons** — see ROADMAP for scope.
