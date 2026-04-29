@@ -12,6 +12,8 @@ from agents.metis.agent import create_spec_stream, get_project_context
 from kourai_common.a2a_utils import extract_image_parts, parse_project_root
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
+from kourai_common.facts import get_relevant_facts_for_enrichment
+from kourai_common.hooks_interaction import VALID_PREFERENCE_KINDS
 from kourai_common.mcp_client import kourai_project_root_var
 from kourai_common.messaging import send_input_required, send_working_status
 from kourai_common.pause_state import stash_preference_kind
@@ -41,6 +43,54 @@ def _player_id_or_none() -> str | None:
         return None
     profile = PlayerProfile.load()
     return profile.player_id if profile and profile.player_id else None
+
+
+def _format_recall_narration(player_id: str | None, project_id: str | None) -> str | None:
+    """Build the M17 Phase 2 visible-recall status line, or None when nothing to say.
+
+    Narrates project-scoped preference facts so the player sees Metis using
+    her stored answers instead of re-asking. Closed-vocab gate matches the
+    write-side gate (``VALID_PREFERENCE_KINDS``) so only PAUSE-resolved
+    preferences narrate; free-form ``<FACT>`` observations (skills,
+    identity, goals) don't pollute the status stream.
+
+    Returns:
+        ``"Using your stored coverage_target (80%)."`` for one fact;
+        ``"Using your stored project preferences: coverage_target (80%),
+        python_version (3.13)."`` for many; ``None`` when the player
+        profile or project scope is missing, or when no project-scoped
+        preference facts exist.
+    """
+    if not player_id or not project_id:
+        return None
+
+    facts = get_relevant_facts_for_enrichment(
+        player_id, agent_name="metis", project_id=project_id, limit=10
+    )
+
+    recalled: list[tuple[str, str]] = []
+    for fact in facts:
+        # Skip global facts — they're useful as context but don't represent
+        # project-scoped preference recall, which is what Phase 2 narrates.
+        if fact.get("project_id") != project_id:
+            continue
+        body = fact.get("body", "")
+        if ":" not in body:
+            continue
+        kind, _, value = body.partition(":")
+        kind = kind.strip()
+        value = value.strip()
+        if kind not in VALID_PREFERENCE_KINDS or not value:
+            continue
+        recalled.append((kind, value))
+
+    if not recalled:
+        return None
+    if len(recalled) == 1:
+        kind, value = recalled[0]
+        return f"Using your stored {kind} ({value})."
+    preview = ", ".join(f"{k} ({v})" for k, v in recalled)
+    return f"Using your stored project preferences: {preview}."
 
 
 class MetisAgentExecutor(BaseAgentExecutor):
@@ -112,6 +162,19 @@ class MetisAgentExecutor(BaseAgentExecutor):
                 if "[project_root:" in (user_input or "").lower()
                 else None
             )
+
+            # M17 Phase 2 — narrate the recall so the player sees that
+            # their stored answer is being used instead of re-asked.
+            # Returns None when there's nothing project-scoped to narrate;
+            # the status stream stays clean on the no-recall path.
+            recall_line = _format_recall_narration(player_id, project_id_for_facts)
+            if recall_line:
+                await send_working_status(updater, task, recall_line, emoji="📐")
+                log.info(
+                    "Metis recall narration emitted (player=%s project=%s)",
+                    (player_id or "")[:8],
+                    project_id_for_facts,
+                )
 
             with create_span("metis.spec", {"idea": user_input[:100]}):
                 spec = ""

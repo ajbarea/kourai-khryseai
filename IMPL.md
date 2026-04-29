@@ -80,11 +80,14 @@ requires explicit AJ nomination per UX/DX-default convention.
   pause on `coverage_target`, answer, then start a new context for
   the same project and see Metis quote the answer. Pairs with the
   next interactive run; no automated CI surface.
-- **M17 Phase 2** — visible recall narrator (`📐 Metis: Using your
-  stored coverage target (80%).`), `/preferences` CRUD CLI, telemetry
-  span attributes (`kourai.fact.recalled` / `kourai.fact.kinds`),
-  confidence decay (`PROJECT_FACT_DECAY_DAYS = 90`). Defer until
-  Phase 1 has miles on it.
+- **M17 Phase 2** — partial. Visible recall narrator landed
+  2026-04-29 (Metis emits `📐 Using your stored coverage_target
+  (80%).` before drafting whenever project-scoped preference facts
+  exist). Remaining items: `/preferences` CRUD CLI (lists, sets,
+  forgets project-scoped facts; right-to-forget); telemetry span
+  attributes (`kourai.fact.recalled` / `kourai.fact.kinds`);
+  confidence decay (`PROJECT_FACT_DECAY_DAYS = 90`). Pull the rest
+  up once Phase 1+2-narrator have miles in real REPL sessions.
 - **`run_post_task_hooks` integration** — the layer exists and is
   fully tested but no production code calls it. Wiring it into the
   CLI streaming path (sibling of Memoir append) gives every hook
