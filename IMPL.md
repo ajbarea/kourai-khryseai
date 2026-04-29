@@ -5,119 +5,111 @@ milestone lands, the matching detail block in [ROADMAP.md](./ROADMAP.md)
 collapses to a one-liner under "Shipped" and this file gets reset to the
 next milestone.
 
-Updated: 2026-04-28 · Working on: **no active milestone** — today's
-session was a UX/DX cleanup pass between milestones. Nine PRs:
-[#71](https://github.com/ajbarea/kourai-khryseai/pull/71)
-(prompt fix to block Haiku's `read_file(".")` failure mode) **merged**,
-[#72](https://github.com/ajbarea/kourai-khryseai/pull/72)
-(deslop 195 lines of unused `github_search_code` /
-`introspect_database` scaffolds) **merged**,
-[#73](https://github.com/ajbarea/kourai-khryseai/pull/73)
-(restore `Found 0 diagnostics` baseline via `Mapping` covariance for
-read-only `tool_handlers`) **merged**,
-[#75](https://github.com/ajbarea/kourai-khryseai/pull/75)
-(audio test isolation — resolve `AudioManager` via live module so
-`importlib.reload` in `test_audio_env.py` stops poisoning the
-`test_gui_audio_tts_engine.py` namespace) **merged**,
-[#76](https://github.com/ajbarea/kourai-khryseai/pull/76)
-(skip TTS integration tests on third-party network outage — wrap
-Edge-TTS synth calls so `aiohttp.ClientConnectionError` to
-`wss://speech.platform.bing.com` skips the test instead of burning
-a CI rerun) **merged**,
-[#77](https://github.com/ajbarea/kourai-khryseai/pull/77)
-(deslop signature-restate docstrings + stale "surveyed 2026-04-26"
-task-context comments — 18 edits, 7 files, zero behavior change)
-**merged**,
-[#78](https://github.com/ajbarea/kourai-khryseai/pull/78)
-(ty re-raise after `pytest.skip` in `_safe_edge_synthesize` —
-warning slipped past `make lint` rc=0 because warnings don't fail
-the rc; closes the loophole that gave back the "any new ty warning
-is visibly the cause" property #73 just re-established) **merged**,
-[#79](https://github.com/ajbarea/kourai-khryseai/pull/79)
-(deslop the broken Playwright e2e flow end-to-end — `run_playwright`
-has been a stub returning empty `PytestRunResult()` since the
-2026-03-31 "implement accessibility snapshots" commit gutted the
-function body; `get_accessibility_snapshot` calls a Playwright API
-that's been removed post-deprecation; both helpers + the
-`is_e2e_request` branch + the supporting Chromium install in the
-Dockerfile + the `playwright>=1.40` dep + `dbhub` / `playwright`
-phantom MCP registrations + four docs that described the dead path
-all gone in 288-line deletion) **merged**,
-[#80](https://github.com/ajbarea/kourai-khryseai/pull/80)
-(sibling deslop of three more PyGithub helpers that fall through
-ImportError on every code path because PyGithub isn't a declared
-dep — `github_search_repositories` in hephaestus, `github_search_issues`
-in metis (+ its 3-case `TestGithubSearchIssues` test class),
-`github_create_pull_request_impl` in mneme; plus stale
-`docs/configuration.md` claim about which 4 agents use the GitHub
-PAT (only Mneme still does, half-wired), `mcp_client.py` module
-docstring's "GitHub: Issue/PR/repo operations (direct PyGithub)" +
-"Playwright: Frontend E2E testing (direct subprocess)" lines, and
-the `github.**` entry in pyproject.toml's `replace-imports-with-any`
-that no longer suppresses anything — 285-line deletion) **merged**.
+Updated: 2026-04-29 · Working on: **M17 Phase 1 — HOTL answer
+persistence (project-scoped facts)**
 
-M2 effectively closed: Changes 1/2/3 shipped previously
-([roots](./ROADMAP.md#shipped) + the kourai-mcp-forge stdio server +
-the three specialists routed through the bridge). Change 4 (MCP
-elicitation client capability + INPUT_REQUIRED bridge) was attempted
-this session as [PR #74](https://github.com/ajbarea/kourai-khryseai/pull/74)
-and **closed unmerged** — the original "elicitation = spec-blessed
-analog of CONFIRM_ORDER" framing turns out to be a category mismatch
-(CONFIRM_ORDER lives at the A2A layer, not mid-MCP-tool-call), and
-no forge MCP tool currently calls `ctx.elicit()`, so the 1165-line
-bridge would have been anticipatory infrastructure with no caller.
-Held until a real MCP-server-side elicitation use case appears
-(natural candidate: `delete_file` confirming destructive deletes
-against an uncommitted-changes guard).
+## Why
 
----
+Kourai is being extended with Federated Learning features per the
+research-advisor pivot — the orchestration layer needs to start
+gathering structured player data for FL training. M17's Phase 1 is the
+fast structured-recall layer that closes the loop between M13's
+`AgentInputRequired` (already shipped) and the `kourai_common.facts`
+knowledge graph (already shipped, currently unused for HOTL pauses).
+Phase 1 ships the project-scope axis so a clarifying answer in
+project A is recalled by Metis in project A — and is NOT recalled when
+the player switches to project B. That cross-session, cross-project
+discrimination is the property worth shipping. Memoir continues to be
+the FL training-data ground-truth in parallel; facts are the agent-
+facing recall surface.
 
-## Up next (pick one when ready)
+ROADMAP M17 (lines 350-559) carries the full design rationale, anti-
+overclaim ledger, and Phase 1/2 split.
 
-These come from prior ROADMAP audits + open paper trails. Not active
-until AJ explicitly nominates one — UX/DX wins continue to be the
-default between architectural milestones.
+## Decisions (re-anchored from ROADMAP)
 
-- **Smoke 1 re-run** — A2A pipeline through Hephaestus → Techne writes
-  file. Architecture verified end-to-end on 2026-04-28 (PR #64 trace
-  propagation working as designed); only blocker was Haiku tier's
-  `read_file(".")` failure mode, which #71 fixes. Worth re-running
-  next time the WSL2 docker bridge stops dropping outbound to
-  `api.anthropic.com`. Recipe: `make up` + `tmux new-session ... make
-  cli` from `plans/2026-04-28-live-smoke-handoff.md`.
-- **Live VN smoke** — `make vn` exercises both fixes from PR #66
-  (`K_RETURN` keysym + codex notification text-sub). `renpy lint` is
-  clean; the live re-run is the only thing missing before that bug
-  fully closes out.
-- ~~**TTS integration test flake**~~ — addressed in PR #76 above.
-- **`docs/architecture/puck-first-run-tutorial.md`** — sitting
-  untracked in the working tree; if it's player-tutorial work AJ
-  started, it pairs with the M6 player-onboarding theme.
-- **Plan Mode toggle (Cline-style)** — persistent planning mode.
-- **Background memory consolidation (Mneme "autoDream")** — pairs
-  with the previously-shipped `/compact`.
-- **Custom-agent-via-markdown registration (OpenCode-style)** —
-  long-term direction; M2 has now landed so this is unblocked.
-- **T8 follow-up** (ParallelContext shared buffer feeding Metis's
-  partial output back into the classifier prompt).
-- **M15** (forge logging architecture) — operational hygiene; pairs
-  naturally with M16's trace-ID change since both touch
-  `setup_logging`.
-- **M5** (UID alignment for forge worktrees) — would let us drop
-  the `safe.directory '*'` workaround from #42.
-- **M7** (a2a-sdk 1.0.x migration) — the watcher's a2a-sdk-pypi
-  entry will fire when 1.0.x stabilises. The `Message.metadata`
-  migration item is queued under M7's scope as a follow-on once the
-  SDK pin flips.
-- **M12** (dynamic sizing across the GUI) — biggest GUI refactor.
-- **M17** (HOTL answer persistence — project-scoped facts).
-- **M16 follow-ons:**
-  - Live trace-ID-in-Dozzle smoke (unit-tested but worth eyeballing
-    in a real `make up` + smoked pipeline).
+- **Reuse `facts.py`, not `player_memories`.** `kourai_common.facts`
+  already implements the right shape (`<FACT>` tag extraction,
+  `PlayerFact` / `KnowledgeGraphFact`, `store_facts`,
+  `get_relevant_facts_for_enrichment`, `build_fact_context`). Adding a
+  `project_id` axis is materially cheaper than building a parallel
+  project-preference layer on `player_memories`.
+- **Prompt enrichment, not pre-pause hooks.** `build_fact_context()`
+  already runs at planning time; adding a `project_id` filter there
+  gives every specialist project-scoped recall for free — no per-agent
+  patches.
+- **Phase 1 = items 1-5 only.** Items 6-9 (visible recall narrator,
+  `/preferences` CLI, telemetry attributes, confidence decay) defer to
+  Phase 2 once Phase 1 is in production and we know what's load-bearing.
+
+## Scope (Phase 1)
+
+1. **`project_id` axis on facts.** Optional `project_id: str | None`
+   field on `PlayerFact` + `KnowledgeGraphFact`. Extend the `<FACT>`
+   regex to parse a `project_id="..."` attribute. `store_facts()`
+   persists it; `get_relevant_facts_for_enrichment()` accepts a
+   `project_id` filter and prefers project-scoped facts over global at
+   the same retrieval score.
+2. **`derive_project_id(project_root)`** in `projects.py`. Stable
+   sha256 truncated to 16 hex of the absolute, normalised path. Avoids
+   leaking host-absolute paths into fact bodies, survives the player
+   moving the repo on disk, gives a clean tag value for telemetry.
+3. **HOTL → facts write path.** New helper
+   `synthesise_fact_from_pause(player_id, project_id, preference_kind,
+   player_response, source_agent)` in `hooks_interaction.py` (peer to
+   `extract_memories_from_interaction`). Wired into
+   `run_post_task_hooks` so it fires when the most recent task
+   resolved an `INPUT_REQUIRED` AND the originating agent tagged the
+   pause with a `preference_kind`. Synthesises a
+   `PlayerFact(category="preference", confidence="high",
+   project_id=..., body="<kind>: <answer>", source_agent=...)` and
+   calls `store_facts()`.
+4. **Pause-kind tagging.** Metis's `INPUT_REQUIRED` token grows a
+   `preference_kind` attribute (M13 `CONFIRM_ORDER: <tier>` mirror).
+   Phase 1 closed-set vocabulary: `coverage_target`, `python_version`,
+   `style_rules`, `commit_style`, `test_framework`. Broaden later.
+5. **Read path.** `build_fact_context()` filtered by active
+   `project_id`, prefers project-scoped over global facts at the same
+   retrieval score.
+
+## Out of scope (Phase 2 — separate milestone)
+
+- Visible recall narrator line ("📐 Metis: Using your stored coverage
+  target (80%).")
+- `/preferences` CRUD CLI (`/prefs`, `/memory project` aliases)
+- Telemetry span attributes (`kourai.fact.recalled`,
+  `kourai.fact.kinds`)
+- Confidence decay (`PROJECT_FACT_DECAY_DAYS = 90`)
+
+## Definition of done (Phase 1)
+
+A HOTL answer in project A persists, is recalled in the same agent on
+the next run for project A, AND is NOT recalled when the player
+switches to project B. End-to-end test exercising the full path
+(`AgentInputRequired` → `synthesise_fact_from_pause` → `store_facts` →
+next-session `build_fact_context` with project filter) demonstrates
+the property.
+
+## Order of execution
+
+1. **Item 2 first** (`derive_project_id`) — dependency-free pure
+   function with a clean test surface. Ship as standalone PR.
+2. **Item 1** (`project_id` axis on `PlayerFact` /
+   `KnowledgeGraphFact` / `<FACT>` regex / `store_facts`) — depends on
+   item 2 for the canonical id.
+3. **Item 5** (read-path filter on `get_relevant_facts_for_enrichment`
+   + `build_fact_context`) — extends item 1.
+4. **Item 4** (Metis `INPUT_REQUIRED` `preference_kind` attribute) —
+   independent of 1-3 on the agent side; can ship in parallel.
+5. **Item 3** (`synthesise_fact_from_pause` post-task hook) — the
+   integrator that needs items 1, 2, 4. Ship last with the end-to-end
+   property test.
+
+Each step ships as a PR with tests + `make lint` green + IMPL update.
 
 ---
 
-## Notes / open questions (carry-over from M2)
+## Notes / open questions (carry-over from M2 + M16)
 
 - **MCP elicitation deferred-by-design.** The MCP Python SDK gates
   capability declaration on callback presence — declaring `elicitation`
@@ -140,3 +132,16 @@ default between architectural milestones.
   cron (`scripts/watch_protocols.py`) will flag any subsequent
   revision; today's wiring assumes that spec. Tool annotations being
   explicitly marked untrusted is a 2025-11-25 thing.
+
+## Up next (after Phase 1 lands)
+
+Other queued items remain in the prior IMPL "Up next" list — pulling
+them up requires explicit AJ nomination per UX/DX-default convention.
+
+- **Live VN smoke** — `make vn` exercises both fixes from PR #66.
+- **`docs/architecture/puck-first-run-tutorial.md`** — pairs with the
+  M6 player-onboarding theme (committed in `2ad93c1`).
+- **M17 Phase 2** — visible recall + `/preferences` + telemetry +
+  decay. Defer until Phase 1 has miles on it.
+- **M5 / M7 / M12 / M15 / M6 follow-ons** — see the prior IMPL or
+  ROADMAP for scope.
