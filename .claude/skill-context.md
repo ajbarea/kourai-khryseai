@@ -114,7 +114,7 @@ Subagent scan-area split:
 
 - The dev-loop observability triad is **Jaeger** (traces, `:16686`) + **Prometheus** (metrics, `:9090`) + **Dozzle** (per-container live tail, `:8888`). `make observe` opens all three.
 - Before designing any observability change (new spans, metrics, log enrichment, dashboard layout, or container-grouping decision), read [`docs/observability.md`](../docs/observability.md) — it carries the mental model (trace=flow / metric=aggregate / log=narrative), the four-pattern triage runbook, and the "what's currently populated, and what's not" honesty section. Avoids re-deriving design rationale that was load-bearing in M16.
-- Jaeger is on `jaegertracing/jaeger:2.17.0` (OTel-Collector-shape config in `docker/jaeger-config.yaml`); Prometheus on `prom/prometheus:v3.10.0-distroless`; spanmetrics connector emits RED metrics on `:8889`. Bumping any of these pins → web-search current best practice first (caught two deprecations in M16 that recall would have missed).
+- Jaeger is on `jaegertracing/jaeger:2.17.0` (OTel-Collector-shape config in `docker/jaeger-config.yaml`); Prometheus on `prom/prometheus:v3.11.3-distroless`; spanmetrics connector emits RED metrics on `:8889`. Bumping any of these pins → web-search current best practice first (caught two deprecations in M16 that recall would have missed).
 - Trace-ID injection into log lines is shipped (`shared/src/kourai_common/log.py::_OtelTraceFilter`); a span found in Jaeger is grep-findable in Dozzle as `trace=<id>` without code changes between observation and search.
 
 ## renpy
@@ -129,5 +129,5 @@ Subagent scan-area split:
 - js_files: `docs/javascripts/particles.js`
 - build_command: `uv run zensical build --clean`
 - site_url: `https://<owner>.github.io/kourai-khryseai/`
-- action_pins (expected current): `actions/checkout@v6.0.2`, `astral-sh/setup-uv@v8.0.0`, `actions/setup-python@v6.2.0`, `actions/configure-pages@v6.0.0`, `actions/upload-pages-artifact@v5.0.0`, `actions/deploy-pages@v5.0.0`
+- action_pins (expected current): `actions/checkout@v6.0.2`, `astral-sh/setup-uv@v8.1.0`, `actions/setup-python@v6.2.0`, `actions/configure-pages@v6.0.0`, `actions/upload-pages-artifact@v5.0.0`, `actions/deploy-pages@v5.0.0`
 - nav structure: nested ("Agents", "Architecture", "Interfaces" each with sub-pages)
