@@ -55,6 +55,8 @@ class PlayerFact:
     category: str = "preference"
     confidence: str = "medium"
     source_agent: str = "unknown"
+    project_id: str | None = None
+    """Optional M17 project scope. None = global / cross-project."""
     # Numeric weight for retrieval ranking
     weight: float = field(init=False)
 
@@ -69,6 +71,7 @@ class PlayerFact:
             "category": self.category,
             "confidence": self.confidence,
             "source_agent": self.source_agent,
+            "project_id": self.project_id,
             "weight": self.weight,
         }
 
@@ -117,6 +120,9 @@ class KnowledgeGraphFact:
     related_facts: list[str] = field(default_factory=list)
     """Fact IDs of related nodes (used for graph traversal)."""
 
+    project_id: str | None = None
+    """Optional M17 project scope. None = global / cross-project."""
+
     def to_dict(self) -> dict:
         """Serialize to JSON-compatible dict for Knowledge Graph storage."""
         return {
@@ -132,6 +138,7 @@ class KnowledgeGraphFact:
             "validity": self.validity,
             "tags": self.tags,
             "related_facts": self.related_facts,
+            "project_id": self.project_id,
         }
 
     @classmethod
@@ -151,6 +158,7 @@ class KnowledgeGraphFact:
             category=fact.category,
             confidence=fact.weight,  # weight is 0.0–1.0 already
             source_agent=fact.source_agent,
+            project_id=fact.project_id,
         )
 
 
@@ -177,6 +185,7 @@ def extract_facts(text: str, source_agent: str = "unknown") -> list[PlayerFact]:
             category=attrs.get("category", "preference").lower(),
             confidence=attrs.get("confidence", "medium").lower(),
             source_agent=source_agent,
+            project_id=attrs.get("project_id"),
         )
         facts.append(fact)
         log.debug("Extracted fact [%s/%s]: %s", fact.category, fact.confidence, body[:80])
@@ -212,6 +221,7 @@ def store_facts(player_id: str, facts: list[PlayerFact]) -> None:
             category="fact",
             content=content,
             importance=fact.weight,
+            project_id=fact.project_id,
         )
         log.info("Stored fact for player %s: %s", player_id[:8], content[:80])
 

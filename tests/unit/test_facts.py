@@ -272,3 +272,77 @@ class TestProcessAgentOutput:
 
         assert len(stored) == 2
         assert clean.strip() == ""  # all text was inside FACT tags
+
+
+# ── M17 Phase 1: project_id axis on facts ─────────────────────────
+
+
+def test_player_fact_default_project_id_is_none():
+    """A PlayerFact constructed without project_id is global by default."""
+    fact = PlayerFact(body="any preference")
+    assert fact.project_id is None
+
+
+def test_player_fact_carries_project_id_when_provided():
+    fact = PlayerFact(body="coverage_target: 80%", project_id="abc123def4567890")
+    assert fact.project_id == "abc123def4567890"
+
+
+def test_extract_fact_parses_project_id_attribute():
+    """The <FACT> tag accepts a project_id="..." attribute."""
+    text = (
+        '<FACT category="preference" confidence="high" '
+        'project_id="abc123def4567890">coverage_target: 80%</FACT>'
+    )
+    facts = extract_facts(text, "metis")
+
+    assert len(facts) == 1
+    assert facts[0].project_id == "abc123def4567890"
+    assert facts[0].body == "coverage_target: 80%"
+    assert facts[0].category == "preference"
+    assert facts[0].confidence == "high"
+
+
+def test_extract_fact_without_project_id_is_global():
+    """A <FACT> tag without project_id yields a None scope (global)."""
+    text = '<FACT category="preference">global preference</FACT>'
+    facts = extract_facts(text)
+    assert len(facts) == 1
+    assert facts[0].project_id is None
+
+
+def test_knowledge_graph_fact_inherits_project_id():
+    """KnowledgeGraphFact.from_player_fact copies the project_id."""
+    fact = PlayerFact(body="x", project_id="abc123def4567890")
+    kg = KnowledgeGraphFact.from_player_fact(player_id="p1", fact=fact)
+    assert kg.project_id == "abc123def4567890"
+
+
+def test_player_fact_to_dict_includes_project_id():
+    fact = PlayerFact(body="x", project_id="abc123def4567890")
+    assert fact.to_dict()["project_id"] == "abc123def4567890"
+
+
+def test_knowledge_graph_fact_to_dict_includes_project_id():
+    fact = PlayerFact(body="x", project_id="abc123def4567890")
+    kg = KnowledgeGraphFact.from_player_fact(player_id="p1", fact=fact)
+    assert kg.to_dict()["project_id"] == "abc123def4567890"
+
+
+def test_store_facts_threads_project_id_to_storage():
+    """store_facts forwards each fact's project_id to add_player_memory."""
+    facts = [
+        PlayerFact(body="A", project_id="proj-A"),
+        PlayerFact(body="B"),  # global
+    ]
+    captured: list[dict] = []
+
+    def capture(**kwargs: object) -> None:
+        captured.append(kwargs)
+
+    with patch("kourai_common.player.add_player_memory", side_effect=capture):
+        store_facts("p1", facts)
+
+    assert len(captured) == 2
+    assert captured[0]["project_id"] == "proj-A"
+    assert captured[1]["project_id"] is None

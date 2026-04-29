@@ -6,17 +6,16 @@ table in agent_memory.db with importance-weighted heuristic retrieval.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import math
+import sqlite3
 import time
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from uuid import uuid4
 
 from kourai_common.player_constants import _now_iso
-
-if TYPE_CHECKING:
-    import sqlite3
 
 log = logging.getLogger(__name__)
 
@@ -53,7 +52,8 @@ def _ensure_player_tables(conn: sqlite3.Connection) -> None:
             created_at TEXT,
             last_accessed TEXT,
             expires_at TEXT,
-            source TEXT
+            source TEXT,
+            project_id TEXT
         )
         """
     )
@@ -63,6 +63,9 @@ def _ensure_player_tables(conn: sqlite3.Connection) -> None:
         ON player_memories (player_id, agent_name)
         """
     )
+    # Backwards compat: pre-M17 databases lack the project_id column.
+    with contextlib.suppress(sqlite3.OperationalError):
+        conn.execute("ALTER TABLE player_memories ADD COLUMN project_id TEXT")
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS agent_affinity (
@@ -91,6 +94,7 @@ def add_player_memory(
     agent_name: str | None = None,
     importance: float = 0.5,
     source: str = "agent_observed",
+    project_id: str | None = None,
 ) -> str:
     """Store a new player memory.
 
@@ -101,6 +105,7 @@ def add_player_memory(
         agent_name: Owning agent (None = shared/system-wide).
         importance: 0.0–1.0 importance score.
         source: 'player_stated', 'agent_observed', 'system_inferred', or 'gossip:{agent}'.
+        project_id: Optional project scope (M17). None = global / cross-project.
 
     Returns:
         The generated memory_id.
@@ -112,10 +117,21 @@ def add_player_memory(
         """
         INSERT INTO player_memories
             (memory_id, player_id, agent_name, category, content, importance,
-             access_count, created_at, last_accessed, source)
-        VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
+             access_count, created_at, last_accessed, source, project_id)
+        VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
         """,
-        (memory_id, player_id, agent_name, category, content, importance, now, now, source),
+        (
+            memory_id,
+            player_id,
+            agent_name,
+            category,
+            content,
+            importance,
+            now,
+            now,
+            source,
+            project_id,
+        ),
     )
     conn.commit()
     log.debug("Stored player memory [%s] cat=%s agent=%s", memory_id[:8], category, agent_name)
@@ -157,7 +173,7 @@ def get_player_memories(
     where = " AND ".join(clauses)
     query = f"""
         SELECT memory_id, agent_name, category, content, importance,
-               access_count, created_at, last_accessed, source
+               access_count, created_at, last_accessed, source, project_id
         FROM player_memories
         WHERE {where}
         ORDER BY importance DESC, last_accessed DESC
@@ -177,6 +193,7 @@ def get_player_memories(
             "created_at": r[6],
             "last_accessed": r[7],
             "source": r[8],
+            "project_id": r[9],
         }
         for r in rows
     ]

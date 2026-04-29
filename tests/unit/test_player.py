@@ -286,6 +286,25 @@ class TestPlayerMemory:
         assert len(top) == 1
         assert top[0]["content"] == "High importance"
 
+    def test_add_player_memory_default_project_id_is_none(self, profile):
+        """Memories without an explicit project_id round-trip as None."""
+        add_player_memory(profile.player_id, "global preference", "fact")
+        memories = get_player_memories(profile.player_id)
+        assert len(memories) == 1
+        assert memories[0]["project_id"] is None
+
+    def test_add_player_memory_persists_project_id(self, profile):
+        """Project-scoped memories carry project_id through to retrieval."""
+        add_player_memory(
+            profile.player_id,
+            "coverage_target: 80%",
+            "fact",
+            project_id="abc123def4567890",
+        )
+        memories = get_player_memories(profile.player_id)
+        assert len(memories) == 1
+        assert memories[0]["project_id"] == "abc123def4567890"
+
 
 # ── Gossip Transfer Tests ──────────────────────────────────────────────
 
