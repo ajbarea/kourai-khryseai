@@ -45,24 +45,20 @@ def _player_id_or_none() -> str | None:
     return profile.player_id if profile and profile.player_id else None
 
 
-def _format_recall_narration(player_id: str | None, project_id: str | None) -> str | None:
-    """Build the M17 Phase 2 visible-recall status line, or None when nothing to say.
+def _recalled_preferences(player_id: str | None, project_id: str | None) -> list[tuple[str, str]]:
+    """Return the project-scoped preference facts to narrate, parsed.
 
-    Narrates project-scoped preference facts so the player sees Metis using
-    her stored answers instead of re-asking. Closed-vocab gate matches the
-    write-side gate (``VALID_PREFERENCE_KINDS``) so only PAUSE-resolved
-    preferences narrate; free-form ``<FACT>`` observations (skills,
-    identity, goals) don't pollute the status stream.
+    The (kind, value) pairs feed both the visible-recall narrator
+    (player UX) and the M17 Phase 2 telemetry attributes (researcher
+    DX) — so the two views are derived from a single source of truth
+    and can never disagree about whether a recall happened.
 
-    Returns:
-        ``"Using your stored coverage_target (80%)."`` for one fact;
-        ``"Using your stored project preferences: coverage_target (80%),
-        python_version (3.13)."`` for many; ``None`` when the player
-        profile or project scope is missing, or when no project-scoped
-        preference facts exist.
+    Closed-vocab gate matches the write-side ``VALID_PREFERENCE_KINDS``
+    from ``hooks_interaction.py``; free-form ``<FACT>`` observations
+    (skills, identity, goals) and global facts are dropped.
     """
     if not player_id or not project_id:
-        return None
+        return []
 
     facts = get_relevant_facts_for_enrichment(
         player_id, agent_name="metis", project_id=project_id, limit=10
@@ -84,6 +80,16 @@ def _format_recall_narration(player_id: str | None, project_id: str | None) -> s
             continue
         recalled.append((kind, value))
 
+    return recalled
+
+
+def _format_recall_line(recalled: list[tuple[str, str]]) -> str | None:
+    """Format the recall status line from a parsed list, or ``None`` if empty.
+
+    - One fact: ``"Using your stored coverage_target (80%)."``
+    - Many: ``"Using your stored project preferences: coverage_target (80%),
+      python_version (3.13)."``
+    """
     if not recalled:
         return None
     if len(recalled) == 1:
@@ -91,6 +97,17 @@ def _format_recall_narration(player_id: str | None, project_id: str | None) -> s
         return f"Using your stored {kind} ({value})."
     preview = ", ".join(f"{k} ({v})" for k, v in recalled)
     return f"Using your stored project preferences: {preview}."
+
+
+def _format_recall_narration(player_id: str | None, project_id: str | None) -> str | None:
+    """End-to-end recall line: parse facts, format line.
+
+    Backward-compat wrapper around the split helpers. New callers that
+    also need the parsed kinds for telemetry should call
+    ``_recalled_preferences`` directly and pair it with
+    ``_format_recall_line``.
+    """
+    return _format_recall_line(_recalled_preferences(player_id, project_id))
 
 
 class MetisAgentExecutor(BaseAgentExecutor):
@@ -110,7 +127,7 @@ class MetisAgentExecutor(BaseAgentExecutor):
         self, context: RequestContext, task: Task, updater: TaskUpdater
     ) -> None:
         """Metis-specific: create implementation specs."""
-        with create_span("metis.execute", {"a2a.method": "execute"}):
+        with create_span("metis.execute", {"a2a.method": "execute"}) as outer_span:
             user_input = context.get_user_input()
             # The specialist container's default cwd (`/app`) isn't the
             # worktree, so `git status --short` exits 128 without `cwd=`
@@ -164,17 +181,24 @@ class MetisAgentExecutor(BaseAgentExecutor):
             )
 
             # M17 Phase 2 — narrate the recall so the player sees that
-            # their stored answer is being used instead of re-asked.
-            # Returns None when there's nothing project-scoped to narrate;
-            # the status stream stays clean on the no-recall path.
-            recall_line = _format_recall_narration(player_id, project_id_for_facts)
-            if recall_line:
-                await send_working_status(updater, task, recall_line, emoji="📐")
-                log.info(
-                    "Metis recall narration emitted (player=%s project=%s)",
-                    (player_id or "")[:8],
-                    project_id_for_facts,
-                )
+            # their stored answer is being used instead of re-asked, and
+            # tag the outer span with telemetry attributes so a researcher
+            # can grep Dozzle for ``fact.recalled=true`` and find the
+            # matching Jaeger trace immediately. Both views derive from
+            # the same parsed list so they can never disagree.
+            recalled = _recalled_preferences(player_id, project_id_for_facts)
+            outer_span.set_attribute("kourai.fact.recalled", bool(recalled))
+            if recalled:
+                outer_span.set_attribute("kourai.fact.kinds", [kind for kind, _ in recalled])
+                recall_line = _format_recall_line(recalled)
+                if recall_line:
+                    await send_working_status(updater, task, recall_line, emoji="📐")
+                    log.info(
+                        "Metis recall narration emitted (player=%s project=%s kinds=%s)",
+                        (player_id or "")[:8],
+                        project_id_for_facts,
+                        [kind for kind, _ in recalled],
+                    )
 
             with create_span("metis.spec", {"idea": user_input[:100]}):
                 spec = ""
