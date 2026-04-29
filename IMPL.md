@@ -98,7 +98,47 @@ requires explicit AJ nomination per UX/DX-default convention.
   Dokimasia / Hephaestus do not. Sibling work to PR #87 — same
   five-line pattern per agent. Defer until a real PAUSE caller in a
   non-Metis specialist surfaces.
+- **M7 — a2a-sdk 1.0.x migration.** Stable shipped 2026-04-20 (1.0.2
+  current). Bigger than the existing dual-shape firewall in
+  `shared/src/kourai_common/a2a_utils.py` anticipated — see that
+  module's docstring for the full delta. Real scope:
+  - Bump pin in 3 `pyproject.toml` files; bump
+    `A2A_PROTOCOL_VERSION` from `"0.3"` to `"1.0"`.
+  - Refactor every `__main__.py` (10 agents + vn-bridge) from
+    `A2AStarletteApplication` to `create_agent_card_routes` +
+    `create_jsonrpc_routes`; `A2AStarletteApplication` is removed.
+  - Replace every `Part(root=TextPart(text=...))` /
+    `Part(root=FilePart(file=FileWithBytes(...)))` construction with
+    the flat 1.0 shape (`Part(text=...)` / `Part(raw=bytes,
+    media_type="...")`); `TextPart` / `FilePart` / `DataPart` /
+    `FileWithBytes` / `FileWithUri` are all removed.
+  - Rename every `TaskState.<lower>` / `Role.<lower>` reference to
+    the new `TASK_STATE_<UPPER>` / `ROLE_<UPPER>` form.
+  - Update `RemoteAgentConnection.send()` and `streaming.py` event
+    matching from `AsyncIterator[ClientEvent | Message]` to
+    `AsyncIterator[StreamResponse]` with `HasField()` checks.
+  - Migrate `ClientFactory.create_client()` (sync, deprecated) to
+    `await create_client()`.
+  - Audit `AgentCard` construction: `url` removed at top level,
+    `examples` / `input_modes` / `output_modes` moved into
+    `AgentSkill.examples` / `default_input_modes` /
+    `default_output_modes`; `DefaultRequestHandler(...,
+    agent_card=...)` is now required.
+  - Server-side compat flag `enable_v0_3_compat=True` exists for
+    legacy clients but is gated behind the application-setup
+    refactor; not a bypass for the migration above.
+  - Reference: upstream guide at
+    `a2aproject/a2a-python/blob/main/docs/migrations/v1_0/`.
+  - Suggested phasing: (i) refactor application setup behind the
+    compat flag while still on 0.3 wire format, (ii) flip the pin
+    and version constant, (iii) walk Part construction sites, (iv)
+    walk enum renames, (v) migrate bracket-tag workarounds
+    (`[project_root: ...]` etc.) to `Message.metadata`, (vi) tie
+    `kourai_common.pause_state` migration to M17 Phase 2.
+  - Defer scheduling until M17 Phase 1 has miles on it; bundling
+    SDK churn next to a fresh Phase 1 doubles triage cost on any
+    pause-resume regression.
 - **Live VN smoke** — `make vn` exercises both fixes from PR #66.
 - **`docs/architecture/puck-first-run-tutorial.md`** — pairs with the
   M6 player-onboarding theme (committed in `2ad93c1`).
-- **M5 / M7 / M12 / M15 / M6 follow-ons** — see ROADMAP for scope.
+- **M5 / M12 / M15 / M6 follow-ons** — see ROADMAP for scope.
