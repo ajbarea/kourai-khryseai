@@ -443,10 +443,12 @@ Three calls that diverged from the original sketch:
   labeled FL training data so the loop fails soft. Cross-process
   persistence belongs in Phase 2's confidence-decay milestone.
 
-### Phase 2 — narrator + telemetry + CRUD shipped; decay deferred
+### Phase 2 — fully shipped 2026-04-29
 
-Items 6, 7, and 8 landed 2026-04-29. Only item 9 (confidence decay)
-remains queued.
+All four items landed in one session. M17 closed end-to-end: HOTL
+write path, project-scoped recall, visible narrator, telemetry span
+attributes, CRUD CLI with right-to-forget, and lazy confidence decay
+on a 90-day window.
 
 - **Visible recall (player UX) — shipped 2026-04-29.** Metis's
   executor calls `_format_recall_narration(player_id, project_id)`
@@ -498,14 +500,21 @@ remains queued.
   line. The narrator and the span attributes derive from the same
   parsed list (`_recalled_preferences`) so the player view and the
   researcher view can never disagree about whether a recall fired.
-- **Confidence decay.** `facts.py` already carries `confidence`
-  weight and `last_accessed`. Add a `PROJECT_FACT_DECAY_DAYS = 90`
-  default — facts older than this drop confidence one tier
-  (`high → medium → low → skip`). Re-confirmation by the player
-  resets the timer. Mirrors mem0's "memory depth" concept. Open
-  design call: lazy compute inside
-  `get_relevant_facts_for_enrichment` vs a periodic sweep over
-  `player_memories`. Lazy is simpler and player-facing-equivalent.
+- **Confidence decay — shipped 2026-04-29.** `PROJECT_FACT_DECAY_DAYS
+  = 90` lives in `kourai_common.facts`. `_decayed_confidence` walks a
+  4-rung ladder (`skip → low → medium → high`) and drops one rung per
+  decay window of `created_at` age. `list_preference_facts` returns a
+  `decayed_confidence` field alongside the original so /preferences
+  can surface decay state without rewriting the stored row;
+  `get_relevant_facts_for_enrichment` filters out preference facts
+  that have decayed past the floor so Metis stops planning around an
+  old answer. `last_accessed` deliberately does NOT reset the timer
+  — passive recall during a session would otherwise hold a stale
+  preference alive forever; only player-driven re-confirmation
+  (`/preferences set` or PAUSE answer) writes a fresh
+  `created_at`. `synthesise_fact_from_pause` now forget-then-writes
+  (matching `set_preference_fact`) so re-PAUSE on the same scope+kind
+  no longer stacks rows in `player_memories`.
 
 ### Out of scope — defer to follow-on milestones
 
@@ -830,6 +839,7 @@ architectural moves; valuable but not the first lift.
 
 One-liner per item, newest first. Detail moves out of this file when work lands.
 
+- 2026-04-29 — **M17 Phase 2 confidence decay** shipped (closes Phase 2 end-to-end). `PROJECT_FACT_DECAY_DAYS = 90` constant + `_decayed_confidence` ladder helper (`skip ← low ← medium ← high`) + `_age_days` + `_is_preference_decayed_to_skip` filter in `kourai_common.facts`. Lazy compute on `created_at` (NOT `last_accessed` — passive recall during a session must not reset the decay timer); only player-driven re-confirmation writes a fresh `created_at`. `list_preference_facts` returns a `decayed_confidence` field alongside the original `confidence` so the CLI can surface decay state without rewriting the stored row; `get_relevant_facts_for_enrichment` filters out preference facts that have decayed to `skip` so Metis stops planning around old answers. `synthesise_fact_from_pause` now forget-then-writes (matching `set_preference_fact`) so re-PAUSE on the same scope+kind no longer stacks rows — the listing stays single-row-per-(scope, kind) and re-confirmation correctly resets the timer. 11 new unit tests (5 ladder helper + 3 listing integration + 2 recall filter + 1 PAUSE dedup property); 2876 unit tests overall green; lint + ty clean. Mirrors mem0's "memory depth" concept without the embedding-vector dependency. Closes ROADMAP §M17 Phase 2 item 9 — M17 is now fully shipped end-to-end
 - 2026-04-29 — **M17 Phase 2 `/preferences` CRUD CLI + project_id stability fix** shipped. New slash command (aliased `/prefs`) lets the player browse, override, and forget closed-vocab preference facts for the active scope: bare `/preferences` lists project + global rows with a `*` marker on project rows; `set <kind> <value>` upserts (forgets-then-writes the same scope+kind so the listing stays single-row-per-kind); `forget <kind>` removes one; `forget --all` clears the whole active scope without touching global. Closed vocab enforced on `set` (same `VALID_PREFERENCE_KINDS` gate as the PAUSE synthesiser); `forget` tolerates retired kinds so right-to-forget outlives vocab churn. Three new public primitives in `kourai_common.facts` (`list_preference_facts`, `forget_preference_fact`, `set_preference_fact`) backed by the existing `player_memories` SQLite axis and `delete_player_memory`. Bundled the project_id stability fix because the feature would have surfaced empty without it: Phase 1's PAUSE-write path stamped facts with `derive_project_id([project_root: <forge_session.workdir>])`, but the REPL creates a uuid'd worktree per turn, so the id changed every session and recall never fired across sessions. Fix: new `[project_id: <derive_project_id(project.path)>]` forge tag emitted alongside `[project_root: …]`; `streaming.py:_project_id_from_forge_tags` prefers the explicit tag and falls back to deriving from project_root. Specialists keep reading project_root for git ops; only the fact synthesiser reads the new tag. 26 new unit tests (10 facts CRUD + 13 CLI handler + 3 streaming-tag preference); 2865 unit tests overall green; lint + ty clean. Aligns with the GDPR/CCPA-aligned forgetting patterns Mem0 / Letta / Supermemory converged on for 2026 — every fact removable by the player, no operator gate. Closes ROADMAP §M17 Phase 2 item 7
 - 2026-04-29 — **M17 Phase 2 telemetry attributes** shipped. Metis's
   outer `metis.execute` OTel span now carries `kourai.fact.recalled`

@@ -674,3 +674,259 @@ class TestSetPreferenceFact:
             )
             is False
         )
+
+
+# ── M17 Phase 2 item 9: confidence decay ────────────────────────────────
+
+
+class TestDecayedConfidence:
+    """``_decayed_confidence`` ladder-step on age in days."""
+
+    def test_fresh_fact_keeps_original_tier(self):
+        from kourai_common.facts import _decayed_confidence
+
+        assert _decayed_confidence("high", 0.0) == "high"
+        assert _decayed_confidence("high", 89.99) == "high"
+        assert _decayed_confidence("medium", 12.0) == "medium"
+        assert _decayed_confidence("low", 1.0) == "low"
+
+    def test_one_window_drops_one_tier(self):
+        from kourai_common.facts import _decayed_confidence
+
+        # At exactly 90 days the spec says "drop one tier".
+        assert _decayed_confidence("high", 90.0) == "medium"
+        assert _decayed_confidence("medium", 90.0) == "low"
+        assert _decayed_confidence("low", 90.0) == "skip"
+
+    def test_two_windows_drops_two_tiers(self):
+        from kourai_common.facts import _decayed_confidence
+
+        assert _decayed_confidence("high", 180.0) == "low"
+        assert _decayed_confidence("medium", 180.0) == "skip"
+        # "low" already at the second-lowest rung, stays at the floor.
+        assert _decayed_confidence("low", 180.0) == "skip"
+
+    def test_far_past_floors_at_skip(self):
+        from kourai_common.facts import _decayed_confidence
+
+        # Three windows out: high → low at 180d, → skip at 270d.
+        assert _decayed_confidence("high", 270.0) == "skip"
+        # Way past — stays "skip" (no negative tier).
+        assert _decayed_confidence("high", 10_000.0) == "skip"
+
+    def test_unknown_tier_is_returned_unchanged(self):
+        # Defensive: a row with a non-standard confidence string (legacy
+        # data, manual edit) is returned as-is — decay does not silently
+        # rewrite something the caller might depend on.
+        from kourai_common.facts import _decayed_confidence
+
+        assert _decayed_confidence("unknown", 1000.0) == "unknown"
+        assert _decayed_confidence("", 1000.0) == ""
+
+
+class TestListPreferenceFactsAppliesDecay:
+    """``list_preference_facts`` surfaces the decayed tier in each row."""
+
+    def test_fresh_fact_decayed_matches_original(self, _isolate_player_db):
+        from kourai_common.facts import (
+            PlayerFact,
+            list_preference_facts,
+            store_facts,
+        )
+
+        store_facts(
+            "player-uuid",
+            [
+                PlayerFact(
+                    body="coverage_target: 80%",
+                    category="preference",
+                    confidence="high",
+                    source_agent="metis",
+                    project_id="proj-A",
+                )
+            ],
+        )
+        rows = list_preference_facts("player-uuid", project_id="proj-A")
+        assert len(rows) == 1
+        # Stored just now → no decay applied yet.
+        assert rows[0]["confidence"] == "high"
+        assert rows[0]["decayed_confidence"] == "high"
+
+    def test_old_fact_decays_one_tier_after_window(self, _isolate_player_db):
+        from datetime import UTC, datetime, timedelta
+
+        from kourai_common.facts import (
+            PlayerFact,
+            list_preference_facts,
+            store_facts,
+        )
+
+        store_facts(
+            "player-uuid",
+            [
+                PlayerFact(
+                    body="coverage_target: 80%",
+                    category="preference",
+                    confidence="high",
+                    source_agent="metis",
+                    project_id="proj-A",
+                )
+            ],
+        )
+        # Hand-roll the row's created_at to 100 days ago — past one
+        # decay window. The CRUD layer always writes "now", so this is
+        # the cleanest way to age a fact for unit-test purposes.
+        old = (datetime.now(UTC) - timedelta(days=100)).isoformat()
+        _isolate_player_db.execute("UPDATE player_memories SET created_at = ?", (old,))
+        _isolate_player_db.commit()
+
+        rows = list_preference_facts("player-uuid", project_id="proj-A")
+        assert rows[0]["confidence"] == "high"  # original preserved
+        assert rows[0]["decayed_confidence"] == "medium"  # one tier drop
+
+    def test_decay_uses_created_at_not_last_accessed(self, _isolate_player_db):
+        # last_accessed gets bumped on every passive recall; decay must
+        # ignore that signal so silent-recall sessions don't reset the
+        # timer. Only player-driven re-confirmation (forget+rewrite via
+        # set or PAUSE) produces a fresh created_at.
+        from datetime import UTC, datetime, timedelta
+
+        from kourai_common.facts import (
+            PlayerFact,
+            list_preference_facts,
+            store_facts,
+        )
+
+        store_facts(
+            "player-uuid",
+            [
+                PlayerFact(
+                    body="coverage_target: 80%",
+                    category="preference",
+                    confidence="high",
+                    source_agent="metis",
+                    project_id="proj-A",
+                )
+            ],
+        )
+        old_created = (datetime.now(UTC) - timedelta(days=100)).isoformat()
+        recent_access = datetime.now(UTC).isoformat()
+        _isolate_player_db.execute(
+            "UPDATE player_memories SET created_at = ?, last_accessed = ?",
+            (old_created, recent_access),
+        )
+        _isolate_player_db.commit()
+
+        rows = list_preference_facts("player-uuid", project_id="proj-A")
+        # last_accessed is fresh, but the fact still decays — created_at
+        # is what counts for the M17 timer.
+        assert rows[0]["decayed_confidence"] == "medium"
+
+
+class TestRecallSkipsDecayedFacts:
+    """``get_relevant_facts_for_enrichment`` must drop ``skip``-tier rows."""
+
+    def test_skipped_facts_are_not_returned(self, _isolate_player_db):
+        from datetime import UTC, datetime, timedelta
+
+        from kourai_common.facts import (
+            PlayerFact,
+            get_relevant_facts_for_enrichment,
+            store_facts,
+        )
+
+        store_facts(
+            "player-uuid",
+            [
+                PlayerFact(
+                    body="coverage_target: 80%",
+                    category="preference",
+                    confidence="low",  # one window from skip
+                    source_agent="metis",
+                    project_id="proj-A",
+                )
+            ],
+        )
+        # Age it past the single-window drop for "low" → "skip".
+        old = (datetime.now(UTC) - timedelta(days=100)).isoformat()
+        _isolate_player_db.execute("UPDATE player_memories SET created_at = ?", (old,))
+        _isolate_player_db.commit()
+
+        out = get_relevant_facts_for_enrichment("player-uuid", project_id="proj-A")
+        # Decayed all the way to "skip" → recall path drops it.
+        assert out == []
+
+    def test_partially_decayed_facts_still_return(self, _isolate_player_db):
+        from datetime import UTC, datetime, timedelta
+
+        from kourai_common.facts import (
+            PlayerFact,
+            get_relevant_facts_for_enrichment,
+            store_facts,
+        )
+
+        store_facts(
+            "player-uuid",
+            [
+                PlayerFact(
+                    body="coverage_target: 80%",
+                    category="preference",
+                    confidence="high",
+                    source_agent="metis",
+                    project_id="proj-A",
+                )
+            ],
+        )
+        old = (datetime.now(UTC) - timedelta(days=100)).isoformat()
+        _isolate_player_db.execute("UPDATE player_memories SET created_at = ?", (old,))
+        _isolate_player_db.commit()
+
+        out = get_relevant_facts_for_enrichment("player-uuid", project_id="proj-A")
+        # high → medium after one window; still surfaces.
+        assert len(out) == 1
+        assert "coverage_target" in out[0]["body"]
+
+
+class TestPauseSynthesisDedupesAndResetsTimer:
+    """``synthesise_fact_from_pause`` should reset the decay timer.
+
+    Sibling fix bundled with decay: a re-PAUSE on the same scope+kind
+    must result in a single row with a fresh ``created_at``. Without
+    deduplication the listing would surface stale rows alongside the
+    new answer and the player would see (or recall) an old preference
+    despite having just answered the clarifying question.
+    """
+
+    def test_same_scope_kind_replaces_old_row(self, _isolate_player_db):
+        from datetime import UTC, datetime, timedelta
+
+        from kourai_common.facts import list_preference_facts
+        from kourai_common.hooks_interaction import synthesise_fact_from_pause
+
+        # Seed an old answer.
+        synthesise_fact_from_pause(
+            player_id="player-uuid",
+            project_id="proj-A",
+            preference_kind="coverage_target",
+            player_response="80%",
+            source_agent="metis",
+        )
+        old = (datetime.now(UTC) - timedelta(days=200)).isoformat()
+        _isolate_player_db.execute("UPDATE player_memories SET created_at = ?", (old,))
+        _isolate_player_db.commit()
+
+        # Re-confirm — same scope, same kind, new value. Old row goes;
+        # new row's created_at is "now".
+        synthesise_fact_from_pause(
+            player_id="player-uuid",
+            project_id="proj-A",
+            preference_kind="coverage_target",
+            player_response="95%",
+            source_agent="metis",
+        )
+
+        rows = list_preference_facts("player-uuid", project_id="proj-A")
+        assert len(rows) == 1
+        assert rows[0]["value"] == "95%"
+        # And the timer reset — fresh row is at full tier, not decayed.
+        assert rows[0]["decayed_confidence"] == "high"

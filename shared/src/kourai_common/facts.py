@@ -273,6 +273,17 @@ def get_relevant_facts_for_enrichment(
                 if any(kw in m.get("content", "").lower() for kw in keywords_lower)
             ]
 
+        # M17 Phase 2 item 9: drop preference facts that have decayed past
+        # the floor. Non-preference facts (skill / identity / free-form)
+        # pass through unchanged — the decay window only applies to the
+        # closed-vocab preference axis where ``set`` / PAUSE re-confirmation
+        # is the natural reset signal.
+        memories = [
+            m
+            for m in memories
+            if not _is_preference_decayed_to_skip(m.get("content", ""), m.get("created_at"))
+        ]
+
         return [
             {
                 "body": m["content"].replace("[FACT:", "").split("]", 1)[-1].strip(),
@@ -349,6 +360,76 @@ def process_agent_output(
     return strip_facts(text)
 
 
+# ── M17 Phase 2 item 9: confidence decay ────────────────────────────────
+#
+# Lazy compute on top of ``created_at``. No scheduled sweep, no schema
+# change — read-time tier-step. ``last_accessed`` deliberately does NOT
+# reset the timer (passive recall would otherwise hold preferences alive
+# forever); only player-driven re-confirmation (``set`` or PAUSE answer)
+# writes a fresh row with a new ``created_at``.
+
+PROJECT_FACT_DECAY_DAYS = 90
+"""Days between confidence-tier drops on stored project preferences.
+
+A fact at ``high`` becomes ``medium`` after this many days, ``low`` after
+2× this, and ``skip`` after 3×. Floor at ``skip`` — the recall path
+filters those out, the listing surfaces the decayed tier so the player
+can see it. Mirrors mem0's "memory depth" concept without taking on the
+embedding-vector dependency.
+"""
+
+# Order matters: index 0 is the floor, index 3 is the ceiling.
+_TIER_LADDER: tuple[str, ...] = ("skip", "low", "medium", "high")
+
+# ``[FACT:preference/<confidence>] <kind>: <value>`` — write shape produced
+# by ``store_facts`` for closed-vocab preferences. Re-used by both the
+# CRUD listing and the decay-aware recall filter; defined here so the
+# decay helpers can stay co-located with their dependencies.
+_PREF_BODY_RE = re.compile(
+    r"^\[FACT:preference/(?P<confidence>\w+)\]\s+(?P<kind>[A-Za-z_]+):\s*(?P<value>.+)$"
+)
+
+
+def _decayed_confidence(original: str, age_days: float) -> str:
+    """Drop one ladder rung per ``PROJECT_FACT_DECAY_DAYS`` of age.
+
+    ``original`` outside the ladder (legacy data, manual edit) returns
+    unchanged so decay is purely additive — never silently rewriting a
+    confidence string the caller set on purpose.
+    """
+    if original not in _TIER_LADDER:
+        return original
+    drops = max(0, int(age_days // PROJECT_FACT_DECAY_DAYS))
+    idx = max(0, _TIER_LADDER.index(original) - drops)
+    return _TIER_LADDER[idx]
+
+
+def _age_days(iso_timestamp: str | None) -> float:
+    """Days since ``iso_timestamp`` (UTC). Missing / malformed → 0.0."""
+    if not iso_timestamp:
+        return 0.0
+    try:
+        ts = datetime.fromisoformat(iso_timestamp).timestamp()
+    except (ValueError, TypeError):
+        return 0.0
+    return max(0.0, (datetime.now(UTC).timestamp() - ts) / 86400.0)
+
+
+def _is_preference_decayed_to_skip(content: str, created_at: str | None) -> bool:
+    """True iff ``content`` is a preference fact that decayed past the floor.
+
+    Non-preference fact rows (skill, identity, free-form observations)
+    pass through unchanged — only the closed-vocab preference axis is
+    subject to the M17 decay window. Recall callers wrap their listings
+    in this check so a stale preference doesn't keep landing in
+    Metis's planning prompt months after it was last reinforced.
+    """
+    match = _PREF_BODY_RE.match(content.strip())
+    if match is None:
+        return False
+    return _decayed_confidence(match.group("confidence"), _age_days(created_at)) == "skip"
+
+
 # ── M17 Phase 2 item 7: /preferences CRUD primitives ────────────────────
 #
 # The CLI surface for browsing, deleting, and overriding the closed-vocab
@@ -356,14 +437,6 @@ def process_agent_output(
 # ``synthesise_fact_from_pause``. Right-to-forget is non-negotiable for
 # player trust and for GDPR/CCPA-aligned defaults — every fact has to be
 # removable by the player without an operator step.
-
-# ``[FACT:preference/<confidence>] <kind>: <value>`` — write shape produced
-# by ``store_facts`` for closed-vocab preferences. Unanchored kind alphabet
-# is intentional; the ``VALID_PREFERENCE_KINDS`` filter on the parsed kind
-# is what gates inclusion in the listing.
-_PREF_BODY_RE = re.compile(
-    r"^\[FACT:preference/(?P<confidence>\w+)\]\s+(?P<kind>[A-Za-z_]+):\s*(?P<value>.+)$"
-)
 
 
 def list_preference_facts(player_id: str, project_id: str | None) -> list[dict]:
@@ -415,15 +488,19 @@ def list_preference_facts(player_id: str, project_id: str | None) -> list[dict]:
         # bare-list UI doesn't surface project rows under "global".
         if project_id is None and row_project is not None:
             continue
+        confidence = match.group("confidence")
+        created_at = row.get("created_at")
         out.append(
             {
                 "memory_id": row["memory_id"],
                 "kind": kind,
                 "value": match.group("value").strip(),
-                "confidence": match.group("confidence"),
+                "confidence": confidence,
+                "decayed_confidence": _decayed_confidence(confidence, _age_days(created_at)),
                 "source_agent": row.get("agent_name") or "unknown",
                 "project_id": row_project,
                 "scope": "project" if row_project is not None else "global",
+                "created_at": created_at,
                 "last_accessed": row.get("last_accessed"),
             }
         )

@@ -190,8 +190,17 @@ def synthesise_fact_from_pause(
         )
         return False
 
-    from kourai_common.facts import PlayerFact, store_facts
+    from kourai_common.facts import (
+        PlayerFact,
+        forget_preference_fact,
+        store_facts,
+    )
 
+    # M17 Phase 2 item 9: re-confirmation resets the decay timer. The
+    # forget-then-write pattern matches ``set_preference_fact`` so the
+    # listing stays single-row-per-(scope, kind) and the new row carries
+    # a fresh ``created_at`` for the lazy decay calculation.
+    forget_preference_fact(player_id, project_id, preference_kind)
     fact = PlayerFact(
         body=f"{preference_kind}: {player_response.strip()}",
         category="preference",
