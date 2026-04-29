@@ -44,8 +44,8 @@ from kourai_common.projects import derive_project_id
 if TYPE_CHECKING:
     from a2a.client.client import Client
 
-    from hosts.gui.tts_engine import TTSEngine
     from kourai_common.federation.memoir import Memoir
+    from kourai_common.tts_realtime import RealtimeTTSEngine
 
 # ---------------------------------------------------------------------------
 # Last result store — for /copy / /save
@@ -152,7 +152,7 @@ async def send_and_stream(
     task_id: str | None = None,
     verbose: bool = False,
     attachments: list[tuple[str, str]] | None = None,
-    tts: TTSEngine | None = None,
+    tts: RealtimeTTSEngine | None = None,
     gossip_enabled: bool = True,
     *,
     memoir: Memoir | None = None,

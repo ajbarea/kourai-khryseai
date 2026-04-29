@@ -154,32 +154,50 @@ Depends on M19 (word-timing API) and M18 (content-kind metadata
 to route dialogue-only to the synced path). See ROADMAP §M20 for
 full scope, acceptance criteria, and tier-1/tier-2 fallback design.
 
-**M19 staging shipped 2026-04-29 (this session):**
-- `RealtimeTTS[kokoro]>=0.4.0` added to `hosts/gui/pyproject.toml`
-  alongside the transitional `kokoro` / `soundfile` / `edge-tts` deps.
-- AJ pre-flight: `sudo apt install portaudio19-dev` (PyAudio system
-  dep) on host before `make setup`. WSL2 PulseAudio passthrough
-  already works for the existing pygame path, so this is additive.
-- Full migration next session — surveying the API surface revealed
-  `TTSEngine` has substantial GUI-side coupling (`tts_helper.py`,
-  `tts_gui_integration.py`, `speak_sync`, backend-swap, master-volume
-  attribute, `enable_effects` attribute) that a full migration touches.
-  Right move is fresh-session focus over end-of-session push.
-- Fresh-session plan:
-  - New module `kourai_common/tts_realtime.py` with `RealtimeTTSEngine`
-    holding one `KokoroEngine` + one `TextToAudioStream`; mirrors the
-    existing TTSEngine ABI (`speak`, `cleanup`, `set_master_volume`,
-    `is_playing`, `enable_effects`).
-  - `hosts/cli/__main__.py` and `hosts/cli/streaming.py` flip imports
-    from `hosts.gui.tts_engine` to `kourai_common.tts_realtime`.
-  - GUI Phase 2 follow-up: `hosts/gui/tts_gui_integration.py` and
-    `hosts/gui/tts_helper.py` migrate. Old `hosts/gui/tts_engine.py`
-    + `tts_kokoro.py` + `tts_edge.py` retire only after both hosts
-    are on the new module — no flag-toggle workarounds.
-  - Test surface: existing `tests/unit/test_gui_audio_tts_engine.py`,
-    `tests/unit/test_gui_tts.py`, `tests/unit/test_tts_backends.py`,
-    `tests/integration/test_tts_*` need rewrites against the new
-    module. Most existing pygame.mixer mocks can drop entirely.
+**M19 Phase 1 shipped 2026-04-29:**
+- `shared/src/kourai_common/tts_realtime.py` — new `RealtimeTTSEngine`
+  wraps RealtimeTTS's `KokoroEngine` + `TextToAudioStream`; mirrors the
+  legacy `TTSEngine` ABI for drop-in replacement (`speak`, `speak_sync`,
+  `stop`, `cleanup`, `set_master_volume`, `set_on_complete`,
+  `is_playing`, `enable_effects`, `master_volume`). Module re-exports
+  `VoiceConfig` / `VOICE_ROSTER` / `AGENT_VOICES` for parity with
+  `hosts.gui.tts_engine`. Constructor accepts `on_word=` so M20's
+  word-timing reveal hooks straight in once that lands.
+- `hosts/cli/__main__.py` and `hosts/cli/streaming.py` flipped from
+  `hosts.gui.tts_engine.TTSEngine` to
+  `kourai_common.tts_realtime.RealtimeTTSEngine`. CLI greeting + every
+  in-stream `await tts.speak(...)` now routes through PyAudio — no
+  pygame.mixer in the TTS path on the CLI host.
+- `tests/unit/test_tts_realtime.py` — 26 tests, all PyAudio touch points
+  monkeypatched at module level so `pytest` never opens a real audio
+  device. ABI-mirror coverage (init, volume clamping, voice resolution
+  via `AGENT_VOICE_MAP`, `voice_key` override, `speed` override,
+  exception-swallowing, `on_complete` firing on both paths,
+  `speak_sync` event-loop wiring, `stop`/`cleanup` shutdown).
+- Live tmux smoke (`script -qc python -m hosts.cli --voice` against
+  the running agent stack) verified: greeting fires
+  `RealtimeTTSEngine.speak()` with correct per-agent dispatch
+  (`agent=techne, voice=bf_emma, speed=0.93`), engine swallows
+  audio-device errors non-fatally, process exits cleanly. Subprocess
+  PyAudio sees no default device (no PulseServer socket in the tmux
+  child env) — AJ's interactive terminal has WSLg's PulseAudio socket
+  on `$PULSE_SERVER`, so live `make cli` will actually emit audio.
+
+**M19 Phase 2 — GUI flip + retire legacy modules (next session):**
+- `hosts/gui/tts_gui_integration.py` and `hosts/gui/tts_helper.py`
+  migrate from `TTSEngine` to `RealtimeTTSEngine`. The GUI's
+  `set_backend()` runtime swap surface needs rethinking — RealtimeTTS
+  bundles the engine, so the swap point moves up one layer (swap the
+  RealtimeTTSEngine itself, not its inner backend).
+- Retire `hosts/gui/tts_engine.py`, `shared/src/kourai_common/tts_kokoro.py`,
+  and `shared/src/kourai_common/tts_edge.py` once both hosts are off
+  them — no flag-toggle co-existence period.
+- Rewrite `tests/integration/test_tts_demo.py`,
+  `tests/unit/test_gui_audio_tts_engine.py`, `tests/unit/test_gui_tts.py`,
+  `tests/unit/test_tts_backends.py` against the new module. Most
+  pygame.mixer mocking drops entirely.
+- Drop transitional deps from `hosts/gui/pyproject.toml`: `kokoro`,
+  `soundfile`, `edge-tts` (RealtimeTTS bundles the equivalents).
 
 **M13 fix.** After M7 lands: emit the original request via
 Message.metadata on resume dispatch. Tested via re-run of the
@@ -273,8 +291,9 @@ implementation, architectural fix over expedient patch.
 3. **M18 — Structured streaming with content-kind metadata.** New
    milestone, builds on M7. See ROADMAP §M18 for the kind taxonomy
    and per-agent rollout plan.
-4. **M19 — Audio backend separation for TTS.** Independent of
-   M7/M18. New milestone. See ROADMAP §M19. Can run parallel.
+4. **M19 Phase 2 — GUI flip + retire legacy TTS modules.** Phase 1
+   (CLI flip + new `kourai_common/tts_realtime.py`) shipped 2026-04-29;
+   see the M19 Phase 2 block above for the remaining surface.
 5. **M20 — Audio-text synchronization across CLI / GUI / VN.**
    Builds on M18 (content-kind routing) + M19 (RealtimeTTS word-
    timing API). New milestone surfaced this session — the 9-14s

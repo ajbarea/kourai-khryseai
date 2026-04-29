@@ -50,7 +50,6 @@ from hosts.cli.rendering import (
 from hosts.cli.settings import CLISettings
 from hosts.cli.streaming import _connect_with_url_override, get_last_result, send_and_stream
 from hosts.cli.styling import _DIM, _GOLD, _GOLD_BOLD, _GOLD_BRIGHT, _ITALIC, _RED, _RESET
-from hosts.gui.tts_engine import TTSEngine
 from kourai_common.a2a_utils import make_a2a_http_client
 from kourai_common.audio import AudioManager
 from kourai_common.config import MODEL_TIER, PROVIDER, get_agent_url, get_model
@@ -62,6 +61,7 @@ from kourai_common.log import setup_logging
 from kourai_common.memory import list_agents_with_history
 from kourai_common.player import PlayerProfile, get_all_affinities
 from kourai_common.projects import derive_project_id
+from kourai_common.tts_realtime import RealtimeTTSEngine
 from kourai_common.virtues import FORGE_VIRTUES, get_virtue_deltas, get_virtue_scores
 
 _COMPLETER_STYLE = Style.from_dict(
@@ -102,8 +102,8 @@ def _active_model_label() -> str:
 
 
 def _apply_audio_settings(
-    audio: AudioManager, settings: CLISettings, tts: TTSEngine | None
-) -> TTSEngine | None:
+    audio: AudioManager, settings: CLISettings, tts: RealtimeTTSEngine | None
+) -> RealtimeTTSEngine | None:
     """Apply persisted audio/voice settings to runtime systems."""
     if not audio.audio_available:
         if tts:
@@ -140,7 +140,7 @@ def _apply_audio_settings(
 
     if settings.voice_enabled:
         if tts is None:
-            return TTSEngine()
+            return RealtimeTTSEngine()
         return tts
 
     if tts is not None:
@@ -548,7 +548,7 @@ async def main(
 
     # Initialize audio system (forge ambient + playlist)
     audio = AudioManager()
-    tts: TTSEngine | None = None
+    tts: RealtimeTTSEngine | None = None
     tts = _apply_audio_settings(audio, settings, tts)
 
     # Headless mode — run a single prompt and exit (for scripts / piping)
