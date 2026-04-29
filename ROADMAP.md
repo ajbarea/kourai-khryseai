@@ -349,66 +349,32 @@ what the swarm actually did.
 
 ## M17 — HOTL answer persistence (project-scoped facts)
 
-> Status: planned · Builds on: M13 (CONFIRM_ORDER) · Memoir foundation ·
-> `kourai_common.facts` knowledge graph · Distinct from M6 autoDream
+> Status: **Phase 1 shipped (2026-04-29)** · Phase 2 planned · Builds
+> on: M13 (CONFIRM_ORDER) · Memoir foundation · `kourai_common.facts`
+> knowledge graph · Distinct from M6 autoDream
 
 When Metis pauses on a clarifying question — *"what's your test coverage
 target?"*, *"does this project use type hints?"*, *"preferred logging
-backend?"* — the player's answer should stick. Today the answer is captured
-into the per-session Memoir JSONL (good — labeled training tuple for the
-federation pipeline), but agents do not surface prior sessions' preferences
-when planning. Result: every new session, Metis re-asks the same questions a
-careful contributor already answered last week.
-
-This milestone closes the loop between `AgentInputRequired` (M13's
-extracted primitive) and the **`facts.py` knowledge-graph layer**
-(already-shipped infrastructure). Net effect for the player: agents
-*remember the project* across runs and only ask about preferences once.
+backend?"* — the player's answer sticks. Phase 1 closes the loop between
+`AgentInputRequired` and the `kourai_common.facts` knowledge graph: a
+project-scope axis + a `PAUSE: <kind> "<question>"` runtime control token
++ cross-turn stash + write-on-resolve in the CLI streaming layer + Metis-
+side recall via `build_fact_context`. Per the Phase 1 DOD, a HOTL answer
+in project A is recalled in project A's next session and NOT recalled
+when the player switches to project B.
 
 ### Why `facts.py` and not `player_memories` (architecture pivot from initial draft)
 
 Initial scoping assumed M17's write path would extend the `player_memories`
 SQLite table used by the gossip / affinity / personality stack. A code
-audit revealed `kourai_common.facts` already implements *exactly the
-right shape* for this use case:
-
-- `<FACT category="preference" confidence="high">…</FACT>` extraction
-  format parsed from agent output (`extract_facts`)
-- `PlayerFact` + `KnowledgeGraphFact` dataclasses with relationships
-  (refines / contradicts / supports), confidence weights, and source-agent
-  attribution
-- `store_facts()` writes; `get_relevant_facts_for_enrichment()` reads
-  with importance scoring; `build_fact_context()` injects into agent
-  system prompts at planning time
-- `VALID_CATEGORIES` already includes `"preference"`
-
-The missing pieces are tiny by comparison: a *project-scope axis* (facts
-are currently per-player only, no project axis) and a *HOTL-resolution
-write synthesis path* (facts today come exclusively from agent-output XML
-tags, not from structured player-pause answers). Extending `facts.py` is
-materially cheaper than building a parallel project-preference layer on
-top of `player_memories`, and it inherits the entire knowledge-graph
+audit revealed `kourai_common.facts` already had the right shape:
+`<FACT category="preference" confidence="high">…</FACT>` extraction,
+`PlayerFact` / `KnowledgeGraphFact` dataclasses, `store_facts()` writes,
+`get_relevant_facts_for_enrichment()` reads, `build_fact_context()` prompt
+injection — full lifecycle. Adding a `project_id` axis was materially
+cheaper than building a parallel project-preference layer on top of
+`player_memories`, and it inherited the existing knowledge-graph
 machinery (relationships, confidence decay, prompt enrichment) for free.
-
-### Why prompt enrichment, not a new pre-pause hook
-
-`facts.py`'s `build_fact_context()` already runs at planning time and
-injects relevant facts into agent system prompts BEFORE the agent decides
-what to ask. If Metis's prompt arrives carrying
-`<FACT category="preference" project_id="..." confidence="high">coverage
-target: 80%</FACT>`, she will simply not generate a clarifying question
-for something she already knows — no new hook plumbing required, no
-Metis-side recall logic, no per-specialist patches in Phase 2 (every
-specialist's system prompt is already enriched the same way). This is
-*structurally* simpler than the original draft's "patch each agent with a
-recall hook" sketch, and it's what AJ's existing knowledge-graph
-investment was designed to do.
-
-The post-task hook layer (`hooks.py` → `run_post_task_hooks`) handles the
-write side cleanly: it's already the documented integration point for
-"after each agent task completes, do follow-up bookkeeping," and an
-`INPUT_REQUIRED`-resolution synthesis fits in alongside the existing
-`extract_memories_from_interaction` and `score_alignment` calls.
 
 ### Anchors in current 2026 best practice
 
@@ -421,108 +387,87 @@ custom categories, targeted searches scoped by project metadata. M17
 adopts the *project_id-as-metadata-attribute* pattern (rather than the
 original draft's `project_root`-as-column), aligning with the industry
 direction without taking on the full mem0 / Letta stack as a dependency.
-Reference points worth tracking but **not adopting wholesale** today —
-the right framing is "use the convergent vocabulary so a future migration
-to mem0 / Letta is incremental rather than a rewrite."
+Reference points worth tracking — the right framing is "use the
+convergent vocabulary so a future migration to mem0 / Letta is
+incremental rather than a rewrite."
 
-### What's true today — anti-overclaim ledger
+### Phase 1 — what shipped (2026-04-29)
 
-- ✓ HOTL pauses fire via `AgentInputRequired` (shipped via M13).
-- ✓ Player answers persist to per-session Memoir JSONL on disk
-  (`shared/src/kourai_common/federation/memoir.py`), capturing
-  `agent_proposed`, `player_response`, `affinity_delta`, and a
-  `training_label` for federated learning.
-- ✓ `facts.py` knowledge graph: extraction (`<FACT …>` regex), storage
-  (`store_facts`), enrichment-time retrieval
-  (`get_relevant_facts_for_enrichment`), prompt injection
-  (`build_fact_context`) — full lifecycle is shipped, just unused for
-  HOTL-pause answers today.
-- ✓ Cross-session player memory SQLite exists separately for affinity /
-  gossip / personality (`player_memory.py`); M17 does **not** extend
-  this table.
-- ✓ Post-task hook orchestration (`hooks.py` → `run_post_task_hooks`)
-  is the documented write-side integration point.
-- ✗ Facts are currently global to the player — no `project_id` axis.
-- ✗ No write path from `INPUT_REQUIRED` resolution to `store_facts()`.
-- ✗ `get_relevant_facts_for_enrichment()` does not filter by project.
-- ✗ `derive_project_id()` does not exist in `projects.py`.
+Six PRs across one session. The mechanism end-to-end:
 
-### Scope
+1. `derive_project_id(project_root)` — stable sha256-of-canonical-path
+   id (16 hex). Survives the player moving the repo on disk, doesn't
+   leak host-absolute paths into fact bodies. (#81)
+2. `project_id` axis on `PlayerFact` / `KnowledgeGraphFact` /
+   `player_memories` SQLite. `<FACT>` regex parses the attribute;
+   `add_player_memory` and `store_facts` persist it. (#82)
+3. `synthesise_fact_from_pause(player_id, project_id, preference_kind,
+   player_response, source_agent)` helper + Phase 1 property test. (#84)
+4. Read-side filter on `get_player_memories(project_id=...)` and
+   `build_fact_context(project_id=...)` — single-query SQL with a
+   `CASE WHEN project_id = ? THEN 1 ELSE 0 END DESC` ranking boost so
+   project-tagged facts beat global at equal importance / recency. (#85)
+5. Metis `PAUSE: <kind> "<question>"` runtime token mirroring
+   M13's CONFIRM_ORDER shape, with the closed Phase 1 vocabulary
+   `coverage_target` / `python_version` / `style_rules` /
+   `commit_style` / `test_framework`. New `kourai_common.pause_state`
+   + `kourai_common.pause_tag` modules; CLI streaming layer pops the
+   stash and calls `synthesise_fact_from_pause` at the top of every
+   turn. (#86)
+6. Metis-side recall — `create_spec` / `create_spec_stream` thread
+   `player_id` / `project_id` to `build_fact_context`; PLAYER CONTEXT
+   leads the user-message context block so Metis sees prior PAUSE-
+   resolved preferences before docs / project / file context. (#87)
 
-1. **`project_id` axis on facts.** Add an optional `project_id: str |
-   None` field to `PlayerFact` (defaults to `None` = global / cross-
-   project). Extend the `<FACT …>` tag regex to parse a
-   `project_id="..."` attribute. `store_facts()` persists it;
-   `get_relevant_facts_for_enrichment()` accepts a `project_id` filter
-   parameter and prefers project-scoped facts over global facts at the
-   same retrieval score.
-2. **Project-id derivation.** Add `derive_project_id(project_root)` in
-   `projects.py` — a stable hash (e.g. `sha256` truncated to 16 hex)
-   of the absolute, normalised path. Avoids leaking host-absolute
-   paths into the fact body, survives the player moving the repo on
-   disk, and gives a clean tag value for telemetry attributes.
-3. **HOTL → facts write path** (post-task hook synthesis). New helper
-   `synthesise_fact_from_pause(player_id, project_id, preference_kind,
-   player_response, source_agent)` in `hooks_interaction.py` (peer to
-   `extract_memories_from_interaction`). Wired into
-   `run_post_task_hooks` so it fires when the most recent task
-   resolved an `INPUT_REQUIRED` AND the originating agent tagged the
-   pause with a `preference_kind`. Synthesises a
-   `PlayerFact(category="preference", confidence="high",
-   project_id=..., body="<kind>: <answer>", source_agent=...)` and
-   calls `store_facts()`. Memoir continues to receive the
-   `PlayerResponse` independently — Memoir is the FL training-data
-   ground-truth, facts are the fast structured-recall surface.
-4. **Pause-kind tagging.** Metis's `INPUT_REQUIRED` token grows a
-   `preference_kind` attribute (mirroring M13's `CONFIRM_ORDER:
-   <tier>` pattern), populated when she classifies a clarifying
-   question as a one-time-per-project preference. Scope this Phase 1
-   tag set to ~5 kinds (`coverage_target`, `python_version`,
-   `style_rules`, `commit_style`, `test_framework`); broaden later.
-5. **Read path: zero-touch via prompt enrichment.** Extend
-   `build_fact_context()` to filter by the active `project_id`,
-   preferring project-scoped facts over global ones. Metis's
-   existing system-prompt scaffold (and every other specialist's,
-   for free) receives the project-scoped facts; her HOTL-question
-   synthesis logic naturally skips kinds she already has answers
-   for. **No Metis-side patch beyond a one-line audit confirming the
-   fact context lands in her routing prompt** — this is the big
-   simplification vs. the original draft.
-6. **Visible recall (player UX).** When `build_fact_context()` injects
-   a project-scoped fact and the agent would otherwise have asked,
-   narrate via the existing `_maidenify_status` plumbing — e.g.
-   `📐 Metis: "Using your stored coverage target (80%)."` Load-
-   bearing for trust: silent recall feels like agents are guessing.
-7. **`/preferences` CRUD CLI.** New slash command modeled on
-   `/permissions`. Aliases: `/prefs`, `/memory project`. Lists
-   project-scoped facts for the active project; `forget <kind>`
-   removes a fact; `set <kind> <value>` overrides without re-asking.
-   Right-to-forget is non-negotiable for player trust and gives any
-   future user study an honest "edit-the-memory" affordance.
-8. **Telemetry.** Two new span attributes on every specialist span
-   that could-have-paused: `kourai.fact.recalled` (`bool`) and
-   `kourai.fact.kinds` (`list[str]`). Cross-pane linkage is
-   automatic per M16's trace-ID injection — researchers can grep
-   Dozzle for `fact.recalled=true` and find the matching Jaeger
-   trace immediately.
-9. **Confidence decay.** `facts.py` already carries `confidence`
-   weight and `last_accessed`. Add a `PROJECT_FACT_DECAY_DAYS = 90`
-   default — facts older than this drop confidence one tier
-   (`high → medium → low → skip`). Re-confirmation by the player
-   resets the timer. Mirrors mem0's "memory depth" concept without
-   adopting the dependency.
+Three calls that diverged from the original sketch:
 
-### Phasing
+- **`run_post_task_hooks` had no production call sites.** The ROADMAP
+  plan ("wired into `run_post_task_hooks`…") was load-bearing on a
+  layer never integrated into the agent execution pipeline. The
+  pragmatic answer: call `synthesise_fact_from_pause` directly from
+  `hosts/cli/streaming.py` where Memoir already lives. Promoting the
+  call back into a unified post-task hook layer is queued as a
+  follow-on under M5/M6.
+- **Metis didn't actually call `build_fact_context`.** ROADMAP §M17
+  assumed every specialist's prompt was enriched through `facts.py`
+  (true for Puck and Cupid). Metis went through
+  `get_enriched_system_prompt` → `build_player_context` →
+  `retrieve_relevant_memories`, which never touches facts.py. PR #87
+  closed the gap surgically. Other specialists (Techne / Kallos /
+  Dokimasia / Hephaestus) inherit the same disconnect; sibling work
+  when a non-Metis PAUSE caller surfaces.
+- **Cross-turn state lives in-process.** A
+  `kourai_common.pause_state` dict keyed by `context_id` carries
+  `(preference_kind, source_agent)` from pause to resume. Restart
+  drops the classification; the answer still lands in Memoir as
+  labeled FL training data so the loop fails soft. Cross-process
+  persistence belongs in Phase 2's confidence-decay milestone.
 
-- **Phase 1 (foundational, gates the milestone).** Items 1–5:
-  `project_id` axis + derivation + write path + pause-kind tagging +
-  read-path filter + Metis emit-side audit. Smallest end-to-end claim
-  worth shipping: *"a HOTL answer persists, is recalled in the same
-  agent on the next run for the same project, is NOT recalled when
-  the player switches to a different project."*
-- **Phase 2 (UX + dev tools).** Items 6–9: visible recall narrator
-  line + `/preferences` CRUD + telemetry attributes + confidence
-  decay.
+### Phase 2 — planned (defer until Phase 1 has miles)
+
+Items 6–9 from the original scope:
+
+- **Visible recall (player UX).** When the prompt-enrichment path
+  injects a project-scoped fact and the agent would otherwise have
+  asked, narrate via the existing `_maidenify_status` plumbing — e.g.
+  `📐 Metis: "Using your stored coverage target (80%)."` Silent
+  recall feels like agents are guessing; the narration is load-
+  bearing for trust.
+- **`/preferences` CRUD CLI.** New slash command modeled on
+  `/permissions`. Aliases: `/prefs`, `/memory project`. Lists
+  project-scoped facts for the active project; `forget <kind>`
+  removes a fact; `set <kind> <value>` overrides without re-asking.
+  Right-to-forget is non-negotiable for player trust.
+- **Telemetry.** Two new span attributes on every specialist span
+  that could-have-paused: `kourai.fact.recalled` (`bool`) and
+  `kourai.fact.kinds` (`list[str]`). Cross-pane linkage is automatic
+  per M16's trace-ID injection — researchers can grep Dozzle for
+  `fact.recalled=true` and find the matching Jaeger trace.
+- **Confidence decay.** `facts.py` already carries `confidence`
+  weight and `last_accessed`. Add a `PROJECT_FACT_DECAY_DAYS = 90`
+  default — facts older than this drop confidence one tier
+  (`high → medium → low → skip`). Re-confirmation by the player
+  resets the timer. Mirrors mem0's "memory depth" concept.
 
 ### Out of scope — defer to follow-on milestones
 
@@ -531,12 +476,12 @@ to mem0 / Letta is incremental rather than a rewrite."
   could ALSO scan recent Memoir entries for un-tagged-but-extractable
   preferences ("the player chose chunked I/O three times this week —
   promote to a project-scoped fact"). Keep that work in autoDream's
-  scope; M17 only handles the structured-pause case.
-- *Multi-agent recall extension.* `build_fact_context()`'s prompt
-  enrichment already applies to every specialist's system prompt
-  construction; once the `project_id` filter lands in Phase 1,
-  Techne / Kallos / Dokimasia inherit recall for free. Tracked as a
-  one-line audit task post-Phase-1 rather than a separate milestone.
+  scope.
+- *Specialist parity for fact recall.* Metis now reads
+  `build_fact_context` with project scope; Techne / Kallos /
+  Dokimasia / Hephaestus do not. Sibling to PR #87 — same five-line
+  pattern per agent. Defer until a real PAUSE caller in a non-Metis
+  specialist surfaces.
 - *Cross-project preference inference* (*"you usually use ruff at 88
   cols — apply to this new project?"*). Federation / sharing
   question; lives in M6 alongside the federated-forge work.
@@ -544,18 +489,19 @@ to mem0 / Letta is incremental rather than a rewrite."
   pattern; lifts in a separate milestone once the CLI surface
   stabilises.
 
-### Honest external-artifact claim language after this milestone ships
+### Honest external-artifact claim language
 
-*"Kourai captures HOTL responses as project-scoped entries in the
-existing `kourai_common.facts` knowledge-graph layer. Project-scoped
-facts are injected into specialist system prompts at planning time, so
-agents like Metis recall the player's stated preferences (e.g. test-
-coverage target, language version, naming convention) on subsequent
-sessions without re-asking. Scoping aligns with the four-scope memory
-model formalised by Mem0 / Letta in 2026."* Defensible **only** once
-Phase 1 lands. Until then, the truthful claim is *"HOTL responses are
-persisted to a per-session Forge Memoir as labeled training tuples;
-cross-session project-scoped recall is planned future work."*
+Defensible *now* that Phase 1 has landed:
+
+> *"Kourai captures HOTL responses as project-scoped entries in the
+> `kourai_common.facts` knowledge-graph layer. Project-scoped facts
+> are injected into Metis's planning prompt, so she recalls the
+> player's stated preferences (e.g. test-coverage target, Python
+> version, style rules, commit-message convention, test framework)
+> on subsequent sessions for the same project without re-asking, and
+> stays scoped — preferences for project A are NOT surfaced when the
+> player switches to project B. Scoping aligns with the four-scope
+> memory model formalised by Mem0 / Letta in 2026."*
 
 ---
 
@@ -846,6 +792,7 @@ architectural moves; valuable but not the first lift.
 
 One-liner per item, newest first. Detail moves out of this file when work lands.
 
+- 2026-04-29 — **M17 Phase 1 shipped end-to-end** (six PRs in one session: #81 / #82 / #84 / #85 / #86 / #87). The HOTL → facts loop is live for one-time-per-project preferences: a clarifying answer in project A persists, surfaces in Metis's planning prompt the next session for project A, and stays hidden when the player switches to project B. Mechanism: `derive_project_id(project_root)` (sha256-of-canonical-path, 16 hex) + `project_id` axis on `PlayerFact` / `KnowledgeGraphFact` / `player_memories` SQLite + single-query SQL filter with `CASE WHEN project_id = ? THEN 1 ELSE 0 END DESC` ranking boost (project beats global at equal importance / recency) + `synthesise_fact_from_pause` helper + `kourai_common.pause_state` in-process stash + `kourai_common.pause_tag` parser for the new `PAUSE: <kind> "<question>"` runtime control token (mirrors M13's CONFIRM_ORDER shape; closed Phase 1 vocab `coverage_target` / `python_version` / `style_rules` / `commit_style` / `test_framework`) + Metis system-prompt addition + Metis executor pause path + CLI streaming layer pop-and-synthesise at the top of every turn + Metis `create_spec_stream` threading `player_id` / `project_id` to `build_fact_context` so PLAYER CONTEXT leads the user-message context block. Three calls that diverged from the original sketch: `run_post_task_hooks` had no production call sites so write-on-resolve calls `synthesise_fact_from_pause` directly from `streaming.py` where Memoir already lives (promote-back-to-hook layer queued as a follow-on under M5/M6); Metis didn't actually call `build_fact_context` despite the ROADMAP's "every specialist's prompt is enriched the same way" claim (only Puck and Cupid did — fixed surgically for Metis in PR #87, parity for Techne / Kallos / Dokimasia / Hephaestus deferred until a non-Metis PAUSE caller surfaces); cross-turn state lives in-process so agent restart between pause and resume drops the classification (Memoir still captures the answer as labeled FL training data, fail-soft). 48 new unit tests including `tests/unit/test_metis_fact_recall.py::TestM17Phase1RecallProperty::test_metis_recalls_project_a_fact_only_in_project_a` exercising the production recall path through Metis's prompt construction. The honest external-artifact claim ("Kourai captures HOTL responses as project-scoped entries… Metis recalls preferences without re-asking and stays scoped per project") is now defensible. Phase 2 (visible recall narrator + `/preferences` CLI + telemetry attributes + confidence decay) deferred until Phase 1 has miles
 - 2026-04-28 — `chore(deslop)` drop PyGithub helpers without callers (#80, sibling of PR #72): three more "import a library that isn't a declared dependency, fall through ImportError on every code path, never get called anyway" helpers — same dead-twice-over pattern as PR #72's `github_search_code` and `introspect_database`. PyGithub has never been in `pyproject.toml` or `uv.lock`, so every `from github import Github` falls into the ImportError branch and returns `[]` (or the "PyGithub not installed" error dict). Deleted: `agents/hephaestus/agent.py::github_search_repositories` (zero callers anywhere), `agents/metis/agent.py::github_search_issues` + its `tests/unit/test_metis.py::TestGithubSearchIssues` class (3 cases — no-token, ImportError, mocked-results — testing a function nothing called in production; the happy-path test patched `sys.modules` to inject a fake `github` module that didn't reflect any real install state, locking in a wrong shape against any future rewire), `agents/mneme/agent.py::github_create_pull_request_impl` (the "actually create a PR on GitHub" function that nothing called — `create_github_pr` returns a HOTL choice JSON which the executor parses and discards, then decorates the artifact with a "GitHub PR Ready" header without ever wiring back to `_impl`; was anticipatory infra without a caller, PR #74's pattern). `create_github_pr`'s docstring updated to be honest about the unwired state — the previous hint at `_impl()` was misleading. Documentation drift fixes bundled: `docs/configuration.md`'s `GITHUB_PERSONAL_ACCESS_TOKEN` block claimed the token was "Used by Mneme (PR generation), Techne (code search), Metis, and Hephaestus" — after PR #72 + this PR, only Mneme still touches the token (and even then only to flag PR-readiness, not to create the PR), so the doc was reduced to the truth; `shared/src/kourai_common/mcp_client.py` module docstring listed "GitHub: Issue/PR/repo operations (direct PyGithub)" and "Playwright: Frontend E2E testing (direct subprocess)" — neither is real, both removed; `pyproject.toml` `tool.ty.analysis.replace-imports-with-any` `"github.**"` entry dropped (no remaining `from github import` lines anywhere); `tests/unit/test_metis.py` `from unittest.mock import` line drops the now-unused `MagicMock`. What stays in Mneme: `parse_commits_for_pr` and `create_github_pr` are both still called by `agents/mneme/agent_executor.py` — those build the PR-ready metadata + choice-event JSON the executor decorates the artifact with. The actual PR creation step from there remains unwired; that's a separate "finish the HOTL flow" piece of work, not deslop. 285-line deletion. 2736 unit tests pass (was 2739 — exactly the 3 deleted `TestGithubSearchIssues` cases, no other regressions); lint green
 - 2026-04-28 — `chore(deslop)` remove broken Playwright e2e flow from Dokimasia (#79): `run_playwright` was a stub returning empty `PytestRunResult()` since 2026-03-31 commit `27b7190` (\"feat(agents): implement accessibility snapshots and pluggable TTS streaming\") replaced the function body with `# ... (rest of the function)\nreturn PytestRunResult()` while adding `get_accessibility_snapshot` next to it. ~4 weeks of dead code, undetected because the e2e detection only fires on specific keywords. Player-facing impact: when input matched `is_e2e_request` (`\"e2e\"` / `\"playwright\"` / `\"frontend test\"` / `\"browser test\"` / `\"ui test\"`), Dokimasia generated Playwright spec.ts via real LLM call, then \"ran\" them via the stub which returned `PytestRunResult(passed=0, failed=0, ...)`, then rendered `🎭 Playwright E2E Test Results\n\nPytestRunResult(...)` to the player — silent fail reading as \"0 tests, all clean\". Compounding: `get_accessibility_snapshot` calls `page.accessibility.snapshot()` which Playwright **removed** after 3 years of deprecation (microsoft/playwright#16159; replacement is `expect(locator).to_match_aria_snapshot()`); bare `# type: ignore` (no error code) was hiding this; helper had zero callers anyway — dead twice over, same pattern PR #72 cleaned up for `github_search_code` / `introspect_database`. Two-commit cleanup: (1) deletes `run_playwright` + `get_accessibility_snapshot` + `generate_playwright_tests` (only the e2e branch called it) + the entire `is_e2e_request` branch in `agent_executor.py`; (2) drops `playwright>=1.40` from `agents/dokimasia/pyproject.toml` (and 3 packages from `uv.lock` — playwright + greenlet + pyee), removes the 44-line dokimasia-only Chromium install block from `docker/host.Dockerfile` (~30 system libs: chromium itself, GTK, X11, ALSA, fonts), removes `PLAYWRIGHT_BROWSERS_PATH` + `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD` from `docker-compose.yml`, drops the `playwright` + `dbhub` phantom MCP toolkit registrations in `mcp_client.py::_initialize_default_registry` (neither MCP server has ever existed in `mcp_servers/` — directory is `forge` + `shell` only) plus dokimasia's `assign_servers` line dropping the dead `playwright` reference, updates four docs (`agents/dokimasia/README.md` three-modes → two-modes + e2e_test_results artifact removed, `ECOSYSTEM.md` drops the `playwright>=1.40` rationale paragraph, `README.md` Stack list drops \"Browser Context — Accessibility-Tree Snapshots for token-efficient E2E reasoning\", `.github/copilot-instructions.md` drops Chromium-install line and obsolete \"`playwright` and `dbhub` registered but disabled\" note). 168 lines net removed. Honest beats theatrical: if a player wants Playwright tests, the default branch generates them via `generate_tests_stream` and the artifact contains the spec.ts code with no claim of running it; player runs `npx playwright test` themselves. Web-search via Playwright release notes + GitHub issues confirmed `page.accessibility.snapshot()` is gone post-deprecation, so the function couldn't have been unstubbed without rewriting against the new ARIA-snapshot assertion API anyway. 2739 unit tests pass; lint green; container size win for the dokimasia agent
 - 2026-04-28 — ty re-raise after `pytest.skip` in `_safe_edge_synthesize` (#78): caught by `aj-ci-audit` scanning the latest green main run for buried warnings — `make lint` had reported `rc=0` for a ty `invalid-return-type` diagnostic because ty exits 0 on warnings; only the `Found N diagnostics` line surfaces them. Root cause: pytest exposes `skip` as a callable class instance (`skip: _Skip = _Skip()`) whose `__call__` is `-> NoReturn`, but ty doesn't propagate the `NoReturn` annotation through the callable-class export pattern, so ty treats `pytest.skip(...)` as a normal call that could return → function may fall off the end → implicit `None` mismatches the declared `-> bytes`. Fix: explicit bare `raise` after the `pytest.skip(...)` call in PR #76's `_safe_edge_synthesize` helper. Unreachable at runtime (skip already raised `Skipped`), satisfies ty's flow analysis, and re-raises the in-flight network exception if `pytest.skip` somehow did return — semantically correct under both readings. 4-line one-file change. Closes the loophole that let a ty regression slip past three "make lint green" checks today; future reads check the diagnostic count, not just the rc
