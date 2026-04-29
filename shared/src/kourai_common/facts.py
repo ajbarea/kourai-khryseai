@@ -231,6 +231,7 @@ def get_relevant_facts_for_enrichment(
     context_keywords: list[str] | None = None,
     agent_name: str | None = None,
     limit: int = 10,
+    project_id: str | None = None,
 ) -> list[dict]:
     """Retrieve relevant player facts for prompt enrichment.
 
@@ -243,9 +244,12 @@ def get_relevant_facts_for_enrichment(
         context_keywords: Optional keywords to filter facts (e.g., ['async', 'Python']).
         agent_name: Optional agent name to prioritize agent-specific facts.
         limit: Max facts to return.
+        project_id: Optional M17 project scope. When set, results include facts tagged
+            with this project AND global facts, with project-tagged preferred at equal
+            retrieval score. When None, no project axis is applied.
 
     Returns:
-        List of fact dicts with body, category, confidence, source_agent.
+        List of fact dicts with body, category, confidence, source_agent, project_id.
     """
     from kourai_common.player import get_player_memories
 
@@ -257,6 +261,7 @@ def get_relevant_facts_for_enrichment(
             category="fact",
             include_shared=True,
             limit=limit,
+            project_id=project_id,
         )
 
         # Filter by keywords if provided
@@ -274,6 +279,7 @@ def get_relevant_facts_for_enrichment(
                 "category": "fact",
                 "confidence": m.get("importance", 0.5),
                 "source_agent": m.get("agent_name", "unknown"),
+                "project_id": m.get("project_id"),
             }
             for m in memories
         ]
@@ -285,6 +291,7 @@ def get_relevant_facts_for_enrichment(
 def build_fact_context(
     player_id: str,
     agent_name: str | None = None,
+    project_id: str | None = None,
 ) -> str:
     """Build a prose block of player facts for prompt injection.
 
@@ -294,11 +301,15 @@ def build_fact_context(
     Args:
         player_id: Player UUID.
         agent_name: Optional agent name for preference filtering.
+        project_id: Optional M17 project scope. When set, project-scoped facts
+            are preferred over global ones at equal retrieval score.
 
     Returns:
         Human-readable fact block (empty string if no facts).
     """
-    facts = get_relevant_facts_for_enrichment(player_id, agent_name=agent_name, limit=5)
+    facts = get_relevant_facts_for_enrichment(
+        player_id, agent_name=agent_name, limit=5, project_id=project_id
+    )
     if not facts:
         return ""
 
