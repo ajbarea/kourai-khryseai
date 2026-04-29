@@ -129,13 +129,11 @@ Auto-dismisses after 8 seconds.
 
 ## Portrait System
 
-6 of 18 portraits are complete (neutral state). The system uses a fallback chain:
-
-1. Requested state (e.g., `vulnerable`) → try loading `{agent}_vulnerable.png`
-2. Fallback to `neutral` → try loading `{agent}_neutral.png`
-3. Fallback to `None` → skip portrait display entirely
-
-Portraits live in `game/images/portraits/` and use a warm forge aesthetic.
+All ten agents ship a `{agent}_neutral.png` in
+`hosts/vn/kourai_vn/game/images/portraits/`. Emotional states (e.g.
+`vulnerable`, `flushed`) are added incrementally; the runtime falls back
+to `neutral` and finally to no portrait if the requested state is
+missing — so adding a new state never breaks an existing scene.
 
 ---
 

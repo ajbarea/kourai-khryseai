@@ -91,7 +91,7 @@ get_model("metis")       # (1)!
 get_agent_url("techne")  # (2)!
 ```
 
-1. Returns model based on `KOURAI_MODEL_TIER` — e.g. `"anthropic/claude-opus-4-6"` on smart, Haiku on cheap (default)
+1. Returns model based on `KOURAI_MODEL_TIER` — e.g. `"anthropic/claude-opus-4-7"` on smart for Metis, Haiku on cheap (default)
 2. Returns `"http://techne:10002/"` — agents resolve each other via Docker service names
 
 ### `llm.py` — Model-Agnostic LLM Interface

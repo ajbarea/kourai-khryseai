@@ -195,7 +195,7 @@ KOURAI_PROVIDER=local
         | Agent | Model | Why |
         |---|---|---|
         | 🔥 Hephaestus | Claude Sonnet 4.6 | Routing decisions need to be fast and accurate |
-        | 📐 Metis | Claude Opus 4.6 | Planning quality determines everything downstream |
+        | 📐 Metis | Claude Opus 4.7 | Planning quality determines everything downstream |
         | ⚙️ Techne | Claude Sonnet 4.6 | Code generation needs strong reasoning |
         | 🧪 Dokimasia | Claude Sonnet 4.6 | Test generation needs code understanding |
         | ✨ Kallos | Claude Sonnet 4.6 | Higher quality comment analysis |
@@ -213,7 +213,7 @@ KOURAI_PROVIDER=local
     |---|---|---|
     | `cheap` | Gemini 2.0 Flash (all agents) | Haiku 4.5 |
     | `standard` | Gemini 2.5 Pro (heavy) / Flash (light) | Sonnet 4.6 / Haiku 4.5 |
-    | `smart` | Gemini 2.5 Pro (all agents) | Opus 4.6 |
+    | `smart` | Gemini 2.5 Pro (all agents) | Opus 4.7 |
 
     !!! warning "Google free tier"
         Free tier prompts are used to improve Google's products. Switch to Paid tier in AI Studio to opt out.
@@ -310,17 +310,17 @@ See [GUI Reference](gui.md#text-to-speech-system-) for voice profiles and audio 
 
 | Command | Description |
 |---|---|
-| `make setup` | Install all dependencies (`uv sync --all-packages`) |
-| `make cli` | Launch the interactive CLI client |
-| `make gui` | Launch the visual GUI with voice synthesis |
-| `make up` | Start all agents in Docker + Jaeger + Prometheus |
-| `make down` | Stop all Docker containers |
+| `make setup` | Install all workspace deps (`uv sync --all-packages`) |
+| `make cli` / `make gui` / `make vn` | Launch a host (interactive) |
+| `make up` / `make down` / `make restart` | Bring the agent stack up / down / cycle |
 | `make status` | Show Docker service status and health |
-| `make lint` | Run ruff + ty |
-| `make test` | Run linters + full test suite with coverage |
-| `make clean` | Remove `__pycache__`, `.pytest_cache`, build artifacts |
-| `make docs` | Serve documentation locally (Zensical) |
-| `make upgrade` | Update all dependencies to latest versions |
-| `make restart` | Restart all agents (`make down` then `make up`) |
-| `make dev` | Full workflow: restart services + launch GUI |
-| `make help` | Show all available commands |
+| `make observe` | Open Jaeger + Prometheus + Dozzle in one go |
+| `make lint` | `ruff format --check` + `ruff check` + `ty check` |
+| `make fix` | `ruff format` + `ruff check --fix --unsafe-fixes` |
+| `make validate` | `lint + test-unit` — the "ready to push" probe |
+| `make test-unit` / `test-integration` / `test-performance` | Each marker, parallel where safe |
+| `make test` | Combined suite — catches fixture-leak ordering issues |
+| `make audit` | `pip-audit` (informational, not a gate) |
+| `make clean` | Wipe caches and old `logs/dev-*` archives |
+| `make docs` | Serve the Zensical site locally |
+| `make help` | Full target list |

@@ -53,6 +53,11 @@ navigate, `Tab` or `Enter` accepts the highlighted entry.
 | `/settings` (alias `/config`) | Toggle voice, music, romance, and game systems |
 | `/model_tier` | Show current provider, tier, and model |
 | `/metrics` | Show alignment, affinity, and virtue metrics |
+| `/usage` (alias `/cost`) | Per-(agent, model) tokens + dollar cost for this session |
+| `/reset_usage` | Zero the session usage counter |
+| `/yolo` | Toggle the M13 CONFIRM_ORDER pre-pipeline gate (power-user opt-out) |
+| `/permissions` | List gate flags; `/permissions <name>` toggles one (e.g. `auto_approve_reads`) |
+| `/compact` | Fold older transcript turns into long-term memory; cache stays warm |
 | `/maidens` | Meet the Golden Maidens (list all agents) |
 | `/maidens <name>` | Show a specific maiden by name |
 | `/project new <name> [--template …]` | Forge a new player project |

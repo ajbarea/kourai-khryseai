@@ -22,7 +22,7 @@ and what to watch out for cost-wise.
     |---|---|---|
     | `cheap` (default) | Claude Haiku 4.5 | All agents |
     | `standard` | Claude Sonnet 4.6 | Hephaestus, Metis, Techne |
-    | `smart` | Claude Sonnet 4.6 + Opus 4.6 (Metis) | All agents (Opus for Metis only) |
+    | `smart` | Claude Sonnet 4.6 + Opus 4.7 (Metis) | All agents (Opus for Metis only) |
 
 === "Google :material-google:"
 
@@ -64,18 +64,27 @@ batch API discounts, and context caching storage — Kourai uses none of these.
 ## Cost Tips
 
 !!! tip "Keep costs low"
-    1. **`smart` tier is expensive.** Opus 4.6 costs ~5× more than Haiku 4.5.
+    1. **`smart` tier is expensive.** Opus 4.7 costs ~5× more than Haiku 4.5.
        Only use when you need maximum planning quality.
     2. **Gemini 2.5 Pro thinking tokens are unpredictable.** Reasoning tokens
        count as output at full rate. Monitor usage in Google AI Studio.
     3. **Pipeline is sequential** — core specialists make 6 billed API calls, no fan-out. Companion spirits and validators add 1–4 more calls when triggered.
-    4. **`max_tokens=4096`** caps output. Techne and Metis are the most
-       expensive per call due to output length.
-    5. **Streaming has the same cost as non-streaming.** Only affects delivery, not billing.
+    4. **Streaming has the same cost as non-streaming.** Only affects delivery, not billing.
 
-## Prompt Caching (not yet implemented)
+## Prompt Caching
 
-!!! info "Future optimization"
-    Every agent has a large static system prompt — an ideal caching candidate.
-    Both Anthropic and Google offer 80–90% input cost savings on cached reads.
-    LiteLLM supports this via the `cache_control` content block parameter.
+Every agent system prompt is marked `cache_control: ephemeral` so repeated
+calls within a Techne / Kallos / Dokimasia tool-use loop pay the cached-read
+rate (≈10% of input cost) instead of the full input rate. Iterations 2–N of
+each fix loop hit the cache for the `[system + tools + initial-user]` prefix
+— typically 2K–10K tokens of file contents and git context.
+
+Cross-call caching of just the agent system prompt does **not** pay today
+(the prompts are below Anthropic's 2048 / 4096-token cache thresholds for
+Sonnet / Opus); within-loop is the actual win.
+
+## In-session usage tracking
+
+`/usage` (alias `/cost`) in the CLI prints a per-(agent, model) breakdown of
+calls, input / output / cache-read / cache-write tokens, and dollar cost for
+the current REPL session. `/reset_usage` zeros the counter.
