@@ -320,20 +320,3 @@ class TestAgentVoiceMapping:
         # Test None (should use default)
         voice = get_voice_for_agent(None)
         assert voice.voice_id == "af_heart"
-
-
-@pytest.mark.asyncio
-class TestBackendFallback:
-    """Unit tests for backend fallback behavior."""
-
-    async def test_create_default_backend_function(self):
-        """_create_default_backend() should prefer Kokoro, fallback to edge-tts."""
-        from tts_engine import _create_default_backend
-
-        backend = _create_default_backend()
-
-        assert backend is not None
-        backend_name = type(backend).__name__
-
-        # Should be either Kokoro or Edge-TTS
-        assert backend_name in ("KokoroBackend", "EdgeTTSBackend")

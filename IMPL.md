@@ -183,21 +183,52 @@ full scope, acceptance criteria, and tier-1/tier-2 fallback design.
   child env) — AJ's interactive terminal has WSLg's PulseAudio socket
   on `$PULSE_SERVER`, so live `make cli` will actually emit audio.
 
-**M19 Phase 2 — GUI flip + retire legacy modules (next session):**
+**M19 Phase 2 shipped 2026-04-29:**
 - `hosts/gui/tts_gui_integration.py` and `hosts/gui/tts_helper.py`
-  migrate from `TTSEngine` to `RealtimeTTSEngine`. The GUI's
-  `set_backend()` runtime swap surface needs rethinking — RealtimeTTS
-  bundles the engine, so the swap point moves up one layer (swap the
-  RealtimeTTSEngine itself, not its inner backend).
-- Retire `hosts/gui/tts_engine.py`, `shared/src/kourai_common/tts_kokoro.py`,
-  and `shared/src/kourai_common/tts_edge.py` once both hosts are off
-  them — no flag-toggle co-existence period.
-- Rewrite `tests/integration/test_tts_demo.py`,
-  `tests/unit/test_gui_audio_tts_engine.py`, `tests/unit/test_gui_tts.py`,
-  `tests/unit/test_tts_backends.py` against the new module. Most
-  pygame.mixer mocking drops entirely.
-- Drop transitional deps from `hosts/gui/pyproject.toml`: `kokoro`,
-  `soundfile`, `edge-tts` (RealtimeTTS bundles the equivalents).
+  flipped from the legacy `TTSEngine` to `RealtimeTTSEngine`.
+  `TTSGUIManager.__init__` now constructs a `RealtimeTTSEngine`
+  directly — the `set_backend()` runtime kokoro/edge swap and
+  `_create_backend_from_settings()` selection logic dropped (RealtimeTTS
+  bundles the engine; the swap surface returns in M6 once
+  ElevenLabsEngine is on the table, at the engine layer rather than the
+  backend layer).
+- `hosts/gui/tts_settings_config.py` `tts_backend` config key removed
+  from `DEFAULT_CONFIG`; `update_from_manager` no longer snapshots
+  `manager.backend` (attribute is gone).
+- `hosts/gui/tts_engine.py` deleted.
+- `tests/unit/test_gui_audio_tts_engine.py` deleted (TTSEngine-specific
+  tests; coverage moves to `test_tts_realtime.py`).
+- `tests/unit/test_gui_tts.py` autouse fixture patches
+  `RealtimeTTSEngine` instead of `TTSEngine`.
+- `tests/unit/test_gui_voice.py` and `tests/integration/test_tts_demo.py`
+  updated to import `VOICE_ROSTER` / `AGENT_VOICES` / `RealtimeTTSEngine`
+  from `kourai_common.tts_realtime`.
+- Two obsolete fallback tests removed (`test_tts_backends.py`
+  `TestBackendFallback::test_create_default_backend_function` and
+  `test_tts_kokoro_integration.py`
+  `TestBackendInteroperability::test_backend_fallback_to_edge_tts`) —
+  both depended on the deleted `hosts.gui.tts_engine._create_default_backend`.
+
+**M19 Phase 3 — vn_bridge migration + drop transitional deps (later):**
+- `agents/vn_bridge.py` is a third TTS consumer the original Phase 2
+  plan missed. It uses `kourai_common.tts_kokoro.KokoroBackend` /
+  `tts_edge.EdgeTTSBackend` to synthesise WAV bytes that Ren'Py plays
+  through Ren'Py's own audio system (vn_bridge does not own playback,
+  just synthesis). RealtimeTTSEngine has no `synthesise_to_wav(text,
+  voice) -> bytes` API today — playback is bundled.
+- Phase 3 needs either (a) a synthesis-only adapter on
+  `RealtimeTTSEngine` that pulls the queued audio chunks from
+  `_TextToAudioStream` without playing, or (b) calling KokoroEngine's
+  underlying `KPipeline` directly bypassing `TextToAudioStream`. (a) is
+  the cleaner API surface; (b) avoids re-implementing the chunk-merge
+  + WAV-header wrap that `tts_kokoro._to_wav` already does.
+- Until Phase 3 lands, `kourai_common/tts_kokoro.py`,
+  `kourai_common/tts_edge.py`, and `kourai_common/tts_backend.py`
+  (TTSBackend ABC + voice config) all remain, and the transitional
+  deps `kokoro` / `soundfile` / `edge-tts` stay in
+  `hosts/gui/pyproject.toml`. (`audioop-lts` for Py3.13 stays
+  unconditionally — pydub needs it whether it's reached via
+  RealtimeTTS or vn_bridge's KokoroBackend.)
 
 **M13 fix.** After M7 lands: emit the original request via
 Message.metadata on resume dispatch. Tested via re-run of the
@@ -291,9 +322,12 @@ implementation, architectural fix over expedient patch.
 3. **M18 — Structured streaming with content-kind metadata.** New
    milestone, builds on M7. See ROADMAP §M18 for the kind taxonomy
    and per-agent rollout plan.
-4. **M19 Phase 2 — GUI flip + retire legacy TTS modules.** Phase 1
-   (CLI flip + new `kourai_common/tts_realtime.py`) shipped 2026-04-29;
-   see the M19 Phase 2 block above for the remaining surface.
+4. **M19 Phase 3 — vn_bridge synthesise-only API + drop transitional
+   deps.** Phases 1 (CLI) and 2 (GUI + delete `hosts/gui/tts_engine.py`)
+   shipped 2026-04-29. Phase 3 surfaces a `synthesise_to_wav` API for
+   `agents/vn_bridge.py` so Ren'Py keeps its WAV-bytes feed and the
+   `tts_kokoro` / `tts_edge` / `tts_backend` modules can finally retire.
+   See the M19 Phase 3 block above for the chunk-merge tradeoff.
 5. **M20 — Audio-text synchronization across CLI / GUI / VN.**
    Builds on M18 (content-kind routing) + M19 (RealtimeTTS word-
    timing API). New milestone surfaced this session — the 9-14s

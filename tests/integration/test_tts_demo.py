@@ -6,7 +6,7 @@ Run this to hear all five agent voices with their personalities.
 import asyncio
 import logging
 
-from hosts.gui.tts_engine import AGENT_VOICES, VOICE_ROSTER, TTSEngine
+from kourai_common.tts_realtime import AGENT_VOICES, VOICE_ROSTER, RealtimeTTSEngine
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -14,7 +14,7 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 async def demo_all_voices():
     """Play demo dialogue with all agent voices."""
-    engine = TTSEngine()
+    engine = RealtimeTTSEngine()
 
     dialogue = [
         (
@@ -51,7 +51,7 @@ async def demo_all_voices():
 
 async def demo_custom_voice():
     """Demo using explicit voice selection."""
-    engine = TTSEngine()
+    engine = RealtimeTTSEngine()
 
     logger.info("\n🎙️  Custom Voice Demo\n")
     logger.info("=" * 50)

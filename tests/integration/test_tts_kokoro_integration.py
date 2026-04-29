@@ -229,20 +229,6 @@ class TestEdgeTTSIntegration:
 class TestBackendInteroperability:
     """Integration tests for backend switching and fallback."""
 
-    async def test_backend_fallback_to_edge_tts(self):
-        """If Kokoro missing, should fallback to edge-tts."""
-        from tts_engine import _create_default_backend
-
-        backend = _create_default_backend()
-        assert backend is not None
-
-        voice = TTSVoiceConfig("Sarah", "af_sarah")
-        # Fallback may resolve to Edge-TTS (Bing speech WebSocket); wrap
-        # so a Microsoft-side outage skips the test rather than failing.
-        audio = await _safe_edge_synthesize(backend, "Test fallback", voice)
-
-        assert len(audio) > 0
-
     async def test_different_backends_same_voice_config(self):
         """Both backends should accept same voice config."""
         kokoro = None

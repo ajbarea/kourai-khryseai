@@ -21,30 +21,28 @@ import pytest
 pytest.importorskip("pygame")
 
 # ---------------------------------------------------------------------------
-# Module-level mock for TTSEngine so we never import pygame/edge_tts
+# Module-level mock for RealtimeTTSEngine so we never touch PyAudio / Kokoro.
 # ---------------------------------------------------------------------------
-
-_MockTTSEngine = MagicMock
 
 
 @pytest.fixture(autouse=True)
 def _patch_tts_engine():
-    """Replace TTSEngine with a lightweight mock across all tests."""
+    """Replace RealtimeTTSEngine with a lightweight mock across all tests."""
     mock_cls = MagicMock()
     mock_instance = MagicMock()
     mock_instance.master_volume = 0.8
     mock_instance.enable_effects = True
     mock_cls.return_value = mock_instance
 
-    with patch("hosts.gui.tts_gui_integration.TTSEngine", mock_cls):
+    with patch("hosts.gui.tts_gui_integration.RealtimeTTSEngine", mock_cls):
         yield mock_cls, mock_instance
 
 
 # ---------------------------------------------------------------------------
 # Import SUT *after* the autouse fixture is declared so that the module-level
-# import of TTSEngine inside tts_gui_integration is intercepted at use time.
-# We import the module objects lazily inside each test class / function so the
-# patch is active.
+# import of RealtimeTTSEngine inside tts_gui_integration is intercepted at
+# use time. We import the module objects lazily inside each test class /
+# function so the patch is active.
 # ---------------------------------------------------------------------------
 
 

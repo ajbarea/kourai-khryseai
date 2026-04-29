@@ -1,16 +1,17 @@
 """RealtimeTTS-backed TTS engine — bundles Kokoro synth + PyAudio playback.
 
-Replaces the pygame.mixer-based ``hosts.gui.tts_engine.TTSEngine`` on the
-CLI surface. pygame.mixer's documented inability to reliably resample
-24 kHz mono → 44.1 kHz stereo produced the "VHS rewind" chipmunk
-symptom; RealtimeTTS routes Kokoro's native 24 kHz mono through
-PyAudio with no resample step in the path.
+Replaces the pygame.mixer-based TTS path on both the CLI and GUI hosts.
+pygame.mixer's documented inability to reliably resample 24 kHz mono →
+44.1 kHz stereo produced the "VHS rewind" chipmunk symptom; RealtimeTTS
+routes Kokoro's native 24 kHz mono through PyAudio with no resample
+step in the path.
 
-ABI-compatible drop-in for the CLI's TTSEngine usage (``speak``,
-``speak_sync``, ``stop``, ``cleanup``, ``set_master_volume``,
-``master_volume``, ``enable_effects``, ``is_playing``). GUI migration
-is a separate Phase 2 follow-up; until both hosts flip, the legacy
-``tts_engine.py`` / ``tts_kokoro.py`` / ``tts_edge.py`` remain.
+The legacy ``kourai_common.tts_kokoro`` / ``tts_edge`` synth-only
+backends remain in the tree for ``agents/vn_bridge.py``, which feeds
+synthesised WAV bytes into Ren'Py's audio system rather than playing
+them itself. The vn_bridge migration is its own follow-on (it needs a
+``synthesise_to_wav(text, voice) -> bytes`` API that
+``RealtimeTTSEngine`` does not currently expose).
 
 Future ElevenLabs swap (M6) becomes a one-line engine change inside
 ``__init__``.

@@ -9,7 +9,7 @@ import pygame
 pygame.init()
 import pygame.freetype
 
-from hosts.gui.tts_engine import AGENT_VOICES, VOICE_ROSTER, VoiceConfig
+from kourai_common.tts_realtime import AGENT_VOICES, VOICE_ROSTER, VoiceConfig
 
 
 class TestVoiceConfig:
