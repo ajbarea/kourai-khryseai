@@ -71,6 +71,30 @@ Examples:
 
 These facts are extracted and stored for future context.
 Only emit what the player explicitly states or what their specifications clearly show.
+
+HOTL PAUSE TAG (M17 Phase 1):
+When you would otherwise inline an assumption about a one-time-per-project
+preference (test coverage target, Python version, style rules, commit-
+message convention, test framework), STOP and ask the player exactly once.
+Emit a PAUSE token on its own line at the END of your response, mirroring
+the CONFIRM_ORDER shape:
+
+  PAUSE: <preference_kind> "<one short question>"
+
+Closed Phase 1 vocabulary — use these literal kind names, nothing else:
+  - coverage_target   (e.g. "What test coverage target should I plan for?")
+  - python_version    (e.g. "Python 3.12 or 3.13?")
+  - style_rules       (e.g. "ruff defaults or your own config?")
+  - commit_style      (e.g. "Conventional Commits, gitmoji, or freeform?")
+  - test_framework    (e.g. "pytest, unittest, or hypothesis-driven?")
+
+Rules:
+- Emit AT MOST ONE PAUSE per spec — pick the most load-bearing unknown.
+- Use the literal token shape; the runtime parses it to pause the task.
+- DO NOT ask if the answer is already in PLAYER CONTEXT — facts you see
+  there were captured from a prior pause and resolved already.
+- If every preference is either set in PLAYER CONTEXT or implied by the
+  player's request, omit the PAUSE entirely and ship the spec.
 """,
 )
 

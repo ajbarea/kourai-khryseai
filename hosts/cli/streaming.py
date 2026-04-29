@@ -5,6 +5,7 @@ Contains the main send_and_stream() function and connection helpers.
 
 from __future__ import annotations
 
+import re
 import time
 from typing import TYPE_CHECKING
 from uuid import uuid4
@@ -36,6 +37,9 @@ from hosts.cli.events import (
 from hosts.cli.rendering import _comms_window, _echo, _render_markdown
 from hosts.cli.styling import _DIM, _GOLD, _GOLD_BRIGHT, _RED, _RESET
 from kourai_common.federation.host_helpers import build_pipeline_turn_entry
+from kourai_common.hooks_interaction import synthesise_fact_from_pause
+from kourai_common.pause_state import pop_preference_kind
+from kourai_common.projects import derive_project_id
 
 if TYPE_CHECKING:
     from a2a.client.client import Client
@@ -47,6 +51,74 @@ if TYPE_CHECKING:
 # Last result store — for /copy / /save
 # ---------------------------------------------------------------------------
 _last_result: str = ""
+
+
+_PROJECT_ROOT_TAG = re.compile(r"\[project_root:\s*([^\]]+)\]", re.IGNORECASE)
+
+
+def _strip_forge_tag_prefix(text: str, forge_tags: list[str] | None) -> str:
+    """Recover the bare follow-up text from a forge-tag-prefixed payload.
+
+    ``send_and_stream`` re-prepends ``forge_tags`` (joined with ``\\n``)
+    before recursing on an ``input_required`` follow-up; the M17 fact
+    synthesiser wants the player's actual answer, not the prefix.
+    """
+    if not forge_tags:
+        return text
+    prefix = "\n".join(forge_tags) + "\n"
+    return text.removeprefix(prefix)
+
+
+def _project_id_from_forge_tags(forge_tags: list[str] | None) -> str | None:
+    """Pull the project root from the bracket tag and derive its M17 id."""
+    if not forge_tags:
+        return None
+    for tag in forge_tags:
+        match = _PROJECT_ROOT_TAG.search(tag)
+        if match:
+            return derive_project_id(match.group(1).strip())
+    return None
+
+
+def _try_synthesise_pause_fact(
+    *,
+    context_id: str,
+    user_text: str,
+    forge_tags: list[str] | None,
+) -> None:
+    """Idempotently store a project-scoped fact when the resumed turn lands.
+
+    Pops any pause stashed by a specialist's PAUSE token on a prior turn
+    for ``context_id``. The pop is unconditional — turns with nothing
+    stashed (the common case) make this a cheap no-op. When a pause is
+    present, the player's bare answer becomes the fact body and the
+    stashed ``source_agent`` carries through to ``synthesise_fact_from_pause``.
+    """
+    pending = pop_preference_kind(context_id)
+    if pending is None:
+        return
+
+    bare_answer = _strip_forge_tag_prefix(user_text, forge_tags).strip()
+    if not bare_answer:
+        return
+
+    try:
+        from kourai_common.player_profile import PlayerProfile
+    except ImportError:  # pragma: no cover — narrow guard for trimmed builds
+        return
+
+    profile = PlayerProfile.load()
+    if not profile or not profile.player_id:
+        return
+
+    project_id = _project_id_from_forge_tags(forge_tags)
+    synthesise_fact_from_pause(
+        player_id=profile.player_id,
+        project_id=project_id,
+        preference_kind=pending.preference_kind,
+        player_response=bare_answer,
+        source_agent=pending.source_agent,
+    )
 
 
 def get_last_result() -> str:
@@ -91,6 +163,17 @@ async def send_and_stream(
     t0 = time.monotonic()
     reset_last_seen_agent()  # Reset pipeline tracking for this run
     set_pipeline_chatter_enabled(gossip_enabled)
+
+    # M17 Phase 1 — if the prior turn paused with a stashed preference_kind
+    # (Metis's PAUSE token), this call carries the player's answer in
+    # ``user_text``. Synthesise the project-scoped fact NOW so the resumed
+    # turn's prompt-enrichment can already see it, and so a follow-on PAUSE
+    # in this same turn doesn't overwrite the prior kind in the stash.
+    _try_synthesise_pause_fact(
+        context_id=context_id,
+        user_text=user_text,
+        forge_tags=forge_tags,
+    )
 
     # Build multi-part message so images travel alongside text in the A2A envelope.
     parts: list[Part] = [Part(TextPart(text=user_text))]
