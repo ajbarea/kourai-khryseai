@@ -10,7 +10,7 @@ make observe
 
 Each log line emitted inside a span context carries the active trace ID, so a slow span found in Jaeger is grep-findable in Dozzle without any code change between observation and search.
 
-The full mental model, triage runbook, and current coverage gaps (Prometheus is sparsely populated today; the Jaeger v2 SPM uplift is tracked under M16) live on the dedicated **[Observability](../observability.md)** page.
+The full mental model, triage runbook, and current coverage gaps live on the dedicated **[Observability](../observability.md)** page.
 
 ---
 
@@ -38,7 +38,7 @@ Multi-stage build: builder installs deps with `uv`, runtime copies only the venv
     [AgentStack](https://agentstack.beeai.dev/) requires Kubernetes via Lima VM. Windows support needs WSL2. Frequent breaking changes. Decision: `a2a-sdk` + Starlette + uvicorn gives full A2A compliance without K8s overhead.
 
 ??? question "Why A2A 0.3.x, not 1.0?"
-    v1.0 RC has breaking changes: Part type unification, enum case changes, method renames, well-known URL rename. Pinned at `a2a-sdk>=0.3.0,<1.0` until v1.0 stabilizes. Current stable: `0.3.24` (Feb 2026).
+    v1.0 has breaking changes: Part type unification, enum case changes, method renames, well-known URL rename. Pinned at `a2a-sdk[http-server]>=0.3.25,<1.0` (shared) until the M7 cutover lands. The 1.0.x migration is bigger than the dual-shape inspection firewall the codebase carries today.
 
 ??? question "Why LiteLLM?"
     Model-agnostic interface. Claude for production, Ollama for free local dev. Swap with one env var: `KOURAI_PROVIDER=local`.

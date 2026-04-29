@@ -25,13 +25,13 @@ The brain of the system. Receives user requests, uses its LLM to decide which sp
 **Key behaviors:**
 
 - **LLM-based routing** — Analyzes the user's natural language request against pipeline templates to select agents. Falls back to `mneme` if the LLM returns nothing valid.
-- **Direct Agent Mentions** — If a request starts with `@<agent>`, Hephaestus bypasses LLM routing and initiates a direct 1-on-1 pipeline with that specialist. All 10 agents are @-mentionable.
-- **ASK_USER & Proactive UX** — If the request is ambiguous, responds with `ASK_USER: <question>`. Provides A/B multiple-choice options to reduce cognitive load.
+- **Forge Order Confirmation (M13)** — Before any pipeline runs, Hephaestus emits a `CONFIRM_ORDER: <tier> "<read-back>"` token. The CLI surfaces this as an `INPUT_REQUIRED` pause; the player sees a Hephaestus comms-window read-back of what's about to ship and confirms (or redirects) before tokens get spent. `/yolo` opts out for power users.
+- **Parallel Metis discussion (M14)** — On smart / clarify-tier confirmations, Metis's `discuss_tradeoffs` call is spawned in parallel with the routing classifier so the dead zone between "Analyzing request..." and the confirmation card carries useful architectural notes.
+- **Direct Agent Mentions** — Requests starting with `@<agent>` bypass LLM routing for a direct 1-on-1 pipeline. All 10 agents are @-mentionable.
+- **ASK_USER & Proactive UX** — If the request is ambiguous, responds with `ASK_USER: <question>` and proposes A/B options.
 - **Sequential execution** — Calls each specialist via A2A `message/send` with `streaming=True`. Context accumulates from one agent to the next while intermediate status messages stream to the host.
 - **Kallos-Techne feedback loop** — When both are in the pipeline and Kallos finds lint issues, automatically loops Techne (fix) → Kallos (re-check) up to `MAX_ITERATIONS` times.
-- **Affinity tracking** — Updates player affinity with the responding agent after each interaction.
-- **Virtue updates** — Increments `sophia` and `synergy` on successful pipeline completion.
-- **Jealousy detection** — Monitors affinity gaps between agents and routes to Cupid when jealousy triggers.
+- **Affinity / virtue / jealousy** — Updates player affinity per interaction, increments `sophia` / `synergy` on success, monitors affinity gaps and routes to Cupid when jealousy triggers.
 - **Graceful degradation** — If a specialist is unreachable, it's skipped and the pipeline continues.
 
 **Pipeline templates:**
@@ -51,7 +51,8 @@ The brain of the system. Receives user requests, uses its LLM to decide which sp
 
 | File | Purpose |
 |---|---|
-| `routing_agent.py` | LLM routing prompt, pipeline execution, Kallos-Techne loop |
+| `agent.py` | LLM routing prompt, pipeline execution, Kallos-Techne loop |
+| `confirmation.py` | M13 `CONFIRM_ORDER: <tier> "<read-back>"` parser |
 | `remote_connections.py` | `RemoteAgentConnection` wrapper, `AgentInputRequired` exception |
 | `agent_executor.py` | A2A bridge, emoji status messages, affinity/virtue updates, OTEL spans |
 | `__main__.py` | AgentCard, server startup |

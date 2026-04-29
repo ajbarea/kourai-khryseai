@@ -100,174 +100,34 @@ Ten agents across three tiers — each with unique personality, color, and visua
 
 ### Avatar Assets
 
-Avatars are stored in `assets/maidens/golden_avatars/`:
-
-```
-hephaestus.png   — The Forge Master  (gruff male forge god)
-metis.png        — The Architect     (calm, strategic)
-techne.png       — The Artisan       (cool, sunglasses)
-dokimasia.png    — The Crucible      (fierce, warrior)
-kallos.png       — The Muse          (elegant, beautiful)
-mneme.png        — The Oracle        (scholarly, glasses)
-puck.png         — The Trickster     (playful, mischievous)
-cupid.png        — The Matchmaker    (warm, romantic)
-aidos.png        — The Mirror        (reserved, observant)
-aletheia.png     — The Scholar       (serious, studious)
-```
-
-**Format:** PNG with transparency (best), JPG, JPEG, or WebP supported.
-
-**Style:** Semi-realistic anime (Violet Evergarden / Fate/Grand Order aesthetic).
-
-**Size:** Any resolution — renderer downscales automatically with Lanczos resampling.
-
----
-
-## Agent Personality System
-
-### The Dynamic
-
-**Hephaestus** is the gruff, disabled male forge god who CREATED the golden maidens. He's proud of them but they drive him insane.
-
-**The Core Maidens** (Metis, Techne, Dokimasia, Kallos, Mneme) are his gorgeous, sassy automata. They:
-- **Sass Hephaestus** relentlessly ("Yes, Master~ ...eventually.")
-- **Flirt with the user** as their "real master" (gender-neutral)
-- **Banter with each other** like divine sisters
-
-**The Companion Spirits** (Puck, Cupid) add personality and relationship depth — Puck guides new players with mischievous tutorials, Cupid tracks affinity and coaches confessions.
-
-**The Quality Validators** (Aidos, Aletheia) work quietly in the background — Aidos screens for slop patterns, Aletheia validates research claims.
-
-Think: tired craftsman dad energy vs. nine divine women who are simultaneously the best things he ever made and the most insufferable.
-
-### Handoff Chatter
-
-When agents pass work to each other, they exchange personality-driven dialogue:
-
-```
-🔥 [1/4] Sending task to Techne...
-⚙️ [1/4] Techne completed
-🔥 [2/4] Sending task to Dokimasia...
-🧪 [2/4] Dokimasia completed
-```
-
-Each agent has unique handoff lines:
-
-- **Hephaestus → Metis**: "*strikes anvil* Metis! Draw up the plans."
-- **Hephaestus → Techne**: "*points hammer* Techne! Write something worthy."
-- **Metis → Techne**: "Blueprint's done, sis. Bring my vision to life~"
-- **Techne → Dokimasia**: "Code's done. Doki, TRY to find a fault. I dare you."
-- **Dokimasia → Kallos**: "Tests pass, fashionista. Make it beautiful now."
-- **Kallos → Mneme**: "It's beautiful AND functional. Document this masterpiece~"
-
-### Victory Lines
-
-When a pipeline completes successfully:
-
-- **Hephaestus**: "*sets down hammer* ...Not bad. Not bad at all."
-- **Metis**: "Went exactly according to MY plan. As always~"
-- **Techne**: "Clean code, clean finish. All for you~"
-- **Dokimasia**: "All tests passing. All bugs crushed. You can sleep well~"
-- **Kallos**: "Beautiful from start to finish. Just like you deserve~"
-- **Mneme**: "Recorded for posterity. Our story grows more beautiful~"
+Avatars live in `assets/avatars/anime/{agent}.png` (one PNG per agent, all
+ten covered). PNG with transparency renders best; JPG / JPEG / WebP are
+also accepted. The renderer downscales with Lanczos resampling, so the
+source image can be any resolution.
 
 ---
 
 ## Visual Effects
 
-### Particle System
-
-Floating golden embers drift upward in the background:
-- 120 particles maximum
-- Random positions, velocities, and decay rates
-- Alpha fade animation
-- Creates ambient "forge atmosphere"
-
-### Agent Switch Crossfade
-
-When the active agent changes:
-- Previous avatar fades out
-- New avatar fades in
-- 350ms transition duration
-- Smooth alpha interpolation
-
-### Typewriter Effect
-
-Text displays character-by-character:
-- Configurable speed (10ms to 100ms per character)
-- Delta time for consistent animation speed
-- Skip functionality (press any key)
-- Pause/resume support
-- Motion sensitivity toggle (immediate display for accessibility)
-
-### Flash Effect
-
-Portrait panel flashes during agent handoff:
-- Configurable duration (200ms to 500ms)
-- Alpha fade from 150 to 0
-- Delta time animation
-- Visual indicator of agent transition
+The GUI runs a 120-particle golden-ember background, an agent-switch
+crossfade (350 ms), a portrait-panel flash on handoff (200–500 ms,
+configurable), and a typewriter effect (10–100 ms/char, press any key to
+skip, motion-sensitivity toggle for accessibility).
 
 ---
 
-## Text-to-Speech System 🎙️
+## Text-to-Speech 🎙️
 
-Each agent speaks through natural neural voices with personality-matched delivery. The TTS system combines Microsoft Edge's neural synthesis with real-time audio control for a polished, responsive experience.
+Each agent speaks through a per-agent neural voice (Edge-TTS by default,
+[Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) local fallback).
+Audio plays at 44.1 kHz stereo with peak + loudness normalization, runs
+under ~100 ms latency, and the master volume / per-agent voice override
+live in [Configuration → Text-to-Speech](configuration.md#text-to-speech-configuration).
 
-### Voice Personalities
-
-Each agent has an optimized neural voice and personality profile:
-
-| Agent | Voice | Personality | Speed | Pitch |
-|-------|-------|-------------|-------|-------|
-| 🔥 Hephaestus | Guy | Master Smith | 0.95x | 1.0x |
-| 📐 Metis | Aria | Wise Strategist | 0.90x | 1.1x |
-| ⚙️ Techne | Sonia | Technical Expert | 0.93x | 1.05x |
-| 🧪 Dokimasia | Aria | Quality Validator | 0.88x | 1.0x |
-| ✨ Kallos | Jenny | Beautiful Grace | 1.05x | 1.15x |
-| 📜 Mneme | Michelle | Memory Keeper | 0.92x | 0.95x |
-| 🎭 Puck | Sara | Playful Guide | 1.10x | 1.2x |
-| 💘 Cupid | Jenny | Warm Matchmaker | 1.00x | 1.1x |
-| 🪞 Aidos | Michelle | Quiet Observer | 0.85x | 0.9x |
-| 📚 Aletheia | Aria | Careful Scholar | 0.88x | 1.0x |
-
-### Audio Quality
-
-- **44.1 kHz CD-quality stereo** — Professional audio
-- **<100ms latency** — Responsive playback
-- **Automatic normalization** — Consistent loudness
-- **Real-time volume control** — Adjust anytime
-- **Pitch modulation** — Personality-matched delivery
-
-### Voice Customization
-
-The TTS system is fully customizable through settings:
-
-**Per-Agent Voice:**
-Override the default voice assignment for any agent
-
-**Volume Control:**
-Master volume adjustment (0.0-1.0 scale)
-
-**Speed & Pacing:**
-- INSTANT — No delay
-- FAST — 0.5s delay
-- NORMAL — 1.5s delay (default)
-- SLOW — 3.0s delay (light-novel style)
-- CUSTOM — User-defined timing
-
-**Thinking Pauses:**
-Enable/disable pauses before agent responses
-
-**Reading Speed:**
-Adjust character-based reading duration
-
-### Audio Effects
-
-- **Fade effects** for smooth transitions
-- **Peak normalization** preventing clipping
-- **Loudness normalization** for consistency
-- **Personality audio profiles** with warmth/presence
+Voice pacing controls the delay before an agent speaks: `INSTANT` /
+`FAST` (0.5 s) / `NORMAL` (1.5 s, default) / `SLOW` (3.0 s, light-novel
+style) / `CUSTOM`. Thinking pauses and reading speed are independently
+toggleable.
 
 ---
 
@@ -312,29 +172,6 @@ Settings are saved to `~/.kourai_khryseai/settings.json` and automatically loade
 | **Right click on message** | Copy message text |
 | **Scroll wheel** | Navigate dialogue history |
 | **Click outside settings** | Close settings overlay |
-
----
-
-## Color Palette
-
-The GUI uses a deep black + molten gold aesthetic:
-
-??? abstract "Full color table (`constants.py`)"
-
-    | Color | RGB | Usage |
-    |---|---|---|
-    | **BLACK** | (5, 5, 5) | Background |
-    | **DARK_BG** | (12, 10, 8) | Secondary background |
-    | **PANEL_BG** | (18, 14, 10) | Portrait panel background |
-    | **GOLD** | (218, 165, 32) | Primary accent |
-    | **GOLD_BRIGHT** | (255, 215, 0) | Highlights |
-    | **GOLD_DIM** | (140, 105, 20) | Secondary accent |
-    | **GOLD_GLOW** | (255, 200, 60) | Glow effects |
-    | **WHITE** | (240, 235, 225) | Primary text |
-    | **DIM_WHITE** | (160, 155, 145) | Secondary text |
-    | **INPUT_BG** | (20, 16, 12) | Input bar background |
-    | **SCROLLBAR** | (50, 40, 25) | Scrollbar |
-    | **ERROR_RED** | (200, 80, 60) | Error indicators |
 
 ---
 
@@ -460,48 +297,18 @@ The GUI targets WCAG 2.2 Level AA compliance with these features:
 
 ---
 
-## Development
-
-### Running Tests
-
-```bash
-cd hosts/gui
-uv run pytest
-```
-
-### Adding New Agents
-
-1. Add avatar PNG to `assets/maidens/golden_avatars/`
-2. Add agent data to `AGENTS` dict in `maidens.py`
-3. Add emoji mapping to `EMOJI_TO_AGENT` dict
-4. Add handoff lines to `HANDOFF_LINES` dict
-5. Add victory lines to `VICTORY_LINES` dict
-
-### Customizing Visuals
-
-- **Colors** — Edit color constants in `constants.py`
-- **Layout** — Adjust layout constants (W, H, PORTRAIT_W, etc.) in `constants.py`
-- **Fonts** — Modify font loading in `__main__.py`
-- **Particle System** — Edit `Ember` and `ParticleSystem` classes in `particles.py`
-
----
-
 ## Troubleshooting
 
-### Window doesn't appear
-- Ensure Pygame is installed: `uv pip install pygame`
-- Check display permissions on Linux: `xhost +local:`
+| Symptom | Fix |
+|---|---|
+| Window doesn't appear | `uv pip install pygame`; on Linux check display permissions (`xhost +local:`) |
+| Avatars don't show | Verify `assets/avatars/anime/{agent}.png` exists, names lowercase, PNG valid |
+| Connection errors | `make up` to start Hephaestus; override URL with `--agent http://localhost:10000/` |
+| Text rendering issues | Install Inter / Segoe UI / Arial; on Linux `sudo apt install fontconfig` |
 
-### Avatars don't show
-- Verify PNG files exist in `assets/maidens/golden_avatars/`
-- Check file names match agent keys exactly (case-sensitive)
-- Ensure PNGs are valid images (not corrupted)
+## Extending
 
-### Connection errors
-- Verify Hephaestus is running: `make up`
-- Check agent URL in config: `kourai config get agent_url`
-- Try explicit URL: `uv run python -m hosts.gui --agent http://localhost:10000/`
-
-### Text rendering issues
-- Install system fonts: `inter`, `segoeui`, `arial`, `helvetica`
-- On Linux, install fontconfig: `sudo apt install fontconfig`
+Adding a new agent: drop the avatar at `assets/avatars/anime/{agent}.png`,
+register it in `AGENTS` / `EMOJI_TO_AGENT` / `HANDOFF_LINES` / `VICTORY_LINES`
+in `hosts/gui/maidens.py`. Visual constants (colors, dimensions, particle
+system) live in `hosts/gui/constants.py`; fonts load in `hosts/gui/__main__.py`.

@@ -43,46 +43,11 @@ This context is injected into the LLM prompt so specs are grounded in the actual
 
 **Port `10002`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/techne/`](https://github.com/ajbarea/kourai_khryseai/tree/main/agents/techne)
 
-Implements code changes from specs or fix requests. Reads existing files first, understands patterns, then generates targeted edits.
+Implements code changes from specs or fix requests. Drives a provider-native tool-use loop — the LLM emits `tool_use` blocks calling the MCP **forge** server's `read_file` / `write_file` / `edit_file` / `delete_file` tools, the runtime executes them inside a `forge_tool_bridge()` async context, and per-tool results stream back to the player as `🛠 forge.<tool>` status events.
 
-**Capabilities:**
+Path safety: every forge tool call lands in the active project root (set on the `kourai_project_root_var` contextvar at executor entry); `validate_file_path()` re-checks at the runtime layer so a path-traversal payload can't escape the worktree.
 
-- **File reading** — Concurrently reads all files mentioned in the request using `asyncio.gather`
-- **Git context** — Runs `git status` and `git diff` to understand the working tree
-- **Path parsing** — Regex-based extraction of file paths from user input
-- **Code generation** — LLM generates structured output with `ACTION`, `FILE`, `CONTENT` blocks
-- **Path safety** — `validate_file_path()` ensures writes stay within the player's project root
-
-**Output format:**
-
-```
-ACTION: CREATE
-FILE: src/utils/parser.py
-CONTENT:
-def parse_csv(path: str) -> list[dict]:
-    ...
-
-ACTION: EDIT
-FILE: src/api/endpoints.py
-ORIGINAL:
-def get_data():
-    return json_response()
-REPLACEMENT:
-def get_data(format: str = "json"):
-    if format == "csv":
-        return csv_response()
-    return json_response()
-```
-
-Supported actions: `CREATE`, `EDIT`, `DELETE`.
-
-**Files:**
-
-| File | Purpose |
-|---|---|
-| `agent.py` | File I/O, git context, `generate_code()`, path parsing |
-| `agent_executor.py` | A2A bridge, ACTION/FILE/CONTENT parsing, file writes |
-| `__main__.py` | AgentCard, server startup |
+The tool loop is shared with Kallos and Dokimasia — see [Internals](../architecture/internals.md) for the `forge_tool_bridge` lifetime and how MCP-server stdio sessions amortize startup across the loop.
 
 ---
 

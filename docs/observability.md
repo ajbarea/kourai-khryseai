@@ -87,11 +87,19 @@ When triaging, "is this an agent issue or an infra issue?" is one click in the s
 
 Be candid about gaps so you don't go looking for data that isn't there:
 
-- **Jaeger** — fully populated. Every A2A call creates a span; W3C trace context propagates via A2A `metadata` headers; MCP tool calls add child spans.
-- **Dozzle** — fully populated. Every container's stdout/stderr; live tail; trace IDs on every span-bound log line.
-- **Prometheus** — *almost empty today.* The single scrape job in `docker/prometheus.yml` targets Jaeger's own internal metrics endpoint (`:14269`); the 10 agents are **not** currently scraped despite emitting OTLP traces fine. The Service Performance Monitoring "Monitor" tab in Jaeger's UI is therefore unpopulated. Fixing this is tracked under [M16 — Observability DX uplift](../ROADMAP.md#m16--observability-dx-uplift) (Workstream 4: Jaeger v2 `spanmetrics` connector + Prometheus v3).
-
-Until M16 lands, treat Prometheus as a placeholder pane — its real value arrives with the next observability uplift.
+- **Jaeger** — fully populated. Every A2A call creates a span; W3C trace
+  context propagates via A2A `metadata` headers; MCP tool calls add child
+  spans. Running `jaegertracing/jaeger:2.17.0` with the OTel-Collector-shape
+  config in `docker/jaeger-config.yaml`.
+- **Dozzle** — fully populated. Every container's stdout/stderr; live tail;
+  trace IDs on every span-bound log line.
+- **Prometheus** — running `prom/prometheus:v3.11.3-distroless` and scraping
+  the spanmetrics connector's RED metrics endpoint on `:8889`. Service
+  Performance Monitoring (the "Monitor" tab in Jaeger's UI) is populated for
+  agent latency / rate / error percentiles. Note that the 10 agents
+  themselves are **not** scraped directly today — RED metrics come from the
+  spanmetrics-derived stream, not from per-agent `/metrics` endpoints. Adding
+  per-agent scraping is sibling work.
 
 ---
 
@@ -116,7 +124,7 @@ Every span follows a `<source>.<operation>` shape so Jaeger search by service is
 ## References
 
 - [OpenTelemetry Python](https://opentelemetry.io/docs/languages/python/) — the SDK every agent uses
-- [Jaeger v2 deployment guide](https://www.jaegertracing.io/docs/2.16/getting-started/) — target version for the M16 migration
-- [Prometheus 3.0 migration](https://prometheus.io/docs/prometheus/latest/migration/) — breaking changes for the v2 → v3 jump
+- [Jaeger v2 deployment guide](https://www.jaegertracing.io/docs/2.16/getting-started/) — the OTel-Collector-shape config the stack runs
+- [Prometheus 3.0 migration](https://prometheus.io/docs/prometheus/latest/migration/) — context for the v2 → v3 jump completed under M16
 - [Dozzle docs](https://dozzle.dev/) — keyboard shortcuts, filters, swarm mode
 - [W3C Trace Context](https://www.w3.org/TR/trace-context/) — the propagation format A2A `metadata` carries
