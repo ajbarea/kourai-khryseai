@@ -9,7 +9,7 @@ import subprocess
 import pytest
 
 from kourai_common import projects as projects_mod
-from kourai_common.projects import ProjectError, ProjectManager
+from kourai_common.projects import ProjectError, ProjectManager, derive_project_id
 
 
 @pytest.fixture(autouse=True)
@@ -129,3 +129,70 @@ def test_slugify_collapses_whitespace_and_special_chars():
 def test_slug_empty_raises():
     with pytest.raises(ProjectError):
         ProjectManager.create("player-1", "!!!")
+
+
+# ── derive_project_id ──────────────────────────────────────────────
+
+
+def test_derive_project_id_returns_16_hex_chars(tmp_path):
+    project_id = derive_project_id(tmp_path)
+    assert len(project_id) == 16
+    assert all(c in "0123456789abcdef" for c in project_id)
+
+
+def test_derive_project_id_is_stable(tmp_path):
+    """Same path → same id, every time."""
+    a = derive_project_id(tmp_path)
+    b = derive_project_id(tmp_path)
+    assert a == b
+
+
+def test_derive_project_id_normalises_trailing_slash(tmp_path):
+    """Path with and without trailing separator hash to the same id."""
+    bare = derive_project_id(str(tmp_path))
+    with_slash = derive_project_id(f"{tmp_path}/")
+    assert bare == with_slash
+
+
+def test_derive_project_id_accepts_string_or_path(tmp_path):
+    """str and Path inputs produce the same id."""
+    from_str = derive_project_id(str(tmp_path))
+    from_path = derive_project_id(tmp_path)
+    assert from_str == from_path
+
+
+def test_derive_project_id_resolves_relative_path(tmp_path, monkeypatch):
+    """Relative paths resolve against cwd before hashing."""
+    monkeypatch.chdir(tmp_path)
+    sub = tmp_path / "sub"
+    sub.mkdir()
+    via_relative = derive_project_id("sub")
+    via_absolute = derive_project_id(sub)
+    assert via_relative == via_absolute
+
+
+def test_derive_project_id_resolves_user_home(tmp_path, monkeypatch):
+    """`~` is expanded so `~/foo` matches the absolute home path."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    target = tmp_path / "kourai_test_home"
+    target.mkdir()
+    via_tilde = derive_project_id("~/kourai_test_home")
+    via_absolute = derive_project_id(target)
+    assert via_tilde == via_absolute
+
+
+def test_derive_project_id_different_paths_differ(tmp_path):
+    a = tmp_path / "alpha"
+    b = tmp_path / "beta"
+    a.mkdir()
+    b.mkdir()
+    assert derive_project_id(a) != derive_project_id(b)
+
+
+def test_derive_project_id_resolves_symlinks(tmp_path):
+    """Two paths pointing at the same physical dir share an id."""
+    real = tmp_path / "real"
+    real.mkdir()
+    link = tmp_path / "link"
+    link.symlink_to(real)
+    assert derive_project_id(real) == derive_project_id(link)
