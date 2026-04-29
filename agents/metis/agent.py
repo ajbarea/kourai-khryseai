@@ -10,6 +10,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from kourai_common.facts import build_fact_context
 from kourai_common.llm import chat, chat_stream
 from kourai_common.player import get_enriched_system_prompt
 from kourai_common.prompts import CURRENT_DATE, build_system_prompt
@@ -192,12 +193,44 @@ async def discuss_tradeoffs(
     )
 
 
+def _build_metis_context_parts(
+    project_context: str,
+    file_contents: dict[str, str] | None,
+    docs_context: str,
+    player_id: str | None,
+    project_id: str | None,
+) -> list[str]:
+    """Compose the planning context block, including M17 project-scoped facts.
+
+    Player facts come first when present so the LLM sees the prior
+    PAUSE-resolved preferences before any docs / project / file context —
+    keeping the rule "don't re-ask kinds visible in PLAYER CONTEXT" load-
+    bearing.
+    """
+    parts: list[str] = []
+    if player_id:
+        fact_block = build_fact_context(player_id, agent_name="metis", project_id=project_id)
+        if fact_block:
+            parts.append(fact_block)
+    if docs_context:
+        parts.append(docs_context)
+    if project_context:
+        parts.append(f"=== PROJECT CONTEXT ===\n{project_context}")
+    if file_contents:
+        parts.append("=== RELEVANT FILES ===")
+        for path, content in file_contents.items():
+            parts.append(f"\n--- {path} ---\n{content}")
+    return parts
+
+
 async def create_spec(
     idea: str,
     file_contents: dict[str, str] | None = None,
     project_context: str = "",
     image_parts: list[dict] | None = None,
     context_id: str | None = None,
+    player_id: str | None = None,
+    project_id: str | None = None,
 ) -> str:
     """Generate an implementation specification from a rough idea.
 
@@ -207,30 +240,29 @@ async def create_spec(
         project_context: Project structure and git context.
         image_parts: Optional LiteLLM image_url content blocks attached by the user.
         context_id: Context ID for conversational memory.
+        player_id: Player UUID — when set, M17 project-scoped preference
+            facts are injected so Metis recalls prior PAUSE-resolved answers
+            instead of re-asking.
+        project_id: Active M17 project scope (sha256-of-path id from
+            ``derive_project_id``). ``None`` falls back to global facts only.
 
     Returns:
         Detailed implementation spec in structured format.
     """
     from kourai_common.doc_lookup import lookup_documentation
 
-    context_parts = []
-
-    # Fetch relevant documentation for planning
     docs_context = await lookup_documentation(
         idea,
         agent_name="metis",
         max_results=3,
     )
-    if docs_context:
-        context_parts.append(docs_context)
-
-    if project_context:
-        context_parts.append(f"=== PROJECT CONTEXT ===\n{project_context}")
-
-    if file_contents:
-        context_parts.append("=== RELEVANT FILES ===")
-        for path, content in file_contents.items():
-            context_parts.append(f"\n--- {path} ---\n{content}")
+    context_parts = _build_metis_context_parts(
+        project_context=project_context,
+        file_contents=file_contents,
+        docs_context=docs_context or "",
+        player_id=player_id,
+        project_id=project_id,
+    )
 
     context_block = "\n".join(context_parts)
     user_text = f"Create an implementation spec for this idea:\n\n{idea}\n\n{context_block}"
@@ -252,28 +284,29 @@ async def create_spec_stream(
     project_context: str = "",
     image_parts: list[dict] | None = None,
     context_id: str | None = None,
+    player_id: str | None = None,
+    project_id: str | None = None,
 ) -> AsyncIterable[str]:
-    """Stream spec generation for real-time progress."""
+    """Stream spec generation for real-time progress.
+
+    See ``create_spec`` for the ``player_id`` / ``project_id`` semantics —
+    they thread M17 project-scoped facts into the prompt so prior
+    PAUSE-resolved preferences are recalled, not re-asked.
+    """
     from kourai_common.doc_lookup import lookup_documentation
 
-    context_parts = []
-
-    # Fetch relevant documentation for planning
     docs_context = await lookup_documentation(
         idea,
         agent_name="metis",
         max_results=3,
     )
-    if docs_context:
-        context_parts.append(docs_context)
-
-    if project_context:
-        context_parts.append(f"=== PROJECT CONTEXT ===\n{project_context}")
-
-    if file_contents:
-        context_parts.append("=== RELEVANT FILES ===")
-        for path, content in file_contents.items():
-            context_parts.append(f"\n--- {path} ---\n{content}")
+    context_parts = _build_metis_context_parts(
+        project_context=project_context,
+        file_contents=file_contents,
+        docs_context=docs_context or "",
+        player_id=player_id,
+        project_id=project_id,
+    )
 
     context_block = "\n".join(context_parts)
     user_text = f"Create an implementation spec for this idea:\n\n{idea}\n\n{context_block}"

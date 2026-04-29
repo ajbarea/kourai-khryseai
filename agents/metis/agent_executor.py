@@ -16,6 +16,7 @@ from kourai_common.mcp_client import kourai_project_root_var
 from kourai_common.messaging import send_input_required, send_working_status
 from kourai_common.pause_state import stash_preference_kind
 from kourai_common.pause_tag import extract_pause_tag
+from kourai_common.projects import derive_project_id
 from kourai_common.stack import get_stack_context, looks_like_scaffolding
 from kourai_common.tracing import create_span
 
@@ -25,6 +26,21 @@ if TYPE_CHECKING:
     from a2a.server.tasks import TaskUpdater
 
 log = logging.getLogger(__name__)
+
+
+def _player_id_or_none() -> str | None:
+    """Resolve the active player's UUID, or ``None`` when the profile is absent.
+
+    Specialist containers may run without a player profile (CI, smoke
+    tests, fresh installs). Recall is silently skipped in that case —
+    the facts read path is fail-soft by design.
+    """
+    try:
+        from kourai_common.player_profile import PlayerProfile
+    except ImportError:  # pragma: no cover — narrow import-time guard
+        return None
+    profile = PlayerProfile.load()
+    return profile.player_id if profile and profile.player_id else None
 
 
 class MetisAgentExecutor(BaseAgentExecutor):
@@ -85,6 +101,18 @@ class MetisAgentExecutor(BaseAgentExecutor):
                 emoji="📐",
             )
 
+            # M17 Phase 1 — load player + project identity for fact recall.
+            # ``derive_project_id`` is a stable sha256-of-path so the same
+            # project survives the player moving the repo on disk; the
+            # tag-less internal-task fallback in ``parse_project_root``
+            # returns ``Path.cwd()``, which we treat as global (None) here.
+            player_id = _player_id_or_none()
+            project_id_for_facts = (
+                derive_project_id(project_root)
+                if "[project_root:" in (user_input or "").lower()
+                else None
+            )
+
             with create_span("metis.spec", {"idea": user_input[:100]}):
                 spec = ""
                 chunk_count = 0
@@ -93,6 +121,8 @@ class MetisAgentExecutor(BaseAgentExecutor):
                     project_context=project_context,
                     image_parts=extract_image_parts(context) or None,
                     context_id=task.context_id,
+                    player_id=player_id,
+                    project_id=project_id_for_facts,
                 ):
                     spec += chunk
                     chunk_count += 1
