@@ -62,7 +62,17 @@ class AudioManager:
 
         try:
             if not pygame.mixer.get_init():
-                pygame.mixer.pre_init(44100, -16, 2, 512)
+                # Buffer size is samples per chunk; 4096 @ 44.1kHz ≈ 93ms.
+                # WSL2 + 14 Docker containers + Kokoro inference + LLM API
+                # round-trips create CPU pressure that underruns smaller
+                # buffers (512 = 11.6ms crackled audibly; 2048 = 46ms still
+                # crackled on the music track during active pipelines).
+                # 4096 is the standard next-step per pygame docs and forum
+                # recommendations. Music + ambient have no latency
+                # requirement; SFX latency at 93ms is imperceptible. TTS
+                # runs on the same mixer post-BytesIO-fix and is unaffected
+                # since each TTS chunk is queued, not real-time-driven.
+                pygame.mixer.pre_init(44100, -16, 2, 4096)
                 pygame.mixer.init()
 
             # Ensure enough channels (0: voice, 1: ambient, 2: TTS, 3-7: sfx)

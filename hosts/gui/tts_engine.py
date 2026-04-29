@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import io
 import logging
 import tempfile
 from pathlib import Path
@@ -199,12 +200,12 @@ class TTSEngine:
         try:
             logger.info(
                 "TTS: Starting streaming speech generation — "
-                "agent=%s, voice=%s (%s), speed=%.2f, text_len=%d",
+                "agent=%s, voice=%s (%s), speed=%.2f, text=%r",
                 agent_name,
                 voice_cfg.voice_id,
                 type(self.backend).__name__,
                 voice_cfg.speed,
-                len(text),
+                text,
             )
 
             self._init_mixer()
@@ -223,7 +224,12 @@ class TTSEngine:
                     continue
 
                 chunk_count += 1
-                sound = pygame.mixer.Sound(chunk_bytes)
+                # Wrap in BytesIO so pygame parses the WAV/MP3 header and
+                # resamples to mixer format. Passing raw bytes positionally
+                # treats them as PCM matching mixer rate, which produces
+                # ~3.7x speed playback ("VHS rewind") for 24 kHz mono Kokoro
+                # output through a 44.1 kHz stereo mixer.
+                sound = pygame.mixer.Sound(file=io.BytesIO(chunk_bytes))
 
                 # Apply volume normalization
                 if self.enable_effects:
