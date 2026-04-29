@@ -583,24 +583,15 @@ captured in M2 and M7 above; the player-experience bullets live here.
   Zed) can reach `kourai-forge-mcp` without standing up an HTTP
   server. Already noted in M2 scope.
 
-**Prioritization (player-experience-per-effort, highest first).**
+**Open from the prioritized OSS-CC lift list.**
 
-1. ~~**`/compact`** — universal across every clone, we don't have it,
-   Mneme already has the documenter persona. Single-PR-sized.~~
-   **Shipped 2026-04-26** (see Shipped section).
-2. **MCP `roots` + `elicitation` declared at M2 init** — design-time
-   work, near-zero cost if done while M2 is being scaffolded;
-   retrofitting later is much more painful.
-3. ~~**`/permissions` granular tool gating** — small extension to
-   `CLISettings`, big UX win for players who want partial autonomy
-   without full YOLO. Maps onto existing `MUTATING_TOOL_NAMES`.~~
-   **Shipped 2026-04-26** (see Shipped section).
-4. ~~**`A2A-Version` header** — must-do prerequisite for any v1.0
-   migration attempt. One header field, one line of code.~~
-   **Shipped 2026-04-26** (see Shipped section).
-5. ~~**`/cost` alias for `/usage`** — five-line cleanup matching
-   OSS-CC vocabulary so muscle-memory carries over.~~
-   **Shipped 2026-04-26** (see Shipped section).
+Four of the five originally-prioritized items shipped on 2026-04-26
+(`/compact`, `/permissions` granular tool gating, `A2A-Version`
+header, `/cost` alias) — see Shipped log. One remains:
+
+- **MCP `roots` + `elicitation` declared at M2 init.** Design-time
+  work, near-zero cost if done while M2 is being scaffolded;
+  retrofitting later is much more painful.
 
 The remaining bullets (Plan Mode, autoDream, custom-agents-via-markdown,
 tree-sitter project map, LSP integration) are higher-effort
