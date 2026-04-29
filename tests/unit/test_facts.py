@@ -346,3 +346,77 @@ def test_store_facts_threads_project_id_to_storage():
     assert len(captured) == 2
     assert captured[0]["project_id"] == "proj-A"
     assert captured[1]["project_id"] is None
+
+
+# ── M17 Phase 1: read-side scope filter ────────────────────────────
+
+
+def test_get_relevant_facts_passes_project_id_to_get_player_memories():
+    """get_relevant_facts_for_enrichment forwards project_id to the storage layer."""
+    from kourai_common.facts import get_relevant_facts_for_enrichment
+
+    captured_kwargs: dict = {}
+
+    def fake_get(**kwargs: object) -> list:
+        captured_kwargs.update(kwargs)
+        return []
+
+    with patch("kourai_common.player.get_player_memories", side_effect=fake_get):
+        get_relevant_facts_for_enrichment("p1", project_id="proj-A")
+
+    assert captured_kwargs["project_id"] == "proj-A"
+
+
+def test_get_relevant_facts_default_project_id_is_none():
+    """Calls without project_id forward None (no project axis applied)."""
+    from kourai_common.facts import get_relevant_facts_for_enrichment
+
+    captured_kwargs: dict = {}
+
+    def fake_get(**kwargs: object) -> list:
+        captured_kwargs.update(kwargs)
+        return []
+
+    with patch("kourai_common.player.get_player_memories", side_effect=fake_get):
+        get_relevant_facts_for_enrichment("p1")
+
+    assert captured_kwargs["project_id"] is None
+
+
+def test_get_relevant_facts_returns_project_id_in_each_dict():
+    """The dict returned from enrichment carries the persisted project_id."""
+    from kourai_common.facts import get_relevant_facts_for_enrichment
+
+    fake_memory = {
+        "memory_id": "m1",
+        "agent_name": "metis",
+        "category": "fact",
+        "content": "[FACT:preference/high] coverage_target: 80%",
+        "importance": 0.9,
+        "access_count": 0,
+        "created_at": "2026-04-29T10:00:00Z",
+        "last_accessed": "2026-04-29T10:00:00Z",
+        "source": "agent_observed",
+        "project_id": "proj-A",
+    }
+
+    with patch("kourai_common.player.get_player_memories", return_value=[fake_memory]):
+        out = get_relevant_facts_for_enrichment("p1", project_id="proj-A")
+
+    assert out[0]["project_id"] == "proj-A"
+
+
+def test_build_fact_context_passes_project_id():
+    """build_fact_context threads project_id to enrichment."""
+    from kourai_common.facts import build_fact_context
+
+    captured_kwargs: dict = {}
+
+    def fake_get(**kwargs: object) -> list:
+        captured_kwargs.update(kwargs)
+        return []
+
+    with patch("kourai_common.player.get_player_memories", side_effect=fake_get):
+        build_fact_context("p1", agent_name="metis", project_id="proj-A")
+
+    assert captured_kwargs["project_id"] == "proj-A"
