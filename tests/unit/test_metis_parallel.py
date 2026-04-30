@@ -409,7 +409,7 @@ class TestSurfacing:
 
         send_working_calls: list = []
 
-        async def fake_send_working_status(updater, task, message, emoji="⚙️"):
+        async def fake_send_working_status(updater, task, message, emoji="⚙️", **kwargs):
             send_working_calls.append((message, emoji))
 
         with (
@@ -450,7 +450,7 @@ class TestSurfacing:
 
         send_working_calls: list = []
 
-        async def fake_send_working_status(updater, task, message, emoji="⚙️"):
+        async def fake_send_working_status(updater, task, message, emoji="⚙️", **kwargs):
             send_working_calls.append((message, emoji))
 
         with (
@@ -487,7 +487,7 @@ class TestSurfacing:
 
         send_working_calls: list = []
 
-        async def fake_send_working_status(updater, task, message, emoji="⚙️"):
+        async def fake_send_working_status(updater, task, message, emoji="⚙️", **kwargs):
             send_working_calls.append((message, emoji))
 
         with (
@@ -532,7 +532,7 @@ class TestSurfacing:
 
         send_input_calls: list = []
 
-        async def fake_send_input_required(updater, task, message):
+        async def fake_send_input_required(updater, task, message, **kwargs):
             send_input_calls.append(message)
 
         async def quick_emit(metis_task, updater, task, deadline_seconds=0.05):

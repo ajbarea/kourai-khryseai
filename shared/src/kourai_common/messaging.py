@@ -1,6 +1,6 @@
 """Helpers for A2A wire-shape construction.
 
-Two surfaces:
+Three surfaces:
 
 * ``text_part`` / ``file_part_from_b64`` / ``data_part`` / ``user_message``
   centralize Part and Message construction. ``a2a-sdk`` 1.0 went
@@ -14,12 +14,18 @@ Two surfaces:
   wrap ``TaskUpdater`` lifecycle methods (``start_work`` /
   ``requires_input`` / ``complete``) for executors so they don't repeat
   the same three-line boilerplate per status transition.
+* ``KIND_*`` constants + ``set_content_kind`` / ``get_content_kind`` +
+  ``kind_message`` carry M18's content-kind discriminator on
+  ``Message.metadata`` so the host routes by metadata kind rather than
+  prose-parsing emoji prefixes. The four kinds (dialogue / status / code
+  / spec) split TTS-eligible from visual-only content and let status
+  events fire-and-render without gating the next event on narration.
 """
 
 from __future__ import annotations
 
 import base64
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Final, Literal
 from uuid import uuid4
 
 from a2a.helpers import new_text_message
@@ -118,6 +124,126 @@ def user_message(
     return msg
 
 
+# ── Content-kind metadata (M18) ───────────────────────────────────────
+
+
+ContentKind = Literal["dialogue", "status", "code", "spec"]
+"""Discriminator for what an emitted Part carries — drives host routing.
+
+* ``dialogue`` — TTS-eligible maiden speech rendered in a comms window;
+  blocks the next event on narration completion.
+* ``status`` — visual-only pipeline status (``Analyzing request...``,
+  ``Pipeline: foo -> bar``); never spoken, never gates the next event.
+* ``code`` — monospace body (diffs, command output) rendered without
+  TTS or gating.
+* ``spec`` — wide markdown render (specs, plans) without TTS or gating.
+"""
+
+KIND_DIALOGUE: Final[ContentKind] = "dialogue"
+KIND_STATUS: Final[ContentKind] = "status"
+KIND_CODE: Final[ContentKind] = "code"
+KIND_SPEC: Final[ContentKind] = "spec"
+
+KOURAI_STREAMING_EXT_URI: Final[str] = "https://kourai.khryseai/ext/streaming/v1"
+"""URI namespace for the kourai streaming extension on ``Message.metadata``.
+
+A2A 1.0 prescribes URI-namespaced extension keys with nested objects as
+values — e.g. ``metadata["https://example.com/extensions/geolocation/v1"]
+= {"lat": 37.7, "lng": -122.4}``. The URI is the extension's globally
+unique identifier; sibling fields share the namespace by living inside
+the nested object. Today the only field is ``content_kind``; future
+streaming-extension fields (priority, subkind, ssml-version) live under
+the same URI without colliding with other extensions.
+
+The host reads ``metadata[URI]`` as a ``google.protobuf.Struct`` and
+indexes ``content_kind`` off it. Producers assign a plain ``dict``;
+the protobuf accessor auto-coerces to Struct on the wire.
+"""
+
+CONTENT_KIND_FIELD: Final[str] = "content_kind"
+"""Field name inside the streaming-extension nested object."""
+
+
+def set_content_kind(message: Message, kind: ContentKind) -> None:
+    """Tag a Message with its content-kind discriminator under the kourai streaming extension."""
+    message.metadata[KOURAI_STREAMING_EXT_URI] = {CONTENT_KIND_FIELD: kind}
+
+
+def get_content_kind(message: Message | None) -> ContentKind | None:
+    """Read the content-kind discriminator from a Message, or ``None`` if absent.
+
+    Returns ``None`` for unmigrated specialists that emit without the
+    metadata tag — the host falls back to the legacy emoji-prefix
+    detection in that case. Unknown kind values also return ``None`` so
+    the host can route them through the legacy path until the producer
+    is updated.
+    """
+    if message is None:
+        return None
+    metadata = getattr(message, "metadata", None)
+    if metadata is None:
+        return None
+    try:
+        ext = metadata[KOURAI_STREAMING_EXT_URI]
+    except (KeyError, TypeError, ValueError):
+        # protobuf ``Struct.__getitem__`` raises ``ValueError`` ("Value not
+        # set") when the key is absent or its inner ``Value`` oneof is
+        # unset; plain dicts raise ``KeyError``. Both mean "not tagged."
+        return None
+    # ``ext`` is a ``google.protobuf.Struct`` for protobuf Messages,
+    # plain dict for unit-test fixtures. Both support membership +
+    # subscript identically.
+    try:
+        raw = ext[CONTENT_KIND_FIELD]
+    except (KeyError, TypeError, ValueError):
+        return None
+    if raw in ("dialogue", "status", "code", "spec"):
+        return raw  # type: ignore[return-value]
+    return None
+
+
+def kind_message(
+    text: str,
+    kind: ContentKind,
+    *,
+    role: Role = Role.ROLE_AGENT,
+    context_id: str | None = None,
+    task_id: str | None = None,
+    message_id: str | None = None,
+    extra_parts: Sequence[Part] | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> Message:
+    """Build a Message tagged with a content-kind discriminator.
+
+    Mirrors ``user_message`` but defaults to ``ROLE_AGENT`` since the
+    typical caller is a specialist's executor emitting status/dialogue.
+    The kind is stored under ``KOURAI_STREAMING_EXT_URI`` in
+    ``Message.metadata`` alongside any caller-supplied metadata.
+
+    Most agents won't construct messages directly — they go through
+    ``send_working_status`` / ``send_input_required`` / ``send_completed``
+    which now accept a ``kind`` kwarg. This builder is the underlying
+    primitive for paths that need a tagged Message without the
+    ``TaskUpdater`` lifecycle wrappers (e.g. ``add_artifact`` payloads,
+    direct host emissions for tests).
+    """
+    msg = new_text_message(text, role=role)
+    if extra_parts:
+        msg.parts.extend(extra_parts)
+    msg.message_id = message_id or str(uuid4())
+    if context_id is not None:
+        msg.context_id = context_id
+    if task_id is not None:
+        msg.task_id = task_id
+    if metadata:
+        for key, value in metadata.items():
+            if value is None:
+                continue
+            msg.metadata[key] = value
+    set_content_kind(msg, kind)
+    return msg
+
+
 def send_request(message: Message) -> SendMessageRequest:
     """Wrap an A2A Message in a SendMessageRequest for v1.0 ``client.send_message``.
 
@@ -186,9 +312,20 @@ async def send_working_status(
     task: Task,
     message: str,
     emoji: str = "⚙️",
+    *,
+    kind: ContentKind | None = None,
 ) -> None:
-    """Send a working status update with optional emoji prefix."""
+    """Send a working status update with optional emoji prefix.
+
+    ``kind`` tags the outbound message under
+    ``KOURAI_STREAMING_EXT_URI``. Hosts route by kind: ``KIND_STATUS``
+    skips TTS and fires-and-forgets; ``KIND_DIALOGUE`` keeps the current
+    speak-and-gate behavior. Leaving ``kind=None`` preserves the v0.x
+    text-parsing path so unmigrated agents keep working.
+    """
     msg = updater.new_agent_message(parts=[text_part(f"{emoji} {message}")])
+    if kind is not None:
+        set_content_kind(msg, kind)
     await updater.start_work(message=msg)
 
 
@@ -196,9 +333,18 @@ async def send_input_required(
     updater: TaskUpdater,
     task: Task,
     message: str,
+    *,
+    kind: ContentKind | None = None,
 ) -> None:
-    """Request user input and mark the task as paused."""
+    """Request user input and mark the task as paused.
+
+    ``kind`` defaults to ``None`` for backwards compatibility, but
+    callers should pass ``KIND_DIALOGUE`` — input-required prompts are
+    addressed to the player and TTS-eligible.
+    """
     msg = updater.new_agent_message(parts=[text_part(message)])
+    if kind is not None:
+        set_content_kind(msg, kind)
     await updater.requires_input(message=msg)
 
 
@@ -207,7 +353,11 @@ async def send_completed(
     task: Task,
     message: str,
     emoji: str = "✅",
+    *,
+    kind: ContentKind | None = None,
 ) -> None:
     """Mark the task as completed with a final status message."""
     msg = updater.new_agent_message(parts=[text_part(f"{emoji} {message}")])
+    if kind is not None:
+        set_content_kind(msg, kind)
     await updater.complete(message=msg)

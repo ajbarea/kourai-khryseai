@@ -113,6 +113,7 @@ class TestExecutorPausePath:
             await executor.execute(ctx, queue)
 
         send_input_required.assert_awaited_once()
+        assert send_input_required.await_args is not None
         question = send_input_required.await_args.args[2]
         assert question == "What test coverage target should I plan for?"
 

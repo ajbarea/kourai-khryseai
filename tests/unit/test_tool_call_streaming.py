@@ -157,7 +157,7 @@ class TestKallosExecutorEmitsToolCallStatus:
             captured_callback["fn"] = on_tool_call
             return 0
 
-        async def fake_send_working_status(updater, task, message, emoji="⚙️"):
+        async def fake_send_working_status(updater, task, message, emoji="⚙️", **kwargs):
             captured_status_calls.append((message, emoji))
 
         with (
@@ -285,7 +285,7 @@ class TestDokimasiaExecutorEmitsToolCallStatus:
         captured_callback: dict = {}
         captured_status_calls: list = []
 
-        async def fake_send_working_status(updater, task, message, emoji="⚙️"):
+        async def fake_send_working_status(updater, task, message, emoji="⚙️", **kwargs):
             captured_status_calls.append((message, emoji))
 
         async def fake_apply_test_fixes(
@@ -387,7 +387,7 @@ class TestErrorTagInToolMessage:
         captured_callback: dict = {}
         captured_status_calls: list = []
 
-        async def fake_send_working_status(updater, task, message, emoji="⚙️"):
+        async def fake_send_working_status(updater, task, message, emoji="⚙️", **kwargs):
             captured_status_calls.append((message, emoji))
 
         async def fake_apply_lint_fixes(

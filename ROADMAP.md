@@ -751,11 +751,42 @@ Defensible *now* that Phase 1 has landed:
 
 ## M18 — Structured streaming with content-kind metadata
 
-> Status: planned · Surfaced 2026-04-29 live smoke · Builds on M7
-> (depends on `Message.metadata` channel) · Resolves clustered UX
-> findings: comms-window truncation, FACT-tag leakage into status
-> stream, TTS reading entire markdown bodies aloud, TTS-gated
-> pipeline visual cadence
+> Status: Phase 1 in flight on `feat/m18-content-kind-metadata`
+> (contract + hephaestus pilot + host coexistence). Subsequent phases:
+> per-specialist migration, SSML in dialogue bodies, `KIND_CODE` /
+> `KIND_SPEC` distinct render paths. · Surfaced 2026-04-29 live
+> smoke · Builds on M7 (depends on `Message.metadata` channel) ·
+> Resolves clustered UX findings: comms-window truncation, FACT-tag
+> leakage into status stream, TTS reading entire markdown bodies
+> aloud, TTS-gated pipeline visual cadence
+
+### Phase 1 — kind contract + hephaestus pilot (in flight)
+
+`shared/src/kourai_common/messaging.py` ships the discriminator —
+`KIND_DIALOGUE` / `KIND_STATUS` / `KIND_CODE` / `KIND_SPEC` constants,
+a `ContentKind` Literal, `set_content_kind` / `get_content_kind` /
+`kind_message`, and an optional `kind=` kwarg on every TaskUpdater
+helper (`send_working_status`, `send_input_required`,
+`send_completed`). The metadata key is the URI-namespaced extension
+identifier `https://kourai.khryseai/ext/streaming/v1` — A2A 1.0 spec
+form (top-level key is the extension URI, value is a nested object
+with the extension's fields). Today the only field is `content_kind`;
+sibling fields (priority, subkind, ssml_version) live under the same
+URI without colliding with other extensions on the same Message.
+
+Hephaestus migrates first as the pilot — `Analyzing request...` and
+`Pipeline: foo -> bar` tag as `KIND_STATUS`; CONFIRM_ORDER read-back,
+ASK_USER prompt, CHAT response, INPUT_REQUIRED forward, and the Metis
+parallel-discussion emit tag as `KIND_DIALOGUE`. Forwarded specialist
+statuses stay untagged so the legacy emoji-prefix path in
+`_maidenify_status` still routes them; that branch retires when every
+specialist opts in.
+
+Host-side, `hosts/cli/streaming.py` reads kind off
+`event.status.message` and gates TTS on the predicate
+`kind is None or kind == KIND_DIALOGUE`. Untagged emissions (legacy)
+keep the v0.x always-speak behavior; status / code / spec render
+visually only and don't gate the next event on narration completion.
 
 ### Why
 

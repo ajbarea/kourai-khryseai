@@ -32,7 +32,14 @@ from hosts.cli.rendering import _comms_window, _echo, _render_markdown
 from hosts.cli.styling import _DIM, _GOLD, _GOLD_BRIGHT, _RED, _RESET
 from kourai_common.federation.host_helpers import build_pipeline_turn_entry
 from kourai_common.hooks_interaction import synthesise_fact_from_pause
-from kourai_common.messaging import file_part_from_b64, send_request, stream_event, user_message
+from kourai_common.messaging import (
+    KIND_DIALOGUE,
+    file_part_from_b64,
+    get_content_kind,
+    send_request,
+    stream_event,
+    user_message,
+)
 from kourai_common.pause_state import pop_preference_kind
 from kourai_common.projects import derive_project_id
 
@@ -211,7 +218,17 @@ async def send_and_stream(
                 if text:
                     formatted, agent = _maidenify_status(text)
                     _echo(formatted)
-                    if tts and agent:
+                    # M18: TTS only fires for dialogue-kind emissions.
+                    # ``status`` / ``code`` / ``spec`` render visually only,
+                    # so the next event isn't gated on narration completion.
+                    # ``kind=None`` covers unmigrated specialists — those
+                    # keep the v0.x always-speak behavior until each
+                    # specialist's executor opts in. The rollout finishes
+                    # when every specialist emits a kind tag and this
+                    # ``or kind is None`` branch can retire.
+                    kind = get_content_kind(event.status.message)
+                    should_speak = kind is None or kind == KIND_DIALOGUE
+                    if should_speak and tts and agent:
                         # Extract the status message without the name box etc.
                         # For now, just speak the raw status (it doesn't have markdown)
                         msg = text.split(" ", 1)[-1] if " " in text else text
