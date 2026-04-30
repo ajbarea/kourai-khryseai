@@ -6,21 +6,45 @@ collapses to a one-liner under "Shipped" and this file gets reset to the
 next milestone.
 
 Updated: 2026-04-30 · Working on: **M18 Phase 1 in flight on
-``feat/m18-content-kind-metadata`` — content-kind discriminator
-contract on ``Message.metadata`` (``kourai.streaming.content_kind`` →
-one of ``dialogue`` / ``status`` / ``code`` / ``spec``), hephaestus
-migrated as the pilot specialist, host CLI streaming router gated on
-kind so status events fire-and-render without blocking on TTS.
-``send_working_status`` / ``send_input_required`` / ``send_completed``
-each gained an optional ``kind`` kwarg; ``set_content_kind`` /
-``get_content_kind`` / ``kind_message`` are the underlying primitives.
-Coexistence path: untagged emissions (legacy specialists) keep the
-v0.x always-speak behavior; the ``or kind is None`` branch in the
-host's TTS gate retires once every specialist opts in. SSML inside
-dialogue bodies (ROADMAP §M18 step 2), ``KIND_CODE`` / ``KIND_SPEC``
-distinct render paths, and the per-specialist migration are follow-on
-PRs. Draft PR open for review before flipping the remaining 10
-executors.**
+``feat/m18-content-kind-metadata`` (PR #99, draft) — content-kind
+discriminator contract on ``Message.metadata``
+(``kourai.streaming.content_kind`` → one of ``dialogue`` / ``status``
+/ ``code`` / ``spec``), hephaestus migrated as the pilot specialist,
+host CLI streaming router gated on kind so status events fire-and-
+render without blocking on TTS. ``send_working_status`` /
+``send_input_required`` / ``send_completed`` each gained an optional
+``kind`` kwarg; ``set_content_kind`` / ``get_content_kind`` /
+``kind_message`` are the underlying primitives. Coexistence path:
+untagged emissions (legacy specialists) keep the v0.x always-speak
+behavior; the ``or kind is None`` branch in the host's TTS gate
+retires once every specialist opts in. SSML inside dialogue bodies
+(ROADMAP §M18 step 2), ``KIND_CODE`` / ``KIND_SPEC`` distinct render
+paths, and the per-specialist migration are follow-on PRs.**
+
+**Live smoke 2026-04-30 (driven via pexpect against rebuilt M18
+containers): clean pass through the entire M7 + M13 + M18 chain.**
+Driver sent "Plan a small fizzbuzz module with full pytest tests."
+at 13:45:55, hephaestus emitted ``CONFIRM_ORDER: smart`` read-back
+at 13:45:57, driver sent "yes", hephaestus's resumed routing call at
+13:45:58 returned ``metis -> techne -> dokimasia -> kallos -> mneme``,
+the full agent fleet connected at 13:45:58, hephaestus's
+``Sending to metis: 117 chars`` followed at 13:45:58. **Metis log at
+13:46:01 shows ``Streaming spec for: [User]: Plan a small fizzbuzz
+module with full pytest tests.``** — M13's original-request relay
+intact across CONFIRM_ORDER → resume → route. Pipeline ran clean
+through metis spec generation, then paused at 13:46:12 with metis's
+M17 ``PAUSE: coverage_target`` ("Should I plan for 100% coverage,
+or is 95% acceptable?") — that's the M17 fact-axis dialogue gate
+working as designed, not a failure. Driver's expect timed out at
+the "Forged in" pattern because the pipeline correctly paused at
+INPUT_REQUIRED instead of completing; future smokes that want a
+full-pipeline run need a "yes" branch on the metis question. **No
+exceptions in the M18 code paths** — ``send_working_status(...,
+kind=KIND_STATUS)`` and ``send_input_required(..., kind=KIND_DIALOGUE)``
+ran cleanly under load. Host-side TTS gating diff isn't observable
+in this smoke because ``voice_enabled=false`` collapses both kinds
+to a no-TTS path; unit tests already cover the gating predicate in
+isolation.
 
 Pre-M18 baseline (preserved for orientation): M7 fully shipped
 2026-04-30, six phases. M13 fix shipped 2026-04-30. Live smoke
