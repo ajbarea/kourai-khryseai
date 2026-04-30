@@ -15,7 +15,14 @@ from agents.metis.agent import discuss_tradeoffs
 from kourai_common.a2a_utils import extract_file_attachments, get_message_metadata
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
-from kourai_common.messaging import data_part, send_input_required, send_working_status, text_part
+from kourai_common.messaging import (
+    KIND_DIALOGUE,
+    KIND_STATUS,
+    data_part,
+    send_input_required,
+    send_working_status,
+    text_part,
+)
 from kourai_common.player import (
     PlayerProfile,
     get_affinity_tier,
@@ -72,6 +79,7 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
                 task,
                 "Analyzing request...",
                 emoji=AGENT_EMOJI["hephaestus"],
+                kind=KIND_STATUS,
             )
 
             # M14 — kick Metis's discuss_tradeoffs in parallel with the
@@ -140,7 +148,7 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
                             "my own confirmation. Could you re-state the "
                             'request?"'
                         )
-                        await send_input_required(updater, task, message)
+                        await send_input_required(updater, task, message, kind=KIND_DIALOGUE)
                         return
 
                     # M14 — surface Metis's parallel discussion BEFORE the
@@ -153,7 +161,7 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
                     else:
                         await self._cancel_metis(metis_task)
 
-                    await send_input_required(updater, task, message)
+                    await send_input_required(updater, task, message, kind=KIND_DIALOGUE)
                     return
 
                 if pipeline.startswith("ASK_USER:"):
@@ -165,6 +173,7 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
                         updater,
                         task,
                         clarification,
+                        kind=KIND_DIALOGUE,
                     )
                     return
 
@@ -199,6 +208,7 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
                             task,
                             chat_body or f"Connecting to {target_agent}...",
                             emoji=emoji,
+                            kind=KIND_DIALOGUE,
                         )
                     else:
                         # Hephaestus responds directly
@@ -207,6 +217,7 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
                             task,
                             chat_body,
                             emoji=AGENT_EMOJI["hephaestus"],
+                            kind=KIND_DIALOGUE,
                         )
 
                     await updater.add_artifact(
@@ -256,6 +267,7 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
                 task,
                 f"Pipeline: {pipeline_display}",
                 emoji=AGENT_EMOJI["hephaestus"],
+                kind=KIND_STATUS,
             )
 
             # Step 3: Execute pipeline with real-time status updates
@@ -277,11 +289,16 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
                         updater,
                         task,
                         f"{emoji} {agent_name} needs your input: {question}",
+                        kind=KIND_DIALOGUE,
                     )
                     input_required = True
                     break
 
                 emoji = AGENT_EMOJI.get(agent_name, "")
+                # M18 rollout: forwarded specialist statuses stay untagged
+                # until each specialist's executor opts in. The host's
+                # legacy emoji-prefix detection still routes them correctly
+                # in the meantime — this is the coexistence window.
                 await send_working_status(
                     updater,
                     task,
@@ -415,7 +432,9 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
         text = (metis_text or "").strip()
         if not text:
             return
-        await send_working_status(updater, task, text, emoji=AGENT_EMOJI["metis"])
+        await send_working_status(
+            updater, task, text, emoji=AGENT_EMOJI["metis"], kind=KIND_DIALOGUE
+        )
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
         raise UnsupportedOperationError()

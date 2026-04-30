@@ -5,28 +5,45 @@ milestone lands, the matching detail block in [ROADMAP.md](./ROADMAP.md)
 collapses to a one-liner under "Shipped" and this file gets reset to the
 next milestone.
 
-Updated: 2026-04-30 · Working on: **M7 fully shipped 2026-04-30, six
-phases. M13 fix shipped 2026-04-30. Live smoke verified end-to-end
-2026-04-30 (driven via pexpect, not tmux+script — see "Live smoke
-verification" block below): metis log shows ``Streaming spec for:
-[User]: Plan a small fizzbuzz module with full pytest tests.`` after
-the player's "yes" on CONFIRM_ORDER, so the original-request
-metadata channel propagates correctly through the resume dispatch.
-M7 Phase 3 follow-up holes patched in the same session — three
-v0.3-shape APIs missed by the original migration: CLI's
-``client.get_card()``, all 5 ``client.send_message(message)`` call
-sites, and the ``(task, update)`` tuple yield consumer pattern.
+Updated: 2026-04-30 · Working on: **M18 Phase 1 in flight on
+``feat/m18-content-kind-metadata`` — content-kind discriminator
+contract on ``Message.metadata`` (``kourai.streaming.content_kind`` →
+one of ``dialogue`` / ``status`` / ``code`` / ``spec``), hephaestus
+migrated as the pilot specialist, host CLI streaming router gated on
+kind so status events fire-and-render without blocking on TTS.
+``send_working_status`` / ``send_input_required`` / ``send_completed``
+each gained an optional ``kind`` kwarg; ``set_content_kind`` /
+``get_content_kind`` / ``kind_message`` are the underlying primitives.
+Coexistence path: untagged emissions (legacy specialists) keep the
+v0.x always-speak behavior; the ``or kind is None`` branch in the
+host's TTS gate retires once every specialist opts in. SSML inside
+dialogue bodies (ROADMAP §M18 step 2), ``KIND_CODE`` / ``KIND_SPEC``
+distinct render paths, and the per-specialist migration are follow-on
+PRs. Draft PR open for review before flipping the remaining 10
+executors.**
+
+Pre-M18 baseline (preserved for orientation): M7 fully shipped
+2026-04-30, six phases. M13 fix shipped 2026-04-30. Live smoke
+verified end-to-end 2026-04-30 (driven via pexpect, not tmux+script —
+see "Live smoke verification" block below): metis log shows
+``Streaming spec for: [User]: Plan a small fizzbuzz module with full
+pytest tests.`` after the player's "yes" on CONFIRM_ORDER, so the
+original-request metadata channel propagates correctly through the
+resume dispatch. M7 Phase 3 follow-up holes patched in the same
+session — three v0.3-shape APIs missed by the original migration:
+CLI's ``client.get_card()``, all 5 ``client.send_message(message)``
+call sites, and the ``(task, update)`` tuple yield consumer pattern.
 ``send_request`` and ``stream_event`` helpers in
 ``kourai_common.messaging`` centralize the v0.3 → v1.0 boundary.
 M19 Phase 3 vn_bridge package split shipped same session — vn_bridge
 now has its own ``kourai-vn-bridge`` pyproject; hephaestus's image
 stopped carrying RealtimeTTS/pyaudio it never used.
 
-Next: M18 (structured streaming with content-kind metadata) and M20
-(audio-text sync). Pre-release perfection stance: no workarounds.
-Remaining sequence: M7+M13 (verified) → M18 (structured streaming) →
-M20 (audio-text sync). M17 itself ships clean now that M13 is
-unblocked end-to-end.**
+Next after M18 Phase 1 lands on main: per-specialist migration (metis,
+techne, dokimasia, kallos, mneme, puck, cupid, aletheia, aidos,
+vn-bridge — 10 executors), then SSML in dialogue bodies, then
+``KIND_CODE`` / ``KIND_SPEC`` distinct render paths. M20 (audio-text
+sync) waits on full M18. Pre-release perfection stance: no workarounds.
 
 ## 2026-04-29 live smoke — what happened
 

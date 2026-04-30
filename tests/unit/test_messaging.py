@@ -11,11 +11,19 @@ import base64
 from a2a.types import Role
 
 from kourai_common.messaging import (
+    KIND_CODE,
+    KIND_DIALOGUE,
+    KIND_SPEC,
+    KIND_STATUS,
+    KOURAI_KIND_METADATA_KEY,
     data_part,
     data_part_to_dict,
     file_part_from_b64,
+    get_content_kind,
     get_file_bytes,
     is_file_part,
+    kind_message,
+    set_content_kind,
     text_part,
     user_message,
 )
@@ -122,3 +130,93 @@ def test_get_file_bytes_returns_b64_and_media_type() -> None:
     b64_out, media_type = get_file_bytes(part)
     assert b64_out == b64_in
     assert media_type == "image/jpeg"
+
+
+# ── Content-kind metadata (M18) ───────────────────────────────────────
+
+
+def test_kind_constants_serialise_to_documented_strings() -> None:
+    assert KIND_DIALOGUE == "dialogue"
+    assert KIND_STATUS == "status"
+    assert KIND_CODE == "code"
+    assert KIND_SPEC == "spec"
+
+
+def test_kind_message_tags_outbound_message() -> None:
+    msg = kind_message("Analyzing request...", KIND_STATUS)
+
+    assert msg.role == Role.ROLE_AGENT
+    assert msg.parts[0].text == "Analyzing request..."
+    assert get_content_kind(msg) == KIND_STATUS
+
+
+def test_kind_message_with_dialogue_kind() -> None:
+    msg = kind_message('"What sort of fizzbuzz?"', KIND_DIALOGUE)
+    assert get_content_kind(msg) == KIND_DIALOGUE
+
+
+def test_kind_message_threads_context_and_task_ids() -> None:
+    msg = kind_message(
+        "still working",
+        KIND_STATUS,
+        context_id="ctx-1",
+        task_id="task-1",
+    )
+    assert msg.context_id == "ctx-1"
+    assert msg.task_id == "task-1"
+
+
+def test_kind_message_coexists_with_extra_metadata() -> None:
+    msg = kind_message(
+        "narrating",
+        KIND_DIALOGUE,
+        metadata={"project_id": "abc123", "yolo": True},
+    )
+    assert get_content_kind(msg) == KIND_DIALOGUE
+    assert msg.metadata["project_id"] == "abc123"
+    assert msg.metadata["yolo"] is True
+
+
+def test_set_content_kind_overrides_existing_tag() -> None:
+    msg = kind_message("text", KIND_DIALOGUE)
+    set_content_kind(msg, KIND_STATUS)
+    assert get_content_kind(msg) == KIND_STATUS
+
+
+def test_get_content_kind_returns_none_for_untagged_message() -> None:
+    msg = user_message("plain user message")
+    assert get_content_kind(msg) is None
+
+
+def test_get_content_kind_returns_none_for_unknown_kind_value() -> None:
+    """Forward-compat: unknown kind strings route through legacy path, not raise."""
+    msg = user_message("foo")
+    msg.metadata[KOURAI_KIND_METADATA_KEY] = "future_kind_we_havent_added_yet"
+    assert get_content_kind(msg) is None
+
+
+def test_get_content_kind_handles_none_message() -> None:
+    """Guard for hosts that may receive a status update with no inner message."""
+    assert get_content_kind(None) is None
+
+
+def test_metadata_key_is_dotted_kourai_namespace() -> None:
+    """Pin the on-the-wire metadata key — protocol contract."""
+    assert KOURAI_KIND_METADATA_KEY == "kourai.streaming.content_kind"
+
+
+def test_get_content_kind_reads_through_task_status_update_event() -> None:
+    """Wire-shape regression: hosts read kind via ``event.status.message``.
+
+    The host-side routing path in ``hosts/cli/streaming.py`` reads the kind
+    off ``event.status.message`` (a Message proto inside the
+    TaskStatusUpdateEvent's TaskStatus). Verify the metadata round-trips
+    through that nested-proto shape, not just on a bare Message.
+    """
+    from a2a.types import TaskState, TaskStatus, TaskStatusUpdateEvent
+
+    msg = kind_message("Analyzing request...", KIND_STATUS)
+    status = TaskStatus(state=TaskState.TASK_STATE_WORKING, message=msg)
+    event = TaskStatusUpdateEvent(task_id="t1", context_id="c1", status=status)
+
+    assert get_content_kind(event.status.message) == KIND_STATUS

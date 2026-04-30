@@ -372,7 +372,7 @@ class TestExecutorEmitsInputRequiredOnConfirmOrder:
 
         send_input_calls: list = []
 
-        async def fake_send_input_required(updater, task, message):
+        async def fake_send_input_required(updater, task, message, **kwargs):
             send_input_calls.append(message)
 
         with (
@@ -465,7 +465,7 @@ class TestExecutorEmitsInputRequiredOnConfirmOrder:
 
         send_input_calls: list = []
 
-        async def fake_send_input_required(updater, task, message):
+        async def fake_send_input_required(updater, task, message, **kwargs):
             send_input_calls.append(message)
 
         with (
@@ -516,7 +516,7 @@ class TestExecutorEmitsInputRequiredOnConfirmOrder:
 
         send_input_calls: list = []
 
-        async def fake_send_input_required(updater, task, message):
+        async def fake_send_input_required(updater, task, message, **kwargs):
             send_input_calls.append(message)
 
         with (
@@ -559,7 +559,7 @@ class TestExecutorEmitsInputRequiredOnConfirmOrder:
 
         send_input_calls: list = []
 
-        async def fake_send_input_required(updater, task, message):
+        async def fake_send_input_required(updater, task, message, **kwargs):
             send_input_calls.append(message)
 
         with (
@@ -602,7 +602,7 @@ class TestExecutorEmitsInputRequiredOnConfirmOrder:
 
         send_input_calls: list = []
 
-        async def fake_send_input_required(updater, task, message):
+        async def fake_send_input_required(updater, task, message, **kwargs):
             send_input_calls.append(message)
 
         with (
@@ -651,7 +651,7 @@ class TestExecutorEmitsInputRequiredOnConfirmOrder:
 
         send_input_calls: list = []
 
-        async def fake_send_input_required(updater, task, message):
+        async def fake_send_input_required(updater, task, message, **kwargs):
             send_input_calls.append(message)
 
         with (

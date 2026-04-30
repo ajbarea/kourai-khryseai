@@ -1,6 +1,6 @@
 """Helpers for A2A wire-shape construction.
 
-Two surfaces:
+Three surfaces:
 
 * ``text_part`` / ``file_part_from_b64`` / ``data_part`` / ``user_message``
   centralize Part and Message construction. ``a2a-sdk`` 1.0 went
@@ -14,12 +14,18 @@ Two surfaces:
   wrap ``TaskUpdater`` lifecycle methods (``start_work`` /
   ``requires_input`` / ``complete``) for executors so they don't repeat
   the same three-line boilerplate per status transition.
+* ``KIND_*`` constants + ``set_content_kind`` / ``get_content_kind`` +
+  ``kind_message`` carry M18's content-kind discriminator on
+  ``Message.metadata`` so the host routes by metadata kind rather than
+  prose-parsing emoji prefixes. The four kinds (dialogue / status / code
+  / spec) split TTS-eligible from visual-only content and let status
+  events fire-and-render without gating the next event on narration.
 """
 
 from __future__ import annotations
 
 import base64
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Final, Literal
 from uuid import uuid4
 
 from a2a.helpers import new_text_message
@@ -118,6 +124,113 @@ def user_message(
     return msg
 
 
+# ── Content-kind metadata (M18) ───────────────────────────────────────
+
+
+ContentKind = Literal["dialogue", "status", "code", "spec"]
+"""Discriminator for what an emitted Part carries — drives host routing.
+
+* ``dialogue`` — TTS-eligible maiden speech rendered in a comms window;
+  blocks the next event on narration completion.
+* ``status`` — visual-only pipeline status (``Analyzing request...``,
+  ``Pipeline: foo -> bar``); never spoken, never gates the next event.
+* ``code`` — monospace body (diffs, command output) rendered without
+  TTS or gating.
+* ``spec`` — wide markdown render (specs, plans) without TTS or gating.
+"""
+
+KIND_DIALOGUE: Final[ContentKind] = "dialogue"
+KIND_STATUS: Final[ContentKind] = "status"
+KIND_CODE: Final[ContentKind] = "code"
+KIND_SPEC: Final[ContentKind] = "spec"
+
+KOURAI_KIND_METADATA_KEY: Final[str] = "kourai.streaming.content_kind"
+"""Flat dotted ``Message.metadata`` key for the content-kind discriminator.
+
+The A2A 1.0 spec recommends URI-namespaced extension keys for cross-vendor
+extensibility (e.g. ``"https://example.com/extensions/geolocation/v1"``).
+Kourai is internal-only — the agent fleet and the kourai-shipped hosts
+are the only producers and consumers of this key — so a short dotted
+namespace matches the existing forge-metadata pattern (``project_id``,
+``project_root``, ``yolo``) and keeps each emission cheap. If kourai
+ever publishes the streaming contract for external A2A agents to
+consume, swap this constant to a URI; nothing else changes.
+"""
+
+
+def set_content_kind(message: Message, kind: ContentKind) -> None:
+    """Tag a Message with its content-kind discriminator."""
+    message.metadata[KOURAI_KIND_METADATA_KEY] = kind
+
+
+def get_content_kind(message: Message | None) -> ContentKind | None:
+    """Read the content-kind discriminator from a Message, or ``None`` if absent.
+
+    Returns ``None`` for unmigrated specialists that emit without the
+    metadata tag — the host falls back to the legacy emoji-prefix
+    detection in that case. Unknown kind values also return ``None`` so
+    the host can route them through the legacy path until the producer
+    is updated.
+    """
+    if message is None:
+        return None
+    metadata = getattr(message, "metadata", None)
+    if metadata is None:
+        return None
+    try:
+        raw = metadata[KOURAI_KIND_METADATA_KEY]
+    except (KeyError, TypeError, ValueError):
+        # protobuf ``Struct.__getitem__`` raises ``ValueError`` ("Value not
+        # set") when the key is absent or its inner ``Value`` oneof is
+        # unset; plain dicts raise ``KeyError``. Both mean "not tagged."
+        return None
+    if raw in ("dialogue", "status", "code", "spec"):
+        return raw  # type: ignore[return-value]
+    return None
+
+
+def kind_message(
+    text: str,
+    kind: ContentKind,
+    *,
+    role: Role = Role.ROLE_AGENT,
+    context_id: str | None = None,
+    task_id: str | None = None,
+    message_id: str | None = None,
+    extra_parts: Sequence[Part] | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> Message:
+    """Build a Message tagged with a content-kind discriminator.
+
+    Mirrors ``user_message`` but defaults to ``ROLE_AGENT`` since the
+    typical caller is a specialist's executor emitting status/dialogue.
+    The kind is stored under ``KOURAI_KIND_METADATA_KEY`` in
+    ``Message.metadata`` alongside any caller-supplied metadata.
+
+    Most agents won't construct messages directly — they go through
+    ``send_working_status`` / ``send_input_required`` / ``send_completed``
+    which now accept a ``kind`` kwarg. This builder is the underlying
+    primitive for paths that need a tagged Message without the
+    ``TaskUpdater`` lifecycle wrappers (e.g. ``add_artifact`` payloads,
+    direct host emissions for tests).
+    """
+    msg = new_text_message(text, role=role)
+    if extra_parts:
+        msg.parts.extend(extra_parts)
+    msg.message_id = message_id or str(uuid4())
+    if context_id is not None:
+        msg.context_id = context_id
+    if task_id is not None:
+        msg.task_id = task_id
+    if metadata:
+        for key, value in metadata.items():
+            if value is None:
+                continue
+            msg.metadata[key] = value
+    set_content_kind(msg, kind)
+    return msg
+
+
 def send_request(message: Message) -> SendMessageRequest:
     """Wrap an A2A Message in a SendMessageRequest for v1.0 ``client.send_message``.
 
@@ -186,9 +299,20 @@ async def send_working_status(
     task: Task,
     message: str,
     emoji: str = "⚙️",
+    *,
+    kind: ContentKind | None = None,
 ) -> None:
-    """Send a working status update with optional emoji prefix."""
+    """Send a working status update with optional emoji prefix.
+
+    ``kind`` tags the outbound message under
+    ``KOURAI_KIND_METADATA_KEY``. Hosts route by kind: ``KIND_STATUS``
+    skips TTS and fires-and-forgets; ``KIND_DIALOGUE`` keeps the current
+    speak-and-gate behavior. Leaving ``kind=None`` preserves the v0.x
+    text-parsing path so unmigrated agents keep working.
+    """
     msg = updater.new_agent_message(parts=[text_part(f"{emoji} {message}")])
+    if kind is not None:
+        set_content_kind(msg, kind)
     await updater.start_work(message=msg)
 
 
@@ -196,9 +320,18 @@ async def send_input_required(
     updater: TaskUpdater,
     task: Task,
     message: str,
+    *,
+    kind: ContentKind | None = None,
 ) -> None:
-    """Request user input and mark the task as paused."""
+    """Request user input and mark the task as paused.
+
+    ``kind`` defaults to ``None`` for backwards compatibility, but
+    callers should pass ``KIND_DIALOGUE`` — input-required prompts are
+    addressed to the player and TTS-eligible.
+    """
     msg = updater.new_agent_message(parts=[text_part(message)])
+    if kind is not None:
+        set_content_kind(msg, kind)
     await updater.requires_input(message=msg)
 
 
@@ -207,7 +340,11 @@ async def send_completed(
     task: Task,
     message: str,
     emoji: str = "✅",
+    *,
+    kind: ContentKind | None = None,
 ) -> None:
     """Mark the task as completed with a final status message."""
     msg = updater.new_agent_message(parts=[text_part(f"{emoji} {message}")])
+    if kind is not None:
+        set_content_kind(msg, kind)
     await updater.complete(message=msg)
