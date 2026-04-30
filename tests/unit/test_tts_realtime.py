@@ -294,6 +294,76 @@ class TestModuleReExports:
 
 
 # ===================================================================
+# phonemizer 'words count mismatch' filter (#22)
+# ===================================================================
+
+
+class TestPhonemizerWordCountFilter:
+    """Engine init must silence phonemizer's per-call words-count-mismatch spam."""
+
+    @staticmethod
+    def _our_filters() -> list:
+        import logging
+
+        from kourai_common.tts_realtime import _DropPhonemizerWordsCountMismatch
+
+        return [
+            f
+            for f in logging.getLogger("phonemizer").filters
+            if isinstance(f, _DropPhonemizerWordsCountMismatch)
+        ]
+
+    def test_engine_init_installs_filter(self, mock_realtimetts):
+        import logging
+
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        RealtimeTTSEngine()
+
+        spam = logging.LogRecord(
+            name="phonemizer",
+            level=logging.WARNING,
+            pathname=__file__,
+            lineno=0,
+            msg="words count mismatch on 100.0%% of the lines (1/1)",
+            args=(),
+            exc_info=None,
+        )
+        installed = self._our_filters()
+        assert installed, "RealtimeTTSEngine() must install the filter"
+        assert all(f.filter(spam) is False for f in installed)
+
+    def test_filter_preserves_other_phonemizer_warnings(self, mock_realtimetts):
+        import logging
+
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        RealtimeTTSEngine()
+
+        unrelated = logging.LogRecord(
+            name="phonemizer",
+            level=logging.WARNING,
+            pathname=__file__,
+            lineno=0,
+            msg="some other phonemizer message",
+            args=(),
+            exc_info=None,
+        )
+        installed = self._our_filters()
+        assert installed
+        assert all(f.filter(unrelated) is True for f in installed)
+
+    def test_filter_install_is_idempotent(self, mock_realtimetts):
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        RealtimeTTSEngine()
+        RealtimeTTSEngine()
+        RealtimeTTSEngine()
+
+        assert len(self._our_filters()) == 1
+
+
+# ===================================================================
 # synthesize_to_wav() — bytes-only path for vn_bridge
 # ===================================================================
 

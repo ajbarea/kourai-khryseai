@@ -50,6 +50,33 @@ VOICE_ROSTER = {v.voice_id: v for v in AGENT_VOICE_MAP.values()}
 AGENT_VOICES = {agent: cfg.voice_id for agent, cfg in AGENT_VOICE_MAP.items()}
 
 
+class _DropPhonemizerWordsCountMismatch(logging.Filter):
+    """Surgical filter for the 'words count mismatch' espeak spam.
+
+    phonemizer's espeak backend logs ``words count mismatch on N% of the
+    lines (X/Y)`` at WARNING from ``_resume()`` after every batch, even
+    when ``words_mismatch='ignore'`` is set (which is the default).
+    Upstream confirms it's benign — espeak occasionally joins or drops a
+    word and the audio is still correct. Filtering only this message
+    pattern keeps any other phonemizer warnings audible.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return "words count mismatch" not in record.getMessage()
+
+
+_phonemizer_filter_installed = False
+
+
+def _install_phonemizer_word_count_filter() -> None:
+    """Idempotently attach the words-count-mismatch filter to phonemizer's logger."""
+    global _phonemizer_filter_installed
+    if _phonemizer_filter_installed:
+        return
+    logging.getLogger("phonemizer").addFilter(_DropPhonemizerWordsCountMismatch())
+    _phonemizer_filter_installed = True
+
+
 def _pcm_to_wav(pcm: bytes, *, channels: int, sample_rate: int, sample_width: int) -> bytes:
     """Wrap raw signed PCM bytes in a canonical WAV header."""
     buf = io.BytesIO()
@@ -76,6 +103,9 @@ class RealtimeTTSEngine:
         muted: bool = False,
         on_word: Callable[[object], None] | None = None,
     ):
+        # Install before engine init so misaki's first phonemize() call
+        # (which can happen during KokoroEngine warmup) is already filtered.
+        _install_phonemizer_word_count_filter()
         self._engine = _KokoroEngine(voice="af_heart", default_speed=1.0, debug=False)
         self._stream = _TextToAudioStream(
             engine=self._engine,
