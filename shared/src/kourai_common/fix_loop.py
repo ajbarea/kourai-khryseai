@@ -113,7 +113,7 @@ async def run_fix_loop(
     Returns:
         Tuple of (all_passed: bool, final_output: str, result: FixLoopResult)
     """
-    from kourai_common.messaging import send_working_status
+    from kourai_common.messaging import KIND_STATUS, send_working_status
 
     msgs = messages or StatusMessages()
     result = FixLoopResult(max_iterations=max_iterations)
@@ -128,6 +128,7 @@ async def run_fix_loop(
             task,
             msgs.format_running(tool_name, iteration, max_iterations),
             emoji=emoji,
+            kind=KIND_STATUS,
         )
 
         success, output = await run_tool()
@@ -140,6 +141,7 @@ async def run_fix_loop(
                 task,
                 msgs.format_passed(tool_name),
                 emoji=emoji,
+                kind=KIND_STATUS,
             )
             break
 
@@ -154,6 +156,7 @@ async def run_fix_loop(
             task,
             msgs.format_found_issues(len(files_with_issues)),
             emoji=emoji,
+            kind=KIND_STATUS,
         )
 
         fixes_applied = await apply_fixes(output, files_with_issues, task.context_id)
@@ -164,6 +167,7 @@ async def run_fix_loop(
             task,
             msgs.format_applied_fixes(tool_name, fixes_applied),
             emoji=emoji,
+            kind=KIND_STATUS,
         )
 
         if fixes_applied == 0:

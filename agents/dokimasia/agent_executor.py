@@ -14,7 +14,7 @@ from kourai_common.a2a_utils import extract_image_parts, project_root_from_conte
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
 from kourai_common.mcp_client import kourai_project_root_var
-from kourai_common.messaging import data_part, send_working_status, text_part
+from kourai_common.messaging import KIND_STATUS, data_part, send_working_status, text_part
 from kourai_common.player import PlayerProfile
 from kourai_common.tracing import create_span
 from kourai_common.virtues import update_virtue
@@ -66,7 +66,7 @@ class DokimasiaAgentExecutor(BaseAgentExecutor):
                 from kourai_common.subprocess import extract_files_from_output
 
                 async def _pytest_status(line: str) -> None:
-                    await send_working_status(updater, task, line, emoji="🧪")
+                    await send_working_status(updater, task, line, emoji="🧪", kind=KIND_STATUS)
 
                 async def _run_pytest_wrapper() -> tuple[bool, str]:
                     result = await run_pytest(cwd=str(project_root), status_callback=_pytest_status)
@@ -75,7 +75,9 @@ class DokimasiaAgentExecutor(BaseAgentExecutor):
                 async def _on_tool(name: str, args: dict[str, Any], result: str) -> None:
                     target = args.get("path", "")
                     ok = "ok" if not result.startswith("ERROR:") else "fail"
-                    await send_working_status(updater, task, f"{name} {target} ({ok})", emoji="🧪")
+                    await send_working_status(
+                        updater, task, f"{name} {target} ({ok})", emoji="🧪", kind=KIND_STATUS
+                    )
 
                 async def _apply_fixes(
                     pytest_output: str,
@@ -134,6 +136,7 @@ class DokimasiaAgentExecutor(BaseAgentExecutor):
                     task,
                     "Analyzing code and writing tests...",
                     emoji="🧪",
+                    kind=KIND_STATUS,
                 )
 
                 with create_span("dokimasia.generate"):
@@ -154,7 +157,11 @@ class DokimasiaAgentExecutor(BaseAgentExecutor):
                                 latest = latest[:57] + "..."
                             if latest.strip():
                                 await send_working_status(
-                                    updater, task, f"Writing: {latest}", emoji="🧪"
+                                    updater,
+                                    task,
+                                    f"Writing: {latest}",
+                                    emoji="🧪",
+                                    kind=KIND_STATUS,
                                 )
 
                 await send_working_status(
@@ -162,6 +169,7 @@ class DokimasiaAgentExecutor(BaseAgentExecutor):
                     task,
                     "Tests generated",
                     emoji="🧪",
+                    kind=KIND_STATUS,
                 )
 
                 await updater.add_artifact(
