@@ -18,7 +18,14 @@ from kourai_common.decorators import executor_error_handler
 from kourai_common.facts import get_relevant_facts_for_enrichment
 from kourai_common.hooks_interaction import VALID_PREFERENCE_KINDS
 from kourai_common.mcp_client import kourai_project_root_var
-from kourai_common.messaging import data_part, send_input_required, send_working_status, text_part
+from kourai_common.messaging import (
+    KIND_DIALOGUE,
+    KIND_STATUS,
+    data_part,
+    send_input_required,
+    send_working_status,
+    text_part,
+)
 from kourai_common.pause_state import stash_preference_kind
 from kourai_common.pause_tag import extract_pause_tag
 from kourai_common.projects import derive_project_id
@@ -147,11 +154,12 @@ class MetisAgentExecutor(BaseAgentExecutor):
                 task,
                 "Analyzing project structure...",
                 emoji="📐",
+                kind=KIND_STATUS,
             )
 
             # Stream git output to player scratchpad for transparency
             async def _git_status(line: str) -> None:
-                await send_working_status(updater, task, line, emoji="🔍")
+                await send_working_status(updater, task, line, emoji="🔍", kind=KIND_STATUS)
 
             with create_span("metis.context"):
                 project_context = await get_project_context(
@@ -170,6 +178,7 @@ class MetisAgentExecutor(BaseAgentExecutor):
                 task,
                 "Drafting implementation spec...",
                 emoji="📐",
+                kind=KIND_STATUS,
             )
 
             # M17 Phase 1 — load player + project identity for fact recall.
@@ -197,7 +206,12 @@ class MetisAgentExecutor(BaseAgentExecutor):
                 outer_span.set_attribute("kourai.fact.kinds", [kind for kind, _ in recalled])
                 recall_line = _format_recall_line(recalled)
                 if recall_line:
-                    await send_working_status(updater, task, recall_line, emoji="📐")
+                    # Recall is the player-facing M17 confirmation that
+                    # their stored answer is being used — TTS-eligible
+                    # dialogue, not a silent status beat.
+                    await send_working_status(
+                        updater, task, recall_line, emoji="📐", kind=KIND_DIALOGUE
+                    )
                     log.info(
                         "Metis recall narration emitted (player=%s project=%s kinds=%s)",
                         (player_id or "")[:8],
@@ -224,8 +238,16 @@ class MetisAgentExecutor(BaseAgentExecutor):
                         if len(latest) > 60:
                             latest = latest[:57] + "..."
                         if latest.strip():
+                            # Streaming spec snippets are visual progress
+                            # beats — not TTS. Pre-M18, these were spoken
+                            # at every 5th chunk and were the dominant
+                            # narration cost during spec generation.
                             await send_working_status(
-                                updater, task, f"Planning: {latest}", emoji="📐"
+                                updater,
+                                task,
+                                f"Planning: {latest}",
+                                emoji="📐",
+                                kind=KIND_STATUS,
                             )
 
             await send_working_status(
@@ -233,6 +255,7 @@ class MetisAgentExecutor(BaseAgentExecutor):
                 task,
                 "Spec complete",
                 emoji="📐",
+                kind=KIND_STATUS,
             )
 
             # M17 Phase 1 — pull the trailing PAUSE tag, if Metis classified
@@ -267,7 +290,7 @@ class MetisAgentExecutor(BaseAgentExecutor):
 
             if pause:
                 stash_preference_kind(task.context_id, pause.preference_kind)
-                await send_input_required(updater, task, pause.question)
+                await send_input_required(updater, task, pause.question, kind=KIND_DIALOGUE)
                 log.info(
                     "Metis paused for %s preference — context=%s",
                     pause.preference_kind,
