@@ -11,7 +11,11 @@ specialist producers + 1 consumer migration). All eleven agents
 participate in the URI-namespaced extension key
 ``"https://kourai.khryseai/ext/streaming/v1"`` with
 ``{"content_kind": "dialogue" | "status" | "code" | "spec"}`` nested
-under it. Active focus: validate Phase 1 end-to-end via live smoke
+under it. Post-Phase-1 UX/DX cleanup batch shipped same day
+(#107/#108/#109/#110/#111/#112): empty Project root field, phonemizer
+WARN spam, zero-commit soft-fail banner, WSL2 test env, Kokoro
+language pre-warm, Context7 v2 tool rename + transcript-prefix
+leakage. Active focus: validate Phase 1 end-to-end via live smoke
 (blocked on smoke-driver update to pre-seed project facts via
 ``/preferences set`` so metis skips the M17 PAUSE), then proceed to
 Phase 2 (SSML inside dialogue bodies) — Kokoro doesn't natively consume
@@ -141,22 +145,39 @@ boxes, final-render wide-box only-some-agents, TTS gating universal,
 FACT-tag leakage into status, Mneme reading 905-char dialogue including
 markdown markup aloud.
 
-**Independent UX bugs:**
-- `Pipeline complete` + `commit_count: 0` together with no soft-fail
-  surface (#17)
+**Shipped 2026-04-30 (post-M18 Phase 1) UX/DX cleanup:**
+- ``[#107]`` (#15) — empty trailing ``Project root:`` listing dropped
+  from metis enriched prompt when iterdir returned no listable entries.
+- ``[#108]`` (#22) — phonemizer "words count mismatch" WARN spam silenced
+  via surgical filter on the ``phonemizer`` logger; only the specific
+  benign-but-noisy message is dropped, other phonemizer warnings remain
+  audible.
+- ``[#109]`` (#17) — host CLI now renders an explicit ``⚠ No commits
+  produced`` banner before "Forged in" when mneme reports
+  ``commit_count: 0``. Soft-fail surface lifted from buried prose into
+  a visible warning.
+- ``[#110]`` — ``test_kallos`` / ``test_techne`` ``TestRunCommand`` use
+  ``sys.executable`` instead of literal ``"python"``; tests pass on
+  WSL2 hosts where only ``python3`` is on PATH.
+- ``[#111]`` (#23) — KokoroEngine pre-warms one ``KPipeline`` per unique
+  agent ``lang_code`` at init; first Techne ``bf_emma`` speech no
+  longer pays the lazy-pipeline-build pause. Forward-compat — derives
+  language codes from ``AGENT_VOICE_MAP`` so new languages auto-prewarm.
+- ``[#112]`` (#14) — Context7 MCP wrapper updated to v2.x tool name
+  (``query-docs`` not ``get-library-docs``) + new param shape
+  (``libraryId``+``query``). Transcript prefixes (``[User]:``,
+  ``[Hephaestus]:``) stripped from doc-lookup queries before library
+  extraction so Context7 stops emitting ``[User]:`` URL placeholders.
+
+**Independent UX bugs (still open):**
 - Per-agent CLI color coding via colored-background "badge" pattern
   (Okabe-Ito CVD-safe, NO_COLOR-aware) (#10)
 - Music playlist sparse — 2 tracks (#11)
 - Agent-card poll storm — 30+ GET ``/.well-known/agent-card.json`` per
-  minute on idle agents (#12)
-- Context7 MCP integration broken: ``MCP error -32602: Tool
-  get-library-docs not found`` AND URL template emits literal
-  ``[User]:`` placeholder (#14)
-- Duplicate empty `Project root:` field at end of metis enriched
-  prompt (#15)
-- Phonemizer warning spam on every TTS call — downgrade to DEBUG (#22)
-- Pre-warm Kokoro per-language at engine init (#23)
-- Explicit captions / TTS subtitle toggle for accessibility (#19)
+  minute on idle agents (#12) — likely SDK-side; needs investigation
+  before a fix.
+- Explicit captions / TTS subtitle toggle for accessibility (#19) —
+  feature, not a bug; needs UX design.
 
 ## Notes / open questions
 
@@ -192,7 +213,10 @@ implementation, architectural fix over expedient patch.
    smoke then runs end-to-end in one shot.
 2. **Full-pipeline live smoke** against latest main (post-#106) with
    the updated driver — first end-to-end run with all eleven
-   specialists on the URI shape.
+   specialists on the URI shape AND the post-2026-04-30 UX cleanup
+   (#107/#108/#109/#111/#112). Voice-off run gives functional
+   verification of the metadata flow + soft-fail banner + Context7
+   round-trip.
 3. **M18 Phase 2 — SSML inside dialogue bodies.** Web-search 2026 SSML
    best practice (W3C SSML 1.1 status, ElevenLabs/Azure provider
    subset compatibility) before any implementation. Decide
@@ -205,7 +229,9 @@ implementation, architectural fix over expedient patch.
    + M19 (RealtimeTTS word-timing API already wired via ``on_word=``
    callback). 9-14s text-precedes-audio gap is a player-notices UX
    issue.
-6. **Independent UX bugs** from the smoke (above).
+6. **Remaining independent UX bugs** — agent-card poll storm (#12),
+   per-agent CLI color badges (#10), captions toggle (#19), playlist
+   expansion (#11). Each sized for a single PR.
 7. **Live VN smoke** — exercises the new vn_bridge ``/tts`` →
    ``RealtimeTTSEngine.synthesize_to_wav`` path AND the new
    metadata-based dialogue routing.
