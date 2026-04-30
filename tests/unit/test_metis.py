@@ -130,6 +130,22 @@ class TestGetProjectContext:
         # Should contain at least project root entries
         assert len(ctx) > 0
 
+    @pytest.mark.asyncio
+    async def test_skips_empty_project_root_listing(self, tmp_path):
+        """An empty / dotfile-only project must not emit ``Project root:\\n``.
+
+        Pre-fix, the metis enriched prompt ended in a bare ``Project root:``
+        with no body when ``iterdir`` returned only filtered entries — pure
+        prompt noise (#15 from 2026-04-29 smoke).
+        """
+        import subprocess
+
+        from agents.metis.agent import get_project_context
+
+        subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+        ctx = await get_project_context(project_root=str(tmp_path))
+        assert "Project root:" not in ctx
+
 
 class TestMetisAgentCard:
     """Test the agent card configuration."""

@@ -134,7 +134,10 @@ async def get_project_context(
     if code == 0 and stdout.strip():
         parts.append(f"Recent commits:\n{stdout.strip()}")
 
-    # Project structure (top-level only)
+    # Project structure (top-level only). Guarded on non-empty entries —
+    # an empty fresh project leaves a trailing ``Project root:\n`` at the
+    # end of metis's enriched prompt with no body, which is just noise
+    # (#15 from the 2026-04-29 smoke).
     root = Path(project_root) if project_root else Path()
     if root.exists():
         entries = sorted(
@@ -144,7 +147,8 @@ async def get_project_context(
                 if not p.name.startswith(".") and p.name != "__pycache__"
             ],
         )
-        parts.append(f"Project root:\n{chr(10).join(entries[:30])}")
+        if entries:
+            parts.append(f"Project root:\n{chr(10).join(entries[:30])}")
 
     return "\n\n".join(parts) if parts else "No project context available."
 
