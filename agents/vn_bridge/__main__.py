@@ -38,7 +38,13 @@ from kourai_common.a2a_utils import make_a2a_http_client
 from kourai_common.companion import infer_portrait_state
 from kourai_common.config import get_agent_url
 from kourai_common.facts import process_agent_output
-from kourai_common.messaging import send_request, stream_event, user_message
+from kourai_common.messaging import (
+    KIND_DIALOGUE,
+    get_content_kind,
+    send_request,
+    stream_event,
+    user_message,
+)
 from kourai_common.tts_realtime import RealtimeTTSEngine
 
 if TYPE_CHECKING:
@@ -66,7 +72,11 @@ AGENT_NAMES = {
     "aletheia",
 }
 
-# Status keywords promoted to dialogue beats vs. silent HUD updates
+# Legacy dialogue-vs-status discrimination via prose-keyword match. Used as a
+# fallback for untagged emissions (specialists that haven't opted into M18's
+# content-kind metadata yet). Retires when every specialist tags its
+# `send_working_status` calls with an explicit `kind=KIND_*` and `kind is
+# None` no longer occurs in practice.
 DIALOGUE_KEYWORDS = ["pipeline:", "dispatching", "complete", "failed", "error"]
 
 # Short personality hints for gossip generation — keeps prompts small and fast.
@@ -347,7 +357,22 @@ async def handle_message(request: Request) -> StreamingResponse:
                             current_agent = name
                             break
                     log.info(f"Status ({current_agent}): {status_msg[:100]}")
-                    if any(kw in lower for kw in DIALOGUE_KEYWORDS):
+                    # M18: route by content-kind metadata when present. Migrated
+                    # specialists tag dialogue vs status explicitly so we drop
+                    # the prose-keyword guess in favor of a typed predicate.
+                    # `kind is None` covers unmigrated specialists during the
+                    # rollout window — falls back to the DIALOGUE_KEYWORDS
+                    # heuristic. The fallback retires once every specialist
+                    # opts in.
+                    kind = get_content_kind(event.status.message)
+                    if kind == KIND_DIALOGUE:
+                        is_dialogue = True
+                    elif kind is not None:
+                        is_dialogue = False
+                    else:
+                        is_dialogue = any(kw in lower for kw in DIALOGUE_KEYWORDS)
+
+                    if is_dialogue:
                         yield (
                             json.dumps(
                                 {
