@@ -23,7 +23,16 @@ from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from a2a.helpers import new_text_message
-from a2a.types import Message, Part, Role
+from a2a.types import (
+    Message,
+    Part,
+    Role,
+    SendMessageRequest,
+    StreamResponse,
+    Task,
+    TaskArtifactUpdateEvent,
+    TaskStatusUpdateEvent,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -107,6 +116,47 @@ def user_message(
                 continue
             msg.metadata[key] = value
     return msg
+
+
+def send_request(message: Message) -> SendMessageRequest:
+    """Wrap an A2A Message in a SendMessageRequest for v1.0 ``client.send_message``.
+
+    SDK 1.0's ``Client.send_message`` is typed as taking ``SendMessageRequest``;
+    its ``_apply_client_config`` reaches into ``request.configuration`` for
+    polling / push-notification / accepted-output-modes wiring. Passing a
+    bare ``Message`` raises ``AttributeError: configuration`` because the
+    Message proto has no such field. This helper is the one place callers
+    construct the wrapper so the v0.3 → v1.0 boundary stays in one file.
+    """
+    return SendMessageRequest(message=message)
+
+
+def stream_event(
+    response: StreamResponse,
+) -> Message | TaskStatusUpdateEvent | TaskArtifactUpdateEvent | Task:
+    """Decode a v1.0 ``StreamResponse`` into its inner event payload.
+
+    SDK 1.0's streaming ``send_message`` yields ``StreamResponse`` protos
+    with a oneof payload (``message`` / ``task`` / ``status_update`` /
+    ``artifact_update``). v0.3 yielded ``Message`` objects or
+    ``(Task, update | None)`` tuples directly; consumers typed the dispatch
+    around ``isinstance``. This helper returns the inner event so the
+    ``isinstance``-based dispatch keeps working — without it, every caller
+    has to repeat ``HasField`` chains.
+
+    Final task snapshots (no streaming update) come back as ``Task``;
+    consumers that distinguished them via ``update is None`` should match
+    on ``isinstance(event, Task)`` instead.
+    """
+    if response.HasField("message"):
+        return response.message
+    if response.HasField("status_update"):
+        return response.status_update
+    if response.HasField("artifact_update"):
+        return response.artifact_update
+    if response.HasField("task"):
+        return response.task
+    raise ValueError("StreamResponse has no payload field set")
 
 
 # ── Part inspection ───────────────────────────────────────────────────

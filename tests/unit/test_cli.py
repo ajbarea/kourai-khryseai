@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
 from a2a.types import Message, Task, TaskArtifactUpdateEvent, TaskState, TaskStatusUpdateEvent
+
+from tests.conftest import make_stream_response
 
 pytest.importorskip("asyncclick")
 
@@ -100,14 +102,15 @@ class TestSendAndStream:
 
     @pytest.mark.asyncio
     async def test_handles_status_updates(self):
-        task = _make_task()
-        status = MagicMock()
-        status.__class__ = TaskStatusUpdateEvent  # type: ignore[assignment]
+        status = MagicMock(spec=TaskStatusUpdateEvent)
+        status.context_id = "ctx-1"
+        status.task_id = "task-1"
+        status.status = MagicMock()
         status.status.state = TaskState.TASK_STATE_WORKING
         status.status.message = None
 
-        async def mock_send(message, **kwargs):
-            yield (task, status)
+        async def mock_send(request, **kwargs):
+            yield make_stream_response(status)
 
         client = MagicMock()
         client.send_message = mock_send
@@ -143,12 +146,13 @@ class TestSendAndStream:
     async def test_handles_message_response(self):
         """Direct Message response (no task created)."""
         part = MagicMock()
+        part.HasField = lambda name: name == "text"
         part.text = "direct reply"
         msg = MagicMock(spec=Message)
         msg.parts = [part]
 
-        async def mock_send(message, **kwargs):
-            yield msg
+        async def mock_send(request, **kwargs):
+            yield make_stream_response(msg)
 
         client = MagicMock()
         client.send_message = mock_send
@@ -182,6 +186,8 @@ class TestSendAndStream:
         client = MagicMock()
         task = _make_task(TaskState.TASK_STATE_COMPLETED)
         artifact_event = MagicMock(spec=TaskArtifactUpdateEvent)
+        artifact_event.context_id = "ctx-1"
+        artifact_event.task_id = "task-1"
         # Patch artifact extraction to return a deterministic string.
         monkeypatch.setattr(
             "hosts.cli.streaming._extract_artifact_text",
@@ -189,8 +195,8 @@ class TestSendAndStream:
         )
 
         async def _events():
-            yield (task, artifact_event)
-            yield (task, None)
+            yield make_stream_response(artifact_event)
+            yield make_stream_response(task)
 
         client.send_message = MagicMock(return_value=_events())
 
@@ -228,10 +234,12 @@ class TestSendAndStream:
         client = MagicMock()
         task = _make_task(TaskState.TASK_STATE_COMPLETED)
         artifact_event = MagicMock(spec=TaskArtifactUpdateEvent)
+        artifact_event.context_id = "ctx-1"
+        artifact_event.task_id = "task-1"
 
         async def _events():
-            yield (task, artifact_event)
-            yield (task, None)
+            yield make_stream_response(artifact_event)
+            yield make_stream_response(task)
 
         client.send_message = MagicMock(return_value=_events())
 
@@ -241,6 +249,58 @@ class TestSendAndStream:
         # does not exist (proxy: nothing wrote to that directory).
         memoir = Memoir(tmp_path)
         assert not memoir.path.exists()
+
+
+class TestConnectWithUrlOverride:
+    """``_connect_with_url_override`` must return ``(client, card)`` so the
+    CLI can read ``card.name`` / ``card.skills`` on startup without a
+    second resolver round-trip. v1.0 SDK retired ``client.get_card()``; the
+    helper centralizes the v0.3 → 1.0 boundary at one site. This test
+    locks the contract so a future SDK migration doesn't quietly drop the
+    card from the return tuple."""
+
+    @pytest.mark.asyncio
+    async def test_returns_client_and_card_tuple(self, monkeypatch):
+        from a2a.client import ClientConfig
+        from a2a.types import AgentCard
+
+        from hosts.cli.streaming import _connect_with_url_override
+
+        # Real card, mock everything else — the helper patches the URL on
+        # the card's interfaces, so the assertion targets that mutation.
+        live_card = MagicMock(spec=AgentCard)
+        live_card.name = "Test Agent"
+        interface = MagicMock()
+        interface.url = "http://internal-host:10000/"
+        live_card.supported_interfaces = [interface]
+
+        mock_resolver = MagicMock()
+        mock_resolver.get_agent_card = AsyncMock(return_value=live_card)
+
+        mock_client = MagicMock()
+
+        async def fake_create_client(card, client_config):
+            return mock_client
+
+        monkeypatch.setattr("hosts.cli.streaming.A2ACardResolver", lambda *_a, **_kw: mock_resolver)
+        monkeypatch.setattr("hosts.cli.streaming.create_client", fake_create_client)
+
+        config = ClientConfig(streaming=True, httpx_client=MagicMock())
+
+        result = await _connect_with_url_override("http://localhost:10000/", config)
+
+        # Locked contract: returns a 2-tuple, NOT a bare Client. Future SDK
+        # migrations that route around this helper will break this test
+        # rather than silently regressing CLI startup.
+        assert isinstance(result, tuple)
+        assert len(result) == 2
+        client, card = result
+        assert client is mock_client
+        assert card is live_card
+        # The helper's other contract: every supported_interface URL is
+        # rewritten to the reachable host URL so the SDK's outbound calls
+        # don't hit the unreachable internal hostname.
+        assert all(iface.url == "http://localhost:10000/" for iface in card.supported_interfaces)
 
 
 class TestForgeMetadataPropagation:
@@ -255,31 +315,34 @@ class TestForgeMetadataPropagation:
     def _make_input_required_then_complete(self):
         """Return a (mock_send_msg) callable that emits one INPUT_REQUIRED
         on first call, then COMPLETED on the second (the follow-up)."""
-        task = _make_task(TaskState.TASK_STATE_INPUT_REQUIRED)
         completed = _make_task(TaskState.TASK_STATE_COMPLETED)
         status_required = MagicMock(spec=TaskStatusUpdateEvent)
+        status_required.context_id = "ctx-1"
+        status_required.task_id = "task-1"
         status_required.status = MagicMock()
         status_required.status.state = TaskState.TASK_STATE_INPUT_REQUIRED
         status_required.status.message = None
         status_done = MagicMock(spec=TaskStatusUpdateEvent)
+        status_done.context_id = "ctx-1"
+        status_done.task_id = "task-1"
         status_done.status = MagicMock()
         status_done.status.state = TaskState.TASK_STATE_COMPLETED
         status_done.status.message = None
         sends: list[str] = []
 
-        async def gen_input_required(message, **kwargs):
-            sends.append(message.parts[0].text)
-            yield (task, status_required)
+        async def gen_input_required(request, **kwargs):
+            sends.append(request.message.parts[0].text)
+            yield make_stream_response(status_required)
 
-        async def gen_completed(message, **kwargs):
-            sends.append(message.parts[0].text)
-            yield (completed, status_done)
-            yield (completed, None)
+        async def gen_completed(request, **kwargs):
+            sends.append(request.message.parts[0].text)
+            yield make_stream_response(status_done)
+            yield make_stream_response(completed)
 
         client = MagicMock()
         # Each .send_message call returns a fresh async generator.
         gens = iter([gen_input_required, gen_completed])
-        client.send_message = lambda msg, **kw: next(gens)(msg, **kw)
+        client.send_message = lambda req, **kw: next(gens)(req, **kw)
         return client, sends
 
     @pytest.mark.asyncio
@@ -287,29 +350,32 @@ class TestForgeMetadataPropagation:
         client, sends = self._make_input_required_then_complete()
         captured_metadata: list[dict] = []
 
-        async def gen_input_required(message, **kwargs):
-            sends.append(message.parts[0].text)
-            captured_metadata.append(dict(message.metadata))
-            task = _make_task(TaskState.TASK_STATE_INPUT_REQUIRED)
+        async def gen_input_required(request, **kwargs):
+            sends.append(request.message.parts[0].text)
+            captured_metadata.append(dict(request.message.metadata))
             status_required = MagicMock(spec=TaskStatusUpdateEvent)
+            status_required.context_id = "ctx-1"
+            status_required.task_id = "task-1"
             status_required.status = MagicMock()
             status_required.status.state = TaskState.TASK_STATE_INPUT_REQUIRED
             status_required.status.message = None
-            yield (task, status_required)
+            yield make_stream_response(status_required)
 
-        async def gen_completed(message, **kwargs):
-            sends.append(message.parts[0].text)
-            captured_metadata.append(dict(message.metadata))
+        async def gen_completed(request, **kwargs):
+            sends.append(request.message.parts[0].text)
+            captured_metadata.append(dict(request.message.metadata))
             completed = _make_task(TaskState.TASK_STATE_COMPLETED)
             status_done = MagicMock(spec=TaskStatusUpdateEvent)
+            status_done.context_id = "ctx-1"
+            status_done.task_id = "task-1"
             status_done.status = MagicMock()
             status_done.status.state = TaskState.TASK_STATE_COMPLETED
             status_done.status.message = None
-            yield (completed, status_done)
-            yield (completed, None)
+            yield make_stream_response(status_done)
+            yield make_stream_response(completed)
 
         gens = iter([gen_input_required, gen_completed])
-        client.send_message = lambda msg, **kw: next(gens)(msg, **kw)
+        client.send_message = lambda req, **kw: next(gens)(req, **kw)
 
         async def fake_prompt(_text):
             return "yes"
@@ -362,30 +428,33 @@ class TestForgeMetadataPropagation:
         sends: list[str] = []
         captured_metadata: list[dict] = []
 
-        async def gen_input_required(message, **kwargs):
-            sends.append(message.parts[0].text)
-            captured_metadata.append(dict(message.metadata))
-            task = _make_task(TaskState.TASK_STATE_INPUT_REQUIRED)
+        async def gen_input_required(request, **kwargs):
+            sends.append(request.message.parts[0].text)
+            captured_metadata.append(dict(request.message.metadata))
             status_required = MagicMock(spec=TaskStatusUpdateEvent)
+            status_required.context_id = "ctx-1"
+            status_required.task_id = "task-1"
             status_required.status = MagicMock()
             status_required.status.state = TaskState.TASK_STATE_INPUT_REQUIRED
             status_required.status.message = None
-            yield (task, status_required)
+            yield make_stream_response(status_required)
 
-        async def gen_completed(message, **kwargs):
-            sends.append(message.parts[0].text)
-            captured_metadata.append(dict(message.metadata))
+        async def gen_completed(request, **kwargs):
+            sends.append(request.message.parts[0].text)
+            captured_metadata.append(dict(request.message.metadata))
             completed = _make_task(TaskState.TASK_STATE_COMPLETED)
             status_done = MagicMock(spec=TaskStatusUpdateEvent)
+            status_done.context_id = "ctx-1"
+            status_done.task_id = "task-1"
             status_done.status = MagicMock()
             status_done.status.state = TaskState.TASK_STATE_COMPLETED
             status_done.status.message = None
-            yield (completed, status_done)
-            yield (completed, None)
+            yield make_stream_response(status_done)
+            yield make_stream_response(completed)
 
         client = MagicMock()
         gens = iter([gen_input_required, gen_completed])
-        client.send_message = lambda msg, **kw: next(gens)(msg, **kw)
+        client.send_message = lambda req, **kw: next(gens)(req, **kw)
 
         async def fake_prompt(_text):
             return "yes"

@@ -21,7 +21,7 @@ from a2a.types import (
 from hosts.cli.events import _extract_artifact_text, _extract_status_text
 from hosts.cli.streaming import _connect_with_url_override
 from kourai_common.a2a_utils import make_a2a_http_client
-from kourai_common.messaging import user_message
+from kourai_common.messaging import send_request, stream_event, user_message
 
 
 # ---------------------------------------------------------------------------
@@ -33,7 +33,7 @@ async def _headless(agent_url: str, prompt: str, timeout_seconds: int, verbose: 
     )
 
     try:
-        client = await _connect_with_url_override(agent_url, config)
+        client, _ = await _connect_with_url_override(agent_url, config)
     except httpx.ConnectError:
         click.echo(f"Error: cannot reach Hephaestus at {agent_url}", err=True)
         click.echo("Start agents with: make up", err=True)
@@ -50,23 +50,23 @@ async def _headless(agent_url: str, prompt: str, timeout_seconds: int, verbose: 
 
     final_text = ""
     try:
-        async for event in client.send_message(message):
+        async for response in client.send_message(send_request(message)):
+            event = stream_event(response)
+
             if isinstance(event, Message):
                 for p in event.parts:
                     if p.HasField("text") and verbose:
                         click.echo(p.text, err=True)
                 continue
 
-            task, update = event
-
-            if isinstance(update, TaskStatusUpdateEvent):
+            if isinstance(event, TaskStatusUpdateEvent):
                 if verbose:
-                    text = _extract_status_text(update)
+                    text = _extract_status_text(event)
                     if text:
                         click.echo(text, err=True)
 
-            elif isinstance(update, TaskArtifactUpdateEvent):
-                text = _extract_artifact_text(update)
+            elif isinstance(event, TaskArtifactUpdateEvent):
+                text = _extract_artifact_text(event)
                 if text:
                     final_text = text
 

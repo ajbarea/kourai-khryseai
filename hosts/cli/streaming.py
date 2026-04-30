@@ -13,6 +13,7 @@ import httpx
 from a2a.client import A2ACardResolver, ClientConfig, create_client
 from a2a.types import (
     Message,
+    Task,
     TaskArtifactUpdateEvent,
     TaskState,
     TaskStatusUpdateEvent,
@@ -31,12 +32,13 @@ from hosts.cli.rendering import _comms_window, _echo, _render_markdown
 from hosts.cli.styling import _DIM, _GOLD, _GOLD_BRIGHT, _RED, _RESET
 from kourai_common.federation.host_helpers import build_pipeline_turn_entry
 from kourai_common.hooks_interaction import synthesise_fact_from_pause
-from kourai_common.messaging import file_part_from_b64, user_message
+from kourai_common.messaging import file_part_from_b64, send_request, stream_event, user_message
 from kourai_common.pause_state import pop_preference_kind
 from kourai_common.projects import derive_project_id
 
 if TYPE_CHECKING:
     from a2a.client.client import Client
+    from a2a.types import AgentCard
 
     from kourai_common.federation.memoir import Memoir
     from kourai_common.tts_realtime import RealtimeTTSEngine
@@ -187,8 +189,9 @@ async def send_and_stream(
     event_count = 0
 
     try:
-        async for event in client.send_message(message):
+        async for response in client.send_message(send_request(message)):
             event_count += 1
+            event = stream_event(response)
 
             if isinstance(event, Message):
                 for p in event.parts:
@@ -199,16 +202,12 @@ async def send_and_stream(
                             await tts.speak(text, "hephaestus")
                 continue
 
-            # ClientEvent: tuple[Task, update | None]
-            task, update = event
-
-            if task.context_id:
-                context_id = task.context_id
-            task_id = task.id
-
-            if isinstance(update, TaskStatusUpdateEvent):
-                final_state = update.status.state
-                text = _extract_status_text(update)
+            if isinstance(event, TaskStatusUpdateEvent):
+                if event.context_id:
+                    context_id = event.context_id
+                task_id = event.task_id
+                final_state = event.status.state
+                text = _extract_status_text(event)
                 if text:
                     formatted, agent = _maidenify_status(text)
                     _echo(formatted)
@@ -218,14 +217,20 @@ async def send_and_stream(
                         msg = text.split(" ", 1)[-1] if " " in text else text
                         await tts.speak(msg, agent)
 
-            elif isinstance(update, TaskArtifactUpdateEvent):
-                text = _extract_artifact_text(update)
+            elif isinstance(event, TaskArtifactUpdateEvent):
+                if event.context_id:
+                    context_id = event.context_id
+                task_id = event.task_id
+                text = _extract_artifact_text(event)
                 if text:
                     final_text = text
 
-            elif update is None:
+            elif isinstance(event, Task):
                 # Final task snapshot
-                final_state = task.status.state
+                if event.context_id:
+                    context_id = event.context_id
+                task_id = event.id
+                final_state = event.status.state
 
     except httpx.ConnectError:
         _echo(
@@ -330,12 +335,15 @@ async def send_and_stream(
 async def _connect_with_url_override(
     url: str,
     config: ClientConfig,
-) -> Client:
+) -> tuple[Client, AgentCard]:
     """Connect to an agent, overriding the card URL with the reachable URL.
 
     Agent cards in Docker advertise internal hostnames (e.g. http://hephaestus:10000/)
     that the host machine cannot resolve. This fetches the card, patches the URL
-    to the one we actually connected through, then hands it to the SDK.
+    to the one we actually connected through, then hands it to the SDK. The
+    fetched card is returned alongside the client so callers can read
+    name/version/skills without a second round-trip — a2a-sdk 1.0's Client
+    does not expose ``get_card()``.
     """
     http = config.httpx_client
     if http is None:
@@ -344,4 +352,5 @@ async def _connect_with_url_override(
     card = await resolver.get_agent_card()
     for interface in card.supported_interfaces:
         interface.url = url
-    return await create_client(card, client_config=config)
+    client = await create_client(card, client_config=config)
+    return client, card
