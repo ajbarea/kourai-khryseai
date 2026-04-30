@@ -121,11 +121,47 @@ class RealtimeTTSEngine:
 
         self._stream.set_volume(self._effective_volume())
 
+        # Pre-warm one KPipeline per language code that any agent voice
+        # targets. KokoroEngine's __init__ already caches the default
+        # voice's language ("a"); other languages (notably "b" for
+        # Techne's bf_emma voice) lazily build on first set_voice() call,
+        # which adds a noticeable pause to the first Techne emission.
+        # Paying that cost upfront is the right call for a long-running
+        # interactive REPL. (#23)
+        self._prewarm_agent_languages()
+
         logger.info(
             "RealtimeTTSEngine initialized: voice=af_heart, volume=%s, effects=%s",
             self.master_volume,
             self.enable_effects,
         )
+
+    def _prewarm_agent_languages(self) -> None:
+        """Force KokoroEngine to build a pipeline for every agent voice's language.
+
+        Called from ``__init__``. Iterates ``AGENT_VOICE_MAP`` and calls
+        ``KokoroEngine._get_pipeline(lang_code)`` once per unique code.
+        ``"a"`` is already cached by ``KokoroEngine.__init__`` for the
+        default voice, so that call is a no-op cache hit; other codes
+        ("b" for British via Techne) actually build at this point. Failures
+        are non-fatal — TTS warmup is best-effort, and the lazy path still
+        works downstream if pre-warm misses.
+        """
+        seen: set[str] = set()
+        for cfg in AGENT_VOICE_MAP.values():
+            lang_code = getattr(cfg, "lang_code", "a")
+            if lang_code in seen:
+                continue
+            seen.add(lang_code)
+            try:
+                self._engine._get_pipeline(lang_code)
+            except Exception as exc:
+                logger.debug(
+                    "Kokoro pre-warm skipped for lang_code=%s (%s: %s)",
+                    lang_code,
+                    type(exc).__name__,
+                    exc,
+                )
 
     def _effective_volume(self) -> float:
         return self.master_volume * (0.85 if self.enable_effects else 1.0)

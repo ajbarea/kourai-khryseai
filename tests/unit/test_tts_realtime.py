@@ -364,6 +364,56 @@ class TestPhonemizerWordCountFilter:
 
 
 # ===================================================================
+# Per-language Kokoro pre-warm (#23)
+# ===================================================================
+
+
+class TestKokoroLanguagePreWarm:
+    """Engine init must call _get_pipeline once per unique agent lang_code.
+
+    KokoroEngine ships with ``"a"`` (American English) cached for the
+    default voice. Languages used by other agents (notably ``"b"`` for
+    Techne's ``bf_emma``) lazily build on first ``set_voice`` call —
+    a noticeable pause on first speech. Pre-warming pays that cost upfront.
+    """
+
+    def test_prewarms_unique_lang_codes_from_agent_voice_map(self, mock_realtimetts):
+        _, mock_kokoro, _, _ = mock_realtimetts
+        from kourai_common.tts_backend import AGENT_VOICE_MAP
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        RealtimeTTSEngine()
+
+        called_lang_codes = {call.args[0] for call in mock_kokoro._get_pipeline.call_args_list}
+        expected_lang_codes = {cfg.lang_code for cfg in AGENT_VOICE_MAP.values()}
+        assert called_lang_codes == expected_lang_codes
+
+    def test_prewarms_only_once_per_lang_code(self, mock_realtimetts):
+        _, mock_kokoro, _, _ = mock_realtimetts
+        from kourai_common.tts_backend import AGENT_VOICE_MAP
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        RealtimeTTSEngine()
+
+        # AGENT_VOICE_MAP has many "a" entries (most agents) but pre-warm
+        # must dedupe so KPipeline is only constructed once per language.
+        assert mock_kokoro._get_pipeline.call_count == len(
+            {cfg.lang_code for cfg in AGENT_VOICE_MAP.values()}
+        )
+
+    def test_prewarm_failure_does_not_raise(self, mock_realtimetts):
+        _, mock_kokoro, _, _ = mock_realtimetts
+        mock_kokoro._get_pipeline.side_effect = RuntimeError("model download failed")
+
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        # Init must succeed even when pre-warm raises — TTS warmup is
+        # best-effort; the lazy path still works downstream.
+        engine = RealtimeTTSEngine()
+        assert engine is not None
+
+
+# ===================================================================
 # synthesize_to_wav() — bytes-only path for vn_bridge
 # ===================================================================
 
