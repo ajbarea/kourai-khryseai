@@ -6,7 +6,6 @@ import logging
 from typing import TYPE_CHECKING
 
 from a2a.types import Task, UnsupportedOperationError
-from a2a.utils.errors import ServerError
 
 from agents.cupid.agent import translate_emotion
 from kourai_common.base_executor import BaseAgentExecutor
@@ -93,4 +92,4 @@ class CupidAgentExecutor(BaseAgentExecutor):
         await updater.complete()
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
-        raise ServerError(error=UnsupportedOperationError())
+        raise UnsupportedOperationError()

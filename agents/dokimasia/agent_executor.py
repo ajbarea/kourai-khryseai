@@ -6,7 +6,6 @@ import logging
 from typing import TYPE_CHECKING
 
 from a2a.types import Task, UnsupportedOperationError
-from a2a.utils.errors import ServerError
 
 from agents.dokimasia.agent import (
     generate_tests_stream,
@@ -173,4 +172,4 @@ class DokimasiaAgentExecutor(BaseAgentExecutor):
                 log.info("Dokimasia completed — generated tests")
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
-        raise ServerError(error=UnsupportedOperationError())
+        raise UnsupportedOperationError()

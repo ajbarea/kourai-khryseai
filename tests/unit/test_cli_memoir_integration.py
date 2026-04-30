@@ -16,7 +16,7 @@ def _make_completed_task() -> MagicMock:
     task = MagicMock()
     task.id = "task-1"
     task.context_id = "ctx-1"
-    task.status.state = TaskState.completed
+    task.status.state = TaskState.TASK_STATE_COMPLETED
     return task
 
 

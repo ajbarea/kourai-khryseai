@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, cast
 from uuid import uuid4
 
 import uvicorn
-from a2a.client import A2ACardResolver, ClientConfig, ClientFactory
+from a2a.client import A2ACardResolver, ClientConfig, create_client
 from a2a.types import (
     Message,
     TaskArtifactUpdateEvent,
@@ -99,8 +99,9 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
     try:
         resolver = A2ACardResolver(cast("httpx.AsyncClient", config.httpx_client), agent_url)
         card = await resolver.get_agent_card()
-        card.url = agent_url
-        client = await ClientFactory.connect(card, client_config=config)
+        for interface in card.supported_interfaces:
+            interface.url = agent_url
+        client = await create_client(card, client_config=config)
         log.info(f"Connected to {card.name} v{card.version}")
         app.state.a2a_client = client
     except Exception as e:
@@ -362,7 +363,7 @@ async def handle_message(request: Request) -> StreamingResponse:
                         if update.artifact and update.artifact.parts:
                             # Extract jealousy_trigger from DataPart before processing text.
                             for p in update.artifact.parts:
-                                part_data = getattr(p.root, "data", None)
+                                part_data = p.data if p.HasField("data") else None
                                 if isinstance(part_data, dict):
                                     jealousy = part_data.get("jealousy_trigger")
                                     if jealousy and isinstance(jealousy, dict):

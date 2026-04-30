@@ -6,10 +6,14 @@ collapses to a one-liner under "Shipped" and this file gets reset to the
 next milestone.
 
 Updated: 2026-04-29 · Working on: **M7 — a2a-sdk 1.0 migration.
-Six-phase execution plan drafted in ROADMAP §M7; Phases 1-2 shipped
-(centralized Part / Message construction + server build + Part
-inspection in `kourai_common.messaging` and `kourai_common.server`),
-Phase 3 next (the big-bang pin flip).
+Phases 1-3 shipped (the big-bang pin flip to `>=1.0,<2.0` landed
+2026-04-29; messaging + server + AgentCard helpers all flipped to
+the v1.0 protobuf shape; client code uses `await create_client(...)`;
+SCREAMING_SNAKE_CASE enums; `enable_v0_3_compat=True` for transitional
+0.3 wire compatibility). Phase 4 was absorbed into Phase 3 because
+the Python API change forces both server and client migrations
+together. Remaining: Phase 5 (text-tags → Message.metadata) → Phase 6
+(drop compat flag + cleanup) → M13 fix.
 Pre-release perfection stance: no workarounds. M19 fully shipped
 (Phases 1+2+3 all landed 2026-04-29). Remaining sequence: M7
 (a2a-sdk 1.0) → M13 regression fix on M7's `Message.metadata`

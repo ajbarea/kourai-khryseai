@@ -35,25 +35,25 @@ class TestExtractStatusText:
 
     def test_extracts_text_from_parts(self):
         part = MagicMock()
-        part.root.text = "Working..."
+        part.text = "Working..."
         event = MagicMock()
         event.status.message.parts = [part]
         assert _extract_status_text(event) == "Working..."
 
     def test_joins_multiple_parts(self):
         p1 = MagicMock()
-        p1.root.text = "line 1"
+        p1.text = "line 1"
         p2 = MagicMock()
-        p2.root.text = "line 2"
+        p2.text = "line 2"
         event = MagicMock()
         event.status.message.parts = [p1, p2]
         assert _extract_status_text(event) == "line 1\nline 2"
 
     def test_skips_non_text_parts(self):
         p1 = MagicMock()
-        del p1.root.text
+        del p1.text
         p2 = MagicMock()
-        p2.root.text = "text part"
+        p2.text = "text part"
         event = MagicMock()
         event.status.message.parts = [p1, p2]
         result = _extract_status_text(event)
@@ -75,7 +75,7 @@ class TestExtractArtifactText:
 
     def test_extracts_text(self):
         part = MagicMock()
-        part.root.text = "final result"
+        part.text = "final result"
         event = MagicMock()
         event.artifact.parts = [part]
         assert _extract_artifact_text(event) == "final result"
@@ -86,7 +86,7 @@ class TestExtractArtifactText:
 # ---------------------------------------------------------------------------
 
 
-def _make_task(state: TaskState = TaskState.working) -> MagicMock:
+def _make_task(state: TaskState = TaskState.TASK_STATE_WORKING) -> MagicMock:
     task = MagicMock(spec=Task)
     task.id = "task-1"
     task.context_id = "ctx-1"
@@ -103,7 +103,7 @@ class TestSendAndStream:
         task = _make_task()
         status = MagicMock()
         status.__class__ = TaskStatusUpdateEvent  # type: ignore[assignment]
-        status.status.state = TaskState.working
+        status.status.state = TaskState.TASK_STATE_WORKING
         status.status.message = None
 
         async def mock_send(message, **kwargs):
@@ -143,7 +143,7 @@ class TestSendAndStream:
     async def test_handles_message_response(self):
         """Direct Message response (no task created)."""
         part = MagicMock()
-        part.root.text = "direct reply"
+        part.text = "direct reply"
         msg = MagicMock(spec=Message)
         msg.parts = [part]
 
@@ -180,7 +180,7 @@ class TestSendAndStream:
         )
 
         client = MagicMock()
-        task = _make_task(TaskState.completed)
+        task = _make_task(TaskState.TASK_STATE_COMPLETED)
         artifact_event = MagicMock(spec=TaskArtifactUpdateEvent)
         # Patch artifact extraction to return a deterministic string.
         monkeypatch.setattr(
@@ -226,7 +226,7 @@ class TestSendAndStream:
         )
 
         client = MagicMock()
-        task = _make_task(TaskState.completed)
+        task = _make_task(TaskState.TASK_STATE_COMPLETED)
         artifact_event = MagicMock(spec=TaskArtifactUpdateEvent)
 
         async def _events():
@@ -254,24 +254,24 @@ class TestForgeTagsPropagation:
     def _make_input_required_then_complete(self):
         """Return a (mock_send_msg) callable that emits one INPUT_REQUIRED
         on first call, then COMPLETED on the second (the follow-up)."""
-        task = _make_task(TaskState.input_required)
-        completed = _make_task(TaskState.completed)
+        task = _make_task(TaskState.TASK_STATE_INPUT_REQUIRED)
+        completed = _make_task(TaskState.TASK_STATE_COMPLETED)
         status_required = MagicMock(spec=TaskStatusUpdateEvent)
         status_required.status = MagicMock()
-        status_required.status.state = TaskState.input_required
+        status_required.status.state = TaskState.TASK_STATE_INPUT_REQUIRED
         status_required.status.message = None
         status_done = MagicMock(spec=TaskStatusUpdateEvent)
         status_done.status = MagicMock()
-        status_done.status.state = TaskState.completed
+        status_done.status.state = TaskState.TASK_STATE_COMPLETED
         status_done.status.message = None
         sends: list[str] = []
 
         async def gen_input_required(message, **kwargs):
-            sends.append(message.parts[0].root.text)
+            sends.append(message.parts[0].text)
             yield (task, status_required)
 
         async def gen_completed(message, **kwargs):
-            sends.append(message.parts[0].root.text)
+            sends.append(message.parts[0].text)
             yield (completed, status_done)
             yield (completed, None)
 

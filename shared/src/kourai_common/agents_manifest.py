@@ -13,7 +13,7 @@ specialist's ``__main__.py`` — keep those authoritative.
 
 from __future__ import annotations
 
-from a2a.types import AgentCapabilities, AgentCard
+from a2a.types import AgentCapabilities, AgentCard, AgentInterface
 
 
 def fallback_card_for(agent_name: str, agent_url: str) -> AgentCard:
@@ -21,14 +21,28 @@ def fallback_card_for(agent_name: str, agent_url: str) -> AgentCard:
 
     Records that this is a fallback in ``version`` so traces/logs can
     tell a fresh-booted cold connection apart from a live-discovered one.
+    Advertises both 1.0 and 0.3 protocol versions while M7 Phase 6 is
+    pending — see ``agent_cards.build_card`` for the same shape on the
+    rich-card path.
     """
     return AgentCard(
         name=agent_name,
         description=f"[manifest fallback] {agent_name} at {agent_url}",
-        url=agent_url,
         version="0.0.0-fallback",
         default_input_modes=["text"],
         default_output_modes=["text"],
         capabilities=AgentCapabilities(streaming=True),
         skills=[],
+        supported_interfaces=[
+            AgentInterface(
+                url=agent_url,
+                protocol_binding="JSONRPC",
+                protocol_version="1.0",
+            ),
+            AgentInterface(
+                url=agent_url,
+                protocol_binding="JSONRPC",
+                protocol_version="0.3",
+            ),
+        ],
     )

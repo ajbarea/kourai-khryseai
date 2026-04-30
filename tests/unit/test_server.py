@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from a2a.types import AgentCapabilities, AgentCard, AgentSkill
+from a2a.types import AgentCapabilities, AgentCard, AgentInterface, AgentSkill
 from starlette.applications import Starlette
 
 from kourai_common.server import build_a2a_app
@@ -38,7 +38,6 @@ def _stub_card() -> AgentCard:
     return AgentCard(
         name="Stub",
         description="Test card.",
-        url="http://localhost:9999/",
         version="0.1.0",
         default_input_modes=["text"],
         default_output_modes=["text"],
@@ -51,6 +50,13 @@ def _stub_card() -> AgentCard:
                 tags=["test"],
                 examples=["test"],
             )
+        ],
+        supported_interfaces=[
+            AgentInterface(
+                url="http://localhost:9999/",
+                protocol_binding="JSONRPC",
+                protocol_version="1.0",
+            ),
         ],
     )
 

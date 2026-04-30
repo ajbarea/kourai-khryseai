@@ -75,7 +75,11 @@ class RemoteAgentConnection:
                 )
                 self.card = fallback_card_for(self.agent_name, self.agent_url)
             if self.card:
-                self.card.url = self.agent_url
+                # Override every supported_interfaces URL with the Docker-network
+                # address Hephaestus can actually reach. The agent may advertise
+                # an internal hostname that's not resolvable from this side.
+                for interface in self.card.supported_interfaces:
+                    interface.url = self.agent_url
                 config = ClientConfig(
                     streaming=True,
                     httpx_client=self.http,
@@ -138,7 +142,7 @@ class RemoteAgentConnection:
                 # ClientEvent: tuple[Task, update | None]
                 task, update = event
                 if isinstance(update, TaskStatusUpdateEvent):
-                    if update.status.state == TaskState.input_required:
+                    if update.status.state == TaskState.TASK_STATE_INPUT_REQUIRED:
                         question = self._extract_status_message(update)
                         raise AgentInputRequired(
                             self.agent_name, question or "Additional input needed"

@@ -219,10 +219,10 @@ class TestGuiClientMultiPartSend:
             mock_http.return_value.__aenter__.return_value = MagicMock()
             with (
                 patch("hosts.gui.client.A2ACardResolver") as mock_resolver,
-                patch("hosts.gui.client.ClientFactory") as mock_factory,
+                patch("hosts.gui.client.create_client") as mock_create_client,
             ):
                 mock_card = MagicMock()
-                mock_card.url = "http://localhost:10000"
+                mock_card.supported_interfaces = [MagicMock(url="http://localhost:10000")]
                 mock_resolver.return_value.get_agent_card = _async_return(mock_card)
 
                 mock_a2a_client = MagicMock()
@@ -233,7 +233,8 @@ class TestGuiClientMultiPartSend:
                         yield None  # make this an async generator
 
                 mock_a2a_client.send_message = capture_send
-                mock_factory.connect = _async_return(mock_a2a_client)
+                mock_create_client.return_value = mock_a2a_client
+                mock_create_client.side_effect = _async_return(mock_a2a_client)
 
                 await client._send_message(
                     "http://localhost:10000",
@@ -244,11 +245,9 @@ class TestGuiClientMultiPartSend:
 
         message = captured["message"]
         assert len(message.parts) == 1
-        # Single TextPart, no FilePart.
-        from a2a.types import TextPart
-
-        assert hasattr(message.parts[0].root, "text")
-        assert isinstance(message.parts[0].root, TextPart)
+        # Single text Part, no file Part — 1.0 wire shape uses HasField discrimination.
+        assert message.parts[0].HasField("text")
+        assert message.parts[0].text == "fix this bug"
 
     @pytest.mark.asyncio
     async def test_attachments_become_file_parts(self):
@@ -265,11 +264,11 @@ class TestGuiClientMultiPartSend:
         with (
             patch("hosts.gui.client.httpx.AsyncClient") as mock_http,
             patch("hosts.gui.client.A2ACardResolver") as mock_resolver,
-            patch("hosts.gui.client.ClientFactory") as mock_factory,
+            patch("hosts.gui.client.create_client") as mock_create_client,
         ):
             mock_http.return_value.__aenter__.return_value = MagicMock()
             mock_card = MagicMock()
-            mock_card.url = "http://localhost:10000"
+            mock_card.supported_interfaces = [MagicMock(url="http://localhost:10000")]
             mock_resolver.return_value.get_agent_card = _async_return(mock_card)
 
             mock_a2a_client = MagicMock()
@@ -280,30 +279,31 @@ class TestGuiClientMultiPartSend:
                     yield None
 
             mock_a2a_client.send_message = capture_send
-            mock_factory.connect = _async_return(mock_a2a_client)
+            mock_create_client.side_effect = _async_return(mock_a2a_client)
 
             await client._send_message(
                 "http://localhost:10000",
                 "fix the off-by-one in this function",
                 "ctx-1",
                 attachments=[
-                    ("base64payload1==", "image/png"),
-                    ("base64payload2==", "image/jpeg"),
+                    ("YmFzZTY0cGF5bG9hZDE9PQ==", "image/png"),
+                    ("YmFzZTY0cGF5bG9hZDI9PQ==", "image/jpeg"),
                 ],
             )
 
-        from a2a.types import FilePart, TextPart
+        import base64
 
         message = captured["message"]
         assert len(message.parts) == 3
-        assert isinstance(message.parts[0].root, TextPart)
-        assert isinstance(message.parts[1].root, FilePart)
-        assert isinstance(message.parts[2].root, FilePart)
-        # FileWithBytes carries the base64 payload through unchanged.
-        assert message.parts[1].root.file.bytes == "base64payload1=="
-        assert message.parts[1].root.file.mime_type == "image/png"
-        assert message.parts[2].root.file.bytes == "base64payload2=="
-        assert message.parts[2].root.file.mime_type == "image/jpeg"
+        # First Part carries the user prompt; the rest are file Parts.
+        assert message.parts[0].HasField("text")
+        assert message.parts[1].HasField("raw")
+        assert message.parts[2].HasField("raw")
+        # 1.0 stores raw bytes directly; round-trip the b64 to verify the helper decoded.
+        assert message.parts[1].raw == base64.b64decode("YmFzZTY0cGF5bG9hZDE9PQ==")
+        assert message.parts[1].media_type == "image/png"
+        assert message.parts[2].raw == base64.b64decode("YmFzZTY0cGF5bG9hZDI9PQ==")
+        assert message.parts[2].media_type == "image/jpeg"
 
 
 # ---------------------------------------------------------------------------

@@ -252,7 +252,7 @@ class TestCLIHelpers:
 
         event = MagicMock()
         part = MagicMock()
-        part.root.text = "Working on it..."
+        part.text = "Working on it..."
         event.status.message.parts = [part]
         assert _extract_status_text(event) == "Working on it..."
 
@@ -270,7 +270,7 @@ class TestCLIHelpers:
 
         event = MagicMock()
         part = MagicMock()
-        part.root.text = "Final result"
+        part.text = "Final result"
         event.artifact.parts = [part]
         assert _extract_artifact_text(event) == "Final result"
 

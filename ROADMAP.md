@@ -222,7 +222,21 @@ the helpers; 8 new unit tests). Phase 2 shipped 2026-04-29
 (`kourai_common.server.build_a2a_app` collapses 10 agent
 `__main__` boilerplate copies; `is_file_part` / `get_file_bytes`
 moved into `messaging`; `a2a_utils.py` is firewall-free; 6 new unit
-tests; 2852 tests pass green). Phase 3 next.
+tests; 2852 tests pass green). Phase 3 shipped 2026-04-29
+(pin bumped to `>=1.0,<2.0` across `shared/`, `hosts/cli/`,
+`hosts/gui/` pyproject.toml; messaging helpers flipped to
+`Part(text=)` / `Part(raw=, media_type=, filename=)` /
+`Part(data=ParseDict(...))`; `agent_cards.build_card` uses
+`supported_interfaces` with v0.3 fallback; `server.build_a2a_app`
+uses `create_agent_card_routes` + `create_jsonrpc_routes` with
+`enable_v0_3_compat=True`; clients flipped from
+`ClientFactory.connect` to `await create_client`; enums swept to
+`TaskState.TASK_STATE_*` / `Role.ROLE_USER`; `ServerError` wrappers
+dropped — `raise UnsupportedOperationError()` directly; 2853 tests
+pass green). Phase 4 was absorbed into Phase 3 because the Python
+API change forced both server and client migrations together —
+``ClientFactory.connect`` is gone and the streaming consumption no
+longer wraps Parts in ``.root``. Phase 5 next.
 
 **Scope (revised).**
 

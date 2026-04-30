@@ -6,7 +6,6 @@ import logging
 from typing import TYPE_CHECKING
 
 from a2a.types import Task, UnsupportedOperationError
-from a2a.utils.errors import ServerError
 
 from agents.aidos.agent import analyze_slop, flag_slop_words, flag_vacuous_docstrings
 from kourai_common.base_executor import BaseAgentExecutor
@@ -69,4 +68,4 @@ class AidosAgentExecutor(BaseAgentExecutor):
         await updater.complete()
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
-        raise ServerError(error=UnsupportedOperationError())
+        raise UnsupportedOperationError()

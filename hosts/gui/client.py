@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 from uuid import uuid4
 
 import httpx
-from a2a.client import A2ACardResolver, ClientConfig, ClientFactory
+from a2a.client import A2ACardResolver, ClientConfig, create_client
 from a2a.types import (
     Message,
     TaskArtifactUpdateEvent,
@@ -84,9 +84,10 @@ class GuiClient:
             async with httpx.AsyncClient(timeout=10.0) as http:
                 resolver = A2ACardResolver(http, self._default_url)
                 card = await resolver.get_agent_card()
-                # Override card URL — the agent may advertise a Docker-internal
+                # Override card URLs — the agent may advertise a Docker-internal
                 # hostname that the host machine cannot reach.
-                card.url = self._default_url
+                for interface in card.supported_interfaces:
+                    interface.url = self._default_url
                 self._put({"type": "connected", "name": card.name, "url": self._default_url})
         except Exception as e:
             self._put({"type": "error", "text": f"Cannot reach Hephaestus: {e}"})
@@ -158,14 +159,15 @@ class GuiClient:
                 # are replaced with the reachable target_url.
                 resolver = A2ACardResolver(http, target_url)
                 card = await resolver.get_agent_card()
-                card.url = target_url
-                client = await ClientFactory.connect(card, client_config=config)
+                for interface in card.supported_interfaces:
+                    interface.url = target_url
+                client = await create_client(card, client_config=config)
 
                 async for event in client.send_message(message):
                     if isinstance(event, Message):
                         for p in event.parts:
-                            if hasattr(p.root, "text"):
-                                self._put({"type": "status", "text": p.root.text})
+                            if p.HasField("text"):
+                                self._put({"type": "status", "text": p.text})
                         continue
 
                     task, update = event
@@ -174,7 +176,7 @@ class GuiClient:
                         text = self._extract_status(update)
                         if text:
                             self._put({"type": "status", "text": text})
-                        if update.status.state == TaskState.failed:
+                        if update.status.state == TaskState.TASK_STATE_FAILED:
                             self._put({"type": "error", "text": "Pipeline failed"})
 
                     elif isinstance(update, TaskArtifactUpdateEvent):

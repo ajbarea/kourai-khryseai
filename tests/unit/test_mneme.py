@@ -70,7 +70,8 @@ class TestMnemeAgentCard:
         card = build_agent_card()
         assert card.name
         assert card.description
-        assert card.url
+        assert card.supported_interfaces, "card must publish at least one interface"
+        assert all(iface.url for iface in card.supported_interfaces)
         assert card.version == "0.1.0"
         assert card.capabilities.streaming is True
         assert len(card.skills) == 1

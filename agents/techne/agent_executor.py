@@ -6,7 +6,6 @@ import logging
 from typing import TYPE_CHECKING
 
 from a2a.types import Task, UnsupportedOperationError
-from a2a.utils.errors import ServerError
 
 from agents.techne.agent import (
     apply_code_changes,
@@ -177,4 +176,4 @@ class TechneAgentExecutor(BaseAgentExecutor):
                     update_virtue(_profile.player_id, "arete", 0.01 * min(fixes_applied, 5))
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
-        raise ServerError(error=UnsupportedOperationError())
+        raise UnsupportedOperationError()

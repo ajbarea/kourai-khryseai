@@ -6,7 +6,6 @@ import logging
 from typing import TYPE_CHECKING
 
 from a2a.types import Task, UnsupportedOperationError
-from a2a.utils.errors import ServerError
 
 from agents.aidos.agent import analyze_slop, flag_slop_words
 from kourai_common.a2a_utils import parse_project_root
@@ -127,4 +126,4 @@ class KallosAgentExecutor(BaseAgentExecutor):
                 update_virtue(_profile.player_id, "techne_v", _delta)
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
-        raise ServerError(error=UnsupportedOperationError())
+        raise UnsupportedOperationError()

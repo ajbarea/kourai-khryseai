@@ -53,8 +53,8 @@ async def _headless(agent_url: str, prompt: str, timeout_seconds: int, verbose: 
         async for event in client.send_message(message):
             if isinstance(event, Message):
                 for p in event.parts:
-                    if hasattr(p.root, "text") and verbose:
-                        click.echo(p.root.text, err=True)
+                    if p.HasField("text") and verbose:
+                        click.echo(p.text, err=True)
                 continue
 
             task, update = event

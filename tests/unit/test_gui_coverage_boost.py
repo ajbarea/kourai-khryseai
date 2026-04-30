@@ -1048,10 +1048,9 @@ class TestGuiClientHelpers:
     def test_extract_status_with_parts(self):
         from hosts.gui.client import GuiClient
 
-        part_root = Mock()
-        part_root.text = "Processing..."
         part = Mock()
-        part.root = part_root
+        part.HasField = lambda f: f == "text"
+        part.text = "Processing..."
         event = Mock()
         event.status = Mock()
         event.status.message = Mock()
@@ -1069,10 +1068,9 @@ class TestGuiClientHelpers:
     def test_extract_artifact_with_parts(self):
         from hosts.gui.client import GuiClient
 
-        part_root = Mock()
-        part_root.text = "Result text"
         part = Mock()
-        part.root = part_root
+        part.HasField = lambda f: f == "text"
+        part.text = "Result text"
         event = Mock()
         event.artifact = Mock()
         event.artifact.parts = [part]

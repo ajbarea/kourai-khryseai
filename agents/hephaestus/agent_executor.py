@@ -8,7 +8,6 @@ import logging
 from typing import TYPE_CHECKING
 
 from a2a.types import Task, UnsupportedOperationError
-from a2a.utils.errors import ServerError
 
 from agents.hephaestus.agent import determine_pipeline, execute_pipeline
 from agents.hephaestus.confirmation import parse_confirmation_response
@@ -402,4 +401,4 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
         await send_working_status(updater, task, text, emoji=AGENT_EMOJI["metis"])
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
-        raise ServerError(error=UnsupportedOperationError())
+        raise UnsupportedOperationError()

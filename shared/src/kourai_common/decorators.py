@@ -7,7 +7,6 @@ from functools import wraps
 from typing import TYPE_CHECKING, Any
 
 from a2a.types import InternalError
-from a2a.utils.errors import ServerError
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -22,7 +21,8 @@ def executor_error_handler(agent_name: str) -> Callable:
     """Decorator for consistent error handling in agent executors.
 
     Wraps async execute() methods to catch all exceptions, log them with
-    the agent name, and raise proper A2A ServerError with InternalError.
+    the agent name, and re-raise as a v1.0 ``InternalError`` so the
+    JSON-RPC layer maps it to the right status code.
 
     Args:
         agent_name: Name of the agent for error logging (e.g., "techne", "kallos")
@@ -44,7 +44,7 @@ def executor_error_handler(agent_name: str) -> Callable:
                 return await func(self, context, event_queue)
             except Exception as e:
                 log.error("%s execution failed: %s", agent_name, e)
-                raise ServerError(error=InternalError()) from e
+                raise InternalError() from e
 
         return wrapper
 

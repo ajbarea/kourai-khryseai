@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 import asyncclick as click
 import httpx
-from a2a.client import A2ACardResolver, ClientConfig, ClientFactory
+from a2a.client import A2ACardResolver, ClientConfig, create_client
 from a2a.types import (
     Message,
     TaskArtifactUpdateEvent,
@@ -219,8 +219,8 @@ async def send_and_stream(
 
             if isinstance(event, Message):
                 for p in event.parts:
-                    if hasattr(p.root, "text"):
-                        text = p.root.text
+                    if p.HasField("text"):
+                        text = p.text
                         _echo(text)
                         if tts:
                             await tts.speak(text, "hephaestus")
@@ -319,7 +319,7 @@ async def send_and_stream(
         _echo(f"{_DIM}[verbose] {event_count} events in {elapsed:.1f}s{_RESET}")
 
     # Handle input_required — prompt user for follow-up
-    if final_state == TaskState.input_required:
+    if final_state == TaskState.TASK_STATE_INPUT_REQUIRED:
         follow_up: str = await click.prompt(f"\n{_GOLD}\u21b3 Your response{_RESET}")
         if follow_up.strip().lower() in ("/q", "/quit", "quit"):
             return False, context_id, task_id
@@ -365,5 +365,6 @@ async def _connect_with_url_override(
         raise ValueError("ClientConfig must have an httpx_client")
     resolver = A2ACardResolver(http, url)
     card = await resolver.get_agent_card()
-    card.url = url
-    return await ClientFactory.connect(card, client_config=config)
+    for interface in card.supported_interfaces:
+        interface.url = url
+    return await create_client(card, client_config=config)

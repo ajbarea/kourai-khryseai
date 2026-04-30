@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
-from a2a.utils.errors import ServerError
+from a2a.types import UnsupportedOperationError
 
 from kourai_common.messaging import user_message
 
@@ -90,12 +90,12 @@ class TestExecutorCommonBehavior:
     async def test_cancel_raises_unsupported(
         self, agent_name: str, module_path: str, class_name: str
     ):
-        """All executors should raise ServerError on cancel (unsupported operation)."""
+        """All executors raise UnsupportedOperationError on cancel."""
         executor_module = __import__(module_path, fromlist=[class_name])
         executor_class = getattr(executor_module, class_name)
 
         executor = executor_class()
-        with pytest.raises(ServerError):
+        with pytest.raises(UnsupportedOperationError):
             await executor.cancel(_make_context(), _make_queue())
 
 
@@ -450,7 +450,7 @@ class TestHephaestusExecutor:
         from agents.hephaestus.agent_executor import HephaestusAgentExecutor
 
         executor = HephaestusAgentExecutor()
-        with pytest.raises(ServerError):
+        with pytest.raises(UnsupportedOperationError):
             await executor.cancel(_make_context(), _make_queue())
 
 

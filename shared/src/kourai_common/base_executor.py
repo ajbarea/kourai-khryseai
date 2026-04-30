@@ -13,11 +13,10 @@ import logging
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
+from a2a.helpers import new_task_from_user_message
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.tasks import TaskUpdater
 from a2a.types import InternalError, Task
-from a2a.utils import new_task
-from a2a.utils.errors import ServerError
 
 from kourai_common.messaging import send_input_required
 
@@ -62,12 +61,12 @@ class BaseAgentExecutor(AgentExecutor, ABC):
 
         # Create task from message if needed
         if not task and context.message:
-            task = new_task(context.message)
+            task = new_task_from_user_message(context.message)
             await event_queue.enqueue_event(task)
 
         if not task:
             log.error("No task or message in request context")
-            raise ServerError(error=InternalError())
+            raise InternalError()
 
         updater = TaskUpdater(event_queue, task.id, task.context_id)
 

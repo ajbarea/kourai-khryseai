@@ -109,7 +109,7 @@ class TestRemoteAgentConnectionConnect:
             await conn.connect()
 
         assert conn.card is not None
-        assert conn.card.url == "http://metis:10001/"
+        assert conn.card.supported_interfaces[0].url == "http://metis:10001/"
         assert conn.client is mock_client
         mock_factory.create.assert_called_once()
 
@@ -143,20 +143,22 @@ class TestRemoteAgentConnectionConnect:
 
 
 def _make_artifact_part(text: str) -> MagicMock:
-    """Create a mock Part with .root.text."""
+    """Create a mock Part with .text."""
     part = MagicMock()
-    part.root.text = text
+    part.text = text
     return part
 
 
 def _make_data_part(data: object) -> MagicMock:
-    """Create a mock Part with .root.data."""
+    """Create a mock Part with .data."""
     part = MagicMock()
-    part.root.data = data
+    part.data = data
     return part
 
 
-def _make_task_with_artifact(text: str, state: TaskState = TaskState.completed) -> MagicMock:
+def _make_task_with_artifact(
+    text: str, state: TaskState = TaskState.TASK_STATE_COMPLETED
+) -> MagicMock:
     """Create a mock Task with artifacts containing text."""
     task = MagicMock(spec=Task)
     task.context_id = "ctx-1"
@@ -321,7 +323,7 @@ class TestRemoteAgentConnectionSend:
 
         status_event = MagicMock(spec=TaskStatusUpdateEvent)
         status_event.status = MagicMock()
-        status_event.status.state = TaskState.input_required
+        status_event.status.state = TaskState.TASK_STATE_INPUT_REQUIRED
         question_part = _make_artifact_part("Which file?")
         status_event.status.message.parts = [question_part]
 

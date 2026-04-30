@@ -3,10 +3,12 @@
 Consolidates the ten copies of ``build_agent_card()`` that used to live in
 each ``agents/*/__main__.py``. The helper owes callers:
 
-    - the ``url`` must come from ``kourai_common.config.get_agent_url`` so the
-      docker-compose network names stay authoritative
-    - the v0.3 capability shape (``AgentCapabilities(streaming=True)``) stays
-      emitted by default until the v1.0 migration lands
+    - the URL on every ``supported_interfaces`` entry comes from
+      ``kourai_common.config.get_agent_url`` so docker-compose hostnames
+      stay authoritative
+    - the 1.0 wire shape — ``AgentCard.supported_interfaces`` advertising
+      both 1.0 and 0.3 protocol versions while M7 Phase 6 is pending —
+      stays emitted by default
 """
 
 from __future__ import annotations
@@ -43,7 +45,7 @@ def test_build_card_sets_core_fields() -> None:
 
 
 def test_build_card_url_comes_from_config() -> None:
-    """URL must match ``get_agent_url`` so specialists resolve docker-compose hostnames."""
+    """Every supported_interfaces URL must match ``get_agent_url``."""
     from kourai_common.agent_cards import build_card
     from kourai_common.config import get_agent_url
 
@@ -53,7 +55,24 @@ def test_build_card_url_comes_from_config() -> None:
         description="Style specialist.",
         skills=[_skill()],
     )
-    assert card.url == get_agent_url("kallos")
+    expected = get_agent_url("kallos")
+    assert card.supported_interfaces, "card must advertise at least one interface"
+    for interface in card.supported_interfaces:
+        assert interface.url == expected
+
+
+def test_build_card_advertises_1_0_and_0_3_interfaces() -> None:
+    """Transitional safety net — Phase 6 retires the 0.3 fallback entry."""
+    from kourai_common.agent_cards import build_card
+
+    card = build_card(
+        agent_name="kallos",
+        display_name="Kallos",
+        description="x",
+        skills=[_skill()],
+    )
+    versions = sorted(iface.protocol_version for iface in card.supported_interfaces)
+    assert versions == ["0.3", "1.0"]
 
 
 def test_build_card_default_streaming_capability() -> None:
