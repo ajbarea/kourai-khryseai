@@ -198,7 +198,7 @@ class RemoteAgentConnection:
         live during M7 follow-up smoke 2026-04-30).
         """
         if hasattr(artifact, "parts"):
-            return extract_parts_text(list(artifact.parts))
+            return extract_parts_text(list(artifact.parts))  # ty: ignore[invalid-argument-type]
         return ""
 
     def _extract_parts_text(self, parts: object) -> str:

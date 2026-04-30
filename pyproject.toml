@@ -139,6 +139,13 @@ filterwarnings = [
     "ignore::DeprecationWarning:misaki.en",
     "ignore:.*open_text is deprecated.*:DeprecationWarning",
     "ignore:.*unclosed event loop.*:ResourceWarning",
+    # pydub 0.25.1 (transitive via realtimetts → hosts/gui + agents/vn_bridge)
+    # is unmaintained (last release 2021); regex strings in pydub.utils have
+    # unescaped backslashes that emit SyntaxWarning under Python 3.12+, and
+    # pydub.utils:170 emits a one-time RuntimeWarning when ffmpeg is absent
+    # from the runner PATH. Neither is actionable upstream.
+    "ignore::SyntaxWarning:pydub",
+    "ignore::RuntimeWarning:pydub",
 ]
 
 [tool.ty.environment]
