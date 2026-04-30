@@ -17,7 +17,7 @@ from kourai_common.a2a_utils import extract_image_parts, project_root_from_conte
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
 from kourai_common.mcp_client import kourai_project_root_var
-from kourai_common.messaging import data_part, send_working_status, text_part
+from kourai_common.messaging import KIND_STATUS, data_part, send_working_status, text_part
 from kourai_common.player import PlayerProfile
 from kourai_common.stack import looks_like_scaffolding
 from kourai_common.tracing import create_span
@@ -63,6 +63,7 @@ class TechneAgentExecutor(BaseAgentExecutor):
                 updater,
                 task,
                 "Reading existing code..." + (f" ({len(file_paths)} files)" if file_paths else ""),
+                kind=KIND_STATUS,
             )
 
             # Step 2: Read existing files for context
@@ -102,7 +103,7 @@ class TechneAgentExecutor(BaseAgentExecutor):
             # thread the parsed project_root through to land in the
             # right repo.
             async def _git_status(line: str) -> None:
-                await send_working_status(updater, task, line, emoji="🔍")
+                await send_working_status(updater, task, line, emoji="🔍", kind=KIND_STATUS)
 
             with create_span("techne.git_context"):
                 git_context = await get_git_context(
@@ -113,12 +114,15 @@ class TechneAgentExecutor(BaseAgentExecutor):
                 updater,
                 task,
                 "Generating code changes...",
+                kind=KIND_STATUS,
             )
 
             async def _on_tool(name: str, args: dict, result: str) -> None:
                 target = args.get("path", "")
                 ok = "ok" if not result.startswith("ERROR:") else "fail"
-                await send_working_status(updater, task, f"{name} {target} ({ok})", emoji="🔧")
+                await send_working_status(
+                    updater, task, f"{name} {target} ({ok})", emoji="🔧", kind=KIND_STATUS
+                )
 
             # Step 4: Drive the agentic tool-use loop. Each tool call writes
             # directly to disk via the kourai-mcp-forge subprocess — no regex parse.
@@ -143,6 +147,7 @@ class TechneAgentExecutor(BaseAgentExecutor):
                 updater,
                 task,
                 f"Applied {fixes_applied} code changes to disk",
+                kind=KIND_STATUS,
             )
 
             # Step 6: Emit both human-readable text and machine-readable structured data
