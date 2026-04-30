@@ -31,10 +31,8 @@ if TYPE_CHECKING:
 
 # ── A2A protocol version negotiation ──────────────────────────────────
 
-# v1.0 SDK landed across the stack in M7 Phase 3; clients declare 1.0
-# explicitly so the server stops falling through the compat shim. The
-# server still honours v0.3 clients via ``enable_v0_3_compat=True`` —
-# Phase 6 retires that fallback.
+# v1.0 SDK landed across the stack in M7 Phase 3; Phase 6 retired the
+# transitional v0.3 fallback. Every kourai host speaks 1.0 natively.
 A2A_PROTOCOL_VERSION = "1.0"
 
 

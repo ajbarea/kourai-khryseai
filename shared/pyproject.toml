@@ -4,10 +4,11 @@ version = "0.1.0"
 description = "Shared utilities for Kourai Khryseai agents"
 requires-python = ">=3.12,<3.14"
 dependencies = [
-    # a2a-sdk 1.0 landed via M7 Phase 3 — Part construction centralized in
-    # kourai_common.messaging, server build centralized in kourai_common.server,
-    # AgentCard uses supported_interfaces with v0.3 fallback for transitional
-    # client compatibility. See ROADMAP M7.
+    # a2a-sdk 1.0 landed via M7 (six phases, all six shipped 2026-04-30):
+    # Part construction in kourai_common.messaging, server build in
+    # kourai_common.server, AgentCard.supported_interfaces ships the v1.0
+    # JSON-RPC binding only (Phase 6 retired the transitional v0.3
+    # fallback). See ROADMAP M7.
     "a2a-sdk[http-server]>=1.0,<2.0",
     "litellm>=1.83.7",
     "uvicorn[standard]>=0.34.0",
