@@ -1,66 +1,34 @@
 """Shared A2A protocol utilities for Kourai Khryseai agents.
 
-Centralizes common A2A message handling patterns used across multiple agents.
+Two surfaces:
 
-A2A v1.0 migration — status as of 2026-04-29
-    a2a-sdk 1.0.0 stable shipped 2026-04-20; current is 1.0.2 (2026-04-24).
-    The migration is *bigger* than this firewall anticipated:
+* ``make_a2a_http_client`` — outbound httpx client with the
+  ``A2A-Version`` header pre-set. Single bump-site for the protocol
+  version when M7 ships.
+* ``parse_project_root`` — recover the player's project worktree
+  from any historical text-tag injection shape so specialist
+  containers run subprocesses in the right repo.
+* ``extract_image_parts`` / ``extract_file_attachments`` — read the
+  inbound A2A message for FileWithBytes attachments and re-shape them
+  for LiteLLM (image_url blocks) or kourai-internal use (raw b64 +
+  mime tuples). Wire-shape inspection lives in
+  ``kourai_common.messaging.is_file_part`` / ``get_file_bytes``.
 
-    - Predicted: v1.0 would unify ``TextPart`` / ``FilePart`` / ``DataPart``
-      into a single Part type with member discrimination (``hasattr(root,
-      "bytes") and hasattr(root, "media_type")``).
-    - Reality: v1.0 *removed* ``TextPart`` / ``FilePart`` / ``DataPart`` /
-      ``FileWithBytes`` / ``FileWithUri`` entirely. Construction is now
-      ``Part(text="...")`` or ``Part(raw=bytes, media_type="...",
-      filename="...")`` — flat fields on Part itself, not member discrim
-      on a tagged-union root. The ``hasattr(root, "bytes")`` branch below
-      still works *by accident* because protobuf message attribute access
-      is permissive; the ``hasattr(root, "media_type")`` check matches the
-      actual v1.0 field name. So the firewall happens to fall through
-      correctly, but the prediction was wrong and a future reader should
-      rewrite the helpers against the actual v1.0 shape during M7 rather
-      than treating this code as load-bearing.
-
-    The bigger ticket items not addressed by this file:
-
-    - ``A2AStarletteApplication`` is removed; every agent's ``__main__.py``
-      needs rewriting against ``create_agent_card_routes`` +
-      ``create_jsonrpc_routes`` from ``a2a.server.routes``.
-    - All enums switched ``snake_case`` → ``SCREAMING_SNAKE_CASE``
-      (``TaskState.working`` → ``TASK_STATE_WORKING``,
-      ``Role.user`` → ``ROLE_USER``).
-    - ``ClientFactory.create_client()`` is sync-deprecated; new path is
-      ``await create_client(url_or_card)`` from ``a2a.client``.
-    - ``AgentCard`` overhaul: top-level ``url`` removed, ``examples`` /
-      ``input_modes`` / ``output_modes`` moved into ``AgentSkill`` /
-      ``default_input_modes`` / ``default_output_modes``.
-    - ``DefaultRequestHandler`` requires ``agent_card=`` now.
-    - Streaming: ``AsyncIterator[ClientEvent | Message]`` →
-      ``AsyncIterator[StreamResponse]`` with ``HasField('artifact_update'
-      | 'status_update' | 'task' | 'message')`` checks.
-    - Server-side ``enable_v0_3_compat=True`` flag exists on
-      ``create_jsonrpc_routes`` / ``create_rest_routes`` for legacy
-      clients; not reachable today since the application-setup refactor
-      is itself a precondition.
-
-    See ROADMAP §M7 for the milestone scope and the upstream migration
-    guide at ``a2aproject/a2a-python/blob/main/docs/migrations/v1_0/``.
-
-A2A protocol-version negotiation
-    Every outbound request carries an ``A2A-Version`` header per the
-    v1.0 spec. We declare 0.3 explicitly today so a 1.0.x server can
-    negotiate down rather than silently downgrading. ``A2A_PROTOCOL_VERSION``
-    is the single bump-site when M7 ships.
+See ROADMAP §M7 for the in-flight a2a-sdk 1.0 migration plan. This
+module's piece — Part inspection — was the dual-shape firewall before
+2026-04-29; Phase 2 moved inspection into ``messaging`` so this file
+is now firewall-free.
 """
 
 from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import httpx
-from a2a.types import FileWithBytes
+
+from kourai_common.messaging import get_file_bytes, is_file_part
 
 if TYPE_CHECKING:
     from a2a.server.agent_execution import RequestContext
@@ -164,39 +132,6 @@ def parse_project_root(text: str) -> Path:
     return Path.cwd()
 
 
-# ── Part inspection helpers (live 0.3.x; M7 will rewrite) ────────────
-
-
-def _is_file_part(root: Any) -> bool:
-    """Return True if the Part root contains embedded file bytes.
-
-    Today's path: SDK 0.3.x ``FilePart`` with ``root.file`` = ``FileWithBytes``.
-
-    The second branch was a forward-compat stub that predicted the v1.0
-    Part shape would be a tagged union with ``bytes`` / ``media_type``
-    members; the real 1.0 shape is flat fields directly on ``Part``
-    (``Part(raw=bytes, media_type="...")``), no nested root. The check
-    happens to match anyway because protobuf attribute access is
-    permissive, but M7 should rewrite both helpers against the actual
-    v1.0 surface rather than relying on this accidental match.
-    """
-    if hasattr(root, "file") and isinstance(root.file, FileWithBytes):
-        return True
-    return hasattr(root, "bytes") and hasattr(root, "media_type")
-
-
-def _get_file_bytes(root: Any) -> tuple[str, str]:
-    """Extract (base64_bytes, mime_type) from a file Part root.
-
-    Same caveat as ``_is_file_part`` — the v1.0 branch happens to work
-    against protobuf attribute access but assumes a tagged-union shape
-    that didn't ship. Rewrite both during M7.
-    """
-    if hasattr(root, "file") and isinstance(root.file, FileWithBytes):
-        return root.file.bytes, root.file.mime_type or "image/png"
-    return root.bytes, getattr(root, "media_type", None) or "image/png"
-
-
 # ── Public API ───────────────────────────────────────────────────────
 
 
@@ -221,9 +156,8 @@ def extract_image_parts(context: RequestContext) -> list[dict]:
         return image_parts
 
     for part in context.message.parts:
-        root = part.root
-        if _is_file_part(root):
-            b64, mime = _get_file_bytes(root)
+        if is_file_part(part):
+            b64, mime = get_file_bytes(part)
             image_parts.append(
                 {
                     "type": "image_url",
@@ -247,12 +181,6 @@ def extract_file_attachments(context: RequestContext) -> list[tuple[str, str]]:
         >>> for bytes_data, mime_type in attachments:
         ...     process_file(bytes_data, mime_type)
     """
-    attachments: list[tuple[str, str]] = []
     if not context.message:
-        return attachments
-
-    for part in context.message.parts:
-        root = part.root
-        if _is_file_part(root):
-            attachments.append(_get_file_bytes(root))
-    return attachments
+        return []
+    return [get_file_bytes(part) for part in context.message.parts if is_file_part(part)]

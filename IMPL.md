@@ -6,9 +6,10 @@ collapses to a one-liner under "Shipped" and this file gets reset to the
 next milestone.
 
 Updated: 2026-04-29 · Working on: **M7 — a2a-sdk 1.0 migration.
-Six-phase execution plan drafted in ROADMAP §M7; Phase 1 shipped
-(centralized Part / Message construction in `kourai_common.messaging`),
-Phase 2 next (centralize server build + Part inspection).
+Six-phase execution plan drafted in ROADMAP §M7; Phases 1-2 shipped
+(centralized Part / Message construction + server build + Part
+inspection in `kourai_common.messaging` and `kourai_common.server`),
+Phase 3 next (the big-bang pin flip).
 Pre-release perfection stance: no workarounds. M19 fully shipped
 (Phases 1+2+3 all landed 2026-04-29). Remaining sequence: M7
 (a2a-sdk 1.0) → M13 regression fix on M7's `Message.metadata`

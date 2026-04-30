@@ -99,6 +99,24 @@ def user_message(
     return msg
 
 
+# ── Part inspection (M7 Phase 2) ──────────────────────────────────────
+
+
+def is_file_part(part: Part) -> bool:
+    """Return True if the Part carries embedded file bytes (FileWithBytes)."""
+    root = part.root
+    return isinstance(root, FilePart) and isinstance(root.file, FileWithBytes)
+
+
+def get_file_bytes(part: Part) -> tuple[str, str]:
+    """Extract (base64_bytes, media_type) from a file Part.
+
+    Caller must ensure ``is_file_part(part)`` first.
+    """
+    file = part.root.file
+    return file.bytes, file.mime_type or "image/png"
+
+
 # ── Task status helpers ───────────────────────────────────────────────
 
 

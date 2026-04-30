@@ -5,15 +5,13 @@ from __future__ import annotations
 import os
 
 import uvicorn
-from a2a.server.apps import A2AStarletteApplication
-from a2a.server.request_handlers import DefaultRequestHandler
-from a2a.server.tasks import InMemoryTaskStore
 from a2a.types import AgentCard, AgentSkill
 
 from agents.aletheia.agent_executor import AletheiaAgentExecutor
 from kourai_common.agent_cards import build_card
 from kourai_common.config import AGENT_PORTS, OTEL_ENDPOINT
 from kourai_common.log import setup_logging
+from kourai_common.server import build_a2a_app
 from kourai_common.tracing import setup_tracing
 
 AGENT_NAME = "aletheia"
@@ -52,17 +50,9 @@ def build_agent_card() -> AgentCard:
 
 def main() -> None:
     setup_tracing(AGENT_NAME, OTEL_ENDPOINT)
-    agent_card = build_agent_card()
-    request_handler = DefaultRequestHandler(
-        agent_executor=AletheiaAgentExecutor(),
-        task_store=InMemoryTaskStore(),
-    )
-    server = A2AStarletteApplication(
-        agent_card=agent_card,
-        http_handler=request_handler,
-    )
+    app = build_a2a_app(agent_card=build_agent_card(), executor=AletheiaAgentExecutor())
     log.info("🔬 Aletheia starting on %s:%d", HOST, PORT)
-    uvicorn.run(server.build(), host=HOST, port=PORT)
+    uvicorn.run(app, host=HOST, port=PORT)
 
 
 if __name__ == "__main__":
