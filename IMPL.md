@@ -5,22 +5,28 @@ milestone lands, the matching detail block in [ROADMAP.md](./ROADMAP.md)
 collapses to a one-liner under "Shipped" and this file gets reset to the
 next milestone.
 
-Updated: 2026-04-30 · Working on: **M7 fully shipped 2026-04-30 (six
-phases). M13 fix shipped 2026-04-30 — CLI stamps the previous turn's
-user_text as ``Message.metadata["original_request"]`` on the
-input_required follow-up; Hephaestus's ``execute_pipeline`` reads
-it and uses it as the transcript's ``[User]:`` line so specialists
-see the player's actual development ask instead of the confirmation
-token. Next: M17 live smoke re-run (`make up`, fizzbuzz prompt,
-verify PAUSE on coverage_target → narrator quotes preference back →
-fact.recalled=true on metis.execute span); then M18 (structured
-streaming with content-kind metadata) and M20 (audio-text sync).
-Pre-release perfection stance: no workarounds. M19 fully shipped
-(Phases 1+2+3 all landed 2026-04-29). Remaining sequence: M7
-(a2a-sdk 1.0) → M13 regression fix on M7's `Message.metadata`
-channel → M18 (structured streaming with content-kind metadata) →
-M20 (audio-text sync). M17 itself ships clean once M13 unblocks the
-readout path.**
+Updated: 2026-04-30 · Working on: **M7 fully shipped 2026-04-30, six
+phases. M13 fix shipped 2026-04-30. Live smoke verified end-to-end
+2026-04-30 (driven via pexpect, not tmux+script — see "Live smoke
+verification" block below): metis log shows ``Streaming spec for:
+[User]: Plan a small fizzbuzz module with full pytest tests.`` after
+the player's "yes" on CONFIRM_ORDER, so the original-request
+metadata channel propagates correctly through the resume dispatch.
+M7 Phase 3 follow-up holes patched in the same session — three
+v0.3-shape APIs missed by the original migration: CLI's
+``client.get_card()``, all 5 ``client.send_message(message)`` call
+sites, and the ``(task, update)`` tuple yield consumer pattern.
+``send_request`` and ``stream_event`` helpers in
+``kourai_common.messaging`` centralize the v0.3 → v1.0 boundary.
+M19 Phase 3 vn_bridge package split shipped same session — vn_bridge
+now has its own ``kourai-vn-bridge`` pyproject; hephaestus's image
+stopped carrying RealtimeTTS/pyaudio it never used.
+
+Next: M18 (structured streaming with content-kind metadata) and M20
+(audio-text sync). Pre-release perfection stance: no workarounds.
+Remaining sequence: M7+M13 (verified) → M18 (structured streaming) →
+M20 (audio-text sync). M17 itself ships clean now that M13 is
+unblocked end-to-end.**
 
 ## 2026-04-29 live smoke — what happened
 
@@ -110,6 +116,153 @@ The bug originally surfaced 2026-04-29 when two live smoke runs
 showed Metis receiving only `"y"` / `"light it"` and generating
 questions-as-prose as her spec. After the fix, the resumed turn's
 specialist dispatch uses the original prompt.
+
+## Live M7+M13 smoke verification — 2026-04-30
+
+Driven via pexpect (not tmux+script — the tmux-detached-pane stdin
+EOF kept killing the CLI before prompt_async engaged; pexpect with a
+real PTY worked first try). Settings flipped to
+``voice_enabled=false`` (WSL2 has no PortAudio default output device
+so RealtimeTTS init crashed the host CLI on the random greeting
+quote) and ``yolo_enabled=false`` (so CONFIRM_ORDER actually fires;
+the 2026-04-29 saved settings had yolo on, which would have skipped
+the gate). Smoke driver at ``/tmp/smoke_driver.py``:
+
+1. Spawn ``python -m hosts.cli --agent http://localhost:10000/`` (NOT
+   ``make cli`` — dev_cli's ``cli`` task hardcodes ``--voice`` which
+   would have re-overridden the saved setting back to True)
+2. Wait for "Connected to Hephaestus"
+3. ``/project new harbour-smoke-0430 --template python`` — falls
+   through to ``/project use`` if the project exists
+4. ``Plan a small fizzbuzz module with full pytest tests.``
+5. Wait for "Your response" (CONFIRM_ORDER input_required)
+6. ``yes``
+7. Wait for "Forged in"
+
+Verification line in metis container log:
+
+```
+agents.metis.agent: Streaming spec for: [User]: Plan a small
+fizzbuzz module with full pytest tests.
+```
+
+The `[User]:` line carries the fizzbuzz prompt, not the bare "yes".
+M13 fix verified — ``effective_request = md.get("original_request")
+or user_request`` correctly reads the metadata channel and uses it
+as the transcript opener.
+
+## M7 Phase 3 follow-up — v0.3 → 1.0 client-side holes patched 2026-04-30
+
+The M7 six-phase chain shipped clean for production agent code, but
+three v0.3-shape APIs survived in the client codepath because no
+unit test exercises CLI startup or driver-level streaming events.
+Live smoke surfaced all three. Patched same session:
+
+1. **`client.get_card()` removed in v1.0.** ``hosts/cli/__main__.py``
+   line 594 called it on startup to print the agent name/version.
+   ``hosts/cli/streaming.py::_connect_with_url_override`` already
+   fetched the card via ``A2ACardResolver`` to patch URLs, so the
+   helper now returns ``(client, card)``. Two callers updated
+   (``__main__.py``, ``headless.py``); the CLI saves a card-fetch
+   round-trip as a side benefit.
+
+2. **`client.send_message(message)` raised `AttributeError:
+   configuration` on v1.0** — the SDK expects ``SendMessageRequest``
+   (which has the ``configuration`` sub-message ``_apply_client_config``
+   reaches into for polling / push-notification / accepted-output-
+   modes wiring). Added ``send_request(message)`` helper in
+   ``kourai_common.messaging`` and applied it at all five call sites
+   (CLI streaming + headless, GUI client, hephaestus's
+   remote_connections, vn_bridge).
+
+3. **The streaming yield shape changed from `(Task, update | None)`
+   tuples / direct `Message` to `StreamResponse` with oneof
+   payload.** Old code did ``task, update = event`` then
+   ``isinstance(update, TaskStatusUpdateEvent)``. Added
+   ``stream_event(response)`` helper in ``kourai_common.messaging``
+   that decodes the StreamResponse into one of (Message,
+   TaskStatusUpdateEvent, TaskArtifactUpdateEvent, Task) so the
+   existing isinstance dispatch keeps working. Migrated the same
+   five sites. Final task snapshot (``update is None`` in v0.3) now
+   matches on ``isinstance(event, Task)``.
+
+CI didn't catch any of the three because (a) integration tests pull
+``ajb6289/kourai-khryseai:*`` from the registry, which were pre-M7
+(v0.3 wire shape), so the wire-shape mismatch wasn't exercised
+client-side; (b) unit tests mock the SDK or don't cover the CLI
+startup path. Regression-test gap noted as a follow-up.
+
+## M19 Phase 3 vn_bridge package split — fixed 2026-04-30
+
+vn_bridge originally piggybacked on hephaestus's pyproject
+(``PACKAGE_NAME=hephaestus`` in compose) so RealtimeTTS lived in
+``agents/hephaestus/pyproject.toml`` "for vn_bridge's sake."
+RealtimeTTS pulls ``pyaudio``; pyaudio 0.2.14 is sdist-only on Linux
+and needs gcc + portaudio19-dev; the Dockerfile only installs those
+for ``HOST_TYPE`` in {cli, gui, vn_bridge}. Hephaestus's HOST_TYPE
+is ``agent`` — its image build broke when uv tried to compile
+pyaudio. Latent for ~24h until anyone actually ran ``make rebuild``.
+
+Fix: gave vn_bridge its own ``kourai-vn-bridge`` package in
+``agents/vn_bridge/`` (``__init__.py`` + ``__main__.py`` +
+``pyproject.toml``). Removed RealtimeTTS + audioop-lts from
+hephaestus's pyproject. Compose vn-bridge service flipped
+``PACKAGE_NAME: hephaestus`` → ``vn_bridge``. Entrypoint collapsed
+to a single ``python -m agents.${PACKAGE_NAME}`` branch. ``uv lock``
+regenerated, ``make rebuild`` clean. Hephaestus's image stopped
+carrying TTS deps it never used.
+
+## vn-bridge restart loop — fixed 2026-04-30
+
+Three compounding causes — diagnosed in order, only the third was
+the actual root cause. The first two were sizing fixes that needed
+to land regardless and helped unmask the third.
+
+1. **start_period too short for cold-start model load.** Compose
+   ``start_period: 30s`` was sized for edge-tts (no model load).
+   Kokoro init runs 45-60s on first boot, so the
+   still-loading-state checks counted toward unhealthy and triggered
+   restart. Bumped to ``90s`` per April 2026 FastAPI/Starlette
+   ML-serving best practice (60-120s typical for multi-hundred-MB
+   weight loads). Same docker-compose.yml block.
+2. **Memory limit too low for runtime.** vn-bridge's
+   ``deploy.resources.limits.memory: 512M`` was also edge-tts-era
+   sizing. Kokoro 82M weights are ~1GB at FP16 + PyTorch runtime
+   (CUDA-or-CPU kernels, buffers) brings total to 2-3GB per HF
+   model card + April 2026 deployment guides; 8GB system RAM
+   recommended. Bumped to ``4G`` — single-stream synth fits well
+   inside (verified live: ~1.4GiB at steady state).
+3. **The actual root cause: spaCy model lazy-download via pip in
+   a uv-managed venv.** Kokoro's ``misaki`` G2P transitively
+   imports ``en_core_web_sm`` and lazy-calls
+   ``spacy.cli.download(name)`` on first ``KPipeline.__init__``.
+   That shells out to ``pip install`` — uv-managed venvs have no
+   pip on PATH, so spacy's wasabi printer fails with
+   ``SystemExit(1)``. uvicorn caught the ``SystemExit`` and exited
+   the app cleanly (exit 0, no OOM signal, no traceback in stderr
+   — just ``ERROR: Application startup failed. Exiting.``), hiding
+   the cause behind a silent restart loop. Fix: pin the spaCy
+   model wheel as a ``kourai-vn-bridge`` workspace dep so uv
+   installs it at image build time:
+
+       "en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl"
+
+   Hatchling rejects direct references by default for repeatable-
+   build hygiene; opt in via
+   ``[tool.hatch.metadata] allow-direct-references = true`` in the
+   same pyproject. spaCy 3.8.x ↔ en_core_web_sm 3.8.0 per
+   explosion/spacy-models compatibility.json.
+
+Verification (2026-04-30): fresh ``docker compose build vn-bridge``
++ ``up -d vn-bridge`` lands ``Up Ns (healthy)`` with restarts=0 and
+~1.4GiB steady-state memory.
+
+**Latent in hosts/cli + hosts/gui:** they also import
+RealtimeTTSEngine but run on the host machine where pip *is*
+available, so spacy.cli.download succeeds (slow first-init download
+but no crash). Optional follow-up: pin the same model wheel in
+those pyprojects too so the install is bundled at sync time
+instead of paid lazily on first speech.
 
 ## Architectural sequence ahead
 

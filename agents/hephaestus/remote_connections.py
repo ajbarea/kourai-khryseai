@@ -24,7 +24,7 @@ from kourai_common.a2a_events import (
 )
 from kourai_common.a2a_utils import make_a2a_http_client
 from kourai_common.agents_manifest import fallback_card_for
-from kourai_common.messaging import file_part_from_b64, user_message
+from kourai_common.messaging import file_part_from_b64, send_request, stream_event, user_message
 from kourai_common.tracing import create_span, get_trace_context
 
 if TYPE_CHECKING:
@@ -138,7 +138,8 @@ class RemoteAgentConnection:
             log.info("Sending to %s: %d chars", self.agent_name, len(text))
             latest_artifact_text = ""
 
-            async for event in self.client.send_message(message):
+            async for response in self.client.send_message(send_request(message)):
+                event = stream_event(response)
                 if isinstance(event, Message):
                     result = self._extract_message_text(event)
                     if result:
@@ -147,26 +148,24 @@ class RemoteAgentConnection:
                         return
                     continue
 
-                # ClientEvent: tuple[Task, update | None]
-                task, update = event
-                if isinstance(update, TaskStatusUpdateEvent):
-                    if update.status.state == TaskState.TASK_STATE_INPUT_REQUIRED:
-                        question = self._extract_status_message(update)
+                if isinstance(event, TaskStatusUpdateEvent):
+                    if event.status.state == TaskState.TASK_STATE_INPUT_REQUIRED:
+                        question = self._extract_status_message(event)
                         raise AgentInputRequired(
                             self.agent_name, question or "Additional input needed"
                         )
-                    elif update.status.message:
-                        status_msg = self._extract_status_message(update)
+                    elif event.status.message:
+                        status_msg = self._extract_status_message(event)
                         if status_msg:
                             yield ("status", status_msg)
-                elif isinstance(update, TaskArtifactUpdateEvent):
-                    if update.artifact:
-                        artifact_text = self._extract_artifact_text(update.artifact)
+                elif isinstance(event, TaskArtifactUpdateEvent):
+                    if event.artifact:
+                        artifact_text = self._extract_artifact_text(event.artifact)
                         if artifact_text:
                             latest_artifact_text = artifact_text
-                elif update is None:
+                elif isinstance(event, Task):
                     # Final task snapshot — extract artifacts
-                    result = self._extract_task_text(task)
+                    result = self._extract_task_text(event)
                     final_result = result or latest_artifact_text
                     if final_result:
                         log.info("Received from %s: %d chars", self.agent_name, len(final_result))
@@ -190,9 +189,16 @@ class RemoteAgentConnection:
         return extract_task_text(task)
 
     def _extract_artifact_text(self, artifact: object) -> str:
-        """Pull text from a task artifact."""
+        """Pull text from a task artifact.
+
+        ``list(artifact.parts)`` materializes the v1.0 protobuf
+        ``RepeatedCompositeContainer`` before extraction. Without the
+        conversion, iteration in ``extract_parts_text`` silently yielded
+        zero matches against ``HasField`` on streamed artifacts (caught
+        live during M7 follow-up smoke 2026-04-30).
+        """
         if hasattr(artifact, "parts"):
-            return extract_parts_text(artifact.parts)
+            return extract_parts_text(list(artifact.parts))
         return ""
 
     def _extract_parts_text(self, parts: object) -> str:

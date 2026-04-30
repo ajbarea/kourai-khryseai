@@ -9,7 +9,7 @@ native 24 kHz mono through PyAudio with no resample step in the path.
 Two public surfaces:
 
 - ``speak`` / ``speak_sync`` for CLI + GUI — synth + PyAudio playback bundled.
-- ``synthesize_to_wav`` for ``agents/vn_bridge.py`` — synth-only path that
+- ``synthesize_to_wav`` for ``agents/vn_bridge/`` — synth-only path that
   drives ``TextToAudioStream`` with ``muted=True`` and an ``on_audio_chunk``
   collector, then wraps the int16 PCM in one WAV header sized from
   ``KokoroEngine.get_stream_info()``.
@@ -203,7 +203,7 @@ class RealtimeTTSEngine:
         Drives ``TextToAudioStream`` with ``muted=True`` and an
         ``on_audio_chunk`` collector — RealtimeTTS's documented bytes-only
         path — then wraps the int16 PCM in one WAV header sized from
-        ``KokoroEngine.get_stream_info()``. Used by ``agents/vn_bridge.py``
+        ``KokoroEngine.get_stream_info()``. Used by ``agents/vn_bridge/``
         which feeds WAV bytes into Ren'Py's audio system rather than
         playing them itself.
         """

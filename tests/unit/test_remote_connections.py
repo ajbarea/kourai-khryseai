@@ -12,6 +12,7 @@ from agents.hephaestus.remote_connections import (
     AgentInputRequired,
     RemoteAgentConnection,
 )
+from tests.conftest import make_stream_response
 
 
 class TestRemoteAgentConnectionInit:
@@ -193,8 +194,8 @@ class TestRemoteAgentConnectionSend:
         task = _make_task_with_artifact("generated code")
 
         mock_client = MagicMock()
-        # send_message yields (Task, None) for non-streaming
-        mock_client.send_message = MagicMock(return_value=_async_iter((task, None)))
+        # v1.0: send_message yields a StreamResponse with the Task field set
+        mock_client.send_message = MagicMock(return_value=_async_iter(make_stream_response(task)))
 
         with (
             patch("agents.hephaestus.remote_connections.create_span"),
@@ -225,7 +226,9 @@ class TestRemoteAgentConnectionSend:
         artifact_event.artifact.parts = [_make_artifact_part("streamed code")]
 
         mock_client = MagicMock()
-        mock_client.send_message = MagicMock(return_value=_async_iter((task, artifact_event)))
+        mock_client.send_message = MagicMock(
+            return_value=_async_iter(make_stream_response(artifact_event))
+        )
 
         with (
             patch("agents.hephaestus.remote_connections.create_span"),
@@ -255,7 +258,10 @@ class TestRemoteAgentConnectionSend:
 
         mock_client = MagicMock()
         mock_client.send_message = MagicMock(
-            return_value=_async_iter((task, artifact_event), (task, None))
+            return_value=_async_iter(
+                make_stream_response(artifact_event),
+                make_stream_response(task),
+            )
         )
 
         with (
@@ -292,7 +298,10 @@ class TestRemoteAgentConnectionSend:
 
         mock_client = MagicMock()
         mock_client.send_message = MagicMock(
-            return_value=_async_iter((task, empty_artifact_event), (task, non_empty_artifact_event))
+            return_value=_async_iter(
+                make_stream_response(empty_artifact_event),
+                make_stream_response(non_empty_artifact_event),
+            )
         )
 
         with (
@@ -328,7 +337,9 @@ class TestRemoteAgentConnectionSend:
         status_event.status.message.parts = [question_part]
 
         mock_client = MagicMock()
-        mock_client.send_message = MagicMock(return_value=_async_iter((task, status_event)))
+        mock_client.send_message = MagicMock(
+            return_value=_async_iter(make_stream_response(status_event))
+        )
 
         with (
             patch("agents.hephaestus.remote_connections.create_span"),

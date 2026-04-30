@@ -18,6 +18,7 @@ import httpx
 from a2a.client import A2ACardResolver, ClientConfig, create_client
 from a2a.types import (
     Message,
+    Task,
     TaskArtifactUpdateEvent,
     TaskState,
     TaskStatusUpdateEvent,
@@ -28,7 +29,7 @@ from kourai_common.a2a_events import (
     extract_status_text,
 )
 from kourai_common.config import AGENT_PORTS, get_agent_url
-from kourai_common.messaging import file_part_from_b64, user_message
+from kourai_common.messaging import file_part_from_b64, send_request, stream_event, user_message
 
 if TYPE_CHECKING:
     import queue as _queue
@@ -163,28 +164,28 @@ class GuiClient:
                     interface.url = target_url
                 client = await create_client(card, client_config=config)
 
-                async for event in client.send_message(message):
+                async for response in client.send_message(send_request(message)):
+                    event = stream_event(response)
+
                     if isinstance(event, Message):
                         for p in event.parts:
                             if p.HasField("text"):
                                 self._put({"type": "status", "text": p.text})
                         continue
 
-                    task, update = event
-
-                    if isinstance(update, TaskStatusUpdateEvent):
-                        text = self._extract_status(update)
+                    if isinstance(event, TaskStatusUpdateEvent):
+                        text = self._extract_status(event)
                         if text:
                             self._put({"type": "status", "text": text})
-                        if update.status.state == TaskState.TASK_STATE_FAILED:
+                        if event.status.state == TaskState.TASK_STATE_FAILED:
                             self._put({"type": "error", "text": "Pipeline failed"})
 
-                    elif isinstance(update, TaskArtifactUpdateEvent):
-                        text = self._extract_artifact(update)
+                    elif isinstance(event, TaskArtifactUpdateEvent):
+                        text = self._extract_artifact(event)
                         if text:
                             final_text = text
 
-                    elif update is None:
+                    elif isinstance(event, Task):
                         pass  # final task snapshot — state already tracked
 
         except httpx.ConnectError:

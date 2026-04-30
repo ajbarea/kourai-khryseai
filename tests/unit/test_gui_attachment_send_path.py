@@ -227,8 +227,8 @@ class TestGuiClientMultiPartSend:
 
                 mock_a2a_client = MagicMock()
 
-                async def capture_send(message):
-                    captured["message"] = message
+                async def capture_send(request):
+                    captured["request"] = request
                     if False:
                         yield None  # make this an async generator
 
@@ -243,7 +243,9 @@ class TestGuiClientMultiPartSend:
                     attachments=None,
                 )
 
-        message = captured["message"]
+        # send_request wraps the Message in a SendMessageRequest — assert
+        # against the inner Message's parts.
+        message = captured["request"].message
         assert len(message.parts) == 1
         # Single text Part, no file Part — 1.0 wire shape uses HasField discrimination.
         assert message.parts[0].HasField("text")
@@ -273,8 +275,8 @@ class TestGuiClientMultiPartSend:
 
             mock_a2a_client = MagicMock()
 
-            async def capture_send(message):
-                captured["message"] = message
+            async def capture_send(request):
+                captured["request"] = request
                 if False:
                     yield None
 
@@ -293,7 +295,9 @@ class TestGuiClientMultiPartSend:
 
         import base64
 
-        message = captured["message"]
+        # send_request wraps the Message in a SendMessageRequest — assert
+        # against the inner Message's parts.
+        message = captured["request"].message
         assert len(message.parts) == 3
         # First Part carries the user prompt; the rest are file Parts.
         assert message.parts[0].HasField("text")

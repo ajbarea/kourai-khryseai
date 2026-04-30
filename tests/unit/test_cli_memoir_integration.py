@@ -5,17 +5,19 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 import pytest
-from a2a.types import TaskArtifactUpdateEvent, TaskState
+from a2a.types import Task, TaskArtifactUpdateEvent, TaskState
 
 from hosts.cli.streaming import send_and_stream
 from kourai_common.federation.host_helpers import derive_scene_id
 from kourai_common.federation.memoir import Memoir
+from tests.conftest import make_stream_response
 
 
 def _make_completed_task() -> MagicMock:
-    task = MagicMock()
+    task = MagicMock(spec=Task)
     task.id = "task-1"
     task.context_id = "ctx-1"
+    task.status = MagicMock()
     task.status.state = TaskState.TASK_STATE_COMPLETED
     return task
 
@@ -42,10 +44,12 @@ async def test_two_turns_produce_two_ordered_entries(monkeypatch, tmp_path):
         client = MagicMock()
         task = _make_completed_task()
         artifact_event = MagicMock(spec=TaskArtifactUpdateEvent)
+        artifact_event.context_id = "ctx-1"
+        artifact_event.task_id = "task-1"
 
         async def _events(task=task, artifact_event=artifact_event):
-            yield (task, artifact_event)
-            yield (task, None)
+            yield make_stream_response(artifact_event)
+            yield make_stream_response(task)
 
         client.send_message = MagicMock(return_value=_events())
 
@@ -82,10 +86,12 @@ async def test_unknown_agent_does_not_break_pipeline(monkeypatch, tmp_path):
     client = MagicMock()
     task = _make_completed_task()
     artifact_event = MagicMock(spec=TaskArtifactUpdateEvent)
+    artifact_event.context_id = "ctx-1"
+    artifact_event.task_id = "task-1"
 
     async def _events():
-        yield (task, artifact_event)
-        yield (task, None)
+        yield make_stream_response(artifact_event)
+        yield make_stream_response(task)
 
     client.send_message = MagicMock(return_value=_events())
 

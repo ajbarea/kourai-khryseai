@@ -582,7 +582,7 @@ async def main(
     )
 
     try:
-        client = await _connect_with_url_override(agent, config)
+        client, card = await _connect_with_url_override(agent, config)
     except httpx.ConnectError:
         _echo(f"{_RED}\U0001f525 Cannot reach Hephaestus at {agent}{_RESET}")
         _echo(f"Start the forge with: {_GOLD}make up{_RESET}")
@@ -591,7 +591,6 @@ async def main(
         _echo(f"{_RED}Failed to connect: {e}{_RESET}")
         sys.exit(1)
 
-    card = await client.get_card()
     model_label = _active_model_label()
     _echo(f"Connected to {_GOLD}{card.name}{_RESET} v{card.version}")
     _echo(f"Skills: {_DIM}{', '.join(s.name for s in card.skills)}{_RESET}")

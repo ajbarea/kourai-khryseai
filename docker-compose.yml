@@ -641,7 +641,7 @@ services:
       dockerfile: docker/host.Dockerfile
       args:
         HOST_TYPE: vn_bridge
-        PACKAGE_NAME: hephaestus
+        PACKAGE_NAME: vn_bridge
         PORT: 10010
       cache_from:
         - type=registry,ref=${DOCKER_HUB_USERNAME:-local}/kourai-khryseai:vn-bridge
@@ -656,7 +656,7 @@ services:
     ports:
       - "127.0.0.1:10010:10010"
     volumes:
-      - ./agents/vn_bridge.py:/app/agents/vn_bridge.py
+      - ./agents/vn_bridge:/app/agents/vn_bridge
       - ./shared:/app/shared
       - ~/.kourai_khryseai:/home/kourai/.kourai_khryseai
       # See Kallos's mount block above for the rationale on the second
@@ -672,12 +672,29 @@ services:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:10010/health')\""]
       interval: 15s
       timeout: 5s
-      start_period: 30s
+      # Kokoro model + RealtimeTTS pipeline init in vn_bridge's lifespan
+      # routinely takes 45-60s on first boot (PyTorch RNN/weight_norm setup
+      # + HF model fetch on cold cache). 30s clipped this and triggered a
+      # restart loop on fresh rebuilds. 90s aligns with the April 2026
+      # FastAPI/Starlette best practice for ML-serving containers (start
+      # period covers model load; per-check `interval` + `retries` still
+      # catches genuine wedges within ~45s post-warm-up).
+      start_period: 90s
       retries: 3
     deploy:
       resources:
         limits:
-          memory: 512M
+          # Kokoro 82M weights are ~1GB at FP16; RealtimeTTS + PyTorch
+          # runtime adds CUDA/CPU kernels and buffers totalling 2-3GB
+          # during inference (per HF model card + April 2026 deployment
+          # guides). The legacy 512M limit was sized for edge-tts
+          # (no model load) and silently truncated Kokoro's lifespan
+          # init on M19 Phase 3 — Python exited 0 mid-load with no
+          # OOM-kill signal, hiding the cause behind a restart loop.
+          # 4G covers cold-start init plus a single-stream synthesis
+          # buffer with headroom; bump again only if a future engine
+          # (M6 ElevenLabs, etc.) shifts the footprint.
+          memory: 4G
           cpus: "1"
     logging: *default-logging
 
