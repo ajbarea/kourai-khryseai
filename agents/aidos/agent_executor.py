@@ -10,7 +10,7 @@ from a2a.types import Task, UnsupportedOperationError
 from agents.aidos.agent import analyze_slop, flag_slop_words, flag_vacuous_docstrings
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
-from kourai_common.messaging import data_part, send_working_status, text_part
+from kourai_common.messaging import KIND_STATUS, data_part, send_working_status, text_part
 
 if TYPE_CHECKING:
     from a2a.server.agent_execution import RequestContext
@@ -46,9 +46,13 @@ class AidosAgentExecutor(BaseAgentExecutor):
             issues.append(f"{len(vacuous)} vacuous docstring(s): {names}")
 
         if issues:
-            await send_working_status(updater, task, "Found " + "; ".join(issues), emoji="🚫")
+            await send_working_status(
+                updater, task, "Found " + "; ".join(issues), emoji="🚫", kind=KIND_STATUS
+            )
         else:
-            await send_working_status(updater, task, "Scanning for slop...", emoji="🔍")
+            await send_working_status(
+                updater, task, "Scanning for slop...", emoji="🔍", kind=KIND_STATUS
+            )
 
         result = await analyze_slop(user_input, context_id=task.context_id)
 
