@@ -15,12 +15,14 @@ under it. Post-Phase-1 UX/DX cleanup batch shipped same day
 (#107/#108/#109/#110/#111/#112): empty Project root field, phonemizer
 WARN spam, zero-commit soft-fail banner, WSL2 test env, Kokoro
 language pre-warm, Context7 v2 tool rename + transcript-prefix
-leakage. Active focus: validate Phase 1 end-to-end via live smoke
-(blocked on smoke-driver update to pre-seed project facts via
-``/preferences set`` so metis skips the M17 PAUSE), then proceed to
-Phase 2 (SSML inside dialogue bodies) — Kokoro doesn't natively consume
-SSML so transitional strip-then-synthesize, ElevenLabs migration on M6
-unblocks full SSML downstream.**
+leakage. Smoke driver promoted from /tmp to ``scripts/smoke_m18_full_pipeline.py``
+(#113) with new ``make smoke-m18`` target — pre-seeds the closed M17
+PAUSE vocabulary so metis plans without pausing, then drives metis →
+techne → dokimasia → kallos → mneme end-to-end. Active focus: run
+the full-pipeline live smoke against latest main + container rebuild,
+then proceed to Phase 2 (SSML inside dialogue bodies) — Kokoro
+doesn't natively consume SSML so transitional strip-then-synthesize,
+ElevenLabs migration on M6 unblocks full SSML downstream.**
 
 ## M18 Phase 1 — what shipped (eight PRs, 2026-04-30)
 
@@ -208,33 +210,30 @@ UX/DX is the default between milestones. Pre-release perfection
 stance: no workarounds, web-search 2026 best practice before any
 implementation, architectural fix over expedient patch.
 
-1. **Update smoke driver** to pre-seed project facts via
-   ``/preferences set`` so metis skips the M17 PAUSE; full-pipeline
-   smoke then runs end-to-end in one shot.
-2. **Full-pipeline live smoke** against latest main (post-#106) with
-   the updated driver — first end-to-end run with all eleven
-   specialists on the URI shape AND the post-2026-04-30 UX cleanup
-   (#107/#108/#109/#111/#112). Voice-off run gives functional
-   verification of the metadata flow + soft-fail banner + Context7
-   round-trip.
-3. **M18 Phase 2 — SSML inside dialogue bodies.** Web-search 2026 SSML
+1. **Full-pipeline live smoke** via the new ``make smoke-m18`` target
+   (#113) against latest main (post-#106 + the 2026-04-30 cleanup
+   batch). Container rebuild required first — current images are
+   8+ commits behind. Voice-off run gives functional verification of
+   the metadata flow + soft-fail banner + Context7 round-trip + Kokoro
+   pre-warm.
+2. **M18 Phase 2 — SSML inside dialogue bodies.** Web-search 2026 SSML
    best practice (W3C SSML 1.1 status, ElevenLabs/Azure provider
    subset compatibility) before any implementation. Decide
    producer-vs-consumer SSML wrapping.
-4. **M18 Phase 3 — KIND_CODE / KIND_SPEC distinct render paths.** Drop
+3. **M18 Phase 3 — KIND_CODE / KIND_SPEC distinct render paths.** Drop
    the ``or kind is None`` legacy fallback once full-pipeline smoke
    confirms no untagged emissions in production. Wide markdown render
    for spec, monospace + syntax highlighting for code.
-5. **M20 — Audio-text synchronization.** Builds on M18 (kind routing)
+4. **M20 — Audio-text synchronization.** Builds on M18 (kind routing)
    + M19 (RealtimeTTS word-timing API already wired via ``on_word=``
    callback). 9-14s text-precedes-audio gap is a player-notices UX
    issue.
-6. **Remaining independent UX bugs** — agent-card poll storm (#12),
+5. **Remaining independent UX bugs** — agent-card poll storm (#12),
    per-agent CLI color badges (#10), captions toggle (#19), playlist
    expansion (#11). Each sized for a single PR.
-7. **Live VN smoke** — exercises the new vn_bridge ``/tts`` →
+6. **Live VN smoke** — exercises the new vn_bridge ``/tts`` →
    ``RealtimeTTSEngine.synthesize_to_wav`` path AND the new
    metadata-based dialogue routing.
-8. **``docs/architecture/puck-first-run-tutorial.md``** — pairs with
+7. **``docs/architecture/puck-first-run-tutorial.md``** — pairs with
    the M6 player-onboarding theme.
-9. **M5 / M12 / M15 / M6 follow-ons** — see ROADMAP for scope.
+8. **M5 / M12 / M15 / M6 follow-ons** — see ROADMAP for scope.
