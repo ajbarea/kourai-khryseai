@@ -88,6 +88,9 @@ vn:                        ## Launch Ren'Py Visual Novel GUI (runs on host machi
 vn-demo:                   ## Launch VN in scripted demo mode (no bridge, no Docker — for poster screenshots)
 	@KOURAI_POSTER_DEMO=1 $(UV_DEV) vn
 
+smoke-m18:                 ## Drive full-pipeline live smoke (preferences pre-seed → dev turn → completion); requires `make up`
+	@uvx --with pexpect python scripts/smoke_m18_full_pipeline.py
+
 # ---------------------------------------------------------------------------
 # Documentation
 # ---------------------------------------------------------------------------
