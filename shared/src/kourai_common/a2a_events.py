@@ -61,6 +61,48 @@ def extract_parts_text(parts: object) -> str:
     return "\n".join(extracted)
 
 
+def extract_parts_data(parts: object) -> list[dict]:
+    """Pull structured-data payloads (DataPart) out of an A2A parts list.
+
+    Mirror of ``extract_parts_text`` but returning the parsed dicts
+    instead of a JSON-serialized blob — callers that need to inspect
+    fields (e.g. host CLI checking ``commit_count``) get a typed view.
+    """
+    if not isinstance(parts, list) and not hasattr(parts, "__iter__"):
+        return []
+
+    out: list[dict] = []
+    for part in parts:  # ty: ignore[not-iterable]
+        if not _has_field(part, "data"):
+            continue
+        data = getattr(part, "data", None)
+        if data is None:
+            continue
+        try:
+            payload = MessageToDict(data)
+        except Exception:
+            payload = None
+        if isinstance(payload, dict):
+            out.append(payload)
+    return out
+
+
+def extract_artifact_data(event: TaskArtifactUpdateEvent) -> list[dict]:
+    """Return the structured-data dicts emitted by an artifact event.
+
+    Tolerant of ``MagicMock(spec=TaskArtifactUpdateEvent)`` instances that
+    don't expose ``.artifact`` — the upstream protobuf class hides the
+    field behind a descriptor that ``unittest.mock`` doesn't auto-mock.
+    Pre-existing memoir/CLI tests build the mock without setting the
+    attribute and rely on the host stubbing extractors at call time;
+    this getattr keeps the new commit-count probe equally tolerant.
+    """
+    artifact = getattr(event, "artifact", None)
+    if artifact and hasattr(artifact, "parts"):
+        return extract_parts_data(list(artifact.parts))
+    return []
+
+
 def extract_message_text(message: Message) -> str:
     """Pull text from a direct Message response."""
     return extract_parts_text(list(message.parts))

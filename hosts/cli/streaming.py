@@ -5,6 +5,7 @@ Contains the main send_and_stream() function and connection helpers.
 
 from __future__ import annotations
 
+import contextlib
 import time
 from typing import TYPE_CHECKING, Any
 
@@ -30,6 +31,7 @@ from hosts.cli.events import (
 )
 from hosts.cli.rendering import _comms_window, _echo, _render_markdown
 from hosts.cli.styling import _DIM, _GOLD, _GOLD_BRIGHT, _RED, _RESET
+from kourai_common.a2a_events import extract_artifact_data
 from kourai_common.federation.host_helpers import build_pipeline_turn_entry
 from kourai_common.hooks_interaction import synthesise_fact_from_pause
 from kourai_common.messaging import (
@@ -194,6 +196,12 @@ async def send_and_stream(
     final_state = None
     final_text = ""
     event_count = 0
+    # Soft-fail surface (#17): track mneme's commit_count from artifact
+    # data parts. ``None`` = mneme didn't emit a commit_messages artifact
+    # (pipeline didn't include scribe step); ``0`` = mneme ran but produced
+    # no commits, which the player needs called out explicitly so a silent
+    # "Pipeline complete / Forged in" doesn't read as success.
+    observed_commit_count: int | None = None
 
     try:
         async for response in client.send_message(send_request(message)):
@@ -241,6 +249,10 @@ async def send_and_stream(
                 text = _extract_artifact_text(event)
                 if text:
                     final_text = text
+                for payload in extract_artifact_data(event):
+                    if "commit_count" in payload:
+                        with contextlib.suppress(TypeError, ValueError):
+                            observed_commit_count = int(payload["commit_count"])
 
             elif isinstance(event, Task):
                 # Final task snapshot
@@ -277,6 +289,16 @@ async def send_and_stream(
         )
 
         # Always show elapsed time — the golden forge signature
+        # Soft-fail surface (#17): when mneme reports zero commits, the
+        # pipeline cascaded through specialists but produced no code
+        # changes. Without this banner the "Forged in" line reads as
+        # success even when nothing landed.
+        if observed_commit_count == 0:
+            _echo(
+                f"{_RED}\u26a0 No commits produced \u2014 the forge ran but "
+                f"nothing landed. Check the result above for what Mneme reported.{_RESET}"
+            )
+
         _echo(f"{_GOLD_BRIGHT}\u2728 Forged in {elapsed:.1f}s{_RESET}")
 
         # Write a Memoir entry capturing this turn for FL training data.
