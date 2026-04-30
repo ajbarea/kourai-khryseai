@@ -12,7 +12,7 @@ from kourai_common.a2a_utils import project_root_from_context
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
 from kourai_common.mcp_client import kourai_project_root_var
-from kourai_common.messaging import data_part, send_working_status, text_part
+from kourai_common.messaging import KIND_STATUS, data_part, send_working_status, text_part
 from kourai_common.player import PlayerProfile
 from kourai_common.tracing import create_span
 from kourai_common.virtues import update_virtue
@@ -50,7 +50,7 @@ class KallosAgentExecutor(BaseAgentExecutor):
             from kourai_common.subprocess import extract_files_from_output
 
             async def _lint_status(line: str) -> None:
-                await send_working_status(updater, task, line, emoji="💻")
+                await send_working_status(updater, task, line, emoji="💻", kind=KIND_STATUS)
 
             project_root = project_root_from_context(context)
             kourai_project_root_var.set(project_root)
@@ -61,7 +61,9 @@ class KallosAgentExecutor(BaseAgentExecutor):
             async def _on_tool(name: str, args: dict[str, Any], result: str) -> None:
                 target = args.get("path", "")
                 ok = "ok" if not result.startswith("ERROR:") else "fail"
-                await send_working_status(updater, task, f"{name} {target} ({ok})", emoji="✨")
+                await send_working_status(
+                    updater, task, f"{name} {target} ({ok})", emoji="✨", kind=KIND_STATUS
+                )
 
             async def _apply_fixes(
                 lint_output: str,
@@ -101,6 +103,7 @@ class KallosAgentExecutor(BaseAgentExecutor):
                     task,
                     f"Aidos: {len(slop_words)} slop word(s) found — {', '.join(slop_words[:3])}",
                     emoji="🚫",
+                    kind=KIND_STATUS,
                 )
                 slop_analysis = await analyze_slop(final_output, context_id=task.context_id)
                 if slop_analysis != "CLEAN":
