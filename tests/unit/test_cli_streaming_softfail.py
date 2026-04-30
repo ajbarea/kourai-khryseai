@@ -41,12 +41,8 @@ def _artifact_event(parts: list) -> MagicMock:
 async def test_zero_commit_count_renders_softfail_banner(monkeypatch):
     captured: list[str] = []
     monkeypatch.setattr("hosts.cli.streaming._echo", captured.append)
-    monkeypatch.setattr(
-        "hosts.cli.streaming._render_markdown", lambda text: text
-    )
-    monkeypatch.setattr(
-        "hosts.cli.streaming._extract_artifact_text", lambda _: "Final result"
-    )
+    monkeypatch.setattr("hosts.cli.streaming._render_markdown", lambda text: text)
+    monkeypatch.setattr("hosts.cli.streaming._extract_artifact_text", lambda _: "Final result")
     monkeypatch.setattr("hosts.cli.streaming.get_last_seen_agent", lambda: "mneme")
 
     client = MagicMock()
@@ -71,12 +67,8 @@ async def test_zero_commit_count_renders_softfail_banner(monkeypatch):
 async def test_nonzero_commit_count_no_banner(monkeypatch):
     captured: list[str] = []
     monkeypatch.setattr("hosts.cli.streaming._echo", captured.append)
-    monkeypatch.setattr(
-        "hosts.cli.streaming._render_markdown", lambda text: text
-    )
-    monkeypatch.setattr(
-        "hosts.cli.streaming._extract_artifact_text", lambda _: "Final result"
-    )
+    monkeypatch.setattr("hosts.cli.streaming._render_markdown", lambda text: text)
+    monkeypatch.setattr("hosts.cli.streaming._extract_artifact_text", lambda _: "Final result")
     monkeypatch.setattr("hosts.cli.streaming.get_last_seen_agent", lambda: "mneme")
 
     client = MagicMock()
@@ -105,12 +97,8 @@ async def test_no_commit_count_artifact_no_banner(monkeypatch):
     not show the soft-fail banner — observed_commit_count stays None."""
     captured: list[str] = []
     monkeypatch.setattr("hosts.cli.streaming._echo", captured.append)
-    monkeypatch.setattr(
-        "hosts.cli.streaming._render_markdown", lambda text: text
-    )
-    monkeypatch.setattr(
-        "hosts.cli.streaming._extract_artifact_text", lambda _: "Final result"
-    )
+    monkeypatch.setattr("hosts.cli.streaming._render_markdown", lambda text: text)
+    monkeypatch.setattr("hosts.cli.streaming._extract_artifact_text", lambda _: "Final result")
     monkeypatch.setattr("hosts.cli.streaming.get_last_seen_agent", lambda: "hephaestus")
 
     client = MagicMock()
