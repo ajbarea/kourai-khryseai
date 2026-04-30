@@ -82,12 +82,16 @@ def user_message(
     task_id: str | None = None,
     message_id: str | None = None,
     extra_parts: Sequence[Part] | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> Message:
     """Build an A2A Message with role=user, a text body, and optional extra parts.
 
     Mirrors how hosts (CLI, GUI, vn_bridge) construct outbound prompts —
     one text Part with the user's typed input, optional FilePart(s) for
-    attachments, optional context/task IDs for resume threading.
+    attachments, optional context/task IDs for resume threading, and
+    optional ``Message.metadata`` for forge context (``project_root``,
+    ``project_id``, ``yolo``, ``auto_approve_reads``,
+    ``relationship_tiers``).
     """
     msg = new_text_message(text, role=Role.ROLE_USER)
     if extra_parts:
@@ -97,6 +101,11 @@ def user_message(
         msg.context_id = context_id
     if task_id is not None:
         msg.task_id = task_id
+    if metadata:
+        for key, value in metadata.items():
+            if value is None:
+                continue
+            msg.metadata[key] = value
     return msg
 
 

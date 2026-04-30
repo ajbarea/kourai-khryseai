@@ -64,13 +64,19 @@ async def _async_gen(items: list[str]):
         yield item
 
 
-def _make_context(user_input: str, context_id: str | None = None) -> MagicMock:
+def _make_context(
+    user_input: str,
+    context_id: str | None = None,
+    *,
+    metadata: dict | None = None,
+) -> MagicMock:
     ctx = MagicMock()
     ctx.get_user_input.return_value = user_input
     ctx.current_task = None
     ctx.message = user_message(
         user_input or "placeholder",
         context_id=context_id or uuid4().hex,
+        metadata=metadata,
     )
     return ctx
 
@@ -206,7 +212,7 @@ class TestExecutorRecallWiring:
             captured["kwargs"] = kwargs
             yield "spec"
 
-        ctx = _make_context("[project_root: /var/forge/proj-a]\nimplement CSV export")
+        ctx = _make_context("implement CSV export", metadata={"project_root": "/var/forge/proj-a"})
         queue = _make_queue()
         executor = MetisAgentExecutor()
 
@@ -271,7 +277,7 @@ class TestExecutorRecallWiring:
             captured["kwargs"] = kwargs
             yield "spec"
 
-        ctx = _make_context("[project_root: /var/forge/proj-a]\nplan a feature")
+        ctx = _make_context("plan a feature", metadata={"project_root": "/var/forge/proj-a"})
         queue = _make_queue()
         executor = MetisAgentExecutor()
 

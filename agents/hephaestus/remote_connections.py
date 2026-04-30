@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import httpx
 from a2a.client import A2ACardResolver, ClientConfig, ClientFactory
@@ -93,6 +93,8 @@ class RemoteAgentConnection:
         text: str,
         context_id: str,
         attachments: list[tuple[str, str]] | None = None,
+        *,
+        metadata: dict[str, Any] | None = None,
     ) -> AsyncGenerator[tuple[str, str], None]:
         """Send a message to the specialist and yield status and result updates.
 
@@ -100,6 +102,10 @@ class RemoteAgentConnection:
             text: The message/task content to send.
             context_id: Conversation context ID for multi-turn.
             attachments: Optional list of (base64_bytes, mime_type) image attachments.
+            metadata: Forge metadata (``project_root``, ``project_id``,
+                ``relationship_tiers``, etc.) to propagate to the specialist.
+                Merged with the OTel trace-context dict so the wire metadata
+                carries both transport-level (trace) and forge-level keys.
 
         Yields:
             Tuples of (event_type, text) where event_type is "status" or "result".
@@ -120,12 +126,14 @@ class RemoteAgentConnection:
                 )
                 for b64_data, mime_type in (attachments or [])
             ]
+            merged_metadata: dict[str, Any] = dict(metadata or {})
+            merged_metadata.update(get_trace_context())
             message = user_message(
                 text,
                 context_id=context_id,
                 extra_parts=extra_parts or None,
+                metadata=merged_metadata,
             )
-            message.metadata = get_trace_context()
 
             log.info("Sending to %s: %d chars", self.agent_name, len(text))
             latest_artifact_text = ""

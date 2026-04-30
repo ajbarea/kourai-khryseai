@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from a2a.types import Task, UnsupportedOperationError
 
 from agents.aidos.agent import analyze_slop, flag_slop_words
-from kourai_common.a2a_utils import parse_project_root
+from kourai_common.a2a_utils import project_root_from_context
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
 from kourai_common.mcp_client import kourai_project_root_var
@@ -52,7 +52,7 @@ class KallosAgentExecutor(BaseAgentExecutor):
             async def _lint_status(line: str) -> None:
                 await send_working_status(updater, task, line, emoji="💻")
 
-            project_root = parse_project_root(context.get_user_input())
+            project_root = project_root_from_context(context)
             kourai_project_root_var.set(project_root)
 
             async def _run_lint_with_status() -> tuple[bool, str]:

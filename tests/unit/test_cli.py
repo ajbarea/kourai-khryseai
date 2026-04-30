@@ -243,13 +243,14 @@ class TestSendAndStream:
         assert not memoir.path.exists()
 
 
-class TestForgeTagsPropagation:
-    """``send_and_stream``'s ``forge_tags`` kwarg re-prepends bracket-tags
-    on ``input_required`` follow-ups so multi-turn confirmation flows
-    (M13 ``yes``, mid-pipeline ASK_USER replies) preserve forge metadata
+class TestForgeMetadataPropagation:
+    """``send_and_stream``'s ``forge_metadata`` kwarg propagates the forge
+    context across ``input_required`` follow-ups so multi-turn confirmation
+    flows (M13 ``yes``, mid-pipeline ASK_USER replies) preserve forge state
     across the recursion. Discovered via 2026-04-27 live smoke when M13
     ``yes`` arrived bare at Metis and the agent fell back to ``Path.cwd()``
-    (= ``/app`` in container, not a git repo, ``exit 128``)."""
+    (= ``/app`` in container, not a git repo, ``exit 128``). Migrated to
+    ``Message.metadata`` in M7 Phase 5."""
 
     def _make_input_required_then_complete(self):
         """Return a (mock_send_msg) callable that emits one INPUT_REQUIRED
@@ -282,52 +283,59 @@ class TestForgeTagsPropagation:
         return client, sends
 
     @pytest.mark.asyncio
-    async def test_input_required_follow_up_re_prepends_tags(self, monkeypatch):
+    async def test_input_required_follow_up_carries_forge_metadata(self, monkeypatch):
         client, sends = self._make_input_required_then_complete()
+        captured_metadata: list[dict] = []
+
+        async def gen_input_required(message, **kwargs):
+            sends.append(message.parts[0].text)
+            captured_metadata.append(dict(message.metadata))
+            task = _make_task(TaskState.TASK_STATE_INPUT_REQUIRED)
+            status_required = MagicMock(spec=TaskStatusUpdateEvent)
+            status_required.status = MagicMock()
+            status_required.status.state = TaskState.TASK_STATE_INPUT_REQUIRED
+            status_required.status.message = None
+            yield (task, status_required)
+
+        async def gen_completed(message, **kwargs):
+            sends.append(message.parts[0].text)
+            captured_metadata.append(dict(message.metadata))
+            completed = _make_task(TaskState.TASK_STATE_COMPLETED)
+            status_done = MagicMock(spec=TaskStatusUpdateEvent)
+            status_done.status = MagicMock()
+            status_done.status.state = TaskState.TASK_STATE_COMPLETED
+            status_done.status.message = None
+            yield (completed, status_done)
+            yield (completed, None)
+
+        gens = iter([gen_input_required, gen_completed])
+        client.send_message = lambda msg, **kw: next(gens)(msg, **kw)
 
         async def fake_prompt(_text):
             return "yes"
 
-        # Patch the click.prompt call inside streaming.py so the test
-        # doesn't actually try to read from stdin.
         monkeypatch.setattr("hosts.cli.streaming.click.prompt", fake_prompt)
 
-        forge_tags = [
-            "[project_root: /home/ajbar/.kourai_khryseai/projects/p1/work]",
-            "[yolo: on]",
-        ]
-        await send_and_stream(
-            client, "[project_root: /...]\n[yolo: on]\nadd fn", "ctx-1", forge_tags=forge_tags
-        )
+        forge_metadata = {
+            "project_root": "/home/ajbar/.kourai_khryseai/projects/p1/work",
+            "yolo": "on",
+        }
+        await send_and_stream(client, "add fn", "ctx-1", forge_metadata=forge_metadata)
 
         # Two messages sent: the original turn, then the follow-up.
         assert len(sends) == 2
-        # The follow-up MUST carry both tags before the user's "yes".
+        # The follow-up must carry the same metadata so specialists still
+        # see project_root + yolo on the resumed task.
         follow_up_text = sends[1]
-        assert "[project_root: /home/ajbar/.kourai_khryseai/projects/p1/work]" in follow_up_text
-        assert "[yolo: on]" in follow_up_text
-        assert follow_up_text.endswith("yes")
-
-    @pytest.mark.asyncio
-    async def test_no_tags_keeps_follow_up_bare(self, monkeypatch):
-        # Backward-compat: when forge_tags is None (no active project), the
-        # follow-up sends the user's text unchanged — same behavior as before.
-        client, sends = self._make_input_required_then_complete()
-
-        async def fake_prompt(_text):
-            return "more details"
-
-        monkeypatch.setattr("hosts.cli.streaming.click.prompt", fake_prompt)
-
-        await send_and_stream(client, "hello", "ctx-1")  # no forge_tags
-
-        assert len(sends) == 2
-        assert sends[1] == "more details"  # bare, no prepending
+        assert follow_up_text == "yes"
+        follow_up_meta = captured_metadata[1]
+        assert follow_up_meta.get("project_root") == forge_metadata["project_root"]
+        assert follow_up_meta.get("yolo") == "on"
 
     @pytest.mark.asyncio
     async def test_quit_response_does_not_recurse(self, monkeypatch):
         # Defensive: typing /q at the input_required prompt aborts the
-        # follow-up entirely, doesn't try to send the tags + /q.
+        # follow-up entirely.
         client, sends = self._make_input_required_then_complete()
 
         async def fake_prompt(_text):
@@ -336,7 +344,10 @@ class TestForgeTagsPropagation:
         monkeypatch.setattr("hosts.cli.streaming.click.prompt", fake_prompt)
 
         cont, _, _ = await send_and_stream(
-            client, "first", "ctx-1", forge_tags=["[project_root: /tmp]"]
+            client,
+            "first",
+            "ctx-1",
+            forge_metadata={"project_root": "/tmp"},  # noqa: S108
         )
         assert cont is False
         assert len(sends) == 1  # original send only, no follow-up

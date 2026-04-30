@@ -5,9 +5,8 @@ Contains the main send_and_stream() function and connection helpers.
 
 from __future__ import annotations
 
-import re
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import asyncclick as click
 import httpx
@@ -48,46 +47,22 @@ if TYPE_CHECKING:
 _last_result: str = ""
 
 
-_PROJECT_ROOT_TAG = re.compile(r"\[project_root:\s*([^\]]+)\]", re.IGNORECASE)
-# Explicit, project-stable id. Set by the REPL alongside ``[project_root: …]``
-# so the M17 fact axis stays stable across forge sessions whose ``workdir`` is
-# uuid'd per-turn. Specialists ignore this tag (their regex matches
-# ``project_root`` only); only the streaming-side fact synthesiser reads it.
-_PROJECT_ID_TAG = re.compile(r"\[project_id:\s*([^\]\s]+)\s*\]", re.IGNORECASE)
+def _project_id_from_metadata(forge_metadata: dict[str, Any] | None) -> str | None:
+    """Resolve the M17 fact-axis project id from the message's forge metadata.
 
-
-def _strip_forge_tag_prefix(text: str, forge_tags: list[str] | None) -> str:
-    """Recover the bare follow-up text from a forge-tag-prefixed payload.
-
-    ``send_and_stream`` re-prepends ``forge_tags`` (joined with ``\\n``)
-    before recursing on an ``input_required`` follow-up; the M17 fact
-    synthesiser wants the player's actual answer, not the prefix.
+    Prefers the explicit ``project_id`` key (the stable, project-rooted
+    sha256). Falls back to deriving from ``project_root`` for callers
+    that haven't surfaced the explicit id yet — that fallback is unstable
+    when the path is a per-session forge worktree.
     """
-    if not forge_tags:
-        return text
-    prefix = "\n".join(forge_tags) + "\n"
-    return text.removeprefix(prefix)
-
-
-def _project_id_from_forge_tags(forge_tags: list[str] | None) -> str | None:
-    """Resolve the M17 fact-axis project id from forge tags.
-
-    Prefers the explicit ``[project_id: <stable>]`` tag (carries the id
-    derived from the project's persistent root). Falls back to deriving
-    from ``[project_root: <path>]`` for callers that haven't been updated
-    to emit the explicit tag yet — note this fallback is unstable when
-    the path is a per-session forge worktree.
-    """
-    if not forge_tags:
+    if not forge_metadata:
         return None
-    for tag in forge_tags:
-        match = _PROJECT_ID_TAG.search(tag)
-        if match:
-            return match.group(1).strip()
-    for tag in forge_tags:
-        match = _PROJECT_ROOT_TAG.search(tag)
-        if match:
-            return derive_project_id(match.group(1).strip())
+    explicit = forge_metadata.get("project_id")
+    if isinstance(explicit, str) and explicit.strip():
+        return explicit.strip()
+    root = forge_metadata.get("project_root")
+    if isinstance(root, str) and root.strip():
+        return derive_project_id(root.strip())
     return None
 
 
@@ -95,7 +70,7 @@ def _try_synthesise_pause_fact(
     *,
     context_id: str,
     user_text: str,
-    forge_tags: list[str] | None,
+    forge_metadata: dict[str, Any] | None,
 ) -> None:
     """Idempotently store a project-scoped fact when the resumed turn lands.
 
@@ -109,7 +84,7 @@ def _try_synthesise_pause_fact(
     if pending is None:
         return
 
-    bare_answer = _strip_forge_tag_prefix(user_text, forge_tags).strip()
+    bare_answer = (user_text or "").strip()
     if not bare_answer:
         return
 
@@ -122,7 +97,7 @@ def _try_synthesise_pause_fact(
     if not profile or not profile.player_id:
         return
 
-    project_id = _project_id_from_forge_tags(forge_tags)
+    project_id = _project_id_from_metadata(forge_metadata)
     synthesise_fact_from_pause(
         player_id=profile.player_id,
         project_id=project_id,
@@ -152,23 +127,20 @@ async def send_and_stream(
     *,
     memoir: Memoir | None = None,
     scene_id: str | None = None,
-    forge_tags: list[str] | None = None,
+    forge_metadata: dict[str, Any] | None = None,
 ) -> tuple[bool, str, str | None]:
     """Send a message and stream the response.
 
     Returns:
         (continue_loop, context_id, task_id) tuple.
 
-    ``forge_tags`` carries the bracket-tag prefixes the REPL prepended on
-    the original turn (``[project_root: …]``, ``[yolo: on]``,
-    ``[auto_approve_reads: on]``). The ``input_required`` follow-up loop
-    re-prepends them to the player's response so multi-turn confirmation
-    flows preserve forge metadata. Without this, every M13 ``yes`` would
-    arrive at specialists stripped of project_root, dropping them back to
-    ``Path.cwd()`` (= ``/app`` in the agent container — not a git repo,
-    fails with ``exit 128``). A2A v1.0's ``Message.metadata`` channel is
-    the spec-correct destination for these (see M7 scope) but the
-    text-tag carrier ships value today on 0.3.x.
+    ``forge_metadata`` rides on the outbound ``Message.metadata`` channel
+    (M7 Phase 5). Carries ``project_root``, ``project_id``, ``yolo``, and
+    ``auto_approve_reads`` so specialists chdir into the worktree, drop
+    CONFIRM_ORDER when the player has /yolo on, and resolve the M17 fact
+    axis. Propagates across input_required follow-ups (M13 confirmations,
+    mid-pipeline ASK_USER replies) by being re-passed on the recursive
+    call below.
     """
     global _last_result
     t0 = time.monotonic()
@@ -183,7 +155,7 @@ async def send_and_stream(
     _try_synthesise_pause_fact(
         context_id=context_id,
         user_text=user_text,
-        forge_tags=forge_tags,
+        forge_metadata=forge_metadata,
     )
 
     # Build multi-part message so images travel alongside text in the A2A envelope.
@@ -200,6 +172,7 @@ async def send_and_stream(
         context_id=context_id,
         task_id=task_id or None,
         extra_parts=extra_parts or None,
+        metadata=forge_metadata,
     )
 
     if verbose:
@@ -323,16 +296,11 @@ async def send_and_stream(
         follow_up: str = await click.prompt(f"\n{_GOLD}\u21b3 Your response{_RESET}")
         if follow_up.strip().lower() in ("/q", "/quit", "quit"):
             return False, context_id, task_id
-        # Re-prepend the original turn's bracket-tags so specialists
-        # still receive [project_root: ...] / [yolo: on] / [auto_approve_reads: on]
-        # on the resumed task. Without this, the M13 confirmation `yes`
-        # arrives bare and Hephaestus's transcript-build emits an empty
-        # `Project root:` line. Metis/Techne then fall back to Path.cwd()
-        # (= /app inside the agent container) and git operations fail
-        # with exit 128. Tags propagate per-turn until the player exits
-        # to the REPL outer loop and the next turn rebuilds them.
-        if forge_tags:
-            follow_up = "\n".join((*forge_tags, follow_up))
+        # Forward the same forge metadata so specialists still see
+        # ``project_root`` / ``yolo`` on the resumed task. Without this,
+        # the M13 confirmation `yes` arrives bare and Metis/Techne fall
+        # back to ``Path.cwd()`` (= /app inside the agent container)
+        # where git operations fail with exit 128.
         return await send_and_stream(
             client,
             follow_up,
@@ -341,7 +309,7 @@ async def send_and_stream(
             verbose,
             tts=tts,
             gossip_enabled=gossip_enabled,
-            forge_tags=forge_tags,
+            forge_metadata=forge_metadata,
         )
 
     return True, context_id, task_id

@@ -74,17 +74,17 @@ class TestExecutePipelineIterativeLoop:
         # Use separate connection instances per agent so we can give each different behavior
         kallos_send_count = 0
 
-        async def kallos_send(text, ctx_id):
+        async def kallos_send(text, ctx_id, **kwargs):
             nonlocal kallos_send_count
             kallos_send_count += 1
             if kallos_send_count <= 1:
                 return "✨ Linting completed with issues.\nE123 error on line 5"
             return "✨ All linting checks passed!"
 
-        async def techne_send(text, ctx_id):
+        async def techne_send(text, ctx_id, **kwargs):
             return "Fixed code output"
 
-        async def mneme_send(text, ctx_id):
+        async def mneme_send(text, ctx_id, **kwargs):
             return "feat: add feature X"
 
         conn_map = {}

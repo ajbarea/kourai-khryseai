@@ -108,43 +108,10 @@ class TestDeterminePipelineForwardsConfirmOrder:
 
 
 class TestYoloBypass:
-    """``[yolo: on]`` text-tag bypasses the gate via system-prompt augmentation."""
-
-    def test_extract_yolo_strips_tag_and_returns_true(self):
-        from agents.hephaestus.agent import extract_yolo
-
-        clean, yolo = extract_yolo("[yolo: on]\nadd a function")
-        assert yolo is True
-        assert clean == "add a function"
-
-    def test_extract_yolo_case_insensitive(self):
-        from agents.hephaestus.agent import extract_yolo
-
-        clean, yolo = extract_yolo("[YOLO: ON]\nadd a function")
-        assert yolo is True
-        assert clean == "add a function"
-
-    def test_extract_yolo_absent_returns_false(self):
-        from agents.hephaestus.agent import extract_yolo
-
-        clean, yolo = extract_yolo("add a function")
-        assert yolo is False
-        assert clean == "add a function"
-
-    def test_extract_yolo_does_not_match_quoted_yolo_in_text(self):
-        from agents.hephaestus.agent import extract_yolo
-
-        # The bracketed-tag format is what we strip — bare "yolo" in
-        # the prompt body must NOT trigger the bypass.
-        clean, yolo = extract_yolo("teach me about yolo programming")
-        assert yolo is False
-        assert "yolo" in clean
+    """``metadata.yolo`` bypasses the gate via system-prompt augmentation."""
 
     @pytest.mark.asyncio
     async def test_yolo_augments_system_prompt(self):
-        # Verifies the bypass path actually reaches the LLM. We capture
-        # the messages handed to ``chat`` and assert the system prompt
-        # contains the YOLO MODE instruction.
         from agents.hephaestus.agent import determine_pipeline
 
         captured: dict = {}
@@ -154,7 +121,7 @@ class TestYoloBypass:
             return "metis, techne, dokimasia, kallos, mneme"
 
         with patch("agents.hephaestus.agent.chat", side_effect=capture_chat):
-            await determine_pipeline("[yolo: on]\nadd a function")
+            await determine_pipeline("add a function", metadata={"yolo": "on"})
 
         system_msg = next(m for m in captured["messages"] if m["role"] == "system")
         assert "YOLO MODE" in system_msg["content"]
@@ -162,7 +129,6 @@ class TestYoloBypass:
 
     @pytest.mark.asyncio
     async def test_no_yolo_keeps_system_prompt_clean(self):
-        # Default path — no YOLO MODE injection.
         from agents.hephaestus.agent import determine_pipeline
 
         captured: dict = {}
@@ -179,39 +145,10 @@ class TestYoloBypass:
 
 
 class TestAutoApproveReadsBypass:
-    """``[auto_approve_reads: on]`` — granular middle ground from
+    """``metadata.auto_approve_reads`` — granular middle ground from
     ``/permissions auto_approve_reads``. Skips CONFIRM_ORDER for read-
     only / planning-only pipelines; still gates anything that touches
-    disk. Tier-2 lift from the 2026-04-26 OSS-CC research sweep."""
-
-    def test_extract_auto_approve_reads_strips_tag_and_returns_true(self):
-        from agents.hephaestus.agent import extract_auto_approve_reads
-
-        clean, on = extract_auto_approve_reads("[auto_approve_reads: on]\nplan a feature")
-        assert on is True
-        assert clean == "plan a feature"
-
-    def test_extract_auto_approve_reads_case_insensitive(self):
-        from agents.hephaestus.agent import extract_auto_approve_reads
-
-        clean, on = extract_auto_approve_reads("[AUTO_APPROVE_READS: ON]\nplan a feature")
-        assert on is True
-        assert clean == "plan a feature"
-
-    def test_extract_auto_approve_reads_absent_returns_false(self):
-        from agents.hephaestus.agent import extract_auto_approve_reads
-
-        clean, on = extract_auto_approve_reads("plan a feature")
-        assert on is False
-        assert clean == "plan a feature"
-
-    def test_extract_does_not_match_substring_in_text(self):
-        from agents.hephaestus.agent import extract_auto_approve_reads
-
-        # The bracket-tag format is what we strip — bare phrase in body must NOT trigger.
-        clean, on = extract_auto_approve_reads("explain what auto_approve_reads does")
-        assert on is False
-        assert "auto_approve_reads" in clean
+    disk."""
 
     @pytest.mark.asyncio
     async def test_augments_system_prompt(self):
@@ -224,20 +161,17 @@ class TestAutoApproveReadsBypass:
             return "metis"
 
         with patch("agents.hephaestus.agent.chat", side_effect=capture_chat):
-            await determine_pipeline("[auto_approve_reads: on]\nplan a feature")
+            await determine_pipeline("plan a feature", metadata={"auto_approve_reads": "on"})
 
         system_msg = next(m for m in captured["messages"] if m["role"] == "system")
         assert "AUTO_APPROVE_READS" in system_msg["content"]
-        # Must explicitly call out the three mutating agents so the LLM
-        # doesn't widen the bypass to write paths.
         assert "techne" in system_msg["content"].lower()
         assert "kallos" in system_msg["content"].lower()
         assert "dokimasia" in system_msg["content"].lower()
 
     @pytest.mark.asyncio
     async def test_yolo_wins_when_both_set(self):
-        # Defensive: if both flags are on, /yolo's broader bypass takes
-        # precedence — auto_approve_reads is the narrower middle ground.
+        # Defensive: if both flags are on, /yolo's broader bypass wins.
         from agents.hephaestus.agent import determine_pipeline
 
         captured: dict = {}
@@ -247,12 +181,13 @@ class TestAutoApproveReadsBypass:
             return "metis, techne"
 
         with patch("agents.hephaestus.agent.chat", side_effect=capture_chat):
-            await determine_pipeline("[yolo: on]\n[auto_approve_reads: on]\nbuild a feature")
+            await determine_pipeline(
+                "build a feature",
+                metadata={"yolo": "on", "auto_approve_reads": "on"},
+            )
 
         system_msg = next(m for m in captured["messages"] if m["role"] == "system")
         assert "YOLO MODE" in system_msg["content"]
-        # The auto_approve_reads block should NOT also be appended —
-        # the elif in determine_pipeline guards against double-injection.
         assert "AUTO_APPROVE_READS" not in system_msg["content"]
 
 

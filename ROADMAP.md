@@ -236,7 +236,15 @@ dropped — `raise UnsupportedOperationError()` directly; 2853 tests
 pass green). Phase 4 was absorbed into Phase 3 because the Python
 API change forced both server and client migrations together —
 ``ClientFactory.connect`` is gone and the streaming consumption no
-longer wraps Parts in ``.root``. Phase 5 next.
+longer wraps Parts in ``.root``. Phase 5 shipped 2026-04-30 (every
+text-tag construction site replaced by ``Message.metadata`` keys;
+``determine_pipeline`` / ``execute_pipeline`` / ``_iter_agent_events``
+/ ``RemoteAgentConnection.send`` / ``send_and_stream`` all take a
+``metadata`` kwarg and propagate it across input_required follow-ups;
+Hephaestus's four ``extract_*_tag`` regex extractors deleted; new
+``a2a_utils.get_message_metadata`` and ``project_root_from_context``
+helpers replace ``parse_project_root``; ``A2A_PROTOCOL_VERSION``
+header bumped to ``"1.0"``; 2833 tests pass green). Phase 6 next.
 
 **Scope (revised).**
 

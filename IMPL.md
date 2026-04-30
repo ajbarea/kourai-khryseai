@@ -5,15 +5,16 @@ milestone lands, the matching detail block in [ROADMAP.md](./ROADMAP.md)
 collapses to a one-liner under "Shipped" and this file gets reset to the
 next milestone.
 
-Updated: 2026-04-29 · Working on: **M7 — a2a-sdk 1.0 migration.
-Phases 1-3 shipped (the big-bang pin flip to `>=1.0,<2.0` landed
-2026-04-29; messaging + server + AgentCard helpers all flipped to
-the v1.0 protobuf shape; client code uses `await create_client(...)`;
-SCREAMING_SNAKE_CASE enums; `enable_v0_3_compat=True` for transitional
-0.3 wire compatibility). Phase 4 was absorbed into Phase 3 because
-the Python API change forces both server and client migrations
-together. Remaining: Phase 5 (text-tags → Message.metadata) → Phase 6
-(drop compat flag + cleanup) → M13 fix.
+Updated: 2026-04-30 · Working on: **M7 — a2a-sdk 1.0 migration.
+Phases 1-5 shipped: pin flipped to `>=1.0,<2.0`, helpers and server
+build run on the v1.0 protobuf shape, every text-tag construction
+site (`[project_root: ...]`, `[yolo: on]`, `[auto_approve_reads:
+on]`, `[relationship_tiers: ...]`, `[project_id: ...]`) replaced by
+structured `Message.metadata` keys, and Hephaestus's `extract_*_tag`
+regex extractors are gone. Remaining: Phase 6 (drop
+`enable_v0_3_compat=True` + retire transitional v0.3 fallback
+`AgentInterface`) → M13 fix (original_request via Message.metadata
+on resume dispatch).
 Pre-release perfection stance: no workarounds. M19 fully shipped
 (Phases 1+2+3 all landed 2026-04-29). Remaining sequence: M7
 (a2a-sdk 1.0) → M13 regression fix on M7's `Message.metadata`

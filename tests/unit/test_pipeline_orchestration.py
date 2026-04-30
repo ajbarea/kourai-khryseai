@@ -42,7 +42,7 @@ class TestFullPipelineOrchestration:
         call_order: list[str] = []
         accumulated_inputs: dict[str, str] = {}
 
-        async def agent_send(text: str, ctx_id: str, *, _name: str) -> str:
+        async def agent_send(text: str, ctx_id: str, *, _name: str, **kwargs: object) -> str:
             call_order.append(_name)
             accumulated_inputs[_name] = text
             return f"{_name} output: done"
@@ -53,7 +53,7 @@ class TestFullPipelineOrchestration:
             conn.connect = AsyncMock()
             conn.close = AsyncMock()
 
-            async def send_fn(text: str, ctx_id: str) -> str:
+            async def send_fn(text: str, ctx_id: str, **kwargs: object) -> str:
                 return await agent_send(text, ctx_id, _name=agent_name)
 
             conn.send = AsyncMock(side_effect=send_fn)
@@ -132,7 +132,7 @@ class TestIterativeLoopConvergence:
         kallos_call_count = 0
         agents_that_ran: list[str] = []
 
-        async def kallos_send(text: str, ctx_id: str) -> str:
+        async def kallos_send(text: str, ctx_id: str, **kwargs: object) -> str:
             nonlocal kallos_call_count
             kallos_call_count += 1
             agents_that_ran.append("kallos")
@@ -140,11 +140,11 @@ class TestIterativeLoopConvergence:
                 return "✨ Linting completed with issues.\nE501 line too long on line 42"
             return "✨ All linting checks passed!"
 
-        async def techne_send(text: str, ctx_id: str) -> str:
+        async def techne_send(text: str, ctx_id: str, **kwargs: object) -> str:
             agents_that_ran.append("techne")
             return "Fixed: shortened line 42"
 
-        async def mneme_send(text: str, ctx_id: str) -> str:
+        async def mneme_send(text: str, ctx_id: str, **kwargs: object) -> str:
             agents_that_ran.append("mneme")
             return "style: shorten line 42 for ruff compliance"
 
@@ -216,7 +216,9 @@ class TestMidPipelineDegradation:
             else:
                 conn.connect = AsyncMock()
 
-                async def send_fn(text: str, ctx_id: str, _name: str = agent_name) -> str:
+                async def send_fn(
+                    text: str, ctx_id: str, _name: str = agent_name, **kwargs: object
+                ) -> str:
                     call_order.append(_name)
                     return f"{_name} result"
 
@@ -263,7 +265,7 @@ class TestMidPipelineDegradation:
                 )
             else:
 
-                async def send_fn(text: str, ctx_id: str) -> str:
+                async def send_fn(text: str, ctx_id: str, **kwargs: object) -> str:
                     nonlocal techne_called
                     techne_called = True
                     return "code"

@@ -24,13 +24,19 @@ async def _async_gen(items: list[str]):
         yield item
 
 
-def _make_context(user_input: str, context_id: str | None = None) -> MagicMock:
+def _make_context(
+    user_input: str,
+    context_id: str | None = None,
+    *,
+    metadata: dict | None = None,
+) -> MagicMock:
     ctx = MagicMock()
     ctx.get_user_input.return_value = user_input
     ctx.current_task = None
     ctx.message = user_message(
         user_input or "placeholder",
         context_id=context_id or uuid4().hex,
+        metadata=metadata,
     )
     return ctx
 
@@ -126,7 +132,7 @@ class TestExecutorEmitsRecallNarration:
     async def test_emits_status_when_recall_present(self):
         from agents.metis.agent_executor import MetisAgentExecutor
 
-        ctx = _make_context("[project_root: /var/forge/proj-a]\nplan a CSV exporter")
+        ctx = _make_context("plan a CSV exporter", metadata={"project_root": "/var/forge/proj-a"})
         queue = _make_queue()
         executor = MetisAgentExecutor()
 
@@ -178,7 +184,7 @@ class TestExecutorEmitsRecallNarration:
     async def test_no_status_when_no_facts(self):
         from agents.metis.agent_executor import MetisAgentExecutor
 
-        ctx = _make_context("[project_root: /var/forge/proj-a]\nplan a CSV exporter")
+        ctx = _make_context("plan a CSV exporter", metadata={"project_root": "/var/forge/proj-a"})
         queue = _make_queue()
         executor = MetisAgentExecutor()
 
@@ -290,7 +296,7 @@ class TestExecutorSetsTelemetryAttributes:
         from agents.metis.agent_executor import MetisAgentExecutor
 
         outer_span = MagicMock()
-        ctx = _make_context("[project_root: /var/forge/proj-a]\nplan a CSV exporter")
+        ctx = _make_context("plan a CSV exporter", metadata={"project_root": "/var/forge/proj-a"})
         queue = _make_queue()
         executor = MetisAgentExecutor()
         pinned_pid = "deadbeefdeadbeef"
@@ -333,7 +339,7 @@ class TestExecutorSetsTelemetryAttributes:
         from agents.metis.agent_executor import MetisAgentExecutor
 
         outer_span = MagicMock()
-        ctx = _make_context("[project_root: /var/forge/proj-a]\nplan a CSV exporter")
+        ctx = _make_context("plan a CSV exporter", metadata={"project_root": "/var/forge/proj-a"})
         queue = _make_queue()
         executor = MetisAgentExecutor()
 

@@ -29,7 +29,11 @@ async def _async_gen(items: list[str]):
         yield item
 
 
-def _make_context(user_input: str | None = "test input") -> MagicMock:
+def _make_context(
+    user_input: str | None = "test input",
+    *,
+    metadata: dict | None = None,
+) -> MagicMock:
     ctx = MagicMock()
     ctx.get_user_input.return_value = user_input
     ctx.current_task = None
@@ -37,6 +41,7 @@ def _make_context(user_input: str | None = "test input") -> MagicMock:
     ctx.message = user_message(
         user_input or "placeholder",
         context_id=uuid4().hex,
+        metadata=metadata,
     )
     return ctx
 
@@ -205,12 +210,16 @@ class TestMetisExecutor:
     async def test_get_project_context_called_with_project_root(self):
         """`git status --short` exits 128 from the Metis container
         because the default cwd (`/app`) isn't the worktree. The
-        executor parses [project_root: ...] and threads it through to
-        get_project_context — this regression-guards that wiring."""
+        executor reads ``project_root`` from ``Message.metadata`` and
+        threads it through to ``get_project_context`` — this regression-
+        guards that wiring."""
         from agents.metis.agent_executor import MetisAgentExecutor
 
         executor = MetisAgentExecutor()
-        ctx = _make_context("[project_root: /tmp/forge/abc123]\nimplement CSV export")
+        ctx = _make_context(
+            "implement CSV export",
+            metadata={"project_root": "/tmp/forge/abc123"},  # noqa: S108
+        )
         queue = _make_queue()
 
         get_ctx_mock = AsyncMock(return_value="project ctx")
@@ -335,7 +344,10 @@ class TestTechneExecutor:
         from agents.techne.agent_executor import TechneAgentExecutor
 
         executor = TechneAgentExecutor()
-        ctx = _make_context("[project_root: /tmp/forge/abc123]\nfix auth.py null check")
+        ctx = _make_context(
+            "fix auth.py null check",
+            metadata={"project_root": "/tmp/forge/abc123"},  # noqa: S108
+        )
         queue = _make_queue()
 
         git_context_mock = AsyncMock(return_value="M auth.py")
@@ -380,7 +392,7 @@ class TestHephaestusExecutor:
         ctx = _make_context("implement CSV export")
         queue = _make_queue()
 
-        async def mock_pipeline(agents, user_input, context_id=None, image_parts=None):
+        async def mock_pipeline(agents, user_input, context_id=None, image_parts=None, **kwargs):
             yield ("metis", "Spec generated", "spec text")
             yield ("techne", "Code written", "code text")
             yield ("hephaestus", "Pipeline complete", "")
@@ -427,7 +439,7 @@ class TestHephaestusExecutor:
         ctx = _make_context("plan something")
         queue = _make_queue()
 
-        async def mock_pipeline(agents, user_input, context_id=None, image_parts=None):
+        async def mock_pipeline(agents, user_input, context_id=None, image_parts=None, **kwargs):
             yield ("metis", "INPUT_REQUIRED:Which module?", "")
 
         with (
@@ -482,7 +494,7 @@ class TestExecutorsSetKouraiProjectRootVar:
             return "project ctx"
 
         executor = MetisAgentExecutor()
-        ctx = _make_context(f"[project_root: {tmp_path}]\nimplement CSV export")
+        ctx = _make_context("implement CSV export", metadata={"project_root": str(tmp_path)})
         queue = _make_queue()
 
         token = kourai_project_root_var.set(None)
@@ -515,7 +527,7 @@ class TestExecutorsSetKouraiProjectRootVar:
             return "M auth.py"
 
         executor = TechneAgentExecutor()
-        ctx = _make_context(f"[project_root: {tmp_path}]\nfix auth.py null check")
+        ctx = _make_context("fix auth.py null check", metadata={"project_root": str(tmp_path)})
         queue = _make_queue()
 
         token = kourai_project_root_var.set(None)
@@ -557,7 +569,7 @@ class TestExecutorsSetKouraiProjectRootVar:
             return (True, "All checks passed")
 
         executor = KallosAgentExecutor()
-        ctx = _make_context(f"[project_root: {tmp_path}]\nagents/kallos/agent.py")
+        ctx = _make_context("agents/kallos/agent.py", metadata={"project_root": str(tmp_path)})
         queue = _make_queue()
 
         token = kourai_project_root_var.set(None)
@@ -589,7 +601,7 @@ class TestExecutorsSetKouraiProjectRootVar:
             return result
 
         executor = DokimasiaAgentExecutor()
-        ctx = _make_context(f"[project_root: {tmp_path}]\nrun tests please")
+        ctx = _make_context("run tests please", metadata={"project_root": str(tmp_path)})
         queue = _make_queue()
 
         token = kourai_project_root_var.set(None)

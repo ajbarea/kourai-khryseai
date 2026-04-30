@@ -7,7 +7,6 @@ a collaborative transcript moderated by Hephaestus.
 
 from __future__ import annotations
 
-import contextlib
 import datetime
 import inspect
 import logging
@@ -16,6 +15,7 @@ import re
 import uuid
 from collections.abc import AsyncIterable
 from dataclasses import dataclass, field
+from typing import Any
 
 from agents.hephaestus.remote_connections import AgentInputRequired, RemoteAgentConnection
 from kourai_common.config import MAX_ITERATIONS, get_agent_url
@@ -175,83 +175,11 @@ _MENTION_ALIASES: list[tuple[re.Pattern, str]] = [
 ]
 
 
-def extract_project_root(text: str) -> tuple[str, str | None]:
-    """Strip the [project_root: /path] metadata tag injected by vn_bridge.
-
-    Returns (clean_text, project_root_or_None) so callers can:
-    - Send clean_text to the routing LLM (no metadata noise)
-    - Inject "Project root: /path" into accumulated_context for specialist agents
-
-    vn_bridge injects the tag as a text prefix because A2A message metadata
-    fields aren't guaranteed to be forwarded by all transports. Text is universal.
-    """
-    match = re.search(r"\[project_root:\s*([^\]]+)\]", text, re.IGNORECASE)
-    if match:
-        root = match.group(1).strip()
-        clean = re.sub(r"\[project_root:\s*[^\]]+\]\n?", "", text).strip()
-        return clean, root
-    return text, None
-
-
-def extract_yolo(text: str) -> tuple[str, bool]:
-    """Strip the ``[yolo: on]`` tag the CLI prepends when ``/yolo`` is on.
-
-    Same text-tag convention as ``extract_project_root`` and
-    ``extract_relationship_tiers`` — the CLI inlines the flag into the
-    user message because A2A `Message.metadata` isn't guaranteed to be
-    forwarded by every transport. When yolo is on, the routing call
-    augments its system prompt to skip CONFIRM_ORDER and emit the agent
-    list directly (M13 power-user opt-out).
-
-    Returns ``(clean_text, yolo_enabled)``.
-    """
-    pattern = re.compile(r"\[yolo:\s*on\]\n?", re.IGNORECASE)
-    if pattern.search(text):
-        clean = pattern.sub("", text).strip()
-        return clean, True
-    return text, False
-
-
-def extract_auto_approve_reads(text: str) -> tuple[str, bool]:
-    """Strip the ``[auto_approve_reads: on]`` tag the CLI prepends when the
-    matching ``/permissions`` toggle is on.
-
-    Granular middle ground between full ``/yolo`` and the always-on
-    CONFIRM_ORDER gate: when set, Hephaestus skips the gate for
-    read-only / planning-only pipelines (no Techne / Kallos / Dokimasia
-    in the route) but still confirms anything that would touch disk.
-
-    Returns ``(clean_text, auto_approve_reads_enabled)``.
-    """
-    pattern = re.compile(r"\[auto_approve_reads:\s*on\]\n?", re.IGNORECASE)
-    if pattern.search(text):
-        clean = pattern.sub("", text).strip()
-        return clean, True
-    return text, False
-
-
-def extract_relationship_tiers(text: str) -> tuple[str, dict[str, float]]:
-    """Strip the [relationship_tiers: name=score,...] tag injected by vn_bridge.
-
-    Returns (clean_text, affinity_dict) where affinity_dict maps agent names
-    to their current 0.0–1.0 affinity score from the VN's client-side state.
-
-    Same tag pattern as [project_root:] — text injection is universal
-    across all A2A transports. The dict is used to build a relationship context
-    block injected into accumulated_context so specialist agents can adapt
-    their personality tone by tier without SYSTEM_PROMPT changes.
-    """
-    match = re.search(r"\[relationship_tiers:\s*([^\]]+)\]", text, re.IGNORECASE)
-    if not match:
-        return text, {}
-    affinities: dict[str, float] = {}
-    for pair in match.group(1).split(","):
-        if "=" in pair:
-            name, val = pair.strip().split("=", 1)
-            with contextlib.suppress(ValueError):
-                affinities[name.strip()] = float(val.strip())
-    clean = re.sub(r"\[relationship_tiers:\s*[^\]]+\]\n?", "", text).strip()
-    return clean, affinities
+"""Forge metadata is read directly from ``Message.metadata`` since M7 Phase 5;
+the four text-tag extractors that used to live here (``extract_project_root``
+/ ``extract_yolo`` / ``extract_auto_approve_reads`` /
+``extract_relationship_tiers``) are gone — the values arrive as structured
+keys on the inbound message instead of as bracket-tag prose."""
 
 
 def _tier_label(score: float) -> str:
@@ -313,22 +241,33 @@ class PipelineResult:
     error: str = ""
 
 
-async def determine_pipeline(user_request: str, context_id: str | None = None) -> list[str] | str:
+async def determine_pipeline(
+    user_request: str,
+    context_id: str | None = None,
+    *,
+    metadata: dict[str, Any] | None = None,
+) -> list[str] | str:
     """Use LLM to decide which agents to call and in what order.
 
     Args:
         user_request: The user's natural language request.
+        context_id: Optional A2A context ID for trace correlation.
+        metadata: Forge metadata from ``Message.metadata`` —
+            ``yolo`` / ``auto_approve_reads`` flags and
+            ``relationship_tiers`` map drive routing decisions.
 
     Returns:
         List of agent names in execution order, or a string starting
         with "ASK_USER:" or "CHAT:" if not a dev task.
     """
-    # Strip project metadata tag, extract affinity tiers, then expand @mention shorthands.
-    # The routing LLM only needs the human-readable request, not the tag prefixes.
-    user_request, _ = extract_project_root(user_request)
-    user_request, affinities = extract_relationship_tiers(user_request)
-    user_request, yolo = extract_yolo(user_request)
-    user_request, auto_approve_reads = extract_auto_approve_reads(user_request)
+    md = metadata or {}
+    yolo = bool(md.get("yolo")) or md.get("yolo") == "on"
+    auto_approve_reads = bool(md.get("auto_approve_reads")) or md.get("auto_approve_reads") == "on"
+    raw_tiers = md.get("relationship_tiers")
+    if isinstance(raw_tiers, dict):
+        affinities = {k: float(v) for k, v in raw_tiers.items() if isinstance(v, int | float)}
+    else:
+        affinities = {}
     user_request = expand_mentions(user_request)
 
     with create_span("hephaestus.route", {"request_length": str(len(user_request))}):
@@ -436,12 +375,16 @@ async def _iter_agent_events(
     text: str,
     context_id: str,
     attachments: list[tuple[str, str]] | None = None,
+    *,
+    metadata: dict[str, Any] | None = None,
 ) -> AsyncIterable[tuple[str, str]]:
     """Normalize streamed and direct-result agent sends into one event stream."""
-    if attachments:
-        send_result = conn.send(text, context_id, attachments=attachments)
-    else:
-        send_result = conn.send(text, context_id)
+    send_result = conn.send(
+        text,
+        context_id,
+        attachments=attachments,
+        metadata=metadata,
+    )
 
     if isinstance(send_result, AsyncIterable):
         async for event_type, content in send_result:
@@ -460,6 +403,8 @@ async def execute_pipeline(
     user_request: str,
     context_id: str | None = None,
     initial_attachments: list[tuple[str, str]] | None = None,
+    *,
+    metadata: dict[str, Any] | None = None,
 ) -> AsyncIterable[tuple[str, str, str]]:
     """Execute a pipeline of specialist agents as a 'Forge Party' dialogue.
 
@@ -493,16 +438,16 @@ async def execute_pipeline(
 
     connections: dict[str, RemoteAgentConnection] = {}
 
-    clean_request, project_root = extract_project_root(user_request)
-    clean_request, affinities = extract_relationship_tiers(clean_request)
+    md = metadata or {}
+    md.get("project_root")
+    raw_tiers = md.get("relationship_tiers")
+    if isinstance(raw_tiers, dict):
+        affinities = {k: float(v) for k, v in raw_tiers.items() if isinstance(v, int | float)}
+    else:
+        affinities = {}
 
     # Initialize the Forge Transcript
-    transcript = f"[User]: {clean_request}"
-    if project_root:
-        # Format matches parse_project_root() in a2a_utils so specialists
-        # (Dokimasia, Techne, Kallos) can recover the worktree path and run
-        # subprocesses there instead of Path.cwd() (the Kourai repo root).
-        transcript += f"\n\nProject root: {project_root}"
+    transcript = f"[User]: {user_request}"
 
     # Metadata context (hidden from the transcript, injected into system prompts)
     # Each agent receives "Relationship tiers: techne: Tier 3 — Warm (affinity 0.72)"
@@ -585,6 +530,7 @@ async def execute_pipeline(
                         send_context,
                         context_id,
                         attachments=attachments,
+                        metadata=metadata,
                     ):
                         if event_type == "status":
                             # Forward status messages with the specialist's own emoji

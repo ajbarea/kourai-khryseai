@@ -8,7 +8,11 @@ from typing import TYPE_CHECKING
 from a2a.types import Task, UnsupportedOperationError
 
 from agents.metis.agent import create_spec_stream, get_project_context
-from kourai_common.a2a_utils import extract_image_parts, parse_project_root
+from kourai_common.a2a_utils import (
+    extract_image_parts,
+    get_message_metadata,
+    project_root_from_context,
+)
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
 from kourai_common.facts import get_relevant_facts_for_enrichment
@@ -130,10 +134,11 @@ class MetisAgentExecutor(BaseAgentExecutor):
             user_input = context.get_user_input()
             # The specialist container's default cwd (`/app`) isn't the
             # worktree, so `git status --short` exits 128 without `cwd=`
-            # set. parse_project_root falls back to cwd when the
-            # [project_root: ...] tag is missing, so internal / test
-            # invocations are unaffected.
-            project_root = parse_project_root(user_input)
+            # set. project_root_from_context falls back to cwd when the
+            # ``project_root`` metadata key is missing, so internal /
+            # test invocations are unaffected.
+            project_root = project_root_from_context(context)
+            forge_meta = get_message_metadata(context)
             kourai_project_root_var.set(project_root)
 
             # Step 1: Gather project context
@@ -170,13 +175,14 @@ class MetisAgentExecutor(BaseAgentExecutor):
             # M17 Phase 1 — load player + project identity for fact recall.
             # ``derive_project_id`` is a stable sha256-of-path so the same
             # project survives the player moving the repo on disk; the
-            # tag-less internal-task fallback in ``parse_project_root``
+            # tag-less internal-task fallback in ``project_root_from_context``
             # returns ``Path.cwd()``, which we treat as global (None) here.
+            # M7 Phase 5 prefers ``project_id`` from message metadata when
+            # the host emits it directly (matches the explicit forge tag
+            # the CLI used to prepend).
             player_id = _player_id_or_none()
-            project_id_for_facts = (
-                derive_project_id(project_root)
-                if "[project_root:" in (user_input or "").lower()
-                else None
+            project_id_for_facts: str | None = forge_meta.get("project_id") or (
+                derive_project_id(project_root) if "project_root" in forge_meta else None
             )
 
             # M17 Phase 2 — narrate the recall so the player sees that

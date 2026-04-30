@@ -10,7 +10,7 @@ from a2a.types import Task, UnsupportedOperationError
 from agents.dokimasia.agent import (
     generate_tests_stream,
 )
-from kourai_common.a2a_utils import extract_image_parts, parse_project_root
+from kourai_common.a2a_utils import extract_image_parts, project_root_from_context
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
 from kourai_common.mcp_client import kourai_project_root_var
@@ -47,7 +47,7 @@ class DokimasiaAgentExecutor(BaseAgentExecutor):
         with create_span("dokimasia.execute", {"a2a.method": "execute"}):
             user_input = context.get_user_input()
             # Resolve player's project root once; used by both test and e2e branches
-            project_root = parse_project_root(user_input)
+            project_root = project_root_from_context(context)
             kourai_project_root_var.set(project_root)
 
             input_lower = user_input.lower()

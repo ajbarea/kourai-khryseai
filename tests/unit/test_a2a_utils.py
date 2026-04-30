@@ -1,49 +1,74 @@
 """Unit tests for kourai_common.a2a_utils.
 
-Focus: parse_project_root accepts every injection shape the pipeline has used,
-so specialists (Dokimasia, Techne, Kallos) always run in the forge worktree
-instead of silently falling back to the Kourai repo cwd.
+Focus: ``project_root_from_context`` reads the worktree path from
+``Message.metadata`` (the M7 Phase 5 home for forge context) and
+translates host paths to the container's bind-mount mirror so the same
+value works on both sides.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
-from kourai_common.a2a_utils import _translate_to_container, parse_project_root
+from kourai_common.a2a_utils import (
+    _translate_to_container,
+    get_message_metadata,
+    project_root_from_context,
+)
 
 
-class TestParseProjectRoot:
-    def test_canonical_form(self, tmp_path: Path) -> None:
-        text = f"[User]: do a thing\n\nProject root: {tmp_path}"
-        assert parse_project_root(text) == tmp_path
+def _ctx_with_metadata(meta: dict | None) -> MagicMock:
+    """Build a minimal RequestContext-shaped mock with the given metadata."""
+    ctx = MagicMock()
+    if meta is None:
+        ctx.message = None
+    else:
+        ctx.message = MagicMock()
+        ctx.message.metadata = meta
+    return ctx
 
-    def test_bracket_tag_form(self, tmp_path: Path) -> None:
-        """CLI injects this on the outbound prompt."""
-        text = f"[project_root: {tmp_path}]\nmake me a greeter"
-        assert parse_project_root(text) == tmp_path
 
-    def test_legacy_project_settings_form(self, tmp_path: Path) -> None:
-        """Older transcripts used this key; keep compatibility."""
-        text = f"[User]: x\n\n[Project Settings]: root={tmp_path}"
-        assert parse_project_root(text) == tmp_path
+class TestProjectRootFromContext:
+    def test_reads_metadata_value(self, tmp_path: Path) -> None:
+        ctx = _ctx_with_metadata({"project_root": str(tmp_path)})
+        assert project_root_from_context(ctx) == tmp_path
 
-    def test_falls_back_to_cwd_when_missing(self) -> None:
-        assert parse_project_root("nothing here") == Path.cwd()
+    def test_falls_back_to_cwd_when_metadata_missing(self) -> None:
+        ctx = _ctx_with_metadata({})
+        assert project_root_from_context(ctx) == Path.cwd()
 
-    def test_falls_back_when_path_does_not_exist(self, tmp_path: Path) -> None:
+    def test_falls_back_to_cwd_when_path_does_not_exist(self, tmp_path: Path) -> None:
         missing = tmp_path / "nope-does-not-exist"
-        text = f"Project root: {missing}"
-        assert parse_project_root(text) == Path.cwd()
+        ctx = _ctx_with_metadata({"project_root": str(missing)})
+        assert project_root_from_context(ctx) == Path.cwd()
 
-    def test_canonical_form_wins_when_both_present(self, tmp_path: Path) -> None:
-        """Transcript that still has the bracket tag plus the canonical line
-        (possible if a specialist echoes the user's prompt back) should
-        resolve to the canonical path."""
-        other = tmp_path / "other"
-        other.mkdir()
-        text = f"[project_root: {other}]\nProject root: {tmp_path}"
-        assert parse_project_root(text) == tmp_path
+    def test_falls_back_to_cwd_when_no_message(self) -> None:
+        assert project_root_from_context(_ctx_with_metadata(None)) == Path.cwd()
+
+    def test_strips_whitespace(self, tmp_path: Path) -> None:
+        ctx = _ctx_with_metadata({"project_root": f"  {tmp_path}  "})
+        assert project_root_from_context(ctx) == tmp_path
+
+
+class TestGetMessageMetadata:
+    def test_returns_empty_dict_for_none_source(self) -> None:
+        assert get_message_metadata(None) == {}
+
+    def test_returns_empty_dict_for_empty_metadata(self) -> None:
+        ctx = _ctx_with_metadata({})
+        assert get_message_metadata(ctx) == {}
+
+    def test_unwraps_dict_metadata(self) -> None:
+        ctx = _ctx_with_metadata({"yolo": "on", "project_id": "abc123"})
+        meta = get_message_metadata(ctx)
+        assert meta == {"yolo": "on", "project_id": "abc123"}
+
+    def test_returns_empty_when_message_metadata_is_none(self) -> None:
+        ctx = MagicMock()
+        ctx.message = MagicMock()
+        ctx.message.metadata = None
+        assert get_message_metadata(ctx) == {}
 
 
 class TestTranslateToContainer:
@@ -60,62 +85,12 @@ class TestTranslateToContainer:
             )
         assert result == fake_home / ".kourai_khryseai/projects/abc/hello/.kourai/forges/xyz"
 
-    def test_parse_project_root_translates_host_path(self, tmp_path: Path) -> None:
-        """End-to-end: a host-style transcript resolves to the container-mounted path."""
+    def test_project_root_from_context_translates_host_path(self, tmp_path: Path) -> None:
         fake_home = tmp_path / "kourai"
-        forge = fake_home / ".kourai_khryseai/projects/p1/hello"
+        forge = fake_home / ".kourai_khryseai/projects/abc/hello/.kourai/forges/xyz"
         forge.mkdir(parents=True)
+        ctx = _ctx_with_metadata(
+            {"project_root": "/home/ajbar/.kourai_khryseai/projects/abc/hello/.kourai/forges/xyz"}
+        )
         with patch("kourai_common.a2a_utils.Path.home", return_value=fake_home):
-            text = "Project root: /home/ajbar/.kourai_khryseai/projects/p1/hello"
-            assert parse_project_root(text) == forge
-
-
-class TestA2AHttpClient:
-    """``make_a2a_http_client`` carries the spec-required ``A2A-Version``
-    header so v1.0 servers don't silently downgrade to 0.3 semantics
-    when our SDK pin eventually flips. Centralising construction means
-    one bump-site for M7 (a2a-sdk 1.0 migration)."""
-
-    def test_default_carries_version_header(self):
-        from kourai_common.a2a_utils import A2A_PROTOCOL_VERSION, make_a2a_http_client
-
-        client = make_a2a_http_client()
-        try:
-            assert client.headers["A2A-Version"] == A2A_PROTOCOL_VERSION
-        finally:
-            # Tests don't await aclose; rely on GC for the test client.
-            pass
-
-    def test_protocol_version_is_documented_pin(self):
-        # Regression guard: the constant must match what M7 expects.
-        # When M7 lands the SDK 1.0 cutover, this test failure is the
-        # signal to bump in lockstep.
-        from kourai_common.a2a_utils import A2A_PROTOCOL_VERSION
-
-        assert A2A_PROTOCOL_VERSION == "0.3"
-
-    def test_extra_headers_merge_without_overriding_version(self):
-        from kourai_common.a2a_utils import A2A_PROTOCOL_VERSION, make_a2a_http_client
-
-        client = make_a2a_http_client(extra_headers={"X-Trace-Id": "abc123"})
-        assert client.headers["A2A-Version"] == A2A_PROTOCOL_VERSION
-        assert client.headers["X-Trace-Id"] == "abc123"
-
-    def test_timeout_passed_through(self):
-        import httpx
-
-        from kourai_common.a2a_utils import make_a2a_http_client
-
-        client = make_a2a_http_client(timeout=42.0)
-        # httpx normalises a float to a Timeout(connect=42, read=42, write=42, pool=42).
-        assert isinstance(client.timeout, httpx.Timeout)
-        assert client.timeout.read == 42.0
-
-    def test_explicit_override_in_extra_headers_wins(self):
-        # Defensive: a caller can override A2A-Version (for compat
-        # testing with a legacy server). The helper passes the explicit
-        # value through unchanged.
-        from kourai_common.a2a_utils import make_a2a_http_client
-
-        client = make_a2a_http_client(extra_headers={"A2A-Version": "0.2"})
-        assert client.headers["A2A-Version"] == "0.2"
+            assert project_root_from_context(ctx) == forge

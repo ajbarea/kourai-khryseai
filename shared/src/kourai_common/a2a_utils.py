@@ -1,30 +1,25 @@
 """Shared A2A protocol utilities for Kourai Khryseai agents.
 
-Two surfaces:
+Surfaces:
 
 * ``make_a2a_http_client`` — outbound httpx client with the
   ``A2A-Version`` header pre-set. Single bump-site for the protocol
-  version when M7 ships.
-* ``parse_project_root`` — recover the player's project worktree
-  from any historical text-tag injection shape so specialist
-  containers run subprocesses in the right repo.
+  version.
+* ``get_message_metadata`` / ``project_root_from_context`` — read the
+  inbound message's structured ``Message.metadata`` (the v1.0 home
+  for forge context like ``project_root``, ``project_id``, ``yolo``).
+  Replaces the text-tag regex extraction Phase 5 retired.
 * ``extract_image_parts`` / ``extract_file_attachments`` — read the
-  inbound A2A message for FileWithBytes attachments and re-shape them
-  for LiteLLM (image_url blocks) or kourai-internal use (raw b64 +
-  mime tuples). Wire-shape inspection lives in
+  inbound A2A message for raw-bytes file Parts and re-shape them for
+  LiteLLM (image_url blocks) or kourai-internal use (b64 + mime
+  tuples). Wire-shape inspection lives in
   ``kourai_common.messaging.is_file_part`` / ``get_file_bytes``.
-
-See ROADMAP §M7 for the in-flight a2a-sdk 1.0 migration plan. This
-module's piece — Part inspection — was the dual-shape firewall before
-2026-04-29; Phase 2 moved inspection into ``messaging`` so this file
-is now firewall-free.
 """
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
@@ -36,11 +31,11 @@ if TYPE_CHECKING:
 
 # ── A2A protocol version negotiation ──────────────────────────────────
 
-# Single bump-site for M7. Today's clients declare 0.3 explicitly so a
-# 1.0.x server can negotiate down. Flipping this to ``"1.0"`` is one of
-# the last steps of the M7 cutover, paired with the pin bump in pyproject
-# and the application-setup refactor noted in this module's docstring.
-A2A_PROTOCOL_VERSION = "0.3"
+# v1.0 SDK landed across the stack in M7 Phase 3; clients declare 1.0
+# explicitly so the server stops falling through the compat shim. The
+# server still honours v0.3 clients via ``enable_v0_3_compat=True`` —
+# Phase 6 retires that fallback.
+A2A_PROTOCOL_VERSION = "1.0"
 
 
 def make_a2a_http_client(
@@ -70,14 +65,8 @@ def make_a2a_http_client(
     return httpx.AsyncClient(timeout=timeout, headers=headers)
 
 
-# ── Project root extraction ───────────────────────────────────────────
+# ── Message.metadata accessors ────────────────────────────────────────
 
-
-_PROJECT_ROOT_PATTERNS = (
-    re.compile(r"^Project root:\s*(.+)$", re.MULTILINE),
-    re.compile(r"\[project_root:\s*([^\]]+)\]", re.IGNORECASE),
-    re.compile(r"\[Project Settings\]:\s*root=([^\s\]]+)", re.IGNORECASE),
-)
 # The CLI runs as the host user (/home/<host_user>/.kourai_khryseai/...)
 # while specialists run inside containers that bind-mount the same dir at
 # /home/kourai/.kourai_khryseai. _translate_to_container rewrites any host
@@ -101,34 +90,57 @@ def _translate_to_container(path: Path) -> Path:
     return path
 
 
-def parse_project_root(text: str) -> Path:
-    """Recover the player's project directory from any context-injection format.
+def get_message_metadata(context: RequestContext | None) -> dict[str, Any]:
+    """Return the inbound message's metadata as a plain Python dict.
 
-    Specialist agents (Kallos, Dokimasia, Techne) call this to get the worktree
-    path so subprocesses and file writes land in the forge session directory
-    instead of the Kourai codebase's cwd.
-
-    Accepts all historical/current injection shapes defensively:
-      * ``Project root: /path`` — canonical form injected by Hephaestus into the
-        forge transcript.
-      * ``[project_root: /path]`` — bracket tag the CLI prepends on the outbound
-        prompt before Hephaestus strips it.
-      * ``[Project Settings]: root=/path`` — legacy transcript key.
-
-    Paths under ``.kourai_khryseai`` are translated from the host user's home
-    to this process's home so the same path works from the CLI (host) and
-    from specialist containers (bind-mounted at ``/home/kourai``).
-
-    Falls back to ``Path.cwd()`` when no tag is present (internal tasks) or the
-    parsed path no longer exists on disk.
+    Reads ``context.message.metadata`` and unwraps it. Real protobuf
+    ``Struct`` values flow through ``MessageToDict`` so callers see
+    plain Python (``str``, ``int``, ``float``, ``bool``, ``list``,
+    ``dict``); plain-dict fixtures (unit-test mocks) come back as-is.
+    Returns ``{}`` when the context has no message or the message has
+    no metadata.
     """
-    for pattern in _PROJECT_ROOT_PATTERNS:
-        match = pattern.search(text)
-        if match:
-            raw = Path(match.group(1).strip())
-            candidate = _translate_to_container(raw)
-            if candidate.is_dir():
-                return candidate
+    if context is None:
+        return {}
+    message = getattr(context, "message", None)
+    if message is None:
+        return {}
+    metadata = getattr(message, "metadata", None)
+    if metadata is None:
+        return {}
+    if isinstance(metadata, dict):
+        return dict(metadata)
+    if hasattr(metadata, "DESCRIPTOR"):
+        try:
+            from google.protobuf.json_format import MessageToDict
+
+            return MessageToDict(metadata)
+        except (TypeError, ValueError, ImportError):
+            pass
+    try:
+        return dict(metadata)
+    except (TypeError, ValueError):
+        return {}
+
+
+def project_root_from_context(context: RequestContext | None) -> Path:
+    """Recover the player's project worktree from ``Message.metadata``.
+
+    Specialist agents (Kallos, Dokimasia, Techne, Metis) call this to
+    resolve the forge worktree so subprocesses and file writes land in
+    the right directory instead of the container's ``/app`` cwd. The
+    path is translated from host-user home to the container's home so
+    the same value works on both sides of the bind mount.
+
+    Falls back to ``Path.cwd()`` when no ``project_root`` metadata key
+    is present (internal tasks, smoke tests) or the parsed path no
+    longer exists on disk.
+    """
+    raw = get_message_metadata(context).get("project_root")
+    if isinstance(raw, str) and raw.strip():
+        candidate = _translate_to_container(Path(raw.strip()))
+        if candidate.is_dir():
+            return candidate
     return Path.cwd()
 
 

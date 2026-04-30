@@ -241,7 +241,7 @@ class TestKallosExecutorEmitsToolCallStatus:
                     return_value=set(),
                 ),
                 patch(
-                    "agents.kallos.agent_executor.parse_project_root",
+                    "agents.kallos.agent_executor.project_root_from_context",
                     return_value=project_root,
                 ),
                 patch.object(kallos_executor_module, "create_span"),
@@ -445,7 +445,7 @@ class TestErrorTagInToolMessage:
                 return_value=set(),
             ),
             patch(
-                "agents.kallos.agent_executor.parse_project_root",
+                "agents.kallos.agent_executor.project_root_from_context",
                 return_value=str(tmp_path),
             ),
             patch.object(kallos_executor_module, "create_span"),

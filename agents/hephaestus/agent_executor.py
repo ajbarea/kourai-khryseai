@@ -12,7 +12,7 @@ from a2a.types import Task, UnsupportedOperationError
 from agents.hephaestus.agent import determine_pipeline, execute_pipeline
 from agents.hephaestus.confirmation import parse_confirmation_response
 from agents.metis.agent import discuss_tradeoffs
-from kourai_common.a2a_utils import extract_file_attachments
+from kourai_common.a2a_utils import extract_file_attachments, get_message_metadata
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
 from kourai_common.messaging import data_part, send_input_required, send_working_status, text_part
@@ -64,6 +64,7 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
         """Hephaestus-specific: determine pipeline and orchestrate specialist agents."""
         with create_span("hephaestus.execute", {"a2a.method": "execute"}):
             user_input = context.get_user_input()
+            forge_meta = get_message_metadata(context)
 
             # Step 1: Determine the pipeline
             await send_working_status(
@@ -81,10 +82,16 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
             # tier-1 (clear) Metis stays silent so the read-back beat
             # is a beat, not an interrogation. Skip entirely when
             # /yolo is on — power-user flow doesn't want the chatter.
-            metis_task = self._maybe_spawn_metis_discussion(user_input, task.context_id)
+            metis_task = self._maybe_spawn_metis_discussion(
+                user_input, task.context_id, metadata=forge_meta
+            )
 
             try:
-                pipeline = await determine_pipeline(user_input, context_id=task.context_id)
+                pipeline = await determine_pipeline(
+                    user_input,
+                    context_id=task.context_id,
+                    metadata=forge_meta,
+                )
             except Exception:
                 await self._cancel_metis(metis_task)
                 raise
@@ -256,7 +263,11 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
             last_agent_output = ""
             input_required = False
             async for agent_name, status, agent_output in execute_pipeline(
-                pipeline, user_input, task.context_id, image_attachments or None
+                pipeline,
+                user_input,
+                task.context_id,
+                image_attachments or None,
+                metadata=forge_meta,
             ):
                 # Detect INPUT_REQUIRED from specialist agents
                 if status.startswith("INPUT_REQUIRED:"):
@@ -337,15 +348,21 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
     # ── M14 Metis-First Parallel Routing helpers ──────────────────
 
     def _maybe_spawn_metis_discussion(
-        self, user_input: str, context_id: str | None
+        self,
+        user_input: str,
+        context_id: str | None,
+        *,
+        metadata: dict | None = None,
     ) -> asyncio.Task[str] | None:
         """Spawn Metis's ``discuss_tradeoffs`` as a parallel asyncio task.
 
         Returns the task so cancellation/awaiting is the caller's
-        responsibility. Skips entirely when ``[yolo:`` is in the input —
-        the power-user opt-out also opts out of the parallel chatter.
+        responsibility. Skips entirely when ``yolo`` is on — the
+        power-user opt-out also opts out of the parallel chatter.
         """
-        if "[yolo:" in user_input.lower():
+        md = metadata or {}
+        yolo = bool(md.get("yolo")) or md.get("yolo") == "on"
+        if yolo:
             log.debug("yolo on — skipping parallel Metis discussion")
             return None
         return asyncio.create_task(

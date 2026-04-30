@@ -289,17 +289,17 @@ async def handle_message(request: Request) -> StreamingResponse:
     # Both "message" and "choice" resolve to a user text turn
     user_text = data.get("choice", "") if action == "choice" else data.get("text", "")
 
+    forge_metadata: dict = {}
     if project_path:
-        user_text = f"[project_root: {project_path}]\n{user_text}"
+        forge_metadata["project_root"] = project_path
 
-    # Inject affinity snapshot so Hephaestus can calibrate relationship tier context.
+    # Forward the affinity snapshot so Hephaestus can calibrate
+    # relationship tiers without parsing prose.
     affinity_data: dict = data.get("affinity") or {}
-    if affinity_data:
-        tiers_str = ",".join(
-            f"{k}={v:.2f}" for k, v in affinity_data.items() if isinstance(v, int | float)
-        )
-        if tiers_str:
-            user_text = f"[relationship_tiers: {tiers_str}]\n{user_text}"
+    tiers = {k: float(v) for k, v in affinity_data.items() if isinstance(v, int | float)}
+    if tiers:
+        forge_metadata["relationship_tiers"] = tiers
+
     if not user_text:
 
         async def empty() -> AsyncGenerator[str, None]:
@@ -308,7 +308,11 @@ async def handle_message(request: Request) -> StreamingResponse:
         return StreamingResponse(empty(), media_type="application/x-ndjson")
 
     log.info(f"Message ({action}, ctx={context_id[:8]}): {user_text[:80]}")
-    message = user_message(user_text, context_id=context_id)
+    message = user_message(
+        user_text,
+        context_id=context_id,
+        metadata=forge_metadata or None,
+    )
 
     async def stream_response() -> AsyncGenerator[str, None]:
         current_agent = "hephaestus"

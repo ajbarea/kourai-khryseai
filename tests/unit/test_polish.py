@@ -94,7 +94,7 @@ class TestGracefulDegradation:
             else:
                 conn.connect = AsyncMock()
 
-                async def send_fn(text, ctx_id, _name=agent_name):
+                async def send_fn(text, ctx_id, _name=agent_name, **kwargs):
                     call_order.append(_name)
                     return f"output from {_name}"
 

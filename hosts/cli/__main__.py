@@ -13,7 +13,7 @@ import io as _io
 import secrets
 import sys
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 from uuid import uuid4
 
 import asyncclick as click
@@ -838,7 +838,7 @@ async def main(
                 # fall back to /app, breaking git context. A2A v1.0's
                 # Message.metadata is the spec-correct destination once M7
                 # lands the SDK migration; text-tag carrier ships value today.
-                forge_tags: list[str] = []
+                forge_metadata: dict[str, Any] = {}
                 project = _active_project(settings)
                 if project is not None:
                     try:
@@ -848,11 +848,12 @@ async def main(
                         # project_root carries the per-session worktree so
                         # specialists can chdir there for git ops; project_id
                         # carries the stable, project-rooted M17 fact axis so
-                        # writes survive forge-session boundaries. Without the
-                        # second tag, deriving project_id from workdir would
-                        # change every turn and break cross-session recall.
-                        forge_tags.append(f"[project_root: {forge_session.workdir}]")
-                        forge_tags.append(f"[project_id: {derive_project_id(project.path)}]")
+                        # writes survive forge-session boundaries. Without
+                        # the second key, deriving project_id from workdir
+                        # would change every turn and break cross-session
+                        # recall.
+                        forge_metadata["project_root"] = str(forge_session.workdir)
+                        forge_metadata["project_id"] = derive_project_id(project.path)
                         _echo(
                             f"{_DIM}\u2692 Forging in {project.name}"
                             f" \u00b7 session {forge_session.session_id[:8]}"
@@ -870,14 +871,11 @@ async def main(
                 # [project_root: …] and [relationship_tiers: …]. Default OFF
                 # so the gate stays the contract of the forge.
                 if settings.yolo_enabled:
-                    forge_tags.append("[yolo: on]")
+                    forge_metadata["yolo"] = "on"
                 elif settings.auto_approve_reads:
                     # Granular middle ground — only takes effect when /yolo
                     # is OFF. With both on, /yolo's broader bypass wins.
-                    forge_tags.append("[auto_approve_reads: on]")
-
-                if forge_tags:
-                    forge_msg = "\n".join((*forge_tags, forge_msg))
+                    forge_metadata["auto_approve_reads"] = "on"
 
                 _echo("")
                 # Explicit kwargs (was a `dict[str, object]` unpacked via
@@ -901,7 +899,7 @@ async def main(
                     attachments=attachments or None,
                     tts=tts,
                     gossip_enabled=settings.gossip_enabled,
-                    forge_tags=forge_tags or None,
+                    forge_metadata=forge_metadata or None,
                     memoir=memoir_arg,
                     scene_id=scene_id_arg,
                 )
