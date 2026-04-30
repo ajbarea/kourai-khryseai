@@ -5,7 +5,7 @@ A public, living plan for where the forge is heading. Items here are either
 *currently working on* lives in [IMPL.md](./IMPL.md) — when it lands, the
 matching milestone here collapses to a single line under "Shipped".
 
-Last reviewed: 2026-04-30 (M18 Phase 1 mid-flight — contract + hephaestus pilot (#99), metis (#100), and techne (#101) all squash-merged to `main`; eight specialists remain — dokimasia, kallos, mneme + puck, cupid, aletheia, aidos, vn-bridge — before the host's `or kind is None` legacy fallback can retire and Phase 2 (SSML in dialogue bodies) + Phase 3 (`KIND_CODE` / `KIND_SPEC` distinct render paths) unlock. The 2026-04-30 morning live smoke against rebuilt URI-shape containers verified the wire shape end-to-end (zero protobuf serialization errors, M13 original-request relay intact, M17 dialogue gate fires through `send_input_required(kind=KIND_DIALOGUE)`); audible cadence-diff still blocked on WSL2 PortAudio crackling, voice-off smoke gives timing-cadence visibility. One latent observation queued: when the smoke driver answered metis's M17 dialogue gate with "100%", hephaestus's resume trigger treated it as a fresh user turn and downstream specialists didn't execute — independent of M18 wire shape, queued for triage before the next live smoke. M7 fully shipped 2026-04-30 (six phases, `Message.metadata` channel as the v1.0 boundary). M13 fix shipped 2026-04-30 (original-request via metadata on resume dispatch). M19 shipped 2026-04-29 (Phases 1+2+3 RealtimeTTS migration — pygame.mixer out of the TTS path, native 24 kHz Kokoro through PyAudio with no resample, "VHS rewind" failure mode gone by construction). M17 Phase 2 shipped 2026-04-29. Sister-repo audit 2026-04-30 surfaced one cache-pin drift (kourai @ v4 vs vFL @ v5.0.5) and now runs on a weekly cron (Monday 12:00 UTC, routine `trig_013uP9ryCLYscBKS7X6PB5og`). Pre-release perfection stance unchanged — April 2026 best practice no matter the cost; web-search before any implementation; architectural fix over expedient patch.)
+Last reviewed: 2026-04-30 (**M18 Phase 1 fully shipped** in eight squash-merged PRs — #99 contract + hephaestus pilot, #100 metis, #101 techne, #102 dokimasia + shared fix_loop, #103 kallos, #104 mneme, #105 bundled puck/cupid/aletheia/aidos, #106 vn_bridge consumer-side routing. All eleven agents participate in the URI-namespaced extension key `https://kourai.khryseai/ext/streaming/v1` with `{"content_kind": "dialogue" | "status" | "code" | "spec"}` nested under it. Host CLI gates TTS on `kind is None or kind == KIND_DIALOGUE`; vn_bridge mirrors the predicate shape for Ren'Py dialogue routing. The "100% round-trip" observation from the morning smoke was investigated and closed — by design per M17 (future-run preference recall, not in-flight pipeline resume). Active focus: validate Phase 1 end-to-end via a full-pipeline live smoke (blocked on smoke-driver update to pre-seed project facts via `/preferences set` so metis skips the M17 PAUSE), then proceed to Phase 2 (SSML inside dialogue bodies — Kokoro doesn't natively consume SSML so transitional strip-then-synthesize, ElevenLabs migration on M6 unblocks full SSML downstream) and Phase 3 (`KIND_CODE` / `KIND_SPEC` distinct render paths + retire the `kind is None` legacy fallback). M7 fully shipped 2026-04-30 (six phases, `Message.metadata` channel as the v1.0 boundary). M13 fix shipped 2026-04-30 (original-request via metadata on resume dispatch). M19 shipped 2026-04-29 (Phases 1+2+3 RealtimeTTS migration — pygame.mixer out of the TTS path, "VHS rewind" failure mode gone by construction). M17 Phase 2 shipped 2026-04-29. Sister-repo audit 2026-04-30 surfaced one cache-pin drift (kourai @ v4 vs vFL @ v5.0.5) and now runs on a weekly cron (Monday 12:00 UTC, routine `trig_013uP9ryCLYscBKS7X6PB5og`). Pre-release perfection stance unchanged — April 2026 best practice no matter the cost; web-search before any implementation; architectural fix over expedient patch.)
 
 ---
 
@@ -751,49 +751,42 @@ Defensible *now* that Phase 1 has landed:
 
 ## M18 — Structured streaming with content-kind metadata
 
-> Status: Phase 1 partial — contract + hephaestus pilot (#99), metis
-> (#100), and techne (#101) squash-merged to `main` 2026-04-30. Eight
-> specialists remain (dokimasia, kallos, mneme + puck, cupid, aletheia,
-> aidos, vn-bridge) before the host's `or kind is None` legacy fallback
-> can retire. Phase 2 (SSML in dialogue bodies) and Phase 3 (`KIND_CODE`
-> / `KIND_SPEC` distinct render paths) gated on full Phase 1. ·
-> Surfaced 2026-04-29 live smoke · Builds on M7 (depends on
-> `Message.metadata` channel) · Resolves clustered UX findings:
-> comms-window truncation, FACT-tag leakage into status stream, TTS
-> reading entire markdown bodies aloud, TTS-gated pipeline visual
-> cadence
+> Status: **Phase 1 fully shipped 2026-04-30 (eight squash-merged
+> PRs).** All eleven agents (10 producers + 1 consumer) participate
+> in the URI-namespaced extension key. Phase 2 (SSML in dialogue
+> bodies) and Phase 3 (`KIND_CODE` / `KIND_SPEC` distinct render
+> paths) planned. · Surfaced 2026-04-29 live smoke · Builds on M7
+> (depends on `Message.metadata` channel) · Resolves clustered UX
+> findings: comms-window truncation, FACT-tag leakage into status
+> stream, TTS reading entire markdown bodies aloud, TTS-gated
+> pipeline visual cadence
 
-### Phase 1 — kind contract + per-specialist migration
+### Phase 1 — kind contract + per-specialist migration (SHIPPED 2026-04-30)
 
-**Shipped 2026-04-30:**
-- Contract + hephaestus pilot (#99 → `8658013`): URI-namespaced
-  extension key `https://kourai.khryseai/ext/streaming/v1` with
-  `{"content_kind": "dialogue" | "status" | "code" | "spec"}` nested
-  under it (A2A 1.0 spec form). Constants
-  `KOURAI_STREAMING_EXT_URI` / `CONTENT_KIND_FIELD` / `KIND_DIALOGUE`
-  / `KIND_STATUS` / `KIND_CODE` / `KIND_SPEC`; helpers
-  `set_content_kind` / `get_content_kind` / `kind_message`; optional
-  `kind=` kwarg on `send_working_status` / `send_input_required` /
-  `send_completed`. Host CLI `streaming.py` reads kind via
-  `get_content_kind` and gates TTS on
-  `kind is None or kind == KIND_DIALOGUE`. Live-smoke verified.
-- Metis migration (#100 → `31f846c`): seven emissions tagged
-  (`KIND_STATUS` for "Analyzing project structure...", streamed git
-  status, "Drafting implementation spec...", "Planning: <latest>"
-  snippets, "Spec complete"; `KIND_DIALOGUE` for M17 recall narration
-  and the M17 PAUSE input_required).
-- Techne migration (#101 → `5e6d603`): five emissions tagged as
-  `KIND_STATUS` ("Reading existing code...", git status, "Generating
-  code changes...", per-tool-call results "🔧 \<tool> \<path>
-  (ok|fail)", "Applied N code changes to disk").
+Eight squash-merged PRs:
 
-**Remaining (8 specialists):** dokimasia, kallos, mneme are next —
-they round out the core development pipeline and are the most
-cadence-relevant after metis + techne (chatty per-step output that
-currently TTS-narrates each chunk). The four companions (puck,
-cupid, aletheia, aidos) and vn-bridge follow; all five are less in
-the cadence path. vn-bridge's emissions live in `vn_bridge.py`
-rather than `agent_executor.py`, so the migration shape differs.
+- `#99 → 8658013` content-kind contract + hephaestus pilot
+- `#100 → 31f846c` metis (7 emissions: 5 STATUS + 2 DIALOGUE for M17 recall + M17 PAUSE)
+- `#101 → 5e6d603` techne (5 STATUS — file-op streaming)
+- `#102 → c0f6fd0` dokimasia + shared `kourai_common.fix_loop` (5 + 4 STATUS)
+- `#103 → 6af8545` kallos (3 STATUS)
+- `#104 → cde587c` mneme (6 STATUS + 1 DIALOGUE for spoken_intro)
+- `#105 → fb5e9c5` puck + cupid + aletheia + aidos bundled (1+1+2+2 STATUS)
+- `#106 → 859a28b` vn_bridge consumer-side routing (replaces `DIALOGUE_KEYWORDS` prose-keyword discrimination with `get_content_kind`-based routing, mirroring the host CLI predicate shape)
+
+Contract surface in `shared/src/kourai_common/messaging.py`: URI key
+`https://kourai.khryseai/ext/streaming/v1` with
+`{"content_kind": "dialogue" | "status" | "code" | "spec"}`;
+`KIND_*` constants + `set_content_kind` / `get_content_kind` /
+`kind_message`; optional `kind=` kwarg on every `TaskUpdater`
+helper. Host CLI gates TTS on `kind is None or kind ==
+KIND_DIALOGUE`; vn_bridge mirrors the predicate for Ren'Py dialogue
+routing.
+
+The `kind is None` legacy fallback is preserved as a safety net for
+future un-migrated agent additions or test fixtures; Phase 3 work
+can decide whether to drop it once full-pipeline smoke confirms no
+untagged emissions in production.
 
 ### Phase 1 contract — original spec (preserved for orientation)
 
@@ -1291,6 +1284,7 @@ architectural moves; valuable but not the first lift.
 
 One-liner per item, newest first. Detail moves out of this file when work lands.
 
+- 2026-04-30 — **M18 Phase 1 — structured streaming with content-kind metadata** shipped end-to-end (eight squash-merged PRs across one session). Contract + hephaestus pilot (#99 → `8658013`): URI-namespaced extension key `https://kourai.khryseai/ext/streaming/v1` with `{"content_kind": "dialogue" | "status" | "code" | "spec"}` nested under it, A2A 1.0 spec form. `KIND_DIALOGUE` / `KIND_STATUS` / `KIND_CODE` / `KIND_SPEC` constants + `set_content_kind` / `get_content_kind` / `kind_message` primitives + optional `kind=` kwarg on every `TaskUpdater` helper (`send_working_status` / `send_input_required` / `send_completed`). Per-specialist producer migrations: metis (#100 → `31f846c`, 5 STATUS + 2 DIALOGUE), techne (#101 → `5e6d603`, 5 STATUS), dokimasia + shared `kourai_common.fix_loop` (#102 → `c0f6fd0`, 5 + 4 STATUS — fix_loop tagged once for both dokimasia and kallos), kallos (#103 → `6af8545`, 3 STATUS), mneme (#104 → `cde587c`, 6 STATUS + 1 DIALOGUE for the `spoken_intro` line `_split_response` deliberately separates from artifact body), bundled puck/cupid/aletheia/aidos (#105 → `fb5e9c5`, 1+1+2+2 STATUS), and vn_bridge consumer-side routing (#106 → `859a28b`) replacing the prose-keyword `DIALOGUE_KEYWORDS` heuristic with `get_content_kind`-based routing. Host CLI (`hosts/cli/streaming.py`) gates TTS on `kind is None or kind == KIND_DIALOGUE`; vn_bridge mirrors the same predicate shape for Ren'Py dialogue routing. The `kind is None` legacy fallback is retained as a defensive guard for future un-migrated agent additions or test fixtures; Phase 3 work decides whether to drop it. Live-smoke verified: zero protobuf serialization errors across all 11 specialist container logs for the URI key, M13 original-request relay intact, M17 dialogue gate fires through `send_input_required(kind=KIND_DIALOGUE)`. The "100% round-trip" finding from the morning smoke was investigated and closed as by-design per M17 (future-run preference recall, not in-flight pipeline resume — the smoke driver needs a `/preferences set` pre-seed to drive metis past the M17 PAUSE in one shot). Audit cleanup that landed alongside: `5ffa4cb chore(ci): silence ty warnings + transitive pydub noise` (two `ty: ignore[code]` comments + filterwarnings entries — pydub 0.25.1 is unmaintained, transitively via realtimetts), `927d464 chore(ci): bump actions/cache v4 → v5.0.5 for sister-repo parity` (flagged by `/aj-sisters` audit; v5 runs Node 24 + cache-service v2 backend). 2847 unit tests green; lint + ty clean. M7 → M18 sequence proven correct: `Message.metadata` channel as the v1.0 boundary made the URI-namespaced extension shape mechanical to adopt. Phase 2 (SSML inside dialogue bodies — Kokoro doesn't natively consume SSML so transitional strip-then-synthesize) and Phase 3 (`KIND_CODE` / `KIND_SPEC` distinct render paths + retire the `kind is None` legacy fallback) unblocked
 - 2026-04-29 — **M19 audio backend separation for TTS** shipped end-to-end across all three phases. Phase 1 (CLI flip + `RealtimeTTSEngine` ABI-mirroring `TTSEngine` + 26 unit tests, commit `34f3d07`); audioop-lts hot-fix for Py3.13 (commit `e6e9cee`); Phase 2 (GUI flip + delete `hosts/gui/tts_engine.py`, -1092 LOC, commit `3ce88c0`); Phase 3 (vn_bridge migration via new `RealtimeTTSEngine.synthesize_to_wav(text, agent_name=…) -> bytes` driving `TextToAudioStream.play(muted=True, on_audio_chunk=collector)` — RealtimeTTS's documented bytes-only path — then wrapping the int16 PCM in one canonical WAV header sized from `KokoroEngine.get_stream_info()` returning `(paInt16, 1, 24000)`). pygame.mixer is out of the TTS path on every host; native 24 kHz mono Kokoro flows through PyAudio with no resample step, so the "VHS rewind" failure mode is gone by construction. Music + ambient + SFX stay on pygame.mixer at 44100 stereo; the two systems now share only the `/settings` volume slider abstraction. `kourai_common/tts_kokoro.py` + `tts_edge.py` deleted; `tts_backend.py` trimmed to `TTSVoiceConfig` + `AGENT_VOICE_MAP` + `get_voice_for_agent` (the `TTSBackend` ABC retired with its implementations). `agents/hephaestus/pyproject.toml` flipped from `edge-tts` to `RealtimeTTS[kokoro]` + `audioop-lts` so the vn_bridge container — which builds with `PACKAGE_NAME=hephaestus` — gets the right runtime deps; `hosts/gui/pyproject.toml` dropped the transitional `kokoro` / `soundfile` / `edge-tts` declarations (`RealtimeTTS[kokoro]` pulls them transitively where still needed). `docker/host.Dockerfile` got the matching system deps for cli/gui/vn_bridge (build-essential + portaudio19-dev in builder, libportaudio2 in runtime — closes the gap CI's `ed4d560` filled for Actions runners but Docker images never had). Real-Kokoro smoke produced 102 KB / 2.13 s WAV output for a five-word sentence with correct headers. The M6 ElevenLabs migration is now a one-line engine change inside `RealtimeTTSEngine.__init__`. Word-timing primitive (`on_word=` callback in `__init__`) in place for M20. 2838 unit tests green; lint + ty clean
 - 2026-04-29 — **M17 Phase 2 confidence decay** shipped (closes Phase 2 end-to-end). `PROJECT_FACT_DECAY_DAYS = 90` constant + `_decayed_confidence` ladder helper (`skip ← low ← medium ← high`) + `_age_days` + `_is_preference_decayed_to_skip` filter in `kourai_common.facts`. Lazy compute on `created_at` (NOT `last_accessed` — passive recall during a session must not reset the decay timer); only player-driven re-confirmation writes a fresh `created_at`. `list_preference_facts` returns a `decayed_confidence` field alongside the original `confidence` so the CLI can surface decay state without rewriting the stored row; `get_relevant_facts_for_enrichment` filters out preference facts that have decayed to `skip` so Metis stops planning around old answers. `synthesise_fact_from_pause` now forget-then-writes (matching `set_preference_fact`) so re-PAUSE on the same scope+kind no longer stacks rows — the listing stays single-row-per-(scope, kind) and re-confirmation correctly resets the timer. 11 new unit tests (5 ladder helper + 3 listing integration + 2 recall filter + 1 PAUSE dedup property); 2876 unit tests overall green; lint + ty clean. Mirrors mem0's "memory depth" concept without the embedding-vector dependency. Closes ROADMAP §M17 Phase 2 item 9 — M17 is now fully shipped end-to-end
 - 2026-04-29 — **M17 Phase 2 `/preferences` CRUD CLI + project_id stability fix** shipped. New slash command (aliased `/prefs`) lets the player browse, override, and forget closed-vocab preference facts for the active scope: bare `/preferences` lists project + global rows with a `*` marker on project rows; `set <kind> <value>` upserts (forgets-then-writes the same scope+kind so the listing stays single-row-per-kind); `forget <kind>` removes one; `forget --all` clears the whole active scope without touching global. Closed vocab enforced on `set` (same `VALID_PREFERENCE_KINDS` gate as the PAUSE synthesiser); `forget` tolerates retired kinds so right-to-forget outlives vocab churn. Three new public primitives in `kourai_common.facts` (`list_preference_facts`, `forget_preference_fact`, `set_preference_fact`) backed by the existing `player_memories` SQLite axis and `delete_player_memory`. Bundled the project_id stability fix because the feature would have surfaced empty without it: Phase 1's PAUSE-write path stamped facts with `derive_project_id([project_root: <forge_session.workdir>])`, but the REPL creates a uuid'd worktree per turn, so the id changed every session and recall never fired across sessions. Fix: new `[project_id: <derive_project_id(project.path)>]` forge tag emitted alongside `[project_root: …]`; `streaming.py:_project_id_from_forge_tags` prefers the explicit tag and falls back to deriving from project_root. Specialists keep reading project_root for git ops; only the fact synthesiser reads the new tag. 26 new unit tests (10 facts CRUD + 13 CLI handler + 3 streaming-tag preference); 2865 unit tests overall green; lint + ty clean. Aligns with the GDPR/CCPA-aligned forgetting patterns Mem0 / Letta / Supermemory converged on for 2026 — every fact removable by the player, no operator gate. Closes ROADMAP §M17 Phase 2 item 7

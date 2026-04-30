@@ -5,149 +5,85 @@ milestone lands, the matching detail block in [ROADMAP.md](./ROADMAP.md)
 collapses to a one-liner under "Shipped" and this file gets reset to the
 next milestone.
 
-Updated: 2026-04-30 · Working on: **M18 Phase 1 — partial.**
-Per-specialist migration to the URI-namespaced extension key
+Updated: 2026-04-30 · Working on: **M18 Phase 1 SHIPPED 2026-04-30
+(eight PRs: #99/#100/#101/#102/#103/#104/#105/#106 — contract + 10
+specialist producers + 1 consumer migration). All eleven agents
+participate in the URI-namespaced extension key
 ``"https://kourai.khryseai/ext/streaming/v1"`` with
 ``{"content_kind": "dialogue" | "status" | "code" | "spec"}`` nested
-under it. Three of eleven specialists shipped to ``main`` 2026-04-30
-— hephaestus pilot (#99), metis (#100), techne (#101). Eight
-remaining: dokimasia, kallos, mneme (core pipeline) + puck, cupid,
-aletheia, aidos, vn-bridge (companions + Ren'Py adapter). The host's
-``or kind is None`` legacy fallback in ``hosts/cli/streaming.py``
-retires when every specialist opts in. Phase 2 (SSML in dialogue
-bodies) and Phase 3 (``KIND_CODE`` / ``KIND_SPEC`` distinct render
-paths) are gated on full Phase 1. Pre-release perfection stance: no
-workarounds.
+under it. Active focus: validate Phase 1 end-to-end via live smoke
+(blocked on smoke-driver update to pre-seed project facts via
+``/preferences set`` so metis skips the M17 PAUSE), then proceed to
+Phase 2 (SSML inside dialogue bodies) — Kokoro doesn't natively consume
+SSML so transitional strip-then-synthesize, ElevenLabs migration on M6
+unblocks full SSML downstream.**
 
-## M18 Phase 1 — what's on `main`
+## M18 Phase 1 — what shipped (eight PRs, 2026-04-30)
 
-- ``8658013 feat(M18): content-kind metadata contract + hephaestus pilot (#99)``
-  ships ``shared/src/kourai_common/messaging.py`` with
-  ``KOURAI_STREAMING_EXT_URI``, ``CONTENT_KIND_FIELD``,
-  ``KIND_DIALOGUE`` / ``KIND_STATUS`` / ``KIND_CODE`` / ``KIND_SPEC``,
-  ``set_content_kind`` / ``get_content_kind`` / ``kind_message``, and
-  an optional ``kind=`` kwarg on every ``TaskUpdater`` helper.
-  Hephaestus pilot tags CONFIRM_ORDER / INPUT_REQUIRED forward /
-  parallel-discussion as ``KIND_DIALOGUE``; routing + pipeline status
-  as ``KIND_STATUS``. Specialist relays stay untagged so the legacy
-  emoji-prefix path keeps routing during the migration window. Host
-  ``hosts/cli/streaming.py`` reads kind via ``get_content_kind`` and
-  gates TTS on ``kind is None or kind == KIND_DIALOGUE``.
+| PR | Subject | Sites | Notes |
+|---|---|---|---|
+| #99 (`8658013`) | content-kind contract + hephaestus pilot | n/a + 6 | URI extension key, ``KIND_*`` constants, helpers, optional ``kind=`` kwarg on every ``TaskUpdater`` helper. Hephaestus tags CONFIRM_ORDER / INPUT_REQUIRED forward / parallel-discussion as ``KIND_DIALOGUE``; routing + pipeline status as ``KIND_STATUS``. Host CLI gates TTS on ``kind is None or kind == KIND_DIALOGUE``. |
+| #100 (`31f846c`) | metis | 7 | "Analyzing project structure...", git status, "Drafting spec...", "Planning: <latest>" snippets, "Spec complete" → ``STATUS``; M17 recall narration + M17 PAUSE input_required → ``DIALOGUE``. |
+| #101 (`5e6d603`) | techne | 5 | All ``STATUS`` — "Reading existing code...", git status, "Generating code changes...", per-tool-call results, "Applied N code changes". |
+| #102 (`c0f6fd0`) | dokimasia + shared ``fix_loop`` | 5 + 4 | All ``STATUS``. fix_loop is shared with kallos so the helper's iteration beats are tagged once. |
+| #103 (`6af8545`) | kallos | 3 | All ``STATUS`` — lint output, fix tool calls, Aidos slop relay. |
+| #104 (`cde587c`) | mneme | 7 | First specialist after hephaestus to use both kinds — 6 ``STATUS`` (analyzing / drafting / Aidos relay / Aletheia relay / PR-creation status) + 1 ``DIALOGUE`` (the ``spoken_intro`` line that ``_split_response`` deliberately separates from artifact body). |
+| #105 (`fb5e9c5`) | puck + cupid + aletheia + aidos (bundled) | 1+1+2+2 | All ``STATUS``. Companions and post-process specialists; their player-facing content flows through ``add_artifact``, not status emissions. |
+| #106 (`859a28b`) | vn_bridge consumer routing | 1 site rewritten | Replaces vn_bridge's prose-keyword DIALOGUE_KEYWORDS heuristic with ``get_content_kind``-based routing, mirroring the host CLI predicate shape. ``kind is None`` legacy fallback retained as a safety net. |
 
-- ``31f846c feat(M18): tag metis emissions with content-kind metadata (#100)``
-  tags all seven metis emissions: "Analyzing project structure...",
-  streamed git status (🔍), "Drafting implementation spec...", M17
-  recall narration ("Metis remembers..." → ``KIND_DIALOGUE``), streamed
-  "Planning: <latest>" snippets every 5 chunks, "Spec complete", M17
-  PAUSE input_required (``KIND_DIALOGUE``).
-
-- ``5e6d603 feat(M18): tag techne emissions with content-kind metadata (#101)``
-  tags all five techne emissions as ``KIND_STATUS``: "Reading existing
-  code...", streamed git status (🔍), "Generating code changes...",
-  streamed tool-call results (🔧 "<tool> <path> (ok|fail)"), "Applied
-  N code changes to disk".
-
-Audit cleanup that landed on the same branches:
+Audit-cleanup commits that landed on the same branches:
 - ``5ffa4cb chore(ci): silence ty warnings + transitive pydub noise`` —
-  two `ty` ignore comments + filterwarnings entries for pydub
-  ``SyntaxWarning`` (5x per test job, upstream-unmaintained, transitive
-  via realtimetts) and ``RuntimeWarning`` (ffmpeg lookup). 2847 unit
-  tests now run with 9 warnings, down from 20.
+  two `ty: ignore[code]` comments + filterwarnings entries for pydub.
 - ``927d464 chore(ci): bump actions/cache v4 → v5.0.5 for sister-repo parity``
   — flagged by ``/aj-sisters`` audit; v5 runs Node 24 + cache-service v2
-  backend, runner ≥ 2.327.1.
+  backend.
 
-## M18 Phase 1 — what's left (8 specialist migrations)
+## Live-smoke evidence
 
-| Specialist | Role | Expected emissions |
-|---|---|---|
-| dokimasia | tester (pytest) | ``KIND_STATUS`` — "Running tests...", per-test progress, summary |
-| kallos    | stylist (ruff) | ``KIND_STATUS`` — "Linting...", per-file fix events, summary |
-| mneme     | commits (git) | ``KIND_STATUS`` for diff/group beats; ``KIND_DIALOGUE`` for "I have nothing to commit" + final commit narration |
-| puck      | tutorial companion | ``KIND_DIALOGUE`` for player-directed nudges |
-| cupid     | romance companion | ``KIND_DIALOGUE`` for player-facing dialogue |
-| aletheia  | truth / fact read-side (M17) | TBD — read first |
-| aidos     | shame / fact write-side (M17) | TBD — read first |
-| vn-bridge | Ren'Py adapter | Different shape — emissions live in ``vn_bridge.py``, not ``agent_executor.py`` |
+**2026-04-30 morning re-run (URI shape, against rebuilt M18 containers
+post-#99):** Wire shape verified end-to-end. Targeted grep across all
+11 specialist container logs for ``KOURAI_STREAMING_EXT_URI`` /
+``content_kind`` / ``set_content_kind`` / ``get_content_kind`` /
+``kourai.streaming`` / ``kourai/ext/streaming`` returned zero hits in
+error contexts — protobuf ``Struct`` round-trip works under live
+container load. M13 baseline preserved (metis "Streaming spec for:
+[User]: ..."). M17 dialogue gate fires through
+``send_input_required(kind=KIND_DIALOGUE)`` URI emission.
 
-dokimasia + kallos are the most cadence-relevant after metis + techne
-(they emit chatty per-step output that currently TTS-narrates each
-chunk). mneme follows. The four companions + vn-bridge can land later;
-they're less in the cadence path.
+**Pending (full-pipeline post-#100..#106 smoke):** end-to-end run with
+all eleven specialists on the URI shape. Requires:
+1. Container rebuild against latest main (8 commits ahead of the
+   morning rebuild)
+2. Smoke driver update (pre-seed project facts via ``/preferences set``
+   so metis skips the M17 PAUSE — see "100% round-trip" finding below)
+3. Voice-off smoke gives functional verification (no exceptions,
+   pipeline reaches "Forged in" through all specialists, kind-routing
+   logs in vn_bridge confirm metadata flow). Audio-on cadence-diff
+   measurement still blocked on WSL2 PortAudio crackling
+   (``feedback_drive_smoke_yourself.md``,
+   ``shared/src/kourai_common/audio.py`` comment).
 
-## Live-smoke evidence — 2026-04-30 morning
+## "100% round-trip" finding — investigated 2026-04-30
 
-Driven via pexpect (``/tmp/m18_smoke_driver.py``) against containers
-rebuilt at the URI shape (4614c92 + the hephaestus pilot kit). Settings:
-``voice_enabled=false`` (WSL2 PortAudio default-output crackle blocked
-audio-on smoke), ``yolo_enabled=false``. ``make rebuild`` took 848s.
+The smoke driver's "answer the metis dialogue gate with '100%'"
+assumption was wrong. Per ROADMAP §M17, M17 is **future-run preference
+recall**, not in-flight pipeline resume. Designed flow:
+1. Metis hits ``PAUSE: <kind>`` token, stashes preference_kind via
+   ``pause_state.stash_preference_kind``
+2. Metis emits INPUT_REQUIRED, the metis task TERMINATES
+3. Hephaestus catches ``AgentInputRequired``, yields INPUT_REQUIRED to
+   CLI, the pipeline run ENDS at that state
+4. Player answers; CLI synthesizes a project-scoped fact via
+   ``synthesise_fact_from_pause``
+5. The **next** development request in this project sees the fact via
+   ``build_fact_context``; metis no longer needs to ask
 
-| beat | timestamp (UTC) | observed |
-|---|---|---|
-| Driver sends prompt | 15:16:42 | "Plan a small fizzbuzz module with full pytest tests." |
-| Hephaestus first execute | 15:16:44 | ``Hephaestus execute triggered`` |
-| CONFIRM_ORDER read-back | 15:16:50 | ``CONFIRM_ORDER: smart "FizzBuzz module ... or the works?"`` |
-| Driver sends ``yes`` | 15:16:53 | resume turn dispatched |
-| Pipeline determined | 15:16:55 | ``metis -> techne -> dokimasia -> kallos`` (LLM routed 4-stage, no mneme this run) |
-| All 4 specialists connected | 15:16:55 | ``hephaestus.remote_connections.Connected to {metis,techne,dokimasia,kallos}`` |
-| Hephaestus → metis | 15:16:55 | ``Sending to metis: 117 chars`` |
-| **M13 verification** | **15:16:58** | ``agents.metis.agent: Streaming spec for: [User]: Plan a small fizzbuzz module with full pytest tests.`` (M13 original-request relay intact on the URI shape) |
-| Metis spec streams + dialogue gate | 15:17:05–15:17:16 | full FizzBuzz spec; ``AgentInputRequired`` bubbles through hephaestus |
-| Driver sends ``100%`` | 15:17:16 | resume metis dialogue |
-| Resumed turn complete | 15:17:18 | ``✨ Forged in 1.6s`` |
+So the ``Forged in 1.6s`` outcome was the EXPECTED endpoint on a fresh
+project — the pipeline doesn't continue mid-flight. To drive
+metis → techne → dokimasia → kallos → mneme end-to-end in one run, the
+project facts must be pre-seeded so metis doesn't pause at all. Two
+paths in priority order:
 
-**M18 wire shape verified.** Targeted grep across all 11 specialist
-container logs for ``KOURAI_STREAMING_EXT_URI`` / ``content_kind`` /
-``set_content_kind`` / ``get_content_kind`` / ``kourai.streaming`` /
-``kourai/ext/streaming`` returned zero hits in error contexts —
-protobuf ``Struct`` round-trip on
-``msg.metadata[URI] = {"content_kind": ...}`` works under live
-container load. Three hephaestus tracebacks observed
-(``AgentInputRequired``, ``GeneratorExit``, OpenTelemetry
-``ValueError: Token created in a different Context``) are intentional
-control flow + a known opentelemetry+asyncio context-detach issue;
-none mention M18 constants.
-
-**Audible cadence-diff** still isn't observable here because
-``voice_enabled=false`` collapses both kinds to a no-TTS path. Unit
-tests already cover the gating predicate in isolation
-(``test_get_content_kind_reads_through_task_status_update_event``).
-An audio-on smoke remains blocked on the WSL2 PortAudio crackling
-tracked separately (``feedback_drive_smoke_yourself.md``,
-``shared/src/kourai_common/audio.py`` comment).
-
-## "100%" round-trip — investigated 2026-04-30, **by design (M17 is future-run, not in-flight resume)**
-
-Initial flag: in the live smoke, after the driver answered metis's M17
-dialogue gate ("Should I plan for pytest, unittest, or hypothesis?")
-with "100%", the downstream pipeline (techne / dokimasia / kallos)
-didn't execute and ``✨ Forged in 1.6s`` was just the resumed-turn
-elapsed time. Initially triaged as either smoke-driver wording or a
-hephaestus resume-routing gap.
-
-Investigation: ROADMAP §M17 lines 510-518 are explicit — M17 is
-**future-run preference recall**, not in-flight pipeline resume. The
-designed flow:
-1. Metis hits ``PAUSE: <kind> "<question>"`` token in spec generation
-2. ``pause_state.stash_preference_kind`` saves
-   ``(preference_kind, source_agent)`` keyed by ``context_id``
-3. Metis's executor sends INPUT_REQUIRED, the metis task TERMINATES
-4. Hephaestus catches ``AgentInputRequired`` and yields INPUT_REQUIRED
-   to CLI; the pipeline run ENDS at that state
-5. Player answers; CLI's ``_try_synthesise_pause_fact`` pops the stash
-   and writes a project-scoped fact via ``synthesise_fact_from_pause``
-6. The **next** development request in this project sees the fact via
-   ``build_fact_context`` injected into metis's PLAYER CONTEXT block —
-   metis no longer needs to ask
-
-So the smoke's ``Forged in 1.6s`` is the EXPECTED outcome on a fresh
-project. The pipeline doesn't continue mid-flight; the answer benefits
-the next run. The original M13 ``CONFIRM_ORDER → "yes" → continue``
-flow is a different mechanism (M13 is in-flight, M17 is post-pause).
-
-**Implication for full-pipeline smokes:** to drive metis →
-techne → dokimasia → kallos → mneme end-to-end in one run, the project
-facts must be pre-seeded so metis doesn't pause at all. Two paths:
 - **Pre-seed via ``/preferences set``** (M17 Phase 2 CRUD CLI) before
   the smoke prompt. Sets ``test_framework=pytest`` /
   ``coverage_target=100%`` etc. as project-scoped facts; metis reads
@@ -156,19 +92,56 @@ facts must be pre-seeded so metis doesn't pause at all. Two paths:
   benefits from recall narration ("Metis remembers...") and runs
   through.
 
-Either path is the right shape for a full-pipeline smoke once
-dokimasia / kallos / mneme migrations land. Not a bug. The smoke
-driver at ``/tmp/m18_smoke_driver.py`` should be updated to pre-seed
-``test_framework=pytest`` rather than reply to the gate at runtime.
+## Phase 2 — SSML inside dialogue bodies (next architectural work)
 
-## Open issues — surfaced from the 2026-04-29 smoke (M18-adjacent or independent)
+Each ``KIND_DIALOGUE`` Part text body becomes an SSML document —
+``<speak>...<break time="200ms"/>...<emphasis>...</emphasis>...</speak>``.
+Standard W3C markup, supported declaratively by Google / Azure /
+Amazon / ElevenLabs. Kokoro doesn't natively consume SSML; we
+strip-then-synthesize as a transitional layer. ElevenLabs migration on
+M6 unblocks full SSML downstream.
+
+Open questions for Phase 2 (web-search before any implementation, per
+standing rule):
+- **Where does SSML get added — at producer, consumer, or both?**
+  Producer side (specialist's ``send_input_required`` / dialogue
+  emissions) means each specialist owns its prosody. Consumer side
+  (host CLI / vn_bridge wraps in default SSML) means a single layer
+  controls the cadence baseline.
+- **Strip-then-synthesize layer placement.** Current Kokoro path is
+  via ``kourai_common.tts_realtime.RealtimeTTSEngine``. SSML strip
+  could live in the engine itself (so callers stay SSML-agnostic) or
+  in the host (so SSML is end-to-end visible in logs).
+- **Per-specialist persona prosody** (e.g., Hephaestus gruff vs Kallos
+  lilting) — defer to a follow-on once structural plumbing is in.
+
+## Phase 3 — KIND_CODE / KIND_SPEC distinct render paths
+
+Once Phase 1 is fully validated end-to-end (full-pipeline smoke
+passes) and Phase 2 is in:
+- Drop the ``or kind is None`` legacy fallback in
+  ``hosts/cli/streaming.py`` (line 230) and
+  ``agents/vn_bridge/__main__.py`` — every specialist tags now, the
+  fallback should never execute in production.
+- Distinct render paths for ``KIND_CODE`` (monospace, no TTS) and
+  ``KIND_SPEC`` (wide markdown render, no TTS) — currently both
+  collapse to "not dialogue, render as status". Phase 3 splits them so
+  spec output renders in a wide markdown panel (vs the narrow status
+  box) and code output renders in a monospace block with syntax
+  highlighting.
+
+Today only ``KIND_DIALOGUE`` and ``KIND_STATUS`` are emitted by any
+specialist. ``KIND_CODE`` and ``KIND_SPEC`` are reserved tokens — their
+producer-side adoption is part of Phase 3 work.
+
+## Open issues — independent UX bugs (small focused PRs each)
 
 **Solved by completing M18:** comms-window streaming as discrete narrow
-boxes (truncation appearance), final-render wide-box only-some-agents,
-TTS gating universal, FACT-tag leakage into status, Mneme reading
-905-char dialogue including markdown markup aloud.
+boxes, final-render wide-box only-some-agents, TTS gating universal,
+FACT-tag leakage into status, Mneme reading 905-char dialogue including
+markdown markup aloud.
 
-**Independent UX bugs — small focused PRs:**
+**Independent UX bugs:**
 - `Pipeline complete` + `commit_count: 0` together with no soft-fail
   surface (#17)
 - Per-agent CLI color coding via colored-background "badge" pattern
@@ -181,13 +154,9 @@ TTS gating universal, FACT-tag leakage into status, Mneme reading
   ``[User]:`` placeholder (#14)
 - Duplicate empty `Project root:` field at end of metis enriched
   prompt (#15)
-- Phonemizer warning spam ("words count mismatch on 100.0% of the
-  lines (1/1)") on every TTS call — downgrade to DEBUG (#22)
-- Pre-warm Kokoro per-language at engine init (avoid first-speak pause
-  when an agent in lang_code=b speaks for the first time) (#23)
-- Explicit captions / TTS subtitle toggle for accessibility — SPEECH
-  VS ACTION rule already provides de-facto captions; toggle would
-  surface SPEECH VS ACTION violations (#19)
+- Phonemizer warning spam on every TTS call — downgrade to DEBUG (#22)
+- Pre-warm Kokoro per-language at engine init (#23)
+- Explicit captions / TTS subtitle toggle for accessibility (#19)
 
 ## Notes / open questions
 
@@ -207,6 +176,10 @@ TTS gating universal, FACT-tag leakage into status, Mneme reading
   ``build_fact_context`` with project scope; techne / kallos /
   dokimasia / hephaestus inherit the gap. Defer until a non-metis
   PAUSE caller surfaces.
+- **Sisters audit weekly cron** (``trig_013uP9ryCLYscBKS7X6PB5og``,
+  Mondays 12:00 UTC) opens drift PRs and a rollup issue automatically
+  for action-pin / toolchain-pin / merge-setting / open-PR / local-main
+  divergence findings.
 
 ## Up next — priority order
 
@@ -214,30 +187,28 @@ UX/DX is the default between milestones. Pre-release perfection
 stance: no workarounds, web-search 2026 best practice before any
 implementation, architectural fix over expedient patch.
 
-1. **Finish M18 Phase 1 specialist migrations.** Suggested order:
-   dokimasia → kallos → mneme (core pipeline, most cadence-relevant)
-   then puck → cupid → aletheia → aidos → vn-bridge.
-2. **Update smoke driver** to pre-seed project facts via
+1. **Update smoke driver** to pre-seed project facts via
    ``/preferences set`` so metis skips the M17 PAUSE; full-pipeline
    smoke then runs end-to-end in one shot.
-3. **Full-pipeline live smoke** once dokimasia / kallos / mneme land
-   AND the smoke driver is updated — first run where the audible
-   cadence-diff is observable end-to-end (still blocked on the
-   audio-on path under WSL2; voice-off at minimum gives
-   timing-cadence visibility).
-4. **M18 Phase 2 — SSML in dialogue bodies.** Kokoro doesn't natively
-   consume SSML; transitional strip-then-synthesize. ElevenLabs
-   migration on M6 unblocks full SSML downstream.
-5. **M18 Phase 3 — KIND_CODE / KIND_SPEC distinct render paths.** Drop
-   the ``or kind is None`` legacy fallback once every specialist opts
-   in.
-6. **M20 — Audio-text synchronization.** Builds on M18 (kind routing)
-   + M19 (RealtimeTTS word-timing API already wired via the ``on_word=``
+2. **Full-pipeline live smoke** against latest main (post-#106) with
+   the updated driver — first end-to-end run with all eleven
+   specialists on the URI shape.
+3. **M18 Phase 2 — SSML inside dialogue bodies.** Web-search 2026 SSML
+   best practice (W3C SSML 1.1 status, ElevenLabs/Azure provider
+   subset compatibility) before any implementation. Decide
+   producer-vs-consumer SSML wrapping.
+4. **M18 Phase 3 — KIND_CODE / KIND_SPEC distinct render paths.** Drop
+   the ``or kind is None`` legacy fallback once full-pipeline smoke
+   confirms no untagged emissions in production. Wide markdown render
+   for spec, monospace + syntax highlighting for code.
+5. **M20 — Audio-text synchronization.** Builds on M18 (kind routing)
+   + M19 (RealtimeTTS word-timing API already wired via ``on_word=``
    callback). 9-14s text-precedes-audio gap is a player-notices UX
-   issue. See ROADMAP §M20.
-7. **Independent UX bugs** from the smoke (above).
-8. **Live VN smoke** — exercises the new vn_bridge ``/tts`` →
-   ``RealtimeTTSEngine.synthesize_to_wav`` path.
-9. **``docs/architecture/puck-first-run-tutorial.md``** — pairs with
+   issue.
+6. **Independent UX bugs** from the smoke (above).
+7. **Live VN smoke** — exercises the new vn_bridge ``/tts`` →
+   ``RealtimeTTSEngine.synthesize_to_wav`` path AND the new
+   metadata-based dialogue routing.
+8. **``docs/architecture/puck-first-run-tutorial.md``** — pairs with
    the M6 player-onboarding theme.
-10. **M5 / M12 / M15 / M6 follow-ons** — see ROADMAP for scope.
+9. **M5 / M12 / M15 / M6 follow-ons** — see ROADMAP for scope.
