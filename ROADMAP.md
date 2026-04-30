@@ -5,7 +5,7 @@ A public, living plan for where the forge is heading. Items here are either
 *currently working on* lives in [IMPL.md](./IMPL.md) — when it lands, the
 matching milestone here collapses to a single line under "Shipped".
 
-Last reviewed: 2026-04-29 (M17 Phase 2 fully shipped — `/preferences` CRUD CLI + project_id stability fix (#93), confidence decay (#94); 2026-04-29 live smoke against `make up` uncovered an architectural overhaul that supersedes "between milestones" UX/DX work: **M13 CONFIRM_ORDER prompt-loss regression** — Hephaestus drops the original development request when relaying to a specialist after the player's confirmation, so Metis received only `"light it"` / `"y"` as her spec body; pipeline cascaded on garbage and reported `✨ Forged in 333.6s` / `commit_count: 0` with no soft-fail signal across two end-to-end runs (sessions `bd1e413a` and `0dbafe91`); /yolo verified to only tag messages with `[yolo: on]` rather than bypass the gate, so the regression is independent of the yolo path. Beyond M13, the smoke surfaced 23+ findings clustering around two architectural gaps: unstructured streaming (every text update parsed as either narrow status box or wide artifact render with no metadata to distinguish dialogue, status, code, or spec — manifests as truncation, FACT-tag leakage, TTS reading 905-char Mneme dialogue including markdown asterisks aloud, TTS gating turning 60-90s of pipeline work into 333s of wall-clock) and audio playback architecture (pygame.mixer documented as not reliably resampling, so 24kHz mono Kokoro output through 44.1kHz stereo mixer renders as ~3.7× speed "VHS rewind" — BytesIO header-parsing patch verified ineffective by AJ; pygame buffer 512→2048 bumped to fix WSL2+LLM-load underrun crackling, verified gone). New milestones M18 (structured streaming with content-kind metadata in `Message.metadata`, builds on M7) and M19 (audio backend separation for TTS via miniaudio or sounddevice, independent of M7/M18) added below. M7 status elevated to critical-path: no longer "deferred until M17 Phase 1 has miles" — it's the foundation for M13 fix AND M18. Quick wins shipped in working tree without architectural commitment: `[HH:MM:SS]` dim prefix in every comms-window header for per-step timing visibility (`hosts/cli/rendering.py`), full TTS text logged at INFO via `text=%r` in `hosts/gui/tts_engine.py`, pygame buffer bump documented in `shared/src/kourai_common/audio.py` with the WSL2-trade-off comment so future PRs don't shrink it back. New memory `feedback_no_workarounds.md` captures the pre-release perfection stance: "April-2026 best practice no matter the cost; never frame as 'cheapest fix'; web-search before any implementation proposal." All the rest from the 2026-04-27 reviewed line still applies — see Shipped, revised M2/M7, and the M6 "Surfaced from external research" subsection)
+Last reviewed: 2026-04-30 (M18 Phase 1 mid-flight — contract + hephaestus pilot (#99), metis (#100), and techne (#101) all squash-merged to `main`; eight specialists remain — dokimasia, kallos, mneme + puck, cupid, aletheia, aidos, vn-bridge — before the host's `or kind is None` legacy fallback can retire and Phase 2 (SSML in dialogue bodies) + Phase 3 (`KIND_CODE` / `KIND_SPEC` distinct render paths) unlock. The 2026-04-30 morning live smoke against rebuilt URI-shape containers verified the wire shape end-to-end (zero protobuf serialization errors, M13 original-request relay intact, M17 dialogue gate fires through `send_input_required(kind=KIND_DIALOGUE)`); audible cadence-diff still blocked on WSL2 PortAudio crackling, voice-off smoke gives timing-cadence visibility. One latent observation queued: when the smoke driver answered metis's M17 dialogue gate with "100%", hephaestus's resume trigger treated it as a fresh user turn and downstream specialists didn't execute — independent of M18 wire shape, queued for triage before the next live smoke. M7 fully shipped 2026-04-30 (six phases, `Message.metadata` channel as the v1.0 boundary). M13 fix shipped 2026-04-30 (original-request via metadata on resume dispatch). M19 shipped 2026-04-29 (Phases 1+2+3 RealtimeTTS migration — pygame.mixer out of the TTS path, native 24 kHz Kokoro through PyAudio with no resample, "VHS rewind" failure mode gone by construction). M17 Phase 2 shipped 2026-04-29. Sister-repo audit 2026-04-30 surfaced one cache-pin drift (kourai @ v4 vs vFL @ v5.0.5) and now runs on a weekly cron (Monday 12:00 UTC, routine `trig_013uP9ryCLYscBKS7X6PB5og`). Pre-release perfection stance unchanged — April 2026 best practice no matter the cost; web-search before any implementation; architectural fix over expedient patch.)
 
 ---
 
@@ -751,16 +751,51 @@ Defensible *now* that Phase 1 has landed:
 
 ## M18 — Structured streaming with content-kind metadata
 
-> Status: Phase 1 in flight on `feat/m18-content-kind-metadata`
-> (contract + hephaestus pilot + host coexistence). Subsequent phases:
-> per-specialist migration, SSML in dialogue bodies, `KIND_CODE` /
-> `KIND_SPEC` distinct render paths. · Surfaced 2026-04-29 live
-> smoke · Builds on M7 (depends on `Message.metadata` channel) ·
-> Resolves clustered UX findings: comms-window truncation, FACT-tag
-> leakage into status stream, TTS reading entire markdown bodies
-> aloud, TTS-gated pipeline visual cadence
+> Status: Phase 1 partial — contract + hephaestus pilot (#99), metis
+> (#100), and techne (#101) squash-merged to `main` 2026-04-30. Eight
+> specialists remain (dokimasia, kallos, mneme + puck, cupid, aletheia,
+> aidos, vn-bridge) before the host's `or kind is None` legacy fallback
+> can retire. Phase 2 (SSML in dialogue bodies) and Phase 3 (`KIND_CODE`
+> / `KIND_SPEC` distinct render paths) gated on full Phase 1. ·
+> Surfaced 2026-04-29 live smoke · Builds on M7 (depends on
+> `Message.metadata` channel) · Resolves clustered UX findings:
+> comms-window truncation, FACT-tag leakage into status stream, TTS
+> reading entire markdown bodies aloud, TTS-gated pipeline visual
+> cadence
 
-### Phase 1 — kind contract + hephaestus pilot (in flight)
+### Phase 1 — kind contract + per-specialist migration
+
+**Shipped 2026-04-30:**
+- Contract + hephaestus pilot (#99 → `8658013`): URI-namespaced
+  extension key `https://kourai.khryseai/ext/streaming/v1` with
+  `{"content_kind": "dialogue" | "status" | "code" | "spec"}` nested
+  under it (A2A 1.0 spec form). Constants
+  `KOURAI_STREAMING_EXT_URI` / `CONTENT_KIND_FIELD` / `KIND_DIALOGUE`
+  / `KIND_STATUS` / `KIND_CODE` / `KIND_SPEC`; helpers
+  `set_content_kind` / `get_content_kind` / `kind_message`; optional
+  `kind=` kwarg on `send_working_status` / `send_input_required` /
+  `send_completed`. Host CLI `streaming.py` reads kind via
+  `get_content_kind` and gates TTS on
+  `kind is None or kind == KIND_DIALOGUE`. Live-smoke verified.
+- Metis migration (#100 → `31f846c`): seven emissions tagged
+  (`KIND_STATUS` for "Analyzing project structure...", streamed git
+  status, "Drafting implementation spec...", "Planning: <latest>"
+  snippets, "Spec complete"; `KIND_DIALOGUE` for M17 recall narration
+  and the M17 PAUSE input_required).
+- Techne migration (#101 → `5e6d603`): five emissions tagged as
+  `KIND_STATUS` ("Reading existing code...", git status, "Generating
+  code changes...", per-tool-call results "🔧 \<tool> \<path>
+  (ok|fail)", "Applied N code changes to disk").
+
+**Remaining (8 specialists):** dokimasia, kallos, mneme are next —
+they round out the core development pipeline and are the most
+cadence-relevant after metis + techne (chatty per-step output that
+currently TTS-narrates each chunk). The four companions (puck,
+cupid, aletheia, aidos) and vn-bridge follow; all five are less in
+the cadence path. vn-bridge's emissions live in `vn_bridge.py`
+rather than `agent_executor.py`, so the migration shape differs.
+
+### Phase 1 contract — original spec (preserved for orientation)
 
 `shared/src/kourai_common/messaging.py` ships the discriminator —
 `KIND_DIALOGUE` / `KIND_STATUS` / `KIND_CODE` / `KIND_SPEC` constants,
