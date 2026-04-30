@@ -10,10 +10,31 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import subprocess
 from typing import Any
 
 log = logging.getLogger(__name__)
+
+# Hephaestus prefixes the forge transcript with role markers like
+# ``[User]: <request>`` and ``[Metis]: <result>`` so downstream
+# specialists "hear" the conversation. The first marker leaks into doc
+# lookups when the specialist forwards its full user_input as the
+# library-search query — extracting "[User]:" as the library name then
+# blew up Context7 with ``URL template emits literal [User]: placeholder``
+# errors (#14 from 2026-04-29 smoke). Strip any leading transcript
+# markers before splitting library / topic.
+_TRANSCRIPT_MARKER_RE = re.compile(r"^\s*\[\w[\w-]*\]:\s*")
+
+
+def _strip_transcript_markers(query: str) -> str:
+    """Remove leading ``[Word]:`` transcript markers from a doc-lookup query."""
+    out = query
+    while True:
+        new = _TRANSCRIPT_MARKER_RE.sub("", out)
+        if new == out:
+            return out
+        out = new
 
 
 class DocLookupError(Exception):
@@ -42,10 +63,11 @@ async def query_context7(
         query_context7 as mcp_query_context7,
     )
 
+    cleaned = _strip_transcript_markers(query)
     # Use the first word as the library name; rest of query becomes the topic
-    parts = query.split(None, 1)
+    parts = cleaned.split(None, 1)
     library = parts[0] if parts else ""
-    topic = parts[1] if len(parts) > 1 else query
+    topic = parts[1] if len(parts) > 1 else cleaned
 
     if not library:
         return []

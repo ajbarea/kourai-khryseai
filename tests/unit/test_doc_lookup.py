@@ -114,6 +114,51 @@ class TestQueryContext7:
         assert captured["library"] == "asyncio"
         assert captured["topic"] == "asyncio"
 
+    @pytest.mark.asyncio
+    async def test_strips_user_transcript_marker_from_query(self):
+        """``[User]:`` prefix from hephaestus transcript must NOT leak into library name (#14)."""
+        captured: dict[str, str] = {}
+
+        async def capture(library: str, topic: str, **_: object) -> str:
+            captured["library"] = library
+            captured["topic"] = topic
+            return "docs"
+
+        with patch("kourai_common.mcp_client.query_context7", new=capture):
+            await query_context7("[User]: asyncio gather semantics")
+
+        assert captured["library"] == "asyncio"
+        assert captured["topic"] == "gather semantics"
+
+    @pytest.mark.asyncio
+    async def test_strips_chained_transcript_markers(self):
+        """Multiple stacked transcript markers are all stripped."""
+        captured: dict[str, str] = {}
+
+        async def capture(library: str, topic: str, **_: object) -> str:
+            captured["library"] = library
+            captured["topic"] = topic
+            return "docs"
+
+        with patch("kourai_common.mcp_client.query_context7", new=capture):
+            await query_context7("[Hephaestus]: [User]: react hooks lifecycle")
+
+        assert captured["library"] == "react"
+        assert captured["topic"] == "hooks lifecycle"
+
+    @pytest.mark.asyncio
+    async def test_strip_helper_is_pure(self):
+        """The stripping helper handles edge cases without side effects."""
+        from kourai_common.doc_lookup import _strip_transcript_markers
+
+        assert _strip_transcript_markers("plain query") == "plain query"
+        assert _strip_transcript_markers("[User]: hi") == "hi"
+        assert _strip_transcript_markers("[A]: [B]: [C]: x") == "x"
+        # Markers only get stripped from the START of the string.
+        assert _strip_transcript_markers("middle [User]: text") == "middle [User]: text"
+        # Empty input is a no-op.
+        assert _strip_transcript_markers("") == ""
+
 
 # ── query_context_hub ─────────────────────────────────────────────────────────
 

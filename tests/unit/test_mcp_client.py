@@ -306,6 +306,42 @@ class TestQueryContext7Async:
 
         assert captured_url[0] == "http://custom-host:9999/mcp"
 
+    @pytest.mark.asyncio
+    async def test_uses_query_docs_tool_name_and_v2_param_shape(self):
+        """v2.x server renamed get-library-docs → query-docs and reshaped params (#14).
+
+        Sticking with the old names produces ``MCP error -32602: Tool
+        get-library-docs not found`` against current ``@upstash/context7-mcp``.
+        Lock the tool name and parameter keys so a future regression
+        gets caught here, not in production.
+        """
+        session = _make_session_mock()
+
+        @asynccontextmanager
+        async def mock_client_session(_read: object, _write: object, **_kwargs: object):
+            yield session
+
+        with (
+            patch("mcp.client.streamable_http.streamable_http_client", _mock_streamable_client),
+            patch("mcp.ClientSession", mock_client_session),
+        ):
+            await query_context7("asyncio", "gather")
+
+        calls = session.call_tool.call_args_list
+        assert len(calls) == 2
+
+        # First call: resolve-library-id with libraryName.
+        assert calls[0].args[0] == "resolve-library-id"
+        assert calls[0].args[1] == {"libraryName": "asyncio"}
+
+        # Second call: query-docs (NOT get-library-docs) with libraryId+query
+        # (NOT context7CompatibleLibraryID+topic+tokens).
+        assert calls[1].args[0] == "query-docs"
+        params = calls[1].args[1]
+        assert set(params.keys()) == {"libraryId", "query"}
+        assert params["libraryId"] == "/python/asyncio"
+        assert params["query"] == "gather"
+
 
 # ── create_memory_entities (async MCP) ───────────────────────────────────────
 

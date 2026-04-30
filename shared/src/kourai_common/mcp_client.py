@@ -280,12 +280,15 @@ async def query_context7(library: str, topic: str, tokens: int = 5000) -> str:
 
     Args:
         library: Library name to look up (e.g., "asyncio").
-        topic: Specific topic within the library.
-        tokens: Max token budget for the documentation response.
+        topic: Free-form question routed to Context7's documentation API.
+        tokens: Accepted for ABI parity with older callers; the upstream
+            ``query-docs`` tool no longer exposes a token-budget knob, so
+            the value is ignored.
 
     Raises:
         MCPUnavailable: If the sidecar is unreachable or the call fails.
     """
+    del tokens  # ABI-compat; upstream query-docs has no token knob.
     from mcp.client.streamable_http import streamable_http_client
     from mcp.types import TextContent
 
@@ -306,12 +309,19 @@ async def query_context7(library: str, topic: str, tokens: int = 5000) -> str:
                         library_id = text_items[0].text.strip() if text_items else ""
                         if not library_id:
                             raise MCPUnavailable(f"Context7 could not resolve library: {library}")
+                        # @upstash/context7-mcp v2.x renamed ``get-library-docs``
+                        # to ``query-docs`` and renamed parameters from
+                        # ``context7CompatibleLibraryID`` / ``topic`` to
+                        # ``libraryId`` / ``query``. The ``tokens`` knob was
+                        # removed entirely (the server now sizes responses
+                        # internally). Sticking with the old names produced
+                        # ``MCP error -32602: Tool get-library-docs not found``
+                        # in production sidecars (#14 from 2026-04-29 smoke).
                         docs_result = await session.call_tool(
-                            "get-library-docs",
+                            "query-docs",
                             {
-                                "context7CompatibleLibraryID": library_id,
-                                "topic": topic,
-                                "tokens": tokens,
+                                "libraryId": library_id,
+                                "query": topic,
                             },
                         )
                         text_items = [c for c in docs_result.content if isinstance(c, TextContent)]
