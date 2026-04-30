@@ -31,7 +31,7 @@ def bridge(tmp_path: Path) -> RenPyBridge:
     Prevents log file and TTS audio file creation in the real project tree during tests.
     """
     with patch("bridge._find_project_root", return_value=tmp_path):
-        b = RenPyBridge(agent_script="agents/vn_bridge.py")
+        b = RenPyBridge(agent_script="agents/vn_bridge")
     b.game_dir = tmp_path / "game"
     return b
 

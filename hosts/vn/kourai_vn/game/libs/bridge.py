@@ -37,7 +37,7 @@ class RenPyBridge:
     script.rpy needs no changes.
     """
 
-    def __init__(self, agent_script: str = "agents/vn_bridge.py"):
+    def __init__(self, agent_script: str = "agents/vn_bridge"):
         # agent_script kept for Ren'Py save/load pickle compatibility only
         self.agent_script = agent_script
         self.is_running = False
@@ -241,4 +241,4 @@ class RenPyBridge:
         return {"agent_script": self.agent_script}
 
     def __setstate__(self, state: dict) -> None:
-        self.__init__(agent_script=state.get("agent_script", "agents/vn_bridge.py"))
+        self.__init__(agent_script=state.get("agent_script", "agents/vn_bridge"))

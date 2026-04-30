@@ -38,7 +38,7 @@ from kourai_common.a2a_utils import make_a2a_http_client
 from kourai_common.companion import infer_portrait_state
 from kourai_common.config import get_agent_url
 from kourai_common.facts import process_agent_output
-from kourai_common.messaging import user_message
+from kourai_common.messaging import send_request, stream_event, user_message
 from kourai_common.tts_realtime import RealtimeTTSEngine
 
 if TYPE_CHECKING:
@@ -318,7 +318,8 @@ async def handle_message(request: Request) -> StreamingResponse:
         current_agent = "hephaestus"
         found_artifact = False
         try:
-            async for event in client.send_message(message):
+            async for response in client.send_message(send_request(message)):
+                event = stream_event(response)
                 if isinstance(event, Message):
                     text = extract_message_text(event)
                     if text:
@@ -336,69 +337,65 @@ async def handle_message(request: Request) -> StreamingResponse:
                             )
                         found_artifact = True
                     continue
-                if isinstance(event, tuple):
-                    task, update = event
-                    if isinstance(update, TaskStatusUpdateEvent):
-                        status_msg = extract_status_text(update)
-                        if not status_msg:
-                            continue
-                        lower = status_msg.lower()
-                        for name in AGENT_NAMES:
-                            if name in lower:
-                                current_agent = name
-                                break
-                        log.info(f"Status ({current_agent}): {status_msg[:100]}")
-                        if any(kw in lower for kw in DIALOGUE_KEYWORDS):
-                            yield (
-                                json.dumps(
-                                    {
-                                        "agent": "hephaestus",
-                                        "message": status_msg[:200],
-                                        "portrait": "neutral",
-                                    }
-                                )
-                                + "\n"
+                if isinstance(event, TaskStatusUpdateEvent):
+                    status_msg = extract_status_text(event)
+                    if not status_msg:
+                        continue
+                    lower = status_msg.lower()
+                    for name in AGENT_NAMES:
+                        if name in lower:
+                            current_agent = name
+                            break
+                    log.info(f"Status ({current_agent}): {status_msg[:100]}")
+                    if any(kw in lower for kw in DIALOGUE_KEYWORDS):
+                        yield (
+                            json.dumps(
+                                {
+                                    "agent": "hephaestus",
+                                    "message": status_msg[:200],
+                                    "portrait": "neutral",
+                                }
                             )
-                        else:
-                            yield (
-                                json.dumps({"action": "status", "message": status_msg[:120]}) + "\n"
-                            )
-                    elif isinstance(update, TaskArtifactUpdateEvent):
-                        if update.artifact and update.artifact.parts:
-                            # Extract jealousy_trigger from DataPart before processing text.
-                            for p in update.artifact.parts:
-                                part_data = p.data if p.HasField("data") else None
-                                if isinstance(part_data, dict):
-                                    jealousy = part_data.get("jealousy_trigger")
-                                    if jealousy and isinstance(jealousy, dict):
-                                        yield (
-                                            json.dumps(
-                                                {
-                                                    "action": "jealousy",
-                                                    "agent": jealousy.get("agent", ""),
-                                                    "score": jealousy.get("score", 0.0),
-                                                }
-                                            )
-                                            + "\n"
-                                        )
-                            text = extract_artifact_text(update)
-                            if text:
-                                log.info(f"Artifact ({current_agent}): {text[:80]}")
-                                text = process_agent_output(
-                                    text, current_player_id, source_agent=current_agent
-                                )
-                                portrait_state = infer_portrait_state(current_agent, text)
-                                for beat in _paginate(text):
+                            + "\n"
+                        )
+                    else:
+                        yield (json.dumps({"action": "status", "message": status_msg[:120]}) + "\n")
+                elif isinstance(event, TaskArtifactUpdateEvent):
+                    if event.artifact and event.artifact.parts:
+                        # Extract jealousy_trigger from DataPart before processing text.
+                        for p in event.artifact.parts:
+                            part_data = p.data if p.HasField("data") else None
+                            if isinstance(part_data, dict):
+                                jealousy = part_data.get("jealousy_trigger")
+                                if jealousy and isinstance(jealousy, dict):
                                     yield (
                                         json.dumps(
                                             {
-                                                "agent": current_agent,
-                                                "message": beat,
-                                                "portrait": portrait_state,
+                                                "action": "jealousy",
+                                                "agent": jealousy.get("agent", ""),
+                                                "score": jealousy.get("score", 0.0),
                                             }
                                         )
                                         + "\n"
                                     )
+                        text = extract_artifact_text(event)
+                        if text:
+                            log.info(f"Artifact ({current_agent}): {text[:80]}")
+                            text = process_agent_output(
+                                text, current_player_id, source_agent=current_agent
+                            )
+                            portrait_state = infer_portrait_state(current_agent, text)
+                            for beat in _paginate(text):
+                                yield (
+                                    json.dumps(
+                                        {
+                                            "agent": current_agent,
+                                            "message": beat,
+                                            "portrait": portrait_state,
+                                        }
+                                    )
+                                    + "\n"
+                                )
                                 found_artifact = True
         except Exception as e:
             log.error(f"Stream error: {e}", exc_info=True)

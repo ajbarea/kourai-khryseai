@@ -4,10 +4,8 @@ set -e
 
 echo "Starting ${HOST_TYPE}:${PACKAGE_NAME} on port ${PORT:-default}..."
 
-if [ "${HOST_TYPE}" = "agent" ]; then
+if [ "${HOST_TYPE}" = "agent" ] || [ "${HOST_TYPE}" = "vn_bridge" ]; then
     exec python -m "agents.${PACKAGE_NAME}"
-elif [ "${HOST_TYPE}" = "vn_bridge" ]; then
-    exec python -u agents/vn_bridge.py
 else
     exec python -m "hosts.${PACKAGE_NAME}"
 fi

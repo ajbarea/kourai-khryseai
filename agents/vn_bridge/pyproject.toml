@@ -1,0 +1,41 @@
+[project]
+name = "kourai-vn-bridge"
+version = "0.1.0"
+description = "VN Bridge HTTP service — proxies Ren'Py to A2A agents and synthesizes WAV bytes for Ren'Py audio"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "kourai-common",
+    # M19 Phase 3: synthesis is via RealtimeTTSEngine.synthesize_to_wav,
+    # driven with muted=True + on_audio_chunk to return WAV bytes for
+    # Ren'Py's audio system. RealtimeTTS bakes pyaudio into its base
+    # requirements even on the synthesis-only path, so the Linux build
+    # needs gcc + portaudio19-dev (Dockerfile installs them when
+    # HOST_TYPE=vn_bridge).
+    "RealtimeTTS[kokoro]>=0.4.0",
+    # pydub (transitive via RealtimeTTS) needs audioop, removed from
+    # stdlib in 3.13; audioop-lts is the maintained backport.
+    "audioop-lts>=0.2.1; python_version >= '3.13'",
+    # Kokoro's misaki G2P transitively wants the en_core_web_sm spaCy
+    # model and lazy-calls `spacy.cli.download` on first init. That
+    # shells out to `pip install` — uv-managed venvs have no pip, so
+    # the call exits with SystemExit(1) before the lifespan completes
+    # (caught vn-bridge in a silent restart loop on fresh image build).
+    # Pin the model wheel as a workspace dep so uv resolves it at
+    # build time. spaCy 3.8.x ↔ en_core_web_sm 3.8.0 per
+    # explosion/spacy-models compatibility.json.
+    "en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+# en-core-web-sm is pinned by URL above (spaCy doesn't ship models on
+# PyPI), and hatchling's default rejects direct references for
+# repeatable-build hygiene. Allowing it here is the canonical 2026
+# escape hatch — see explosion/spacy-models discussions on uv setup.
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
