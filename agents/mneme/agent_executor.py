@@ -18,7 +18,13 @@ from agents.mneme.agent import (
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
 from kourai_common.facts import extract_facts, store_facts, strip_facts
-from kourai_common.messaging import data_part, send_working_status, text_part
+from kourai_common.messaging import (
+    KIND_DIALOGUE,
+    KIND_STATUS,
+    data_part,
+    send_working_status,
+    text_part,
+)
 from kourai_common.player import PlayerProfile
 from kourai_common.tracing import create_span
 from kourai_common.virtues import update_virtue
@@ -102,6 +108,7 @@ class MnemeAgentExecutor(BaseAgentExecutor):
                 task,
                 "Analyzing git changes...",
                 emoji="📜",
+                kind=KIND_STATUS,
             )
 
             full_response = ""
@@ -116,7 +123,7 @@ class MnemeAgentExecutor(BaseAgentExecutor):
                         latest_line = latest_line[:47] + "..."
                     if latest_line.strip():
                         await send_working_status(
-                            updater, task, f"Drafting: {latest_line}", emoji="📜"
+                            updater, task, f"Drafting: {latest_line}", emoji="📜", kind=KIND_STATUS
                         )
 
             # Extract + store player facts from the full response before splitting
@@ -132,7 +139,9 @@ class MnemeAgentExecutor(BaseAgentExecutor):
 
             # Send spoken intro as dialogue (flows through TTS in the GUI)
             if spoken_intro:
-                await send_working_status(updater, task, spoken_intro, emoji="📜")
+                await send_working_status(
+                    updater, task, spoken_intro, emoji="📜", kind=KIND_DIALOGUE
+                )
 
             # Parse commit groups for structured metadata
             commit_groups = [
@@ -155,6 +164,7 @@ class MnemeAgentExecutor(BaseAgentExecutor):
                     task,
                     f"Aidos: {len(slop_words)} slop word(s) detected — reviewing",
                     emoji="🚫",
+                    kind=KIND_STATUS,
                 )
                 slop_analysis = await analyze_slop(artifact_body, context_id=task.context_id)
                 if slop_analysis != "CLEAN":
@@ -173,6 +183,7 @@ class MnemeAgentExecutor(BaseAgentExecutor):
                         task,
                         f"Aletheia: {len(unsupported)} unsupported claim(s) in narrative",
                         emoji="🏛️",
+                        kind=KIND_STATUS,
                     )
                     research_analysis = await validate_research(
                         spoken_intro, context_id=task.context_id
@@ -183,6 +194,7 @@ class MnemeAgentExecutor(BaseAgentExecutor):
                             task,
                             f"Aletheia: {research_analysis[:120]}",
                             emoji="🏛️",
+                            kind=KIND_STATUS,
                         )
 
             # Offer GitHub PR creation (HOTL confirmation)
@@ -199,6 +211,7 @@ class MnemeAgentExecutor(BaseAgentExecutor):
                     task,
                     f"Ready to create PR: {pr_metadata['title'][:60]}...",
                     emoji="🔗",
+                    kind=KIND_STATUS,
                 )
 
                 # Generate choice event for HOTL confirmation
