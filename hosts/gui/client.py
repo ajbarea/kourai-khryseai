@@ -17,15 +17,10 @@ from uuid import uuid4
 import httpx
 from a2a.client import A2ACardResolver, ClientConfig, ClientFactory
 from a2a.types import (
-    FilePart,
-    FileWithBytes,
     Message,
-    Part,
-    Role,
     TaskArtifactUpdateEvent,
     TaskState,
     TaskStatusUpdateEvent,
-    TextPart,
 )
 
 from kourai_common.a2a_events import (
@@ -33,6 +28,7 @@ from kourai_common.a2a_events import (
     extract_status_text,
 )
 from kourai_common.config import AGENT_PORTS, get_agent_url
+from kourai_common.messaging import file_part_from_b64, user_message
 
 if TYPE_CHECKING:
     import queue as _queue
@@ -138,25 +134,19 @@ class GuiClient:
 
         # Build a multi-part Message identical in shape to the CLI's
         # send_and_stream so Hephaestus can't tell host apart on the wire.
-        parts: list[Part] = [Part(root=TextPart(text=user_text))]
-        for b64_data, mime_type in attachments or []:
-            parts.append(
-                Part(
-                    root=FilePart(
-                        file=FileWithBytes(
-                            bytes=b64_data,
-                            mime_type=mime_type,
-                            name="attachment.png",
-                        )
-                    )
-                )
+        extra_parts = [
+            file_part_from_b64(
+                b64_data=b64_data,
+                media_type=mime_type,
+                filename="attachment.png",
             )
-        message = Message(
-            role=Role.user,
-            parts=parts,
-            message_id=str(uuid4()),
+            for b64_data, mime_type in (attachments or [])
+        ]
+        message = user_message(
+            user_text,
+            context_id=context_id,
+            extra_parts=extra_parts or None,
         )
-        message.context_id = context_id  # type: ignore[attr-defined]
 
         t0 = time.monotonic()
         final_text = ""

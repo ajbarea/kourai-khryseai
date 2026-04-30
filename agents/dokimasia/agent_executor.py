@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from a2a.types import DataPart, Part, Task, TextPart, UnsupportedOperationError
+from a2a.types import Task, UnsupportedOperationError
 from a2a.utils.errors import ServerError
 
 from agents.dokimasia.agent import (
@@ -15,7 +15,7 @@ from kourai_common.a2a_utils import extract_image_parts, parse_project_root
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
 from kourai_common.mcp_client import kourai_project_root_var
-from kourai_common.messaging import send_working_status
+from kourai_common.messaging import data_part, send_working_status, text_part
 from kourai_common.player import PlayerProfile
 from kourai_common.tracing import create_span
 from kourai_common.virtues import update_virtue
@@ -110,8 +110,8 @@ class DokimasiaAgentExecutor(BaseAgentExecutor):
                 # Emit both human-readable text and machine-readable structured data
                 await updater.add_artifact(
                     [
-                        Part(root=TextPart(text=final_output)),
-                        Part(root=DataPart(data=result.to_dict())),
+                        text_part(final_output),
+                        data_part(result.to_dict()),
                     ],
                     name="test_results",
                 )
@@ -166,7 +166,7 @@ class DokimasiaAgentExecutor(BaseAgentExecutor):
                 )
 
                 await updater.add_artifact(
-                    [Part(root=TextPart(text=tests))],
+                    [text_part(tests)],
                     name="generated_tests",
                 )
                 await updater.complete()

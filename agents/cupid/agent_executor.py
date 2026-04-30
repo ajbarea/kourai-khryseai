@@ -5,14 +5,14 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from a2a.types import DataPart, Part, Task, TextPart, UnsupportedOperationError
+from a2a.types import Task, UnsupportedOperationError
 from a2a.utils.errors import ServerError
 
 from agents.cupid.agent import translate_emotion
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
 from kourai_common.facts import extract_facts, store_facts, strip_facts
-from kourai_common.messaging import send_working_status
+from kourai_common.messaging import data_part, send_working_status, text_part
 from kourai_common.player import PlayerProfile, get_all_affinities
 
 if TYPE_CHECKING:
@@ -79,15 +79,13 @@ class CupidAgentExecutor(BaseAgentExecutor):
         # Emit both human-readable text and structured metadata (C10 pattern)
         await updater.add_artifact(
             [
-                Part(root=TextPart(text=clean_response)),
-                Part(
-                    root=DataPart(
-                        data={
-                            "mode": "emotional_translation",
-                            "context": "romance_coach, jealousy_mediator, or confession_handler",
-                            "next_routing": "player_choice or self_contained",
-                        }
-                    )
+                text_part(clean_response),
+                data_part(
+                    {
+                        "mode": "emotional_translation",
+                        "context": "romance_coach, jealousy_mediator, or confession_handler",
+                        "next_routing": "player_choice or self_contained",
+                    }
                 ),
             ],
             name="cupid_response",

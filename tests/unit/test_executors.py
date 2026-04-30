@@ -11,8 +11,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
-from a2a.types import Message, Part, Role, TextPart
 from a2a.utils.errors import ServerError
+
+from kourai_common.messaging import user_message
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -33,10 +34,8 @@ def _make_context(user_input: str | None = "test input") -> MagicMock:
     ctx.get_user_input.return_value = user_input
     ctx.current_task = None
     # A2A SDK requires non-empty TextPart, so always use a valid message
-    ctx.message = Message(
-        role=Role.user,
-        parts=[Part(root=TextPart(text=user_input or "placeholder"))],
-        message_id=str(uuid4()),
+    ctx.message = user_message(
+        user_input or "placeholder",
         context_id=uuid4().hex,
     )
     return ctx

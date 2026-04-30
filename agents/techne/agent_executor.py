@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from a2a.types import DataPart, Part, Task, TextPart, UnsupportedOperationError
+from a2a.types import Task, UnsupportedOperationError
 from a2a.utils.errors import ServerError
 
 from agents.techne.agent import (
@@ -18,7 +18,7 @@ from kourai_common.a2a_utils import extract_image_parts, parse_project_root
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
 from kourai_common.mcp_client import kourai_project_root_var
-from kourai_common.messaging import send_working_status
+from kourai_common.messaging import data_part, send_working_status, text_part
 from kourai_common.player import PlayerProfile
 from kourai_common.stack import looks_like_scaffolding
 from kourai_common.tracing import create_span
@@ -149,18 +149,16 @@ class TechneAgentExecutor(BaseAgentExecutor):
             # Step 6: Emit both human-readable text and machine-readable structured data
             await updater.add_artifact(
                 [
-                    Part(root=TextPart(text=result)),
-                    Part(
-                        root=DataPart(
-                            data={
-                                "files_read": len(file_contents),
-                                "files_changed": fixes_applied,
-                                "file_paths": file_paths,
-                                "tool_calls": [
-                                    {"name": e["name"], "args": e["args"]} for e in tool_log
-                                ],
-                            }
-                        )
+                    text_part(result),
+                    data_part(
+                        {
+                            "files_read": len(file_contents),
+                            "files_changed": fixes_applied,
+                            "file_paths": file_paths,
+                            "tool_calls": [
+                                {"name": e["name"], "args": e["args"]} for e in tool_log
+                            ],
+                        }
                     ),
                 ],
                 name="code_changes",

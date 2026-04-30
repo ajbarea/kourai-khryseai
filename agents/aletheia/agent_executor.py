@@ -5,13 +5,13 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from a2a.types import DataPart, Part, Task, TextPart, UnsupportedOperationError
+from a2a.types import Task, UnsupportedOperationError
 from a2a.utils.errors import ServerError
 
 from agents.aletheia.agent import find_unsupported_claims, validate_research
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
-from kourai_common.messaging import send_working_status
+from kourai_common.messaging import data_part, send_working_status, text_part
 
 if TYPE_CHECKING:
     from a2a.server.agent_execution import RequestContext
@@ -53,14 +53,12 @@ class AletheiaAgentExecutor(BaseAgentExecutor):
 
         await updater.add_artifact(
             [
-                Part(root=TextPart(text=result)),
-                Part(
-                    root=DataPart(
-                        data={
-                            "claims_found": len(claims),
-                            "verified": result == "VERIFIED",
-                        }
-                    )
+                text_part(result),
+                data_part(
+                    {
+                        "claims_found": len(claims),
+                        "verified": result == "VERIFIED",
+                    }
                 ),
             ],
             name="aletheia_validation",

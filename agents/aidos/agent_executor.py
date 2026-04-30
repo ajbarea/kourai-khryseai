@@ -5,13 +5,13 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from a2a.types import DataPart, Part, Task, TextPart, UnsupportedOperationError
+from a2a.types import Task, UnsupportedOperationError
 from a2a.utils.errors import ServerError
 
 from agents.aidos.agent import analyze_slop, flag_slop_words, flag_vacuous_docstrings
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
-from kourai_common.messaging import send_working_status
+from kourai_common.messaging import data_part, send_working_status, text_part
 
 if TYPE_CHECKING:
     from a2a.server.agent_execution import RequestContext
@@ -55,15 +55,13 @@ class AidosAgentExecutor(BaseAgentExecutor):
 
         await updater.add_artifact(
             [
-                Part(root=TextPart(text=result)),
-                Part(
-                    root=DataPart(
-                        data={
-                            "slop_words_found": slop_words,
-                            "vacuous_docstrings": [v["name"] for v in vacuous],
-                            "clean": result == "CLEAN",
-                        }
-                    )
+                text_part(result),
+                data_part(
+                    {
+                        "slop_words_found": slop_words,
+                        "vacuous_docstrings": [v["name"] for v in vacuous],
+                        "clean": result == "CLEAN",
+                    }
                 ),
             ],
             name="aidos_analysis",

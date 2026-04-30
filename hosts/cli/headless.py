@@ -14,16 +14,14 @@ import httpx
 from a2a.client import ClientConfig
 from a2a.types import (
     Message,
-    Part,
-    Role,
     TaskArtifactUpdateEvent,
     TaskStatusUpdateEvent,
-    TextPart,
 )
 
 from hosts.cli.events import _extract_artifact_text, _extract_status_text
 from hosts.cli.streaming import _connect_with_url_override
 from kourai_common.a2a_utils import make_a2a_http_client
+from kourai_common.messaging import user_message
 
 
 # ---------------------------------------------------------------------------
@@ -48,12 +46,7 @@ async def _headless(agent_url: str, prompt: str, timeout_seconds: int, verbose: 
     t0 = time.monotonic()
 
     # Build and send message
-    message = Message(
-        role=Role.user,
-        parts=[Part(TextPart(text=prompt))],
-        message_id=str(uuid4()),
-    )
-    message.context_id = context_id
+    message = user_message(prompt, context_id=context_id)
 
     final_text = ""
     try:

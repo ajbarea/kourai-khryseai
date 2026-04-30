@@ -7,7 +7,7 @@ import contextlib
 import logging
 from typing import TYPE_CHECKING
 
-from a2a.types import DataPart, Part, Task, TextPart, UnsupportedOperationError
+from a2a.types import Task, UnsupportedOperationError
 from a2a.utils.errors import ServerError
 
 from agents.hephaestus.agent import determine_pipeline, execute_pipeline
@@ -16,7 +16,7 @@ from agents.metis.agent import discuss_tradeoffs
 from kourai_common.a2a_utils import extract_file_attachments
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
-from kourai_common.messaging import send_input_required, send_working_status
+from kourai_common.messaging import data_part, send_input_required, send_working_status, text_part
 from kourai_common.player import (
     PlayerProfile,
     get_affinity_tier,
@@ -205,14 +205,12 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
 
                     await updater.add_artifact(
                         [
-                            Part(root=TextPart(text=chat_body)),
-                            Part(
-                                root=DataPart(
-                                    data={
-                                        "mode": "chat",
-                                        "target_agent": target_agent,
-                                    }
-                                )
+                            text_part(chat_body),
+                            data_part(
+                                {
+                                    "mode": "chat",
+                                    "target_agent": target_agent,
+                                }
                             ),
                         ],
                         name="chat_response",
@@ -329,8 +327,8 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
 
             await updater.add_artifact(
                 [
-                    Part(root=TextPart(text=last_agent_output or "Pipeline complete")),
-                    Part(root=DataPart(data=pipeline_data)),
+                    text_part(last_agent_output or "Pipeline complete"),
+                    data_part(pipeline_data),
                 ],
                 name="pipeline_result",
             )

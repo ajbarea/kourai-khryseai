@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from a2a.types import DataPart, Part, Task, TextPart, UnsupportedOperationError
+from a2a.types import Task, UnsupportedOperationError
 from a2a.utils.errors import ServerError
 
 from agents.metis.agent import create_spec_stream, get_project_context
@@ -15,7 +15,7 @@ from kourai_common.decorators import executor_error_handler
 from kourai_common.facts import get_relevant_facts_for_enrichment
 from kourai_common.hooks_interaction import VALID_PREFERENCE_KINDS
 from kourai_common.mcp_client import kourai_project_root_var
-from kourai_common.messaging import send_input_required, send_working_status
+from kourai_common.messaging import data_part, send_input_required, send_working_status, text_part
 from kourai_common.pause_state import stash_preference_kind
 from kourai_common.pause_tag import extract_pause_tag
 from kourai_common.projects import derive_project_id
@@ -246,17 +246,15 @@ class MetisAgentExecutor(BaseAgentExecutor):
             ]
             await updater.add_artifact(
                 [
-                    Part(root=TextPart(text=artifact_text)),
-                    Part(
-                        root=DataPart(
-                            data={
-                                "step_count": len(sections),
-                                "has_file_list": "files to modify" in artifact_text.lower()
-                                or "files to create" in artifact_text.lower(),
-                                "has_tests": "testing" in artifact_text.lower(),
-                                "preference_kind": pause.preference_kind if pause else None,
-                            }
-                        )
+                    text_part(artifact_text),
+                    data_part(
+                        {
+                            "step_count": len(sections),
+                            "has_file_list": "files to modify" in artifact_text.lower()
+                            or "files to create" in artifact_text.lower(),
+                            "has_tests": "testing" in artifact_text.lower(),
+                            "preference_kind": pause.preference_kind if pause else None,
+                        }
                     ),
                 ],
                 name="implementation_spec",

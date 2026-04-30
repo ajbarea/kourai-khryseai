@@ -15,8 +15,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
-from a2a.types import Message, Part, Role, TextPart
 
+from kourai_common.messaging import user_message
 from kourai_common.player import _ensure_player_tables
 
 # ── Fixtures ────────────────────────────────────────────────────────────
@@ -68,10 +68,8 @@ def _make_context(user_input: str, context_id: str | None = None) -> MagicMock:
     ctx = MagicMock()
     ctx.get_user_input.return_value = user_input
     ctx.current_task = None
-    ctx.message = Message(
-        role=Role.user,
-        parts=[Part(root=TextPart(text=user_input or "placeholder"))],
-        message_id=str(uuid4()),
+    ctx.message = user_message(
+        user_input or "placeholder",
         context_id=context_id or uuid4().hex,
     )
     return ctx

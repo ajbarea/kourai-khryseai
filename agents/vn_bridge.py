@@ -21,11 +21,8 @@ import uvicorn
 from a2a.client import A2ACardResolver, ClientConfig, ClientFactory
 from a2a.types import (
     Message,
-    Part,
-    Role,
     TaskArtifactUpdateEvent,
     TaskStatusUpdateEvent,
-    TextPart,
 )
 from starlette.applications import Starlette
 from starlette.requests import Request
@@ -41,6 +38,7 @@ from kourai_common.a2a_utils import make_a2a_http_client
 from kourai_common.companion import infer_portrait_state
 from kourai_common.config import get_agent_url
 from kourai_common.facts import process_agent_output
+from kourai_common.messaging import user_message
 from kourai_common.tts_realtime import RealtimeTTSEngine
 
 if TYPE_CHECKING:
@@ -309,12 +307,7 @@ async def handle_message(request: Request) -> StreamingResponse:
         return StreamingResponse(empty(), media_type="application/x-ndjson")
 
     log.info(f"Message ({action}, ctx={context_id[:8]}): {user_text[:80]}")
-    message = Message(
-        role=Role.user,
-        parts=[Part(root=TextPart(text=user_text))],
-        message_id=str(uuid4()),
-    )
-    message.context_id = context_id
+    message = user_message(user_text, context_id=context_id)
 
     async def stream_response() -> AsyncGenerator[str, None]:
         current_agent = "hephaestus"

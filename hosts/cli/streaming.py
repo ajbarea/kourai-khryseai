@@ -8,21 +8,15 @@ from __future__ import annotations
 import re
 import time
 from typing import TYPE_CHECKING
-from uuid import uuid4
 
 import asyncclick as click
 import httpx
 from a2a.client import A2ACardResolver, ClientConfig, ClientFactory
 from a2a.types import (
-    FilePart,
-    FileWithBytes,
     Message,
-    Part,
-    Role,
     TaskArtifactUpdateEvent,
     TaskState,
     TaskStatusUpdateEvent,
-    TextPart,
 )
 
 from hosts.cli.events import (
@@ -38,6 +32,7 @@ from hosts.cli.rendering import _comms_window, _echo, _render_markdown
 from hosts.cli.styling import _DIM, _GOLD, _GOLD_BRIGHT, _RED, _RESET
 from kourai_common.federation.host_helpers import build_pipeline_turn_entry
 from kourai_common.hooks_interaction import synthesise_fact_from_pause
+from kourai_common.messaging import file_part_from_b64, user_message
 from kourai_common.pause_state import pop_preference_kind
 from kourai_common.projects import derive_project_id
 
@@ -192,19 +187,20 @@ async def send_and_stream(
     )
 
     # Build multi-part message so images travel alongside text in the A2A envelope.
-    parts: list[Part] = [Part(TextPart(text=user_text))]
-    for b64_data, mime_type in attachments or []:
-        parts.append(
-            Part(
-                FilePart(
-                    file=FileWithBytes(bytes=b64_data, mime_type=mime_type, name="screenshot.png")
-                )
-            )
+    extra_parts = [
+        file_part_from_b64(
+            b64_data=b64_data,
+            media_type=mime_type,
+            filename="screenshot.png",
         )
-    message = Message(role=Role.user, parts=parts, message_id=str(uuid4()))
-    message.context_id = context_id
-    if task_id:
-        message.task_id = task_id
+        for b64_data, mime_type in (attachments or [])
+    ]
+    message = user_message(
+        user_text,
+        context_id=context_id,
+        task_id=task_id or None,
+        extra_parts=extra_parts or None,
+    )
 
     if verbose:
         img_count = len(attachments or [])

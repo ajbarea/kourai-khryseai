@@ -215,7 +215,10 @@ themselves rather than every executor.
    fizzbuzz pipeline with M17 PAUSE-on-coverage_target running to
    completion; v0.3 SDK imports absent from `uv.lock`.
 
-**Phase status.** Plan drafted 2026-04-29. Phase 1 next.
+**Phase status.** Plan drafted 2026-04-29. Phase 1 shipped 2026-04-29
+(`kourai_common.messaging` now exposes `text_part` / `file_part_from_b64`
+/ `data_part` / `user_message`; every executor + host call site uses
+the helpers; 8 new unit tests; 2846 tests pass green). Phase 2 next.
 
 **Scope (revised).**
 

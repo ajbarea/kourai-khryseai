@@ -4,22 +4,16 @@ from __future__ import annotations
 
 import logging
 from typing import TYPE_CHECKING
-from uuid import uuid4
 
 import httpx
 from a2a.client import A2ACardResolver, ClientConfig, ClientFactory
 from a2a.types import (
     AgentCard,
-    FilePart,
-    FileWithBytes,
     Message,
-    Part,
-    Role,
     Task,
     TaskArtifactUpdateEvent,
     TaskState,
     TaskStatusUpdateEvent,
-    TextPart,
 )
 
 from kourai_common.a2a_events import (
@@ -30,6 +24,7 @@ from kourai_common.a2a_events import (
 )
 from kourai_common.a2a_utils import make_a2a_http_client
 from kourai_common.agents_manifest import fallback_card_for
+from kourai_common.messaging import file_part_from_b64, user_message
 from kourai_common.tracing import create_span, get_trace_context
 
 if TYPE_CHECKING:
@@ -113,28 +108,19 @@ class RemoteAgentConnection:
             {"target_agent": self.agent_name, "context_id": context_id},
         ):
             # Build multi-part message when images are present; plain text otherwise.
-            if attachments:
-                parts: list[Part] = [Part(TextPart(text=text))]
-                for b64_data, mime_type in attachments:
-                    parts.append(
-                        Part(
-                            FilePart(
-                                file=FileWithBytes(
-                                    bytes=b64_data, mime_type=mime_type, name="attachment.png"
-                                )
-                            )
-                        )
-                    )
-                message = Message(
-                    role=Role.user,
-                    parts=parts,
-                    message_id=str(uuid4()),
+            extra_parts = [
+                file_part_from_b64(
+                    b64_data=b64_data,
+                    media_type=mime_type,
+                    filename="attachment.png",
                 )
-            else:
-                from a2a.client.helpers import create_text_message_object
-
-                message = create_text_message_object(content=text)
-            message.context_id = context_id
+                for b64_data, mime_type in (attachments or [])
+            ]
+            message = user_message(
+                text,
+                context_id=context_id,
+                extra_parts=extra_parts or None,
+            )
             message.metadata = get_trace_context()
 
             log.info("Sending to %s: %d chars", self.agent_name, len(text))
