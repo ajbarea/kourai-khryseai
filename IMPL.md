@@ -5,16 +5,13 @@ milestone lands, the matching detail block in [ROADMAP.md](./ROADMAP.md)
 collapses to a one-liner under "Shipped" and this file gets reset to the
 next milestone.
 
-Updated: 2026-04-30 · Working on: **M7 — a2a-sdk 1.0 migration.
-Phases 1-5 shipped: pin flipped to `>=1.0,<2.0`, helpers and server
-build run on the v1.0 protobuf shape, every text-tag construction
-site (`[project_root: ...]`, `[yolo: on]`, `[auto_approve_reads:
-on]`, `[relationship_tiers: ...]`, `[project_id: ...]`) replaced by
-structured `Message.metadata` keys, and Hephaestus's `extract_*_tag`
-regex extractors are gone. Remaining: Phase 6 (drop
-`enable_v0_3_compat=True` + retire transitional v0.3 fallback
-`AgentInterface`) → M13 fix (original_request via Message.metadata
-on resume dispatch).
+Updated: 2026-04-30 · Working on: **M7 fully shipped 2026-04-30.
+All six phases landed; the a2a-sdk 1.0 migration is complete and the
+transitional v0.3 fallback is gone — every kourai host speaks v1.0
+natively. Next: M13 fix (original_request via Message.metadata on
+resume dispatch) — now unblocked by the Phase 5 metadata channel —
+followed by M18 (structured streaming with content-kind metadata)
+and M20 (audio-text sync).
 Pre-release perfection stance: no workarounds. M19 fully shipped
 (Phases 1+2+3 all landed 2026-04-29). Remaining sequence: M7
 (a2a-sdk 1.0) → M13 regression fix on M7's `Message.metadata`

@@ -5,10 +5,8 @@ its name, skills, and HTTP URL on the docker-compose network. This
 helper is the single source of truth so spec updates land in one place.
 
 The 1.0 ``AgentCard`` exposes a list of ``supported_interfaces`` rather
-than a single top-level ``url``. We declare the JSON-RPC interface at
-both 1.0 and 0.3 protocol versions so transitional v0.3 clients
-negotiate down cleanly while the rest of the stack catches up. Phase 6
-retires the v0.3 fallback.
+than a single top-level ``url``. M7 Phase 6 retired the transitional
+v0.3 ``AgentInterface`` entry — every kourai host speaks 1.0 natively.
 """
 
 from __future__ import annotations
@@ -49,11 +47,6 @@ def build_card(
                 url=url,
                 protocol_binding="JSONRPC",
                 protocol_version="1.0",
-            ),
-            AgentInterface(
-                url=url,
-                protocol_binding="JSONRPC",
-                protocol_version="0.3",
             ),
         ],
     )

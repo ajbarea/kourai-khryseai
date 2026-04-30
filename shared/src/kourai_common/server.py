@@ -3,9 +3,9 @@
 Every agent's ``__main__.py`` calls :func:`build_a2a_app` to construct
 its Starlette ASGI app. The 1.0 SDK retired ``A2AStarletteApplication``
 in favour of ``create_agent_card_routes`` + ``create_jsonrpc_routes``;
-this helper wraps those route factories and surfaces
-``enable_v0_3_compat=True`` so transitional v0.3 clients negotiate
-cleanly while the rest of the stack catches up.
+this helper wraps those route factories. M7 Phase 6 retired the
+``enable_v0_3_compat`` shim — every kourai client now speaks 1.0
+natively.
 """
 
 from __future__ import annotations
@@ -28,7 +28,6 @@ def build_a2a_app(
     agent_card: AgentCard,
     executor: AgentExecutor,
     task_store: TaskStore | None = None,
-    enable_v0_3_compat: bool = True,
 ) -> Starlette:
     """Build the Starlette ASGI app every Kourai specialist serves.
 
@@ -37,9 +36,6 @@ def build_a2a_app(
             v1.0 well-known agent-card path for discovery.
         executor: The agent's :class:`AgentExecutor` implementation.
         task_store: Optional TaskStore. Defaults to ``InMemoryTaskStore``.
-        enable_v0_3_compat: Accept v0.3 client requests via the JSON-RPC
-            route's compat shim. Stays ``True`` until M7 Phase 6 retires
-            the transitional safety net.
     """
     request_handler = DefaultRequestHandler(
         agent_executor=executor,
@@ -48,11 +44,5 @@ def build_a2a_app(
     )
     routes = []
     routes.extend(create_agent_card_routes(agent_card))
-    routes.extend(
-        create_jsonrpc_routes(
-            request_handler,
-            rpc_url="/",
-            enable_v0_3_compat=enable_v0_3_compat,
-        )
-    )
+    routes.extend(create_jsonrpc_routes(request_handler, rpc_url="/"))
     return Starlette(routes=routes)

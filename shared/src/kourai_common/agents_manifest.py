@@ -21,9 +21,6 @@ def fallback_card_for(agent_name: str, agent_url: str) -> AgentCard:
 
     Records that this is a fallback in ``version`` so traces/logs can
     tell a fresh-booted cold connection apart from a live-discovered one.
-    Advertises both 1.0 and 0.3 protocol versions while M7 Phase 6 is
-    pending — see ``agent_cards.build_card`` for the same shape on the
-    rich-card path.
     """
     return AgentCard(
         name=agent_name,
@@ -38,11 +35,6 @@ def fallback_card_for(agent_name: str, agent_url: str) -> AgentCard:
                 url=agent_url,
                 protocol_binding="JSONRPC",
                 protocol_version="1.0",
-            ),
-            AgentInterface(
-                url=agent_url,
-                protocol_binding="JSONRPC",
-                protocol_version="0.3",
             ),
         ],
     )

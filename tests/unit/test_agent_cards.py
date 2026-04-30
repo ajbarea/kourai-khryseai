@@ -61,8 +61,8 @@ def test_build_card_url_comes_from_config() -> None:
         assert interface.url == expected
 
 
-def test_build_card_advertises_1_0_and_0_3_interfaces() -> None:
-    """Transitional safety net — Phase 6 retires the 0.3 fallback entry."""
+def test_build_card_advertises_1_0_interface() -> None:
+    """Phase 6 retired the v0.3 fallback — only 1.0 ships on the wire."""
     from kourai_common.agent_cards import build_card
 
     card = build_card(
@@ -72,7 +72,7 @@ def test_build_card_advertises_1_0_and_0_3_interfaces() -> None:
         skills=[_skill()],
     )
     versions = sorted(iface.protocol_version for iface in card.supported_interfaces)
-    assert versions == ["0.3", "1.0"]
+    assert versions == ["1.0"]
 
 
 def test_build_card_default_streaming_capability() -> None:

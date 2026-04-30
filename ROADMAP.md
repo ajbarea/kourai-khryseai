@@ -244,7 +244,12 @@ text-tag construction site replaced by ``Message.metadata`` keys;
 Hephaestus's four ``extract_*_tag`` regex extractors deleted; new
 ``a2a_utils.get_message_metadata`` and ``project_root_from_context``
 helpers replace ``parse_project_root``; ``A2A_PROTOCOL_VERSION``
-header bumped to ``"1.0"``; 2833 tests pass green). Phase 6 next.
+header bumped to ``"1.0"``; 2833 tests pass green). Phase 6 shipped
+2026-04-30 (``enable_v0_3_compat=True`` removed from
+``server.build_a2a_app``; transitional v0.3 ``AgentInterface``
+fallback removed from ``agent_cards.build_card`` and
+``agents_manifest.fallback_card_for``; 2833 tests still green; lint
+clean). M7 fully shipped.
 
 **Scope (revised).**
 
