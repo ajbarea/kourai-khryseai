@@ -5,13 +5,16 @@ milestone lands, the matching detail block in [ROADMAP.md](./ROADMAP.md)
 collapses to a one-liner under "Shipped" and this file gets reset to the
 next milestone.
 
-Updated: 2026-04-30 · Working on: **M7 fully shipped 2026-04-30.
-All six phases landed; the a2a-sdk 1.0 migration is complete and the
-transitional v0.3 fallback is gone — every kourai host speaks v1.0
-natively. Next: M13 fix (original_request via Message.metadata on
-resume dispatch) — now unblocked by the Phase 5 metadata channel —
-followed by M18 (structured streaming with content-kind metadata)
-and M20 (audio-text sync).
+Updated: 2026-04-30 · Working on: **M7 fully shipped 2026-04-30 (six
+phases). M13 fix shipped 2026-04-30 — CLI stamps the previous turn's
+user_text as ``Message.metadata["original_request"]`` on the
+input_required follow-up; Hephaestus's ``execute_pipeline`` reads
+it and uses it as the transcript's ``[User]:`` line so specialists
+see the player's actual development ask instead of the confirmation
+token. Next: M17 live smoke re-run (`make up`, fizzbuzz prompt,
+verify PAUSE on coverage_target → narrator quotes preference back →
+fact.recalled=true on metis.execute span); then M18 (structured
+streaming with content-kind metadata) and M20 (audio-text sync).
 Pre-release perfection stance: no workarounds. M19 fully shipped
 (Phases 1+2+3 all landed 2026-04-29). Remaining sequence: M7
 (a2a-sdk 1.0) → M13 regression fix on M7's `Message.metadata`
@@ -86,28 +89,27 @@ no architectural commitment:
   ElevenLabs migration which changes the audio architecture
   entirely.
 
-## Critical-path blocker: M13 CONFIRM_ORDER prompt-loss regression
+## M13 CONFIRM_ORDER prompt-loss regression — fixed 2026-04-30
 
-`agents/hephaestus/agent.py` (and the resume handoff path) loses the
-original development request when the player answers a CONFIRM_ORDER
-prompt. The followup A2A dispatch to Metis carries only the player's
-confirmation token, not the original ask. M13's ROADMAP entry says
-"Resume happens implicitly via context_id memory (no explicit metadata
-plumbing)" — that works for Hephaestus's own next-turn LLM call (where
-the SDK preserves conversation history) but **does not carry across the
-A2A boundary** when Hephaestus relays to a separate specialist process.
+The fix landed on top of M7 Phase 5's `Message.metadata` channel.
 
-Fix shape (do not implement until M7 lands so the metadata channel is
-clean): on resume, Hephaestus emits the original prompt as the first
-Part of the dispatch Message. Either explicit `original_request` field
-in `Message.metadata` (preferred — survives audit / replay), or as the
-Message's primary text content with the confirmation as metadata.
-Either way the pattern is: text bodies carry the player's request,
-metadata carries operational state.
+- `hosts/cli/streaming.py` — on the input_required follow-up, the CLI
+  copies the previous turn's `user_text` into
+  `forge_metadata["original_request"]` before recursing into
+  `send_and_stream`. The resumed turn's bare confirmation token
+  ("yes" / "light it") rides as the message body and the original
+  ask rides on the metadata channel.
+- `agents/hephaestus/agent.py::execute_pipeline` — reads
+  `metadata["original_request"]` and uses it as the transcript's
+  `[User]:` line when present. Specialists see the actual
+  development request rather than the confirmation token.
+- Regression guard: `tests/unit/test_cli.py::
+  test_m13_fix_carries_original_request_in_metadata`.
 
-Symptom-level patch on 0.3 wire (text-tag style) is doable but deepens
-the very text-tag pattern M7 wants to retire. **Do not patch on 0.3.**
-Land M7 first, then fix M13 cleanly via Message.metadata.
+The bug originally surfaced 2026-04-29 when two live smoke runs
+showed Metis receiving only `"y"` / `"light it"` and generating
+questions-as-prose as her spec. After the fix, the resumed turn's
+specialist dispatch uses the original prompt.
 
 ## Architectural sequence ahead
 

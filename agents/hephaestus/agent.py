@@ -439,15 +439,25 @@ async def execute_pipeline(
     connections: dict[str, RemoteAgentConnection] = {}
 
     md = metadata or {}
-    md.get("project_root")
     raw_tiers = md.get("relationship_tiers")
     if isinstance(raw_tiers, dict):
         affinities = {k: float(v) for k, v in raw_tiers.items() if isinstance(v, int | float)}
     else:
         affinities = {}
 
+    # M13 fix — when resumed from a CONFIRM_ORDER input_required, the
+    # host adds ``original_request`` to metadata so we know the
+    # player's actual development ask, not just the confirmation
+    # token ("yes" / "light it"). Without this, specialists see only
+    # the confirmation and treat it as the spec body.
+    original_request = md.get("original_request")
+    if isinstance(original_request, str) and original_request.strip():
+        effective_request = original_request
+    else:
+        effective_request = user_request
+
     # Initialize the Forge Transcript
-    transcript = f"[User]: {user_request}"
+    transcript = f"[User]: {effective_request}"
 
     # Metadata context (hidden from the transcript, injected into system prompts)
     # Each agent receives "Relationship tiers: techne: Tier 3 — Warm (affinity 0.72)"

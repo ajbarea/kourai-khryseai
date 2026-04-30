@@ -296,11 +296,20 @@ async def send_and_stream(
         follow_up: str = await click.prompt(f"\n{_GOLD}\u21b3 Your response{_RESET}")
         if follow_up.strip().lower() in ("/q", "/quit", "quit"):
             return False, context_id, task_id
-        # Forward the same forge metadata so specialists still see
-        # ``project_root`` / ``yolo`` on the resumed task. Without this,
-        # the M13 confirmation `yes` arrives bare and Metis/Techne fall
-        # back to ``Path.cwd()`` (= /app inside the agent container)
+        # M13 fix — stash the player's original development ask in
+        # metadata so Hephaestus's resumed routing call relays the
+        # original request to specialists rather than the confirmation
+        # token ("yes" / "light it"). The previous turn's user_text is
+        # the load-bearing context that the v0.3 wire silently dropped.
+        # Forward the same forge metadata otherwise so specialists
+        # still see ``project_root`` / ``yolo`` on the resumed task —
+        # without it, the confirmation arrives bare and Metis/Techne
+        # fall back to ``Path.cwd()`` (= /app in the agent container)
         # where git operations fail with exit 128.
+        follow_up_metadata: dict[str, Any] = dict(forge_metadata or {})
+        original_request = (user_text or "").strip()
+        if original_request:
+            follow_up_metadata["original_request"] = original_request
         return await send_and_stream(
             client,
             follow_up,
@@ -309,7 +318,7 @@ async def send_and_stream(
             verbose,
             tts=tts,
             gossip_enabled=gossip_enabled,
-            forge_metadata=forge_metadata,
+            forge_metadata=follow_up_metadata or None,
         )
 
     return True, context_id, task_id

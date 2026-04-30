@@ -352,6 +352,56 @@ class TestForgeMetadataPropagation:
         assert cont is False
         assert len(sends) == 1  # original send only, no follow-up
 
+    @pytest.mark.asyncio
+    async def test_m13_fix_carries_original_request_in_metadata(self, monkeypatch):
+        """M13 regression — the resumed turn's metadata must include the
+        original development request as ``original_request`` so Hephaestus
+        relays the actual ask (not the confirmation token like ``yes``)
+        to specialists.
+        """
+        sends: list[str] = []
+        captured_metadata: list[dict] = []
+
+        async def gen_input_required(message, **kwargs):
+            sends.append(message.parts[0].text)
+            captured_metadata.append(dict(message.metadata))
+            task = _make_task(TaskState.TASK_STATE_INPUT_REQUIRED)
+            status_required = MagicMock(spec=TaskStatusUpdateEvent)
+            status_required.status = MagicMock()
+            status_required.status.state = TaskState.TASK_STATE_INPUT_REQUIRED
+            status_required.status.message = None
+            yield (task, status_required)
+
+        async def gen_completed(message, **kwargs):
+            sends.append(message.parts[0].text)
+            captured_metadata.append(dict(message.metadata))
+            completed = _make_task(TaskState.TASK_STATE_COMPLETED)
+            status_done = MagicMock(spec=TaskStatusUpdateEvent)
+            status_done.status = MagicMock()
+            status_done.status.state = TaskState.TASK_STATE_COMPLETED
+            status_done.status.message = None
+            yield (completed, status_done)
+            yield (completed, None)
+
+        client = MagicMock()
+        gens = iter([gen_input_required, gen_completed])
+        client.send_message = lambda msg, **kw: next(gens)(msg, **kw)
+
+        async def fake_prompt(_text):
+            return "yes"
+
+        monkeypatch.setattr("hosts.cli.streaming.click.prompt", fake_prompt)
+
+        await send_and_stream(client, "implement fizzbuzz", "ctx-1")
+
+        assert len(sends) == 2
+        assert sends[1] == "yes"
+        # Resumed turn's metadata must echo the player's original
+        # development ask so the orchestrator doesn't treat the
+        # confirmation token as the spec body.
+        follow_up_meta = captured_metadata[1]
+        assert follow_up_meta.get("original_request") == "implement fizzbuzz"
+
 
 class TestMainCommand:
     """CLI main command configuration."""
