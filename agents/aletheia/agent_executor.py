@@ -10,7 +10,7 @@ from a2a.types import Task, UnsupportedOperationError
 from agents.aletheia.agent import find_unsupported_claims, validate_research
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
-from kourai_common.messaging import data_part, send_working_status, text_part
+from kourai_common.messaging import KIND_STATUS, data_part, send_working_status, text_part
 
 if TYPE_CHECKING:
     from a2a.server.agent_execution import RequestContext
@@ -42,10 +42,11 @@ class AletheiaAgentExecutor(BaseAgentExecutor):
                 task,
                 f"Found {len(claims)} algorithmic claim(s) to verify",
                 emoji="🔬",
+                kind=KIND_STATUS,
             )
         else:
             await send_working_status(
-                updater, task, "Scanning for unverified claims...", emoji="🔍"
+                updater, task, "Scanning for unverified claims...", emoji="🔍", kind=KIND_STATUS
             )
 
         result = await validate_research(user_input, context_id=task.context_id)

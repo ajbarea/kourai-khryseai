@@ -11,7 +11,7 @@ from agents.puck.agent import respond
 from kourai_common.base_executor import BaseAgentExecutor
 from kourai_common.decorators import executor_error_handler
 from kourai_common.facts import extract_facts, store_facts, strip_facts
-from kourai_common.messaging import data_part, send_working_status, text_part
+from kourai_common.messaging import KIND_STATUS, data_part, send_working_status, text_part
 from kourai_common.player import PlayerProfile
 
 if TYPE_CHECKING:
@@ -37,7 +37,7 @@ class PuckAgentExecutor(BaseAgentExecutor):
     ) -> None:
         user_input = context.get_user_input()
 
-        await send_working_status(updater, task, "Puck stirs...", emoji="🎭")
+        await send_working_status(updater, task, "Puck stirs...", emoji="🎭", kind=KIND_STATUS)
 
         profile = PlayerProfile.load()
         player_id = profile.player_id if profile else ""
