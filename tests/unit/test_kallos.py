@@ -50,9 +50,11 @@ class TestRunCommand:
 
     @pytest.mark.asyncio
     async def test_run_command_success(self):
+        import sys
+
         from agents.kallos.agent import run_command
 
-        code, stdout, stderr = await run_command(["python", "--version"])
+        code, stdout, stderr = await run_command([sys.executable, "--version"])
         assert code == 0
         assert "Python" in stdout or "Python" in stderr
 

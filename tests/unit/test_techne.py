@@ -323,18 +323,22 @@ class TestRunCommand:
 
     @pytest.mark.asyncio
     async def test_run_returns_stdout(self):
+        import sys
+
         from agents.techne.agent import run_command
 
-        code, stdout, stderr = await run_command(["python", "-c", "print('hello')"])
+        code, stdout, stderr = await run_command([sys.executable, "-c", "print('hello')"])
         assert code == 0
         assert "hello" in stdout
 
     @pytest.mark.asyncio
     async def test_run_captures_stderr(self):
+        import sys
+
         from agents.techne.agent import run_command
 
         code, stdout, stderr = await run_command(
-            ["python", "-c", "import sys; sys.stderr.write('err')"]
+            [sys.executable, "-c", "import sys; sys.stderr.write('err')"]
         )
         assert "err" in stderr
 
