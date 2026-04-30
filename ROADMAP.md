@@ -767,11 +767,12 @@ Defensible *now* that Phase 1 has landed:
 a `ContentKind` Literal, `set_content_kind` / `get_content_kind` /
 `kind_message`, and an optional `kind=` kwarg on every TaskUpdater
 helper (`send_working_status`, `send_input_required`,
-`send_completed`). The metadata key is `kourai.streaming.content_kind`
-— a flat dotted prefix, matching the existing forge-metadata pattern
-(`project_id`, `project_root`, `yolo`); A2A's URI-namespaced
-extension convention is reserved for if kourai ever publishes the
-contract to external A2A consumers.
+`send_completed`). The metadata key is the URI-namespaced extension
+identifier `https://kourai.khryseai/ext/streaming/v1` — A2A 1.0 spec
+form (top-level key is the extension URI, value is a nested object
+with the extension's fields). Today the only field is `content_kind`;
+sibling fields (priority, subkind, ssml_version) live under the same
+URI without colliding with other extensions on the same Message.
 
 Hephaestus migrates first as the pilot — `Analyzing request...` and
 `Pipeline: foo -> bar` tag as `KIND_STATUS`; CONFIRM_ORDER read-back,

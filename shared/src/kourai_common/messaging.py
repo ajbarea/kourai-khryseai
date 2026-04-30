@@ -144,23 +144,29 @@ KIND_STATUS: Final[ContentKind] = "status"
 KIND_CODE: Final[ContentKind] = "code"
 KIND_SPEC: Final[ContentKind] = "spec"
 
-KOURAI_KIND_METADATA_KEY: Final[str] = "kourai.streaming.content_kind"
-"""Flat dotted ``Message.metadata`` key for the content-kind discriminator.
+KOURAI_STREAMING_EXT_URI: Final[str] = "https://kourai.khryseai/ext/streaming/v1"
+"""URI namespace for the kourai streaming extension on ``Message.metadata``.
 
-The A2A 1.0 spec recommends URI-namespaced extension keys for cross-vendor
-extensibility (e.g. ``"https://example.com/extensions/geolocation/v1"``).
-Kourai is internal-only — the agent fleet and the kourai-shipped hosts
-are the only producers and consumers of this key — so a short dotted
-namespace matches the existing forge-metadata pattern (``project_id``,
-``project_root``, ``yolo``) and keeps each emission cheap. If kourai
-ever publishes the streaming contract for external A2A agents to
-consume, swap this constant to a URI; nothing else changes.
+A2A 1.0 prescribes URI-namespaced extension keys with nested objects as
+values — e.g. ``metadata["https://example.com/extensions/geolocation/v1"]
+= {"lat": 37.7, "lng": -122.4}``. The URI is the extension's globally
+unique identifier; sibling fields share the namespace by living inside
+the nested object. Today the only field is ``content_kind``; future
+streaming-extension fields (priority, subkind, ssml-version) live under
+the same URI without colliding with other extensions.
+
+The host reads ``metadata[URI]`` as a ``google.protobuf.Struct`` and
+indexes ``content_kind`` off it. Producers assign a plain ``dict``;
+the protobuf accessor auto-coerces to Struct on the wire.
 """
+
+CONTENT_KIND_FIELD: Final[str] = "content_kind"
+"""Field name inside the streaming-extension nested object."""
 
 
 def set_content_kind(message: Message, kind: ContentKind) -> None:
-    """Tag a Message with its content-kind discriminator."""
-    message.metadata[KOURAI_KIND_METADATA_KEY] = kind
+    """Tag a Message with its content-kind discriminator under the kourai streaming extension."""
+    message.metadata[KOURAI_STREAMING_EXT_URI] = {CONTENT_KIND_FIELD: kind}
 
 
 def get_content_kind(message: Message | None) -> ContentKind | None:
@@ -178,11 +184,18 @@ def get_content_kind(message: Message | None) -> ContentKind | None:
     if metadata is None:
         return None
     try:
-        raw = metadata[KOURAI_KIND_METADATA_KEY]
+        ext = metadata[KOURAI_STREAMING_EXT_URI]
     except (KeyError, TypeError, ValueError):
         # protobuf ``Struct.__getitem__`` raises ``ValueError`` ("Value not
         # set") when the key is absent or its inner ``Value`` oneof is
         # unset; plain dicts raise ``KeyError``. Both mean "not tagged."
+        return None
+    # ``ext`` is a ``google.protobuf.Struct`` for protobuf Messages,
+    # plain dict for unit-test fixtures. Both support membership +
+    # subscript identically.
+    try:
+        raw = ext[CONTENT_KIND_FIELD]
+    except (KeyError, TypeError, ValueError):
         return None
     if raw in ("dialogue", "status", "code", "spec"):
         return raw  # type: ignore[return-value]
@@ -204,7 +217,7 @@ def kind_message(
 
     Mirrors ``user_message`` but defaults to ``ROLE_AGENT`` since the
     typical caller is a specialist's executor emitting status/dialogue.
-    The kind is stored under ``KOURAI_KIND_METADATA_KEY`` in
+    The kind is stored under ``KOURAI_STREAMING_EXT_URI`` in
     ``Message.metadata`` alongside any caller-supplied metadata.
 
     Most agents won't construct messages directly — they go through
@@ -305,7 +318,7 @@ async def send_working_status(
     """Send a working status update with optional emoji prefix.
 
     ``kind`` tags the outbound message under
-    ``KOURAI_KIND_METADATA_KEY``. Hosts route by kind: ``KIND_STATUS``
+    ``KOURAI_STREAMING_EXT_URI``. Hosts route by kind: ``KIND_STATUS``
     skips TTS and fires-and-forgets; ``KIND_DIALOGUE`` keeps the current
     speak-and-gate behavior. Leaving ``kind=None`` preserves the v0.x
     text-parsing path so unmigrated agents keep working.

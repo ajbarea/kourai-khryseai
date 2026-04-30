@@ -11,11 +11,12 @@ import base64
 from a2a.types import Role
 
 from kourai_common.messaging import (
+    CONTENT_KIND_FIELD,
     KIND_CODE,
     KIND_DIALOGUE,
     KIND_SPEC,
     KIND_STATUS,
-    KOURAI_KIND_METADATA_KEY,
+    KOURAI_STREAMING_EXT_URI,
     data_part,
     data_part_to_dict,
     file_part_from_b64,
@@ -191,7 +192,7 @@ def test_get_content_kind_returns_none_for_untagged_message() -> None:
 def test_get_content_kind_returns_none_for_unknown_kind_value() -> None:
     """Forward-compat: unknown kind strings route through legacy path, not raise."""
     msg = user_message("foo")
-    msg.metadata[KOURAI_KIND_METADATA_KEY] = "future_kind_we_havent_added_yet"
+    msg.metadata[KOURAI_STREAMING_EXT_URI] = {CONTENT_KIND_FIELD: "future_kind_we_havent_added_yet"}
     assert get_content_kind(msg) is None
 
 
@@ -200,9 +201,29 @@ def test_get_content_kind_handles_none_message() -> None:
     assert get_content_kind(None) is None
 
 
-def test_metadata_key_is_dotted_kourai_namespace() -> None:
-    """Pin the on-the-wire metadata key — protocol contract."""
-    assert KOURAI_KIND_METADATA_KEY == "kourai.streaming.content_kind"
+def test_streaming_extension_uri_is_a2a_spec_namespaced() -> None:
+    """Pin the on-the-wire extension URI — protocol contract.
+
+    A2A 1.0 spec mandates URI-namespaced top-level extension keys
+    with nested object values. The URI is stable; sibling fields can
+    join the existing nested object without colliding with other
+    extensions on the same Message.
+    """
+    assert KOURAI_STREAMING_EXT_URI == "https://kourai.khryseai/ext/streaming/v1"
+    assert CONTENT_KIND_FIELD == "content_kind"
+
+
+def test_set_content_kind_uses_nested_object_under_uri_key() -> None:
+    """Wire shape regression: ``metadata[URI] = {"content_kind": kind}``.
+
+    Pins the canonical A2A extension shape. If a future field
+    (priority, subkind, ssml_version) joins the streaming extension,
+    it lives in the same nested object — no second URI key needed.
+    """
+    msg = user_message("foo")
+    set_content_kind(msg, KIND_STATUS)
+    ext = msg.metadata[KOURAI_STREAMING_EXT_URI]
+    assert ext[CONTENT_KIND_FIELD] == "status"
 
 
 def test_get_content_kind_reads_through_task_status_update_event() -> None:

@@ -6,10 +6,12 @@ collapses to a one-liner under "Shipped" and this file gets reset to the
 next milestone.
 
 Updated: 2026-04-30 · Working on: **M18 Phase 1 in flight on
-``feat/m18-content-kind-metadata`` (PR #99, draft) — content-kind
-discriminator contract on ``Message.metadata``
-(``kourai.streaming.content_kind`` → one of ``dialogue`` / ``status``
-/ ``code`` / ``spec``), hephaestus migrated as the pilot specialist,
+``feat/m18-content-kind-metadata`` (PR #99) — content-kind
+discriminator contract on ``Message.metadata`` under the
+URI-namespaced extension key
+``"https://kourai.khryseai/ext/streaming/v1"`` (A2A 1.0 spec form)
+with ``{"content_kind": "dialogue" | "status" | "code" | "spec"}``
+nested under it; hephaestus migrated as the pilot specialist,
 host CLI streaming router gated on kind so status events fire-and-
 render without blocking on TTS. ``send_working_status`` /
 ``send_input_required`` / ``send_completed`` each gained an optional
