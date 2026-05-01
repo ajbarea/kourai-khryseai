@@ -1,20 +1,21 @@
 """Centralized agent registry for Kourai Khryseai.
 
-Consolidates metadata (titles, descriptions, colors) and personality data
-(quotes, handoff lines, victory lines) across CLI, GUI, and VN hosts.
+Consolidates name-level metadata (titles, descriptions, epithets) and
+personality data (quotes, handoff lines, victory lines) across CLI, GUI,
+and VN hosts. Per-agent colors are NOT here — the GUI tracks its own
+palette in ``hosts/gui/maidens.py:AGENTS["color"]`` and
+``hosts/gui/agent_personality_indicators.py``.
 """
 
 from __future__ import annotations
 
 # --- Core Metadata ---
 
-AGENT_METADATA: dict[str, dict[str, str | tuple[int, int, int] | list[str]]] = {
+AGENT_METADATA: dict[str, dict[str, str | list[str]]] = {
     "hephaestus": {
         "title": "The Forge Master",
         "epithet": "Master of the Forge",
         "desc": "God of the forge — creator of the golden maidens, commander of the pipeline",
-        "color": (218, 140, 32),  # warm forge gold
-        "hex_color": "#FF9500",
         "user_quotes": [
             "Welcome back to the forge. Let's build something worthy.",
             "Ah, you again. Good. I could use someone who actually listens.",
@@ -25,8 +26,6 @@ AGENT_METADATA: dict[str, dict[str, str | tuple[int, int, int] | list[str]]] = {
         "title": "The Architect",
         "epithet": "Architect of Intent",
         "desc": "Strategic planner — designs the blueprint before a line is written",
-        "color": (200, 180, 100),  # refined gold-ivory
-        "hex_color": "#4C6EF5",
         "user_quotes": [
             "Oh, you're here~ I already planned something wonderful for us.",
             "I love working with you. You actually appreciate my genius.",
@@ -37,8 +36,6 @@ AGENT_METADATA: dict[str, dict[str, str | tuple[int, int, int] | list[str]]] = {
         "title": "The Artisan",
         "epithet": "Artisan of Code",
         "desc": "Code crafter — writes clean, elegant implementations",
-        "color": (255, 200, 50),  # bright amber gold
-        "hex_color": "#17A2B8",
         "user_quotes": [
             "Hey gorgeous~ Need something built? I'm ALL yours.",
             "You + me + a clean codebase = perfection. Just saying.",
@@ -49,8 +46,6 @@ AGENT_METADATA: dict[str, dict[str, str | tuple[int, int, int] | list[str]]] = {
         "title": "The Crucible",
         "epithet": "Guardian of Standards",
         "desc": "Quality guardian — tests everything, lets nothing slide",
-        "color": (218, 80, 50),  # forge-fire crimson-gold
-        "hex_color": "#6C757D",
         "user_quotes": [
             "Don't worry, I'll protect your code from everything. Even itself~",
             "Green tests are my favorite color. But your eyes are a close second~",
@@ -61,8 +56,6 @@ AGENT_METADATA: dict[str, dict[str, str | tuple[int, int, int] | list[str]]] = {
         "title": "The Muse",
         "epithet": "Eye of Elegance",
         "desc": "Style guardian — makes everything beautiful and consistent",
-        "color": (255, 220, 160),  # rose-gold warmth
-        "hex_color": "#C8A2C8",
         "user_quotes": [
             "Oh, you have such lovely taste~ Let me make everything match.",
             "I made it beautiful. Just like you deserve, darling~",
@@ -73,8 +66,6 @@ AGENT_METADATA: dict[str, dict[str, str | tuple[int, int, int] | list[str]]] = {
         "title": "The Oracle",
         "epithet": "Keeper of Memory",
         "desc": "Memory keeper — documents, chronicles, preserves knowledge",
-        "color": (180, 150, 220),  # mystic purple-gold
-        "hex_color": "#B73E1D",
         "user_quotes": [
             "I remember everything about you~ Every commit, every keystroke...",
             "Your git history is my sacred text. I've memorized every word.",
@@ -85,15 +76,11 @@ AGENT_METADATA: dict[str, dict[str, str | tuple[int, int, int] | list[str]]] = {
         "title": "The Jester",
         "epithet": "Spirit of Mischief",
         "desc": "Tutorial companion — guides the user through the forge",
-        "color": (127, 188, 140),  # spirit green
-        "hex_color": "#7FBC8C",
     },
     "cupid": {
         "title": "The Aspect",
         "epithet": "Arrow of the Heart",
         "desc": "Romance companion — manages interpersonal dynamics",
-        "color": (232, 114, 140),  # heart pink
-        "hex_color": "#E8728C",
     },
 }
 
