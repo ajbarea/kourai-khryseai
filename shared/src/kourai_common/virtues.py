@@ -101,17 +101,27 @@ VIRTUE_HIGH_THRESHOLD = 0.80  # Above this → virtue apex interjection
 def _get_virtues_db() -> sqlite3.Connection:
     PLAYER_DIR.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(VIRTUES_DB))
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS player_virtues (
-            player_id TEXT NOT NULL,
-            virtue_key TEXT NOT NULL,
-            score REAL DEFAULT 0.5,
-            session_delta REAL DEFAULT 0.0,
-            last_updated REAL DEFAULT (unixepoch()),
-            PRIMARY KEY (player_id, virtue_key)
-        )
-    """)
-    conn.commit()
+    # Schema-create may fail on a readonly DB (e.g., container UID 1000
+    # writing to a host-owned bind-mount file written last by UID 1001 —
+    # see docker/host.Dockerfile lines 127-133, deferred to ROADMAP M5).
+    # On an *existing* table the CREATE TABLE IF NOT EXISTS is a logical
+    # no-op, so swallow OperationalError here and let read paths proceed.
+    # Writers (update_virtue) still surface their own perms failure — but
+    # gracefully, see that function.
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS player_virtues (
+                player_id TEXT NOT NULL,
+                virtue_key TEXT NOT NULL,
+                score REAL DEFAULT 0.5,
+                session_delta REAL DEFAULT 0.0,
+                last_updated REAL DEFAULT (unixepoch()),
+                PRIMARY KEY (player_id, virtue_key)
+            )
+        """)
+        conn.commit()
+    except sqlite3.OperationalError as exc:
+        log.debug("Virtues DB schema-create skipped (likely readonly): %s", exc)
     return conn
 
 
@@ -156,32 +166,52 @@ def update_virtue(player_id: str, virtue_key: str, delta: float) -> float:
 
     Score is clamped to [0.0, 1.0]. Session delta is accumulated for
     the Forge Journal display (shows change per session).
+
+    On a readonly database (host-mount UID mismatch — see
+    docker/host.Dockerfile lines 127-133, deferred to ROADMAP M5) this
+    function logs a warning and returns the current/default score
+    WITHOUT raising. Virtue tracking is bookkeeping; a perms hiccup
+    must not abort an otherwise-successful pipeline run, which is what
+    bit dokimasia in the 2026-05-01 smoke.
     """
     if virtue_key not in FORGE_VIRTUES:
         log.warning("Unknown virtue key: %s", virtue_key)
         return 0.5
 
     conn = _get_virtues_db()
-    current = conn.execute(
-        "SELECT score FROM player_virtues WHERE player_id = ? AND virtue_key = ?",
-        (player_id, virtue_key),
-    ).fetchone()
-    old_score = current[0] if current else 0.5
-    new_score = max(0.0, min(1.0, old_score + delta))
+    try:
+        current = conn.execute(
+            "SELECT score FROM player_virtues WHERE player_id = ? AND virtue_key = ?",
+            (player_id, virtue_key),
+        ).fetchone()
+        old_score = current[0] if current else 0.5
+        new_score = max(0.0, min(1.0, old_score + delta))
 
-    conn.execute(
-        """
-        INSERT INTO player_virtues (player_id, virtue_key, score, session_delta)
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT(player_id, virtue_key) DO UPDATE SET
-            score = excluded.score,
-            session_delta = session_delta + ?,
-            last_updated = unixepoch()
-        """,
-        (player_id, virtue_key, new_score, delta, delta),
-    )
-    conn.commit()
-    conn.close()
+        try:
+            conn.execute(
+                """
+                INSERT INTO player_virtues (player_id, virtue_key, score, session_delta)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(player_id, virtue_key) DO UPDATE SET
+                    score = excluded.score,
+                    session_delta = session_delta + ?,
+                    last_updated = unixepoch()
+                """,
+                (player_id, virtue_key, new_score, delta, delta),
+            )
+            conn.commit()
+        except sqlite3.OperationalError as exc:
+            log.warning(
+                "Virtues DB write failed for player %s virtue %s "
+                "(%s) — skipping bookkeeping update; pipeline continues. "
+                "Likely UID/perms mismatch on bind mount; see ROADMAP M5.",
+                player_id[:8],
+                virtue_key,
+                exc,
+            )
+            return old_score
+    finally:
+        conn.close()
 
     log.info(
         "Virtue %s for player %s: %.2f → %.2f (Δ%.2f)",

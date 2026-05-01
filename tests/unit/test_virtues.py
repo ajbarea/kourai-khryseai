@@ -265,3 +265,90 @@ def test_get_virtue_context_includes_all_virtue_names(db):
     ctx = get_virtue_context(PLAYER)
     for virtue in FORGE_VIRTUES.values():
         assert virtue.name in ctx, f"{virtue.name} missing from virtue context"
+
+
+# ── readonly-database resilience (M5 UID/perms deferred-by-design) ────────────
+
+
+def test_update_virtue_returns_old_score_on_readonly_database(monkeypatch, caplog):
+    """update_virtue must NOT raise when the DB is read-only.
+
+    Reproduces the dokimasia 2026-05-01 smoke crash: container UID 1000
+    bind-mounted to a host file owned by UID 1001 with mode 0644 → write
+    fails with sqlite3.OperationalError. The pipeline must continue —
+    virtue tracking is bookkeeping, not load-bearing for the forge.
+    """
+    import logging
+
+    real_conn = _fresh_db()
+    real_conn.execute(
+        "INSERT INTO player_virtues (player_id, virtue_key, score, session_delta) "
+        "VALUES (?, ?, ?, ?)",
+        (PLAYER, "arete", 0.42, 0.0),
+    )
+    real_conn.commit()
+
+    def raise_readonly(*args, **kwargs):  # type: ignore[no-untyped-def]
+        raise sqlite3.OperationalError("attempt to write a readonly database")
+
+    proxy = MagicMock(wraps=real_conn)
+    proxy.close = MagicMock()
+    proxy.commit.side_effect = raise_readonly
+
+    def execute_side_effect(sql, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if "INSERT" in sql.upper() or "UPDATE" in sql.upper():
+            raise sqlite3.OperationalError("attempt to write a readonly database")
+        return real_conn.execute(sql, *args, **kwargs)
+
+    proxy.execute.side_effect = execute_side_effect
+
+    monkeypatch.setattr("kourai_common.virtues._get_virtues_db", lambda: proxy)
+
+    with caplog.at_level(logging.WARNING, logger="kourai_common.virtues"):
+        result = update_virtue(PLAYER, "arete", 0.05)
+
+    # Did not raise; returned the stored old_score (0.42), not the would-be new.
+    assert result == pytest.approx(0.42)
+    assert any(
+        "DB write failed" in record.message and "M5" in record.message for record in caplog.records
+    )
+
+    real_conn.close()
+
+
+def test_get_virtues_db_swallows_schema_create_on_readonly(monkeypatch, caplog, tmp_path):
+    """`_get_virtues_db` should not crash when CREATE TABLE write fails.
+
+    Existing tables make CREATE TABLE IF NOT EXISTS a logical no-op; reads
+    must still work even if the underlying sqlite layer can't open the
+    journal for the schema-check write.
+    """
+    import logging
+
+    from kourai_common import virtues as virtues_mod
+
+    db_path = tmp_path / "virtues.db"
+    seed = sqlite3.connect(str(db_path))
+    seed.execute(
+        "CREATE TABLE player_virtues (player_id TEXT, virtue_key TEXT, "
+        "score REAL, session_delta REAL, last_updated REAL, "
+        "PRIMARY KEY (player_id, virtue_key))"
+    )
+    seed.commit()
+    seed.close()
+    db_path.chmod(0o444)
+    tmp_path.chmod(0o555)
+
+    monkeypatch.setattr(virtues_mod, "VIRTUES_DB", db_path)
+    monkeypatch.setattr(virtues_mod, "PLAYER_DIR", tmp_path)
+
+    with caplog.at_level(logging.DEBUG, logger="kourai_common.virtues"):
+        conn = virtues_mod._get_virtues_db()
+
+    assert conn is not None
+    rows = conn.execute("SELECT COUNT(*) FROM player_virtues").fetchone()
+    assert rows is not None
+    conn.close()
+
+    tmp_path.chmod(0o755)
+    db_path.chmod(0o644)
