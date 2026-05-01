@@ -139,6 +139,30 @@ def _adapt_path_for_renpy(renpy_exe: str, path: str) -> str:
         return path
 
 
+def _cli_command() -> list[str]:
+    """Build the argv for ``make cli``, honoring ``KOURAI_TTS`` for unattended runs.
+
+    Default behavior is unchanged: ``make cli`` enables voice. Setting
+    ``KOURAI_TTS=off`` in the environment opts out — needed for the smoke
+    driver, headless CI, or any WSL2 host without an audio device, where
+    the saved ``CLISettings.voice_enabled`` may otherwise be ``True`` and
+    PortAudio errors out trying to open the default output device.
+    """
+    cmd = [
+        sys.executable,
+        "-m",
+        "hosts.cli",
+        "--agent",
+        "http://localhost:10000/",
+    ]
+    tts_pref = os.environ.get("KOURAI_TTS", "").strip().lower()
+    if tts_pref in ("off", "0", "false", "no"):
+        cmd.append("--no-voice")
+    else:
+        cmd.append("--voice")
+    return cmd
+
+
 def _build_vn_command() -> list[str]:
     """Build the argv for launching the Ren'Py VN, adapting paths for WSL."""
     exe = resolve_renpy_executable()
@@ -334,14 +358,7 @@ TASK_GROUPS: tuple[tuple[str, tuple[tuple[str, Task], ...]], ...] = (
                 "cli",
                 Task(
                     description="Launch terminal CLI client (runs on host machine)",
-                    command_factory=lambda: [
-                        sys.executable,
-                        "-m",
-                        "hosts.cli",
-                        "--agent",
-                        "http://localhost:10000/",
-                        "--voice",
-                    ],
+                    command_factory=_cli_command,
                     tee=False,
                 ),
             ),
