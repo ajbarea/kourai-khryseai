@@ -507,10 +507,12 @@ def _show_metrics_dashboard() -> None:
     help="Run a single prompt non-interactively (headless mode)",
 )
 @click.option(
-    "--voice",
-    is_flag=True,
+    "--voice/--no-voice",
     default=None,  # None means use saved setting
-    help="Enable text-to-speech for agent dialogue (overrides saved setting)",
+    help="Enable/disable text-to-speech for agent dialogue (overrides saved setting). "
+    "``--no-voice`` is needed for unattended runs (smoke driver, headless CI, "
+    "WSL2 without an audio device) where the saved setting may otherwise enable TTS "
+    "and PortAudio errors out trying to open the default output device.",
 )
 @click.option(
     "--demo",

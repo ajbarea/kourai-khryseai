@@ -171,6 +171,37 @@ def test_resolve_renpy_executable_falls_back_to_project_path(monkeypatch) -> Non
     )
 
 
+def test_cli_command_defaults_to_voice_on(monkeypatch) -> None:
+    """`make cli` keeps voice on by default (interactive use)."""
+    monkeypatch.delenv("KOURAI_TTS", raising=False)
+    cmd = dev_cli._cli_command()
+    assert "--voice" in cmd
+    assert "--no-voice" not in cmd
+
+
+def test_cli_command_honors_kourai_tts_off(monkeypatch) -> None:
+    """`KOURAI_TTS=off make cli` flips to --no-voice for unattended runs.
+
+    The smoke driver sets ``KOURAI_TTS=off`` so PortAudio doesn't blow up on
+    a WSL2 host with no audio device when the saved CLISettings has
+    ``voice_enabled=True`` from a prior interactive session.
+    """
+    for value in ("off", "OFF", "0", "false", "no"):
+        monkeypatch.setenv("KOURAI_TTS", value)
+        cmd = dev_cli._cli_command()
+        assert "--no-voice" in cmd, f"expected --no-voice for KOURAI_TTS={value!r}"
+        assert "--voice" not in cmd
+
+
+def test_cli_command_treats_other_values_as_on(monkeypatch) -> None:
+    """Anything not in the off-vocabulary keeps voice on (forward-compat)."""
+    for value in ("on", "1", "true", "yes", "anything-else"):
+        monkeypatch.setenv("KOURAI_TTS", value)
+        cmd = dev_cli._cli_command()
+        assert "--voice" in cmd
+        assert "--no-voice" not in cmd
+
+
 def test_rebuild_aborts_with_honest_error_when_substep_fails(monkeypatch, capsys) -> None:
     """rebuild names the failing sub-step in stderr and reads 'aborted' in the timer.
 
