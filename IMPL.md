@@ -219,6 +219,19 @@ markdown markup aloud.
     score so callers see a sane value, pipeline continues. Virtue
     tracking is bookkeeping; a perms hiccup must not abort an
     otherwise-successful pipeline run.
+- ``[#116]`` — soft-fail banner now also fires when the pipeline
+  aborts before reaching mneme. The original ``[#109]`` banner only
+  caught ``commit_count == 0`` (mneme ran and reported empty); the
+  "mneme never reached" code path was silent. Discriminator added:
+  ``commit_count is None`` AND ``final_state == TASK_STATE_FAILED``
+  fires the banner with a distinct ``the forge aborted before Mneme
+  could commit`` message. A legitimate non-mneme run (e.g. metis-only
+  spec discussion) lands COMPLETED, so the FAILED gate separates
+  "crash" from "by design." Also handles the artifact-less abort
+  path: when the pipeline crashes early enough that no final artifact
+  lands, the banner plus a ``Forge aborted at N.Ns`` red closing
+  line surface so the stream doesn't trail off silently after the
+  last specialist's status.
 
 **2026-05-01 full-pipeline smoke — GREEN end-to-end:** First
 successful run of ``make smoke-m18`` against M18-Phase-1-rebuilt
@@ -255,10 +268,6 @@ This run validates:
   + virtues fail-soft
 
 Open follow-ups surfaced by the smoke (small PR shapes each):
-- ``[#109]`` banner doesn't fire when the pipeline aborts BEFORE
-  mneme runs (no ``commit_count`` metadata to gate on). The current
-  banner only catches ``mneme reported commit_count: 0``, not "mneme
-  never reached." Same UX hole, different code path.
 - M5 root-cause UID alignment is still the proper architectural
   fix; ``[#115]`` makes the application layer resilient in the
   meantime.
