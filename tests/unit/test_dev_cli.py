@@ -169,3 +169,92 @@ def test_resolve_renpy_executable_falls_back_to_project_path(monkeypatch) -> Non
     assert dev_cli.resolve_renpy_executable() == str(
         dev_cli.PROJECT_ROOT / "hosts" / "vn" / "renpy-8.5.2-sdk" / "renpy.exe"
     )
+
+
+def test_rebuild_aborts_with_honest_error_when_substep_fails(monkeypatch, capsys) -> None:
+    """rebuild names the failing sub-step in stderr and reads 'aborted' in the timer.
+
+    Reproduces the pre-fix bug where ``docker compose down`` failing in
+    under half a second produced ``[TIMER] Target rebuild completed in 0
+    seconds`` and made the rebuild look like a no-op.
+    """
+
+    def fake_run_process(command: list[str], *, cwd) -> int:  # type: ignore[no-untyped-def]
+        if command == ["docker", "compose", "down", "--remove-orphans"]:
+            return 1
+        return 0
+
+    def fake_run_step(command, *, check=False, label=None, cwd=None, env=None) -> int:  # type: ignore[no-untyped-def]
+        return 0
+
+    monkeypatch.setattr(dev_cli, "run_process", fake_run_process)
+    monkeypatch.setattr(dev_cli, "run_step", fake_run_step)
+
+    result = dev_cli.run_task("rebuild")
+
+    assert result == 1
+    captured = capsys.readouterr()
+    assert "down" in captured.err
+    assert "exit 1" in captured.err
+    rebuild_timer_lines = [line for line in captured.out.splitlines() if "Target rebuild" in line]
+    assert len(rebuild_timer_lines) == 1
+    assert "aborted at 'down'" in rebuild_timer_lines[0]
+    assert "completed" not in rebuild_timer_lines[0]
+
+
+def test_failing_leaf_task_reports_failure_in_timer(monkeypatch, capsys) -> None:
+    """Leaf timed tasks should not print 'completed' when they exited non-zero."""
+
+    def fake_run_process(command: list[str], *, cwd) -> int:  # type: ignore[no-untyped-def]
+        return 5
+
+    monkeypatch.setattr(dev_cli, "run_process", fake_run_process)
+
+    result = dev_cli.run_task("down")
+
+    assert result == 5
+    captured = capsys.readouterr()
+    assert "Target down failed" in captured.out
+    assert "exit 5" in captured.out
+    assert "Target down completed" not in captured.out
+
+
+def test_rebuild_success_timer_uses_sub_second_precision(monkeypatch, capsys) -> None:
+    """Successful rebuild reports elapsed with 2-decimal seconds, not rounded."""
+
+    def fake_run_process(command: list[str], *, cwd) -> int:  # type: ignore[no-untyped-def]
+        return 0
+
+    def fake_run_step(command, *, check=False, label=None, cwd=None, env=None) -> int:  # type: ignore[no-untyped-def]
+        return 0
+
+    monkeypatch.setattr(dev_cli, "run_process", fake_run_process)
+    monkeypatch.setattr(dev_cli, "run_step", fake_run_step)
+
+    result = dev_cli.run_task("rebuild")
+
+    assert result == 0
+    captured = capsys.readouterr()
+    assert "Target rebuild completed in" in captured.out
+    assert captured.out.rstrip().endswith("s")
+    # Sub-second precision means a digit-dot-digit pattern, never bare "0 seconds".
+    assert " 0 seconds" not in captured.out
+
+
+def test_composite_task_aborts_with_honest_error_when_substep_fails(monkeypatch, capsys) -> None:
+    """Same fix applies to COMPOSITE_TASKS targets (yolo, restart, dev, dev-vn)."""
+
+    def fake_run_process(command: list[str], *, cwd) -> int:  # type: ignore[no-untyped-def]
+        if command == ["docker", "compose", "down", "--remove-orphans"]:
+            return 2
+        return 0
+
+    monkeypatch.setattr(dev_cli, "run_process", fake_run_process)
+
+    result = dev_cli.run_task("restart")
+
+    assert result == 2
+    captured = capsys.readouterr()
+    assert "down" in captured.err
+    assert "exit 2" in captured.err
+    assert "aborted at 'down'" in captured.out

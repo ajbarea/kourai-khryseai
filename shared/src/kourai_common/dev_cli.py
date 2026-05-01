@@ -548,11 +548,15 @@ def run_task(name: str, extra_args: list[str] | None = None) -> int:
         for task_name in COMPOSITE_TASKS[name]:
             result = run_task(task_name)
             if result != 0:
-                elapsed = round(time.perf_counter() - start)
-                print(f"[TIMER] Target {name} completed in {elapsed} seconds")
+                elapsed = time.perf_counter() - start
+                print(
+                    f"[ERROR] Sub-step '{task_name}' failed with exit {result}; '{name}' aborted",
+                    file=sys.stderr,
+                )
+                print(f"[TIMER] Target {name} aborted at '{task_name}' after {elapsed:.2f}s")
                 return result
-        elapsed = round(time.perf_counter() - start)
-        print(f"[TIMER] Target {name} completed in {elapsed} seconds")
+        elapsed = time.perf_counter() - start
+        print(f"[TIMER] Target {name} completed in {elapsed:.2f}s")
         return 0
 
     if name == "rebuild":
@@ -560,15 +564,27 @@ def run_task(name: str, extra_args: list[str] | None = None) -> int:
         for task_name in ("down", "prune", "clean"):
             result = run_task(task_name)
             if result != 0:
-                elapsed = round(time.perf_counter() - start)
-                print(f"[TIMER] Target rebuild completed in {elapsed} seconds")
+                elapsed = time.perf_counter() - start
+                print(
+                    f"[ERROR] Sub-step '{task_name}' failed with exit "
+                    f"{result}; rebuild aborted before docker build",
+                    file=sys.stderr,
+                )
+                print(f"[TIMER] Target rebuild aborted at '{task_name}' after {elapsed:.2f}s")
                 return result
         task = TASKS[name]
         result = _execute_task(task, task.command_factory() + extra_args, label=name)
         if result == 0:
             run_process(["docker", "compose", "ps"], cwd=task.cwd)
-        elapsed = round(time.perf_counter() - start)
-        print(f"[TIMER] Target rebuild completed in {elapsed} seconds")
+        elapsed = time.perf_counter() - start
+        if result == 0:
+            print(f"[TIMER] Target rebuild completed in {elapsed:.2f}s")
+        else:
+            print(
+                f"[ERROR] docker compose build/up failed with exit {result}",
+                file=sys.stderr,
+            )
+            print(f"[TIMER] Target rebuild aborted in build step after {elapsed:.2f}s")
         return result
 
     task = TASKS[name]
@@ -576,8 +592,11 @@ def run_task(name: str, extra_args: list[str] | None = None) -> int:
     start = time.perf_counter()
     result = _execute_task(task, command, label=name)
     if task.timed:
-        elapsed = round(time.perf_counter() - start)
-        print(f"[TIMER] Target {name} completed in {elapsed} seconds")
+        elapsed = time.perf_counter() - start
+        if result == 0:
+            print(f"[TIMER] Target {name} completed in {elapsed:.2f}s")
+        else:
+            print(f"[TIMER] Target {name} failed (exit {result}) after {elapsed:.2f}s")
     return result
 
 
