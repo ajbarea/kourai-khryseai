@@ -276,7 +276,21 @@ async def send_and_stream(
 
     elapsed = time.monotonic() - t0
 
-    # Show final artifact with rendered markdown
+    # Soft-fail surface (#17, #109 follow-up): a "Forged in" line without
+    # commits reads as success, so flag the two ways that can happen:
+    #   - mneme ran and reported zero commits (commit_count == 0)
+    #   - pipeline aborted before mneme could run (final_state == FAILED
+    #     with no commit_count observed). A legitimate non-mneme run
+    #     (e.g. metis-only spec discussion) lands COMPLETED, so FAILED
+    #     is the discriminator that distinguishes "crash" from "by design".
+    softfail_message: str | None = None
+    if observed_commit_count == 0:
+        softfail_message = (
+            "the forge ran but nothing landed. Check the result above for what Mneme reported."
+        )
+    elif observed_commit_count is None and final_state == TaskState.TASK_STATE_FAILED:
+        softfail_message = "the forge aborted before Mneme could commit. Nothing landed."
+
     if final_text:
         _last_result = final_text
         _echo(
@@ -288,16 +302,8 @@ async def send_and_stream(
             f"{_GOLD}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501{_RESET}"
         )
 
-        # Always show elapsed time — the golden forge signature
-        # Soft-fail surface (#17): when mneme reports zero commits, the
-        # pipeline cascaded through specialists but produced no code
-        # changes. Without this banner the "Forged in" line reads as
-        # success even when nothing landed.
-        if observed_commit_count == 0:
-            _echo(
-                f"{_RED}\u26a0 No commits produced \u2014 the forge ran but "
-                f"nothing landed. Check the result above for what Mneme reported.{_RESET}"
-            )
+        if softfail_message:
+            _echo(f"{_RED}\u26a0 No commits produced \u2014 {softfail_message}{_RESET}")
 
         _echo(f"{_GOLD_BRIGHT}\u2728 Forged in {elapsed:.1f}s{_RESET}")
 
@@ -331,6 +337,13 @@ async def send_and_stream(
 
         # Post-output suggestions
         _echo(f"{_DIM}/copy clipboard \u00b7 /save <file> \u00b7 /help commands{_RESET}")
+
+    elif softfail_message:
+        # Pipeline aborted before any artifact landed. Without this branch
+        # the stream just trails off after the last specialist's status,
+        # leaving the player to guess that nothing committed.
+        _echo(f"{_RED}\u26a0 No commits produced \u2014 {softfail_message}{_RESET}")
+        _echo(f"{_RED}Forge aborted at {elapsed:.1f}s{_RESET}")
 
     if verbose:
         _echo(f"{_DIM}[verbose] {event_count} events in {elapsed:.1f}s{_RESET}")
