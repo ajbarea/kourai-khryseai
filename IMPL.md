@@ -220,21 +220,48 @@ markdown markup aloud.
     tracking is bookkeeping; a perms hiccup must not abort an
     otherwise-successful pipeline run.
 
-**2026-05-01 smoke evidence (incomplete — API credits exhausted mid-validation):**
-The smoke driver itself is now fully wired and exercised: prompt → 5
-preference seed → dev turn → M13 gate ack on ``Light the forge?`` →
-"Forged in N.Ns" detection → ``/q`` cleanup. Validated:
-- M18 Phase 1 wire shape + the chain hephaestus → metis → techne →
-  dokimasia routed correctly with content-kind metadata flowing
-- ``[#114]`` "failed (exit N)" timer fired correctly on the
-  abort path (validates dev_cli.py fix in production conditions)
+**2026-05-01 full-pipeline smoke — GREEN end-to-end:** First
+successful run of ``make smoke-m18`` against M18-Phase-1-rebuilt
+containers. All five specialists fired:
 
-NOT validated (blocked on Anthropic API credit recharge — 5+ smoke
-runs through Haiku with long system prompts burned the budget):
-- Full kallos → mneme tail of the pipeline post-virtues fix
-- ``[#109]`` "No commits produced" banner firing when mneme reports
-  ``commit_count: 0``
-- The end-to-end `Forged in` happy path with all 11 specialists
+| Specialist | Panel hits | Outcome |
+|---|---|---|
+| Hephaestus | 10 | analyzed, gated, routed, narrated handoffs |
+| Metis | 12 | full spec output |
+| Techne | 11 | wrote ``src/math.py`` + ``tests/test_math.py`` |
+| Dokimasia | 12 | ``1 passed in 0.02s`` |
+| Kallos | 9 | "All linting checks passed!" |
+| Mneme | 6 | generated 2 commit groups |
+
+Final signature: ``✨ Forged in 57.4s``. Full transcript at
+``logs/smoke-m18-20260501-091432Z.log``.
+
+The defensive virtues code (``[#115]``) fired exactly as designed —
+both dokimasia (arete) and kallos (techne_v) hit the readonly-DB
+write path, both logged the M5-cause warning, both continued. Pipeline
+survived; previously this was where the forge crashed.
+
+This run validates:
+- M18 Phase 1 content-kind metadata flow end-to-end (all 11
+  agent-card surfaces verified earlier; this run confirms the
+  structural pipeline)
+- ``[#107]`` empty Project root, ``[#108]`` phonemizer noise (TTS off
+  for unattended), ``[#109]`` soft-fail banner (correctly NOT firing
+  because the run produced 2 commit groups), ``[#111]`` Kokoro
+  pre-warm (N/A under voice-off), ``[#112]`` Context7 wrapper
+- ``[#114]`` "failed (exit N)" timer on the credit-error abort path
+  earlier in the night
+- ``[#115]`` no-voice flag + KOURAI_TTS env honor + smoke gate-ack
+  + virtues fail-soft
+
+Open follow-ups surfaced by the smoke (small PR shapes each):
+- ``[#109]`` banner doesn't fire when the pipeline aborts BEFORE
+  mneme runs (no ``commit_count`` metadata to gate on). The current
+  banner only catches ``mneme reported commit_count: 0``, not "mneme
+  never reached." Same UX hole, different code path.
+- M5 root-cause UID alignment is still the proper architectural
+  fix; ``[#115]`` makes the application layer resilient in the
+  meantime.
 
 **Independent UX bugs (still open):**
 - Per-agent CLI color coding via colored-background "badge" pattern
