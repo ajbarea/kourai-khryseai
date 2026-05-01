@@ -171,6 +171,20 @@ markdown markup aloud.
   ``[Hephaestus]:``) stripped from doc-lookup queries before library
   extraction so Context7 stops emitting ``[User]:`` URL placeholders.
 
+**Shipped 2026-05-01 (DX cleanup):**
+- ``[#114]`` — ``make rebuild`` no longer prints
+  ``[TIMER] Target rebuild completed in 0 seconds`` when ``down`` /
+  ``prune`` / ``clean`` fail in under half a second. Now: stderr names
+  the failing sub-step + exit code, the timer line says
+  ``aborted at '<step>'`` instead of ``completed``, elapsed prints
+  with sub-second precision (``0.42s`` not ``0 seconds``). Same fix
+  applied to every COMPOSITE_TASKS target (yolo, restart, dev,
+  dev-vn) — the bug was copy-pasted in five places. Bonus: leaf timed
+  tasks (e.g. ``make down``) report ``failed (exit N)`` instead of
+  ``completed`` when the underlying command exits non-zero. Found
+  while investigating a WSL2 docker daemon hiccup that was masked as
+  a no-op rebuild.
+
 **Independent UX bugs (still open):**
 - Per-agent CLI color coding via colored-background "badge" pattern
   (Okabe-Ito CVD-safe, NO_COLOR-aware) (#10)
