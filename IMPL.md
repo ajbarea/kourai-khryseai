@@ -184,6 +184,57 @@ markdown markup aloud.
   ``completed`` when the underlying command exits non-zero. Found
   while investigating a WSL2 docker daemon hiccup that was masked as
   a no-op rebuild.
+- ``[#115]`` — four bundled fixes uncovered by the first M18
+  full-pipeline live smoke:
+  - ``hosts/cli/__main__.py``: ``--voice`` becomes
+    ``--voice/--no-voice`` (Click negation idiom). The smoke driver
+    had been setting ``KOURAI_TTS=off`` for unattended runs, but that
+    env var was a fiction the smoke invented — the real CLI was
+    gated only by ``--voice`` with no negation, so PortAudio crashed
+    on first speech under WSL2 (no audio device).
+  - ``shared/src/kourai_common/dev_cli.py``: ``_cli_command`` helper
+    reads ``KOURAI_TTS`` env at invocation. ``off`` / ``0`` /
+    ``false`` / ``no`` → ``--no-voice``; anything else → ``--voice``.
+    Default behavior of bare ``make cli`` unchanged.
+  - ``scripts/smoke_m18_full_pipeline.py``: gate-pattern regex
+    narrowed. Previously matched ``Analyzing`` and ``Forging`` as
+    "gate signals," but those are routine orchestrator status text
+    that fires BEFORE the gate, causing the driver to false-skip the
+    ``yes`` ack and time out at 15min. Now scoped to actual gate
+    surfaces (``Light the forge?`` / ``Approve?`` / ``CONFIRM_ORDER``
+    / ``Forge cooled``) with a 5-min ceiling that falls through to
+    a /yolo passthrough assumption.
+  - ``shared/src/kourai_common/virtues.py``: ``update_virtue`` and
+    ``_get_virtues_db`` are now resilient to a readonly database. The
+    Dockerfile (lines 127-133) acknowledges that container UID 1000
+    writing to a host-owned UID 1001 bind-mount file is a known M5
+    deferred-design issue, and patched it for git via
+    ``safe.directory '*'`` — but never patched the virtues sqlite
+    layer. Dokimasia's post-success ``update_virtue("arete", delta)``
+    call would crash with ``sqlite3.OperationalError: attempt to
+    write a readonly database``, the executor decorator wrapped it as
+    ``InternalError``, and Hephaestus aborted the pipeline mid-flight
+    so kallos and mneme never ran. Now: catches OperationalError,
+    logs a warning identifying the M5 cause, returns the *current*
+    score so callers see a sane value, pipeline continues. Virtue
+    tracking is bookkeeping; a perms hiccup must not abort an
+    otherwise-successful pipeline run.
+
+**2026-05-01 smoke evidence (incomplete — API credits exhausted mid-validation):**
+The smoke driver itself is now fully wired and exercised: prompt → 5
+preference seed → dev turn → M13 gate ack on ``Light the forge?`` →
+"Forged in N.Ns" detection → ``/q`` cleanup. Validated:
+- M18 Phase 1 wire shape + the chain hephaestus → metis → techne →
+  dokimasia routed correctly with content-kind metadata flowing
+- ``[#114]`` "failed (exit N)" timer fired correctly on the
+  abort path (validates dev_cli.py fix in production conditions)
+
+NOT validated (blocked on Anthropic API credit recharge — 5+ smoke
+runs through Haiku with long system prompts burned the budget):
+- Full kallos → mneme tail of the pipeline post-virtues fix
+- ``[#109]`` "No commits produced" banner firing when mneme reports
+  ``commit_count: 0``
+- The end-to-end `Forged in` happy path with all 11 specialists
 
 **Independent UX bugs (still open):**
 - Per-agent CLI color coding via colored-background "badge" pattern
