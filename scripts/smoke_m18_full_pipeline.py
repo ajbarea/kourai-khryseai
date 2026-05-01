@@ -152,22 +152,28 @@ def _drive_dev_turn(child: pexpect.spawn, prompt: str) -> None:
     log.info("Driving dev turn with prompt: %r", prompt)
     _send(child, prompt)
 
-    # First the CONFIRM_ORDER gate fires (M13). Look for the gate signal
-    # before the long pipeline timeout — failure here means the gate
-    # itself is broken, not the pipeline.
-    confirm_pattern = (
-        r"(CONFIRM_ORDER|Light the forge|Approve\?|"
-        # /yolo opt-out path: pipeline starts immediately, no gate
-        r"Forging|Analyzing|"
-        # explicit M13 cancel surface
-        r"Forge cooled)"
-    )
-    child.expect(confirm_pattern, timeout=120)
-
-    # If we matched the confirmation gate, ack with "yes". The yolo
-    # path skips this; the regex above catches both. Whitespace-only
-    # lines are fine — the streaming layer treats Enter as confirm.
-    if "CONFIRM_ORDER" in (child.after or "") or "Approve" in (child.after or ""):
+    # Wait for the M13 confirmation gate. ``Light the forge?`` is the
+    # human-friendly text Hephaestus emits after analyzing the request.
+    # ``CONFIRM_ORDER`` / ``Approve?`` are alternate surfaces. ``Forge
+    # cooled`` is the explicit cancel path.
+    #
+    # IMPORTANT: progress-status text like "Analyzing request..." or
+    # "Forging" must NOT be in this regex — those land BEFORE the gate
+    # on the non-yolo path, which would cause us to falsely think we
+    # had reached the gate already. /yolo bypass: no gate fires; this
+    # expect times out, we fall through to the completion-marker wait.
+    gate_pattern = r"(Light the forge\?|Approve\?|CONFIRM_ORDER|Forge cooled)"
+    try:
+        child.expect(gate_pattern, timeout=300)
+    except pexpect.exceptions.TIMEOUT:
+        # No gate fired in 5 min — assume /yolo passthrough. The
+        # pipeline should produce ``Forged in`` directly. If it doesn't,
+        # the next expect will time out with a meaningful error.
+        log.info("No M13 gate fired in 300s — assuming /yolo passthrough.")
+    else:
+        matched = child.after or ""
+        if "Forge cooled" in matched:
+            raise RuntimeError("M13 gate cancelled the forge — see log")
         _send(child, "yes")
 
     # Then the pipeline runs. Wait for the gold signature.
