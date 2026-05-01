@@ -5,24 +5,19 @@ milestone lands, the matching detail block in [ROADMAP.md](./ROADMAP.md)
 collapses to a one-liner under "Shipped" and this file gets reset to the
 next milestone.
 
-Updated: 2026-04-30 · Working on: **M18 Phase 1 SHIPPED 2026-04-30
-(eight PRs: #99/#100/#101/#102/#103/#104/#105/#106 — contract + 10
-specialist producers + 1 consumer migration). All eleven agents
-participate in the URI-namespaced extension key
-``"https://kourai.khryseai/ext/streaming/v1"`` with
-``{"content_kind": "dialogue" | "status" | "code" | "spec"}`` nested
-under it. Post-Phase-1 UX/DX cleanup batch shipped same day
-(#107/#108/#109/#110/#111/#112): empty Project root field, phonemizer
-WARN spam, zero-commit soft-fail banner, WSL2 test env, Kokoro
-language pre-warm, Context7 v2 tool rename + transcript-prefix
-leakage. Smoke driver promoted from /tmp to ``scripts/smoke_m18_full_pipeline.py``
-(#113) with new ``make smoke-m18`` target — pre-seeds the closed M17
-PAUSE vocabulary so metis plans without pausing, then drives metis →
-techne → dokimasia → kallos → mneme end-to-end. Active focus: run
-the full-pipeline live smoke against latest main + container rebuild,
-then proceed to Phase 2 (SSML inside dialogue bodies) — Kokoro
-doesn't natively consume SSML so transitional strip-then-synthesize,
-ElevenLabs migration on M6 unblocks full SSML downstream.**
+Updated: 2026-05-01 · Working on: **M18 Phase 1 SHIPPED 2026-04-30
+(eight PRs: #99/#100/#101/#102/#103/#104/#105/#106). Phase 1 verified
+GREEN end-to-end via the 2026-05-01 ``make smoke-m18`` run (full
+specialist cascade through hephaestus → metis → techne → dokimasia
+→ kallos → mneme, ``✨ Forged in 57.4s``). DX cleanup post-smoke
+shipped: ``[#114]`` honest rebuild-failure timer, ``[#115]`` no-voice
+flag + KOURAI_TTS env + virtues fail-soft + smoke gate-ack regex,
+``[#116]`` soft-fail banner also fires on pipeline abort before
+mneme, ``[#117]`` uvicorn.access filter (silences Docker healthcheck
+log noise — 44 lines/min cluster-wide → 0). Active focus: M18 Phase 2
+(SSML inside dialogue bodies — Kokoro doesn't natively consume SSML
+so transitional strip-then-synthesize, ElevenLabs migration on M6
+unblocks full SSML downstream).**
 
 ## M18 Phase 1 — what shipped (eight PRs, 2026-04-30)
 
@@ -232,6 +227,19 @@ markdown markup aloud.
   lands, the banner plus a ``Forge aborted at N.Ns`` red closing
   line surface so the stream doesn't trail off silently after the
   last specialist's status.
+- ``[#117]`` (#12) — Docker healthcheck access-log noise silenced.
+  Each agent's uvicorn served ``GET /.well-known/agent-card.json``
+  (15s healthcheck) → ``200 OK`` INFO line, ~4 lines/min/agent × 11
+  agents = 44 lines/min cluster-wide of pure chatter that drowned
+  real events in ``docker logs``. Investigation found the polling is
+  the right cadence for liveness recovery — only the access-log
+  noise was the actual problem. New ``_UvicornAccessPathFilter`` in
+  ``kourai_common.log`` installed on the ``uvicorn.access`` logger
+  (logger-level, not handler-level — uvicorn configures its own
+  StreamHandler outside the kourai root chain). Records at WARNING+
+  pass through so a 5xx healthcheck still surfaces. Path comparison
+  strips query string. Live-verified: restarted aletheia → 0
+  healthcheck access lines in 30s vs 2 lines on idle peer.
 
 **2026-05-01 full-pipeline smoke — GREEN end-to-end:** First
 successful run of ``make smoke-m18`` against M18-Phase-1-rebuilt
@@ -276,9 +284,6 @@ Open follow-ups surfaced by the smoke (small PR shapes each):
 - Per-agent CLI color coding via colored-background "badge" pattern
   (Okabe-Ito CVD-safe, NO_COLOR-aware) (#10)
 - Music playlist sparse — 2 tracks (#11)
-- Agent-card poll storm — 30+ GET ``/.well-known/agent-card.json`` per
-  minute on idle agents (#12) — likely SDK-side; needs investigation
-  before a fix.
 - Explicit captions / TTS subtitle toggle for accessibility (#19) —
   feature, not a bug; needs UX design.
 
@@ -311,30 +316,31 @@ UX/DX is the default between milestones. Pre-release perfection
 stance: no workarounds, web-search 2026 best practice before any
 implementation, architectural fix over expedient patch.
 
-1. **Full-pipeline live smoke** via the new ``make smoke-m18`` target
-   (#113) against latest main (post-#106 + the 2026-04-30 cleanup
-   batch). Container rebuild required first — current images are
-   8+ commits behind. Voice-off run gives functional verification of
-   the metadata flow + soft-fail banner + Context7 round-trip + Kokoro
-   pre-warm.
-2. **M18 Phase 2 — SSML inside dialogue bodies.** Web-search 2026 SSML
+1. **M18 Phase 2 — SSML inside dialogue bodies.** Web-search 2026 SSML
    best practice (W3C SSML 1.1 status, ElevenLabs/Azure provider
    subset compatibility) before any implementation. Decide
    producer-vs-consumer SSML wrapping.
-3. **M18 Phase 3 — KIND_CODE / KIND_SPEC distinct render paths.** Drop
-   the ``or kind is None`` legacy fallback once full-pipeline smoke
-   confirms no untagged emissions in production. Wide markdown render
-   for spec, monospace + syntax highlighting for code.
-4. **M20 — Audio-text synchronization.** Builds on M18 (kind routing)
+2. **M18 Phase 3 — KIND_CODE / KIND_SPEC distinct render paths.** Drop
+   the ``or kind is None`` legacy fallback now that the 2026-05-01
+   GREEN smoke confirmed no untagged emissions in production. Wide
+   markdown render for spec, monospace + syntax highlighting for code.
+3. **M20 — Audio-text synchronization.** Builds on M18 (kind routing)
    + M19 (RealtimeTTS word-timing API already wired via ``on_word=``
    callback). 9-14s text-precedes-audio gap is a player-notices UX
    issue.
-5. **Remaining independent UX bugs** — agent-card poll storm (#12),
-   per-agent CLI color badges (#10), captions toggle (#19), playlist
-   expansion (#11). Each sized for a single PR.
-6. **Live VN smoke** — exercises the new vn_bridge ``/tts`` →
+4. **Remaining independent UX bugs** — per-agent CLI color badges
+   (#10, needs Okabe-Ito palette mapping), captions toggle (#19,
+   needs UX design), playlist expansion (#11, content-driven).
+   Each sized for a single PR.
+5. **Live VN smoke** — exercises the new vn_bridge ``/tts`` →
    ``RealtimeTTSEngine.synthesize_to_wav`` path AND the new
    metadata-based dialogue routing.
+6. **Drift cleanup — ``AGENT_METADATA`` color fields**. The
+   ``color`` (RGB) and ``hex_color`` (hex) keys in
+   ``shared/src/kourai_common/agents.py:AGENT_METADATA`` are dead
+   code (no consumer reads them; values disagree with the live GUI
+   ``hosts/gui/maidens.py:AGENTS["color"]``). Delete or unify before
+   #10 wires real per-agent colors.
 7. **``docs/architecture/puck-first-run-tutorial.md``** — pairs with
    the M6 player-onboarding theme.
 8. **M5 / M12 / M15 / M6 follow-ons** — see ROADMAP for scope.
