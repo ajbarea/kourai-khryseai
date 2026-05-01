@@ -23,6 +23,12 @@ _CONSOLE_SILENCED_LIBS = (
     "a2a.client.card_resolver",
 )
 
+# Paths whose 2xx access logs are pure noise. Docker healthchecks hit
+# ``/.well-known/agent-card.json`` every 15s on every agent (4 lines/min/agent
+# × 11 agents = 44 lines/min cluster-wide of "200 OK" chatter). Filter at
+# uvicorn.access so failed healthchecks (WARN+) still surface.
+_HEALTHCHECK_PATHS = ("/.well-known/agent-card.json",)
+
 
 class _ConsoleSilenceFilter(logging.Filter):
     """Drop low-severity records from chatty third-party loggers."""
@@ -37,6 +43,37 @@ class _ConsoleSilenceFilter(logging.Filter):
         if record.levelno >= logging.WARNING:
             return True
         return not any(record.name == p or record.name.startswith(p + ".") for p in self._prefixes)
+
+
+class _UvicornAccessPathFilter(logging.Filter):
+    """Drop ``uvicorn.access`` records whose request path matches an entry in
+    ``paths``. Records at WARNING or higher always pass — a 5xx healthcheck
+    response should still surface even if the path is in the silence list.
+
+    Matches uvicorn's emission shape: ``access_logger.info('%s - "%s %s
+    HTTP/%s" %d', client_addr, method, path_with_query, http_version,
+    status_code)``. ``record.args[2]`` is the path (with query string),
+    so we strip the query before comparing.
+    """
+
+    __slots__ = ("_paths",)
+
+    def __init__(self, paths: tuple[str, ...]) -> None:
+        super().__init__()
+        self._paths = paths
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if record.levelno >= logging.WARNING:
+            return True
+        if record.name != "uvicorn.access":
+            return True
+        if not record.args or len(record.args) < 3:
+            return True
+        path = record.args[2]
+        if not isinstance(path, str):
+            return True
+        path_only = path.split("?", 1)[0]
+        return path_only not in self._paths
 
 
 # Project root — two levels up from shared/src/kourai_common/
@@ -155,6 +192,13 @@ def setup_logging(name: str, *, level: str | None = None) -> logging.Logger:
         file_handler.setLevel(logging.DEBUG)
         file_handler.addFilter(trace_filter)
         root.addHandler(file_handler)
+
+    # Install on uvicorn.access at the logger level so the filter applies
+    # regardless of which handler emits the record (uvicorn configures its
+    # own StreamHandler outside our root chain).
+    access_logger = logging.getLogger("uvicorn.access")
+    if not any(isinstance(f, _UvicornAccessPathFilter) for f in access_logger.filters):
+        access_logger.addFilter(_UvicornAccessPathFilter(_HEALTHCHECK_PATHS))
 
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)

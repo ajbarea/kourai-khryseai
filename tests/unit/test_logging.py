@@ -184,6 +184,104 @@ class TestSetupLoggingLevel:
         assert all(_apply_filter(f, app_record) for f in console.filters)
 
 
+class TestUvicornAccessPathFilter:
+    """Healthcheck access logs (Docker GET /.well-known/agent-card.json every
+    15s) are pure noise; the filter drops INFO records for those paths but
+    keeps WARN+ so a failed healthcheck still surfaces."""
+
+    def _reset_root(self) -> logging.Logger:
+        root = logging.getLogger()
+        for h in root.handlers[:]:
+            root.removeHandler(h)
+        # uvicorn.access filters persist across tests too — clear them.
+        access = logging.getLogger("uvicorn.access")
+        for f in list(access.filters):
+            access.removeFilter(f)
+        return root
+
+    def _uvicorn_access_record(self, path: str, level: int = logging.INFO) -> logging.LogRecord:
+        # Mirror uvicorn's emission: access_logger.info('%s - "%s %s HTTP/%s" %d', ...)
+        return logging.LogRecord(
+            name="uvicorn.access",
+            level=level,
+            pathname=__file__,
+            lineno=1,
+            msg='%s - "%s %s HTTP/%s" %d',
+            args=("127.0.0.1:1234", "GET", path, "1.1", 200),
+            exc_info=None,
+        )
+
+    def test_filter_drops_healthcheck_info(self):
+        from kourai_common.log import _UvicornAccessPathFilter
+
+        flt = _UvicornAccessPathFilter(("/.well-known/agent-card.json",))
+        record = self._uvicorn_access_record("/.well-known/agent-card.json")
+        assert flt.filter(record) is False
+
+    def test_filter_keeps_warning_on_healthcheck_path(self):
+        """A 5xx healthcheck still surfaces — WARN+ bypass the path drop."""
+        from kourai_common.log import _UvicornAccessPathFilter
+
+        flt = _UvicornAccessPathFilter(("/.well-known/agent-card.json",))
+        record = self._uvicorn_access_record("/.well-known/agent-card.json", level=logging.WARNING)
+        assert flt.filter(record) is True
+
+    def test_filter_keeps_non_healthcheck_path(self):
+        from kourai_common.log import _UvicornAccessPathFilter
+
+        flt = _UvicornAccessPathFilter(("/.well-known/agent-card.json",))
+        record = self._uvicorn_access_record("/")
+        assert flt.filter(record) is True
+
+    def test_filter_keeps_other_loggers(self):
+        """Records from other loggers pass through unchanged."""
+        from kourai_common.log import _UvicornAccessPathFilter
+
+        flt = _UvicornAccessPathFilter(("/.well-known/agent-card.json",))
+        record = logging.LogRecord(
+            name="hosts.cli",
+            level=logging.INFO,
+            pathname=__file__,
+            lineno=1,
+            msg="GET /.well-known/agent-card.json",  # same path in message text
+            args=(),
+            exc_info=None,
+        )
+        assert flt.filter(record) is True
+
+    def test_filter_keeps_path_with_query_string(self):
+        """uvicorn emits path-with-query; we match the path prefix so cache-bust
+        params don't accidentally bypass the filter."""
+        from kourai_common.log import _UvicornAccessPathFilter
+
+        flt = _UvicornAccessPathFilter(("/.well-known/agent-card.json",))
+        record = self._uvicorn_access_record("/.well-known/agent-card.json?ts=12345")
+        assert flt.filter(record) is False
+
+    def test_setup_logging_installs_filter_on_uvicorn_access_logger(self):
+        from kourai_common.log import _UvicornAccessPathFilter
+
+        self._reset_root()
+        setup_logging("test_uvicorn_filter")
+
+        access = logging.getLogger("uvicorn.access")
+        assert any(isinstance(f, _UvicornAccessPathFilter) for f in access.filters), (
+            "uvicorn.access logger missing _UvicornAccessPathFilter"
+        )
+
+    def test_setup_logging_filter_not_duplicated(self):
+        """Repeated setup_logging() calls must not stack filters."""
+        from kourai_common.log import _UvicornAccessPathFilter
+
+        self._reset_root()
+        setup_logging("test_one")
+        setup_logging("test_two")
+
+        access = logging.getLogger("uvicorn.access")
+        installed = [f for f in access.filters if isinstance(f, _UvicornAccessPathFilter)]
+        assert len(installed) == 1
+
+
 class TestOtelTraceInjection:
     """Trace IDs from the active OTel span flow into formatted log lines.
 
