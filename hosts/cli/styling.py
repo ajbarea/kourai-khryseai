@@ -1,14 +1,7 @@
-"""ANSI color constants — rich gold palette for the Golden Maidens.
+"""ANSI color constants — gold palette + Okabe-Ito CVD-safe agent badges.
 
-True-color goldenrod / gold for brand identity, with fallbacks for
-terminals that lack 24-bit color support.
-
-Per-agent badges (#10) use the Okabe-Ito CVD-safe palette — the 2026
-standard for categorical accessibility. NO_COLOR (no-color.org) and
-the ambient _has_truecolor signal both gate the colored render, with
-plain-bold fallback. Approximating Okabe-Ito into 16-color ANSI is
-deliberately NOT attempted — silent CVD-safety drift is worse than
-no color at all.
+Truecolor by default, with NO_COLOR + 16-color terminal fallbacks that
+strip color but preserve bold/italic/dim per the no-color.org spec.
 """
 
 from __future__ import annotations
@@ -29,17 +22,10 @@ _BOLD = "\033[1m"
 _ITALIC = "\033[3m"
 _RESET = "\033[0m"
 
-# NO_COLOR (no-color.org informal standard, 2018, broadly adopted by 2026):
-# any non-empty value disables ANSI color output. Per spec, this only
-# affects color — bold/underline/italic stay on so structural emphasis
-# still reads as emphasis.
 _no_color = bool(os.environ.get("NO_COLOR", ""))
 
-# Fallback for terminals without true-color. COLORTERM is the canonical
-# signal but most terminals don't set it (WSL, Windows Terminal, macOS
-# Terminal, VSCode, etc. all support 24-bit color without it), so also
-# accept well-known emulator env vars and any TERM that advertises 256
-# colors — modern 256-color terminals effectively all honor \033[38;2;…m.
+# COLORTERM is the canonical signal but few terminals set it; also accept
+# well-known emulator env vars and any 256color TERM.
 _has_truecolor = bool(
     os.environ.get("COLORTERM", "") in ("truecolor", "24bit")
     or os.environ.get("WT_SESSION", "")  # Windows Terminal
@@ -54,14 +40,8 @@ if not _has_truecolor:
     _GREEN = "\033[1;32m"
 
 
-# ---------------------------------------------------------------------------
-# Per-agent badge palette — Okabe-Ito CVD-safe (#10)
-# ---------------------------------------------------------------------------
-# Mapping from agent name to background RGB. The eight Okabe-Ito hues are
-# the canonical CVD-safe palette for categorical data; #999999 is the
-# common 9th "neutral" addition for support-role agents that don't carry
-# a primary identity. Specialists each get a distinct hue so handoffs
-# read at a glance; companions/support land on shared or neutral entries.
+# Specialists each get a distinct Okabe-Ito hue; companions/support land
+# on neutral gray or share with a thematic sibling.
 _AGENT_BADGE_COLORS: dict[str, tuple[int, int, int]] = {
     "hephaestus": (230, 159, 0),  # #E69F00 orange — forge fire
     "metis": (86, 180, 233),  # #56B4E9 sky blue — analytical mind
@@ -75,25 +55,16 @@ _AGENT_BADGE_COLORS: dict[str, tuple[int, int, int]] = {
     "aidos": (153, 153, 153),  # gray — neutral respect
 }
 
-# Yellow Okabe-Ito #F0E442 is too light for bold-white text (~2:1
-# contrast); black-on-yellow gets ~12:1. Every other Okabe-Ito hue + the
-# neutral gray have enough darkness that bold white reads cleanly. Pin
-# the exception explicitly so the contrast guarantee is auditable.
+# Yellow #F0E442 fails contrast against bold white (~2:1); pin black-fg
+# exception explicitly. Every other Okabe-Ito hue is dark enough for white.
 _BLACK_FG_BG_RGB = frozenset({(240, 228, 66)})
 
 
 def agent_badge(name: str) -> str:
-    """Render an agent name as an Okabe-Ito-colored background "badge".
+    """Render `name` as a colored-bg chip: " NAME " bold, Okabe-Ito hue.
 
-    Examples:
-        agent_badge("hephaestus")  # → " HEPHAESTUS " on orange bg, bold white fg
-        NO_COLOR=1 agent_badge(...) → " HEPHAESTUS " bold-only, no color
-        agent_badge("vn_bridge")  # unknown → bold-only fallback
-
-    The leading/trailing space is what makes the colored region read as
-    a discrete chip rather than colored text. Always uppercase, always
-    bold — even in the no-color paths — so the structural emphasis
-    survives palette stripping.
+    Falls back to bold-only when NO_COLOR is set, the terminal lacks
+    truecolor, or `name` isn't in the palette.
     """
     label = f" {name.upper()} "
     if _no_color or not _has_truecolor:
