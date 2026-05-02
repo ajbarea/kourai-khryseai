@@ -146,7 +146,9 @@ class RealtimeTTSEngine:
 
         Failures are non-fatal — the lazy path still works if pre-warm misses.
         """
+        t_start = time.monotonic()
         seen: set[str] = set()
+        loaded: list[str] = []
         for cfg in AGENT_VOICE_MAP.values():
             lang_code = getattr(cfg, "lang_code", "a")
             if lang_code in seen:
@@ -154,6 +156,7 @@ class RealtimeTTSEngine:
             seen.add(lang_code)
             try:
                 self._engine._get_pipeline(lang_code)
+                loaded.append(lang_code)
             except Exception as exc:
                 logger.debug(
                     "Kokoro pre-warm skipped for lang_code=%s (%s: %s)",
@@ -161,17 +164,27 @@ class RealtimeTTSEngine:
                     type(exc).__name__,
                     exc,
                 )
+        logger.info(
+            "Kokoro language pre-warm: %d/%d langs (%s) elapsed=%.2fs",
+            len(loaded),
+            len(seen),
+            ",".join(sorted(loaded)) or "none",
+            time.monotonic() - t_start,
+        )
 
     def _prewarm_agent_voices(self) -> None:
         """Materialize each agent's voice tensor (.pt) into KPipeline's voice cache.
 
         Failures are non-fatal — single-voice failure falls back to the lazy path.
         """
+        t_start = time.monotonic()
+        loaded: list[str] = []
         for cfg in AGENT_VOICE_MAP.values():
             lang_code = getattr(cfg, "lang_code", "a")
             try:
                 pipeline = self._engine._get_pipeline(lang_code)
                 pipeline.load_single_voice(cfg.voice_id)
+                loaded.append(cfg.voice_id)
             except Exception as exc:
                 logger.debug(
                     "Kokoro voice pre-warm skipped for voice=%s lang=%s (%s: %s)",
@@ -180,6 +193,12 @@ class RealtimeTTSEngine:
                     type(exc).__name__,
                     exc,
                 )
+        logger.info(
+            "Kokoro voice pre-warm: %d/%d voices elapsed=%.2fs",
+            len(loaded),
+            len(AGENT_VOICE_MAP),
+            time.monotonic() - t_start,
+        )
 
     def _effective_volume(self) -> float:
         return self.master_volume * (0.85 if self.enable_effects else 1.0)
