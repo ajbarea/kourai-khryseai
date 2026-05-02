@@ -15,7 +15,7 @@ import pytest
 from a2a.types import Task, TaskState, TaskStatusUpdateEvent
 
 from hosts.cli.streaming import send_and_stream
-from kourai_common.messaging import KIND_DIALOGUE, KIND_STATUS, kind_message
+from kourai_common.messaging import KIND_DIALOGUE, KIND_STATUS, ContentKind, kind_message
 from tests.conftest import make_stream_response
 
 
@@ -28,7 +28,7 @@ def _completed_task() -> MagicMock:
     return task
 
 
-def _status_event(text: str, kind: str) -> MagicMock:
+def _status_event(text: str, kind: ContentKind) -> MagicMock:
     """Build a TaskStatusUpdateEvent whose inner message carries the given kind."""
     inner = kind_message(text, kind, context_id="ctx-1", task_id="task-1")
     event = MagicMock(spec=TaskStatusUpdateEvent)

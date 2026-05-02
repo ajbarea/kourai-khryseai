@@ -60,7 +60,9 @@ class _UvicornAccessPathFilter(logging.Filter):
             return True
         if record.name != "uvicorn.access":
             return True
-        if not record.args or len(record.args) < 3:
+        # uvicorn always passes args as a tuple; the isinstance check
+        # narrows for ty (record.args is Tuple | Mapping | None).
+        if not isinstance(record.args, tuple) or len(record.args) < 3:
             return True
         path = record.args[2]
         if not isinstance(path, str):
