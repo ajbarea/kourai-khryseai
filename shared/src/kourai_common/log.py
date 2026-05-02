@@ -73,11 +73,10 @@ class _UvicornAccessPathFilter(logging.Filter):
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
 _LOGS_DIR = _PROJECT_ROOT / "logs"
 
-# Shared format across all agents. The `_WITH_TRACE` variant is used by
-# `_TraceAwareFormatter` when an OTel span context is active on the record;
-# otherwise the plain variant is used to avoid 32 zeros of noise on
-# non-traced lines. Trace IDs are emitted as full 32-char hex so a dev can
-# copy a trace ID from Jaeger and grep Dozzle for the matching log lines.
+# _WITH_TRACE renders [trace=<32-char hex>] when an OTel span is active;
+# the plain variant skips it to avoid 32 zeros of noise on non-traced
+# lines. 32-char hex matches Jaeger UI so trace IDs grep against Dozzle
+# directly.
 _CONSOLE_FMT = "%(asctime)s [%(name)s] %(levelname)s: %(message)s"
 _CONSOLE_FMT_WITH_TRACE = (
     "%(asctime)s [%(name)s] %(levelname)s [trace=%(otelTraceID)s]: %(message)s"

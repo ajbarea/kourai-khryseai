@@ -197,11 +197,8 @@ async def send_and_stream(
     final_state = None
     final_text = ""
     event_count = 0
-    # Soft-fail surface (#17): track mneme's commit_count from artifact
-    # data parts. ``None`` = mneme didn't emit a commit_messages artifact
-    # (pipeline didn't include scribe step); ``0`` = mneme ran but produced
-    # no commits, which the player needs called out explicitly so a silent
-    # "Pipeline complete / Forged in" doesn't read as success.
+    # None = mneme didn't emit commit_messages (no scribe step in the
+    # pipeline); 0 = mneme ran but produced no commits.
     observed_commit_count: int | None = None
 
     try:
@@ -226,28 +223,20 @@ async def send_and_stream(
                 text = _extract_status_text(event)
                 if text:
                     formatted, agent = _maidenify_status(text)
-                    # M18: TTS only fires for dialogue-kind emissions.
-                    # ``status`` / ``code`` / ``spec`` render visually only,
-                    # so the next event isn't gated on narration completion.
-                    # ``kind=None`` covers unmigrated specialists — those
-                    # keep the v0.x always-speak behavior until each
-                    # specialist's executor opts in. The rollout finishes
-                    # when every specialist emits a kind tag and this
-                    # ``or kind is None`` branch can retire.
+                    # Speak only KIND_DIALOGUE; status/code/spec render
+                    # visually. kind=None is the legacy fallback for any
+                    # specialist that hasn't tagged yet (M18 Phase 3
+                    # retires this branch).
                     kind = get_content_kind(event.status.message)
                     should_speak = kind is None or kind == KIND_DIALOGUE
-                    # Captions OFF + TTS speaking dialogue → audio-only
-                    # (skip the visual). Captions OFF without TTS would
-                    # silently drop dialogue, so the visual always lands
-                    # if there's no engine to speak it.
+                    # Captions off + TTS on → audio-only (drop visual);
+                    # without TTS, visual must land or dialogue is lost.
                     suppress_visual = (
                         kind == KIND_DIALOGUE and tts is not None and not captions_enabled
                     )
                     if not suppress_visual:
                         _echo(formatted)
                     if should_speak and tts and agent:
-                        # Extract the status message without the name box etc.
-                        # For now, just speak the raw status (it doesn't have markdown)
                         msg = text.split(" ", 1)[-1] if " " in text else text
                         await tts.speak(msg, agent)
 
@@ -285,13 +274,9 @@ async def send_and_stream(
 
     elapsed = time.monotonic() - t0
 
-    # Soft-fail surface (#17, #109 follow-up): a "Forged in" line without
-    # commits reads as success, so flag the two ways that can happen:
-    #   - mneme ran and reported zero commits (commit_count == 0)
-    #   - pipeline aborted before mneme could run (final_state == FAILED
-    #     with no commit_count observed). A legitimate non-mneme run
-    #     (e.g. metis-only spec discussion) lands COMPLETED, so FAILED
-    #     is the discriminator that distinguishes "crash" from "by design".
+    # COMPLETED + no commits is a legitimate non-mneme run (metis-only
+    # spec discussion). FAILED + no commit_count is the crash
+    # discriminator that triggers the abort banner.
     softfail_message: str | None = None
     if observed_commit_count == 0:
         softfail_message = (
@@ -344,34 +329,26 @@ async def send_and_stream(
                 if tts:
                     await tts.speak(victory, last_agent)
 
-        # Post-output suggestions
         _echo(f"{_DIM}/copy clipboard \u00b7 /save <file> \u00b7 /help commands{_RESET}")
 
     elif softfail_message:
-        # Pipeline aborted before any artifact landed. Without this branch
-        # the stream just trails off after the last specialist's status,
-        # leaving the player to guess that nothing committed.
+        # Aborted before any artifact landed; without this branch the
+        # stream trails off silently after the last specialist's status.
         _echo(f"{_RED}\u26a0 No commits produced \u2014 {softfail_message}{_RESET}")
         _echo(f"{_RED}Forge aborted at {elapsed:.1f}s{_RESET}")
 
     if verbose:
         _echo(f"{_DIM}[verbose] {event_count} events in {elapsed:.1f}s{_RESET}")
 
-    # Handle input_required — prompt user for follow-up
     if final_state == TaskState.TASK_STATE_INPUT_REQUIRED:
         follow_up: str = await click.prompt(f"\n{_GOLD}\u21b3 Your response{_RESET}")
         if follow_up.strip().lower() in ("/q", "/quit", "quit"):
             return False, context_id, task_id
-        # M13 fix — stash the player's original development ask in
-        # metadata so Hephaestus's resumed routing call relays the
-        # original request to specialists rather than the confirmation
-        # token ("yes" / "light it"). The previous turn's user_text is
-        # the load-bearing context that the v0.3 wire silently dropped.
-        # Forward the same forge metadata otherwise so specialists
-        # still see ``project_root`` / ``yolo`` on the resumed task —
-        # without it, the confirmation arrives bare and Metis/Techne
-        # fall back to ``Path.cwd()`` (= /app in the agent container)
-        # where git operations fail with exit 128.
+        # Stash original_request in metadata so Hephaestus's resumed
+        # routing relays the actual ask, not the confirmation token
+        # ("yes" / "light it"). Forward forge_metadata too — without
+        # project_root, Metis/Techne fall back to Path.cwd() = /app in
+        # the container and git operations exit 128.
         follow_up_metadata: dict[str, Any] = dict(forge_metadata or {})
         original_request = (user_text or "").strip()
         if original_request:
