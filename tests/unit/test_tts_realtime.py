@@ -389,15 +389,7 @@ class TestKokoroLanguagePreWarm:
         assert called_lang_codes == expected_lang_codes
 
     def test_prewarms_only_once_per_lang_code(self, mock_realtimetts):
-        """Language pre-warm dedupes; voice pre-warm fans out per agent.
-
-        ``_prewarm_agent_languages`` calls ``_get_pipeline`` once per
-        unique lang_code (dedup against many ``"a"`` entries in
-        AGENT_VOICE_MAP). The follow-up ``_prewarm_agent_voices`` then
-        calls ``_get_pipeline(cfg.lang_code)`` once per agent voice,
-        relying on KokoroEngine's idempotent cache to skip rebuilds.
-        Net call count = unique lang_codes + len(AGENT_VOICE_MAP).
-        """
+        """Language phase dedupes; voice phase calls _get_pipeline per agent (idempotent)."""
         _, mock_kokoro, _, _ = mock_realtimetts
         from kourai_common.tts_backend import AGENT_VOICE_MAP
         from kourai_common.tts_realtime import RealtimeTTSEngine
@@ -426,13 +418,7 @@ class TestKokoroLanguagePreWarm:
 
 
 class TestKokoroVoicePreWarm:
-    """Engine init must materialize each agent's voice tensor.
-
-    KPipeline.load_single_voice downloads + parses a ~5-10MB .pt file
-    on first call per voice, then caches the tensor. Pre-loading at
-    init pays that cost once instead of stacking per-voice lag onto
-    the first per-agent utterance.
-    """
+    """Engine init must call load_single_voice for every agent voice."""
 
     def test_prewarms_every_agent_voice(self, mock_realtimetts):
         _, mock_kokoro, _, _ = mock_realtimetts

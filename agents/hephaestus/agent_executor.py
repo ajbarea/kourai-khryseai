@@ -295,11 +295,8 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
                     break
 
                 emoji = AGENT_EMOJI.get(agent_name, "")
-                # `execute_pipeline` flattens specialist status events to
-                # plain strings, so the original kind metadata doesn't
-                # ride along. Forwarded pipeline progress is always
-                # KIND_STATUS by definition (specialist dialogue surfaces
-                # via the INPUT_REQUIRED branch above), so re-tag here.
+                # Forwarded pipeline progress; specialist dialogue went via
+                # the INPUT_REQUIRED branch above.
                 await send_working_status(
                     updater,
                     task,

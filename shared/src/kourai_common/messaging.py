@@ -170,13 +170,10 @@ def set_content_kind(message: Message, kind: ContentKind) -> None:
 
 
 def get_content_kind(message: Message | None) -> ContentKind | None:
-    """Read the content-kind discriminator from a Message, or ``None`` if absent.
+    """Read the content-kind tag from a Message, or ``None`` if missing/unknown.
 
-    Returns ``None`` when the metadata tag is missing or the value is
-    unrecognized. Strict M18 hosts (CLI streaming, vn_bridge) treat
-    ``None`` as not-dialogue — any production emitter that forgets to
-    tag will silently disappear from TTS rather than fall back to a
-    prose-keyword guess.
+    Strict M18 hosts treat ``None`` as not-dialogue — untagged production
+    emissions silently miss TTS rather than fall back to a prose guess.
     """
     if message is None:
         return None
@@ -317,12 +314,9 @@ async def send_working_status(
 ) -> None:
     """Send a working status update with optional emoji prefix.
 
-    ``kind`` tags the outbound message under
-    ``KOURAI_STREAMING_EXT_URI``. Hosts route by kind: ``KIND_STATUS``
-    skips TTS and fires-and-forgets; ``KIND_DIALOGUE`` keeps the current
-    speak-and-gate behavior. Leaving ``kind=None`` produces an untagged
-    message — strict M18 hosts treat that as not-dialogue, so always
-    pass an explicit ``KIND_*`` from production code.
+    Pass an explicit ``KIND_*``. Strict M18 hosts route ``KIND_DIALOGUE``
+    to TTS and ``KIND_STATUS`` to fire-and-forget; ``kind=None`` is
+    treated as not-dialogue.
     """
     msg = updater.new_agent_message(parts=[text_part(f"{emoji} {message}")])
     if kind is not None:
@@ -339,9 +333,8 @@ async def send_input_required(
 ) -> None:
     """Request user input and mark the task as paused.
 
-    Input-required prompts are addressed to the player and TTS-eligible
-    — pass ``kind=KIND_DIALOGUE`` from production callers. Untagged
-    prompts won't speak under strict M18 routing.
+    Pass ``kind=KIND_DIALOGUE`` — input-required prompts are
+    addressed to the player and TTS-eligible.
     """
     msg = updater.new_agent_message(parts=[text_part(message)])
     if kind is not None:

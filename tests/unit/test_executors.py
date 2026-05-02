@@ -95,14 +95,7 @@ class TestExecutorCommonBehavior:
     async def test_empty_input_returns_input_required(
         self, agent_name: str, module_path: str, class_name: str
     ):
-        """All executors return input_required status tagged KIND_DIALOGUE.
-
-        The empty-input prompt is addressed to the player and TTS-eligible,
-        so under strict M18 routing it must carry an explicit
-        ``KIND_DIALOGUE`` content-kind. Untagged (legacy) prompts no
-        longer fall through to TTS via the prose-keyword guess — they
-        just disappear, so the tag is load-bearing.
-        """
+        """All executors return input_required status tagged KIND_DIALOGUE."""
         executor_module = __import__(module_path, fromlist=[class_name])
         executor_class = getattr(executor_module, class_name)
 
@@ -447,13 +440,8 @@ class TestHephaestusExecutor:
 
         assert queue.enqueue_event.call_count >= 5
 
-        # Pipeline forwarder re-emits each specialist status as a fresh
-        # message, dropping the original metadata. M18 Phase 3 fixes that
-        # by re-tagging every forwarded status as KIND_STATUS — without
-        # this, strict-routing hosts would never speak any of the per-
-        # specialist progress lines AND would never know to render them
-        # as status (vs treating untagged as default-not-dialogue, which
-        # is correct in this case but only by accident).
+        # Forwarder drops the original metadata when re-emitting; M18
+        # Phase 3 re-tags as KIND_STATUS so strict routing renders these.
         forwarded_texts = [
             "Spec generated",
             "Code written",

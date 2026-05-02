@@ -350,12 +350,8 @@ async def handle_message(request: Request) -> StreamingResponse:
                             current_agent = name
                             break
                     log.info(f"Status ({current_agent}): {status_msg[:100]}")
-                    # Strict M18 routing: only KIND_DIALOGUE surfaces to
-                    # the VN dialogue layer. Status/code/spec render
-                    # behind the scenes. Untagged messages (kind is None)
-                    # never reach production — every emitter tags
-                    # explicitly — so treating them as not-dialogue here
-                    # is the right default if anything slips through.
+                    # Strict M18 routing: only KIND_DIALOGUE goes to the
+                    # VN dialogue layer.
                     kind = get_content_kind(event.status.message)
                     is_dialogue = kind == KIND_DIALOGUE
 

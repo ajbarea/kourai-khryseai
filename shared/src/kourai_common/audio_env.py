@@ -77,22 +77,10 @@ def _audio_debug_enabled() -> bool:
 
 
 def silence_alsa_lib_errors() -> None:
-    """Install a no-op libasound error handler so PortAudio's
-    "cannot find card '0'" cascade doesn't pollute CLI/GUI startup.
+    """Install a no-op libasound error handler so PortAudio's ALSA
+    enumeration cascade doesn't write to stderr at TTS init.
 
-    PortAudio enumerates ALSA devices during ``PyAudio()`` init. On
-    WSL2 (no native ALSA card; WSLg routes audio through PulseAudio),
-    headless Linux, or any system without a hardware ALSA setup, that
-    enumeration emits 30-50 lines of ``cannot find card '0'`` /
-    ``Unknown PCM cards.pcm.front`` etc. straight from libasound's
-    default fprintf-based handler. Setting an empty handler via
-    ``snd_lib_error_set_handler`` drops them at the C boundary without
-    touching Python-side stderr. Safe on systems with real audio: the
-    handler only fires on actual ALSA errors, which on healthy hosts
-    don't fire at module-load time.
-
-    Idempotent. Skipped when ``KOURAI_AUDIO_DEBUG=1`` (devs diagnosing
-    real audio failures want the diagnostic noise back).
+    Idempotent. Skipped when ``KOURAI_AUDIO_DEBUG=1``.
     """
     global _alsa_silenced, _ALSA_ERROR_HANDLER
     if _alsa_silenced or _audio_debug_enabled():
@@ -131,15 +119,10 @@ def silence_alsa_lib_errors() -> None:
 
 @contextlib.contextmanager
 def silence_audio_init_noise() -> Iterator[None]:
-    """Drop fd-level stderr so libjack's connect-error chatter is hidden.
+    """Drop fd-level stderr to hide libjack's connect-error chatter.
 
-    ``Cannot connect to server socket`` / ``jack server is not running``
-    come from libjack via fprintf and bypass Python logging. PortAudio
-    probes JACK after ALSA during ``PyAudio()`` init, so the body should
-    wrap exactly that constructor — keep the window tight to avoid
-    swallowing unrelated stderr (Hugging Face hub warnings, torch
-    UserWarnings, etc.).
-
+    Wrap only the PyAudio constructor — the redirect catches everything
+    on fd 2, so a wider window would swallow torch / HF Hub warnings.
     Skipped when ``KOURAI_AUDIO_DEBUG=1``.
     """
     if _audio_debug_enabled():
