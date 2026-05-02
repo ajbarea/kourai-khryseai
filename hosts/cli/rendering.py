@@ -26,6 +26,7 @@ from hosts.cli.styling import (
     _GOLD_BRIGHT,
     _ITALIC,
     _RESET,
+    agent_badge,
 )
 
 if TYPE_CHECKING:
@@ -209,9 +210,12 @@ def _comms_window(agent_name: str, dialogue: str, *, style: str = "speak") -> st
 
     # Box width is the longest line length
     box_w = max(len(line) for line in wrapped_lines)
-    # Ensure header (timestamp + name — title) fits
+    # Ensure header (timestamp + " NAME " badge + " — " + title) fits.
+    # The badge wraps the name in one space on each side so the colored
+    # background reads as a chip — that's +2 visible chars over the bare
+    # name length the legacy ``_GOLD_BOLD`` rendering occupied.
     ts_prefix = f"[{datetime.now().strftime('%H:%M:%S')}] "
-    header_len = len(ts_prefix) + len(agent_name) + len(title) + 3
+    header_len = len(ts_prefix) + len(agent_name) + 2 + len(title) + 3
     box_w = max(box_w, header_len)
 
     # Final clamping to terminal width
@@ -223,7 +227,7 @@ def _comms_window(agent_name: str, dialogue: str, *, style: str = "speak") -> st
     output = []
     output.append(f"  {border}\u256d{top_bar}\u256e{_RESET}")
     output.append(
-        f"  {border}\u2502{_RESET} {_DIM}{ts_prefix}{_RESET}{_GOLD_BOLD}{agent_name.upper()}{_RESET} \u2014 {_DIM}{title}{_RESET}{' ' * (box_w - header_len + 1)}{border}\u2502{_RESET}"
+        f"  {border}\u2502{_RESET} {_DIM}{ts_prefix}{_RESET}{agent_badge(agent_name)} \u2014 {_DIM}{title}{_RESET}{' ' * (box_w - header_len + 1)}{border}\u2502{_RESET}"
     )
 
     for line in wrapped_lines:
