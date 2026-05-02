@@ -1,0 +1,114 @@
+name: issue-126 npm xmldom rescan
+
+# Scheduled rescan for the upstream-blocked CVE pair tracked in issue #126
+# (`@xmldom/xmldom@0.8.12` HIGH bundled inside npm 11.13.0). Saturdays
+# 14:17 UTC; date-gated to start firing 2026-05-16, then re-runs weekly
+# until the bundled version lands >=0.8.13 (issue closes) or AJ closes
+# the issue manually (workflow becomes a no-op via the same gate).
+
+on:
+  schedule:
+    - cron: "17 14 * * 6"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  rescan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Gate on date and issue state
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          today=$(date -u +%Y-%m-%d)
+          if [[ "$today" < "2026-05-16" && "$GITHUB_EVENT_NAME" == "schedule" ]]; then
+            echo "today=$today < 2026-05-16; skipping (workflow_dispatch overrides)."
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          state=$(gh issue view 126 --repo "$GITHUB_REPOSITORY" --json state -q .state)
+          if [[ "$state" == "CLOSED" ]]; then
+            echo "issue 126 already closed; skipping."
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "proceed=true" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v6.0.2
+        if: steps.gate.outputs.proceed == 'true'
+
+      - name: Build affected images
+        if: steps.gate.outputs.proceed == 'true'
+        run: |
+          docker build -q -f docker/memory-mcp.Dockerfile -t memory-mcp:rescan .
+          docker build -q -f docker/context7-mcp.Dockerfile -t context7-mcp:rescan .
+          docker build -q -f docker/sandbox.Dockerfile -t sandbox:rescan .
+
+      - name: Inspect bundled @xmldom/xmldom versions
+        if: steps.gate.outputs.proceed == 'true'
+        id: scan
+        run: |
+          set +e
+          PKG=/usr/lib/node_modules/npm/node_modules/@xmldom/xmldom/package.json
+          extract() {
+            docker run --rm --entrypoint= "$1" sh -c "cat $PKG 2>/dev/null" \
+              | jq -r '.version // empty' 2>/dev/null
+          }
+          extract_sandbox() {
+            docker run --rm "$1" sh -c \
+              "find /usr/lib/node_modules -path '*xmldom/package.json' 2>/dev/null | head -1 | xargs cat 2>/dev/null" \
+              | jq -r '.version // empty' 2>/dev/null
+          }
+          mem=$(extract memory-mcp:rescan)
+          ctx=$(extract context7-mcp:rescan)
+          sb=$(extract_sandbox sandbox:rescan)
+          echo "memory_mcp=$mem"   | tee -a "$GITHUB_OUTPUT"
+          echo "context7_mcp=$ctx" | tee -a "$GITHUB_OUTPUT"
+          echo "sandbox=$sb"       | tee -a "$GITHUB_OUTPUT"
+
+      - name: Decide close vs comment
+        if: steps.gate.outputs.proceed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MEM: ${{ steps.scan.outputs.memory_mcp }}
+          CTX: ${{ steps.scan.outputs.context7_mcp }}
+          SB: ${{ steps.scan.outputs.sandbox }}
+        run: |
+          today=$(date -u +%Y-%m-%d)
+
+          # Returns 0 (safe) if v >= 0.8.13 or v is empty (xmldom absent).
+          ge_0_8_13() {
+            local v="$1"
+            [[ -z "$v" ]] && return 0
+            printf '0.8.13\n%s\n' "$v" | sort -V -C
+          }
+
+          all_safe=true
+          ge_0_8_13 "$MEM" || all_safe=false
+          ge_0_8_13 "$CTX" || all_safe=false
+          ge_0_8_13 "$SB"  || all_safe=false
+
+          {
+            echo "### Auto re-scan ($today)"
+            echo
+            echo "Bundled \`@xmldom/xmldom\` per image (fixed in >=0.8.13):"
+            echo
+            echo "- \`memory-mcp\`: \`${MEM:-not present}\`"
+            echo "- \`context7-mcp\`: \`${CTX:-not present}\`"
+            echo "- \`sandbox\`: \`${SB:-not present}\`"
+            echo
+            if [[ "$all_safe" == "true" ]]; then
+              echo "**All bundled xmldom versions are >=0.8.13 (or absent). Closing.**"
+            else
+              echo "Still waiting on upstream npm bundle bump or Wolfi npm apk fix."
+            fi
+          } > /tmp/comment.md
+
+          gh issue comment 126 --repo "$GITHUB_REPOSITORY" --body-file /tmp/comment.md
+          if [[ "$all_safe" == "true" ]]; then
+            gh issue close 126 --repo "$GITHUB_REPOSITORY"
+          fi
