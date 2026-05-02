@@ -1,11 +1,8 @@
 name: Nightly
 
-# Runs slow integration tests once per day plus on manual dispatch. These
-# are deliberately excluded from the fast `tests.yml` lane because building
-# the Docker MCP sidecar images and exercising the real integration path
-# takes ~7 minutes — far above the ~5min budget we want push/PR feedback
-# to stay within. Lint, unit, and performance suites continue to run on
-# every push and PR via tests.yml.
+# Slow integration tests run nightly + on manual dispatch — the Docker
+# MCP sidecar build + real integration path doesn't fit the push/PR fast
+# lane (`tests.yml`).
 
 on:
   schedule:
@@ -42,10 +39,7 @@ jobs:
 
       - name: Install system audio dependencies
         # PyAudio (pulled in by RealtimeTTS via hosts/gui) builds against
-        # PortAudio headers; ubuntu-latest doesn't ship them by default.
-        # Cache the .deb between runs — first run populates, subsequent
-        # runs hit warm cache (~5s vs 60-120s cold, or 15+min when
-        # GitHub's Azure apt mirror is flaking).
+        # PortAudio headers; ubuntu-latest doesn't ship them.
         uses: awalsh128/cache-apt-pkgs-action@v1.6.0
         with:
           packages: portaudio19-dev
