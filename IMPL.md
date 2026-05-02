@@ -14,15 +14,22 @@ specialist cascade through hephaestus → metis → techne → dokimasia
 flag + KOURAI_TTS env + virtues fail-soft + smoke gate-ack regex,
 ``[#116]`` soft-fail banner also fires on pipeline abort before
 mneme, ``[#117]`` uvicorn.access filter (silences Docker healthcheck
-log noise — 44 lines/min cluster-wide → 0). UX/DX + CI batch
-shipped 2026-05-02 (seven PRs): ``[#118]`` dead ``AGENT_METADATA``
-color fields dropped, ``[#119]`` Okabe-Ito CVD-safe agent badges
-(closes #10), ``[#120]`` captions toggle for audio-only dialogue
-mode (closes #19), ``[#121]`` apt cache for ``portaudio19-dev``
-(15+min mirror-flake → ~5s on warm cache), ``[#122]`` GHA layer
-cache for MCP Docker builds, ``[#123]`` NO_COLOR honored across
-the rest of the CLI palette, ``[#124]`` ``/aj-deslop`` sweep on
-recent justification prose (-73 LoC). Active focus: M18 Phase 2
+log noise — 44 lines/min cluster-wide → 0). UX/DX + CI + security
+batch shipped 2026-05-02 (eleven PRs): ``[#118]`` dead
+``AGENT_METADATA`` color fields dropped, ``[#119]`` Okabe-Ito CVD-safe
+agent badges (closes #10), ``[#120]`` captions toggle for audio-only
+dialogue mode (closes #19), ``[#121]`` apt cache for
+``portaudio19-dev``, ``[#122]`` GHA layer cache for MCP Docker
+builds, ``[#123]`` NO_COLOR honored across the rest of the CLI
+palette, ``[#124]`` ``/aj-deslop`` sweep on recent justification
+prose (-73 LoC), ``[#125]`` migrate ten agents + vn_bridge + sandbox
++ 2 MCP sidecars from python:3.12-slim → Chainguard Wolfi (closes
+#98; 0 HIGH CVEs vs 1H baseline), ``[#127]`` migrate
+templates/backend/Dockerfile to Wolfi so Techne-scaffolded player
+projects inherit the 0-CVE base, ``[#128]`` ``/aj-deslop`` sweep on
+streaming + log soft-fail + filter blocks (-24 LoC), ``[#129]``
+``/aj-deslop`` sweep on CI workflow comment blocks (-21 LoC, closes
+the IMPL TODO). Active focus: M18 Phase 2
 (SSML inside dialogue bodies — Kokoro doesn't natively consume
 SSML so transitional strip-then-synthesize, ElevenLabs migration
 on M6 unblocks full SSML downstream; web-searched 2026-05-02
@@ -341,6 +348,63 @@ markdown markup aloud.
   stance from
   ``feedback_terse_field_comments.md``: only keep comments
   that help a reader execute, drop "why we picked this".
+- ``[#125]`` (closes #98) — migrated ten agent containers +
+  vn_bridge + sandbox + the two MCP sidecars from
+  ``python:3.12-slim`` / ``node:20-slim`` to
+  ``cgr.dev/chainguard/wolfi-base:latest`` and
+  ``cgr.dev/chainguard/node:latest-dev``. CVE-2026-5435 glibc HIGH
+  was unfixed in Debian's security pipeline; Chainguard's daily
+  rebuild moves us to a 0-HIGH baseline. ``docker scout cves`` now
+  reports ``0C 0H 0M 0L`` on every Python image vs the ``0C 1H 0M
+  0L`` baseline on ``python:3.12-slim``. Architectural notes
+  recorded inline as ``# research(2026-05):`` markers (new
+  convention — see
+  ``feedback_research_comment_convention.md``):
+  ``wolfi-base`` chosen over ``cgr.dev/chainguard/python:latest-dev``
+  because the free public-tier python image tracks 3.14 and our
+  pyproject pins ``<3.14``; ``espeakng-loader`` manylinux wheel
+  bundles ``libespeak-ng.so`` so vn_bridge runs without the
+  missing-from-Wolfi system espeak-ng. Filed issue #126 for
+  ``@xmldom/xmldom@0.8.12`` HIGH CVE bundled inside ``npm
+  11.13.0`` itself — upstream-blocked, not exploitable in our
+  threat model (xmldom only sees npm-internal config XML, never
+  agent / network input).
+- ``[#127]`` — migrated ``templates/backend/Dockerfile`` to the
+  same Wolfi shape so every Techne-scaffolded player project
+  inherits the 0-CVE base. Smoke-built in a tmp dir + ``uv
+  lock``; image builds clean, ``python --version`` reports
+  3.12.13 in the runtime, ``docker scout`` reports ``0C 0H 1M
+  0L`` (one medium on pip 26.0.1, no high). Plus the two stale
+  ``node:20-slim`` references the parent migration left behind
+  in ``IMPL.md`` and the ``.github/workflows/tests.yml`` GHA
+  layer-cache comment.
+- ``[#128]`` — ``/aj-deslop`` sweep on
+  ``hosts/cli/streaming.py`` soft-fail + M18 TTS comment blocks
+  and ``shared/src/kourai_common/log.py`` format-string
+  commentary. Same pre-release stance as ``[#124]``. Cuts
+  task-context rot (``# M13 fix —``, ``# Soft-fail surface
+  (#17, #109 follow-up):``), narrative restatement (``the two
+  ways that can happen:`` followed by an enumeration the
+  ``if``/``elif`` already shows), and what-comments
+  (``# Handle input_required —``, ``# Post-output suggestions``,
+  ``# Extract the status message``). Keeps non-obvious
+  invariants — COMPLETED + 0 commits is a legitimate non-mneme
+  run; FAILED + no commit_count is the crash discriminator;
+  ``Path.cwd()`` = ``/app`` fall-through if ``project_root``
+  metadata is dropped; 32-char hex matches Jaeger UI for Dozzle
+  grep. -24 LoC.
+- ``[#129]`` — ``/aj-deslop`` sweep on
+  ``.github/workflows/tests.yml`` + ``nightly.yml``. The
+  apt-cache rationale was duplicated five times across the two
+  files (one per job); the GHA layer-cache comment in the
+  integration job carried the same self-evident "first run
+  populates, subsequent runs reuse" framing. Cuts cache-hit
+  timings that don't trace to ``tests/performance/`` (per
+  ``slop_ground_truth``); keeps PyAudio/PortAudio dep,
+  ``mode=max`` rationale (npm install is its own layer we want
+  back across runs), and the ``-m "not slow"`` Kokoro-skip
+  explanation. -21 LoC. Closes the ``/aj-deslop`` IMPL TODO
+  across all three originally-noted targets (#124 + #128 + #129).
 
 **2026-05-01 full-pipeline smoke — GREEN end-to-end:** First
 successful run of ``make smoke-m18`` against M18-Phase-1-rebuilt
@@ -407,14 +471,6 @@ Open follow-ups surfaced by the smoke (small PR shapes each):
   Mondays 12:00 UTC) opens drift PRs and a rollup issue automatically
   for action-pin / toolchain-pin / merge-setting / open-PR / local-main
   divergence findings.
-- **TODO: ``/aj-deslop`` sweep on long justification comments.**
-  Pre-release stance — long architectural-justification comments
-  inflate LoC without earning their keep. Keep only what helps a
-  future reader (AI or human) execute; drop "why we picked this"
-  prose. Targets: streaming.py soft-fail block, log.py filter
-  docstrings, recent CI workflow comments, anywhere multi-line
-  comments justify a decision rather than warn about a behavior.
-
 ## Up next — priority order
 
 UX/DX is the default between milestones. Pre-release perfection
