@@ -631,6 +631,13 @@ architectural moves; valuable but not the first lift.
 One-line per item, newest first. Detail moves to git history when work
 lands — these docs are plans + scratchpad, not a historical archive.
 
+- 2026-05-02 — **`/aj-deslop` sweep on this session's three feature
+  PRs** [#138]. -102 LoC of multi-paragraph docstrings + rationale
+  comment blocks trimmed from `audio_env.py`, `tts_realtime.py`,
+  `messaging.py`, `streaming.py`, `vn_bridge/__main__.py`,
+  `hephaestus/agent_executor.py`, and three test modules — the
+  history+rationale lives in PR descriptions and git, not in the
+  source. Functional behavior unchanged.
 - 2026-05-02 — **M20 sub-task 1 — Kokoro voice tensor pre-warm** [#136].
   Added `_prewarm_agent_voices` alongside `_prewarm_agent_languages`
   at `RealtimeTTSEngine.__init__`; calls `KPipeline.load_single_voice`
