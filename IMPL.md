@@ -319,8 +319,8 @@ markdown markup aloud.
   via ``docker/build-push-action@v7.1.0`` + ``docker/setup-buildx-action@v4.0.0``.
   The integration job rebuilds context7-mcp + memory-mcp images
   every run; ``cache-from: type=gha`` + ``mode=max`` reuses the
-  ``FROM node:20-slim`` and ``npm install`` layers across runs
-  unless Dockerfile content changes. Separate ``scope=`` per
+  ``FROM cgr.dev/chainguard/node:latest-dev`` and ``npm install`` layers
+  across runs unless Dockerfile content changes. Separate ``scope=`` per
   image so they don't evict each other. Expected ~1-2 min saved
   per integration run on warm cache.
 - ``[#123]`` — NO_COLOR honored across the rest of ``styling.py``.

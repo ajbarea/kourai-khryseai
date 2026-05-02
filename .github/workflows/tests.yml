@@ -227,11 +227,11 @@ jobs:
 
       - name: Build context7-mcp sidecar image
         # GHA layer cache: first run populates, subsequent runs reuse the
-        # FROM node:20-slim layer + npm-install layer until package
-        # versions in the Dockerfile change. mode=max also caches
-        # intermediate layers (matters here — npm install is one layer
-        # and we want it back). load=true puts the image in the local
-        # docker daemon for the integration tests to use.
+        # FROM cgr.dev/chainguard/node:latest-dev layer + npm-install layer
+        # until package versions in the Dockerfile change. mode=max also
+        # caches intermediate layers (matters here — npm install is one
+        # layer and we want it back). load=true puts the image in the
+        # local docker daemon for the integration tests to use.
         uses: docker/build-push-action@v7.1.0
         with:
           context: .
