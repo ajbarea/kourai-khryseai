@@ -33,11 +33,17 @@ from typing import TYPE_CHECKING
 import pyaudio
 from RealtimeTTS import KokoroEngine as _KokoroEngine, TextToAudioStream as _TextToAudioStream
 
+from kourai_common.audio_env import silence_alsa_lib_errors, silence_audio_init_noise
 from kourai_common.tts_backend import (
     AGENT_VOICE_MAP,
     TTSVoiceConfig,
     get_voice_for_agent,
 )
+
+# Module-load side effect: install the libasound noop handler before
+# `_TextToAudioStream(...)` triggers PortAudio's ALSA enumeration in
+# `__init__` below. Idempotent and a no-op when KOURAI_AUDIO_DEBUG=1.
+silence_alsa_lib_errors()
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -107,12 +113,19 @@ class RealtimeTTSEngine:
         # (which can happen during KokoroEngine warmup) is already filtered.
         _install_phonemizer_word_count_filter()
         self._engine = _KokoroEngine(voice="af_heart", default_speed=1.0, debug=False)
-        self._stream = _TextToAudioStream(
-            engine=self._engine,
-            on_word=on_word,
-            muted=muted,
-            level=logging.WARNING,
-        )
+        # `_TextToAudioStream(...)` constructs PyAudio, which probes JACK
+        # after ALSA — libasound noise is killed at module load by
+        # silence_alsa_lib_errors(); libjack still writes to fd 2, so
+        # wrap this call with the fd-redirect window. KokoroEngine init
+        # above stays outside the window so HF Hub / torch warnings stay
+        # visible to the user.
+        with silence_audio_init_noise():
+            self._stream = _TextToAudioStream(
+                engine=self._engine,
+                on_word=on_word,
+                muted=muted,
+                level=logging.WARNING,
+            )
 
         self.master_volume = max(0.0, min(1.0, master_volume))
         self.enable_effects = enable_effects
