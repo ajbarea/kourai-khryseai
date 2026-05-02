@@ -223,12 +223,13 @@ async def send_and_stream(
                 text = _extract_status_text(event)
                 if text:
                     formatted, agent = _maidenify_status(text)
-                    # Speak only KIND_DIALOGUE; status/code/spec render
-                    # visually. kind=None is the legacy fallback for any
-                    # specialist that hasn't tagged yet (M18 Phase 3
-                    # retires this branch).
+                    # Strict M18 routing: only KIND_DIALOGUE goes to TTS;
+                    # status/code/spec render visually. Untagged messages
+                    # (kind is None) no longer fall through — every
+                    # specialist + the hephaestus forwarder + base_executor
+                    # tag explicitly, so untagged in production = a bug,
+                    # and silently routing it to TTS would mask that bug.
                     kind = get_content_kind(event.status.message)
-                    should_speak = kind is None or kind == KIND_DIALOGUE
                     # Captions off + TTS on → audio-only (drop visual);
                     # without TTS, visual must land or dialogue is lost.
                     suppress_visual = (
@@ -236,7 +237,7 @@ async def send_and_stream(
                     )
                     if not suppress_visual:
                         _echo(formatted)
-                    if should_speak and tts and agent:
+                    if kind == KIND_DIALOGUE and tts and agent:
                         msg = text.split(" ", 1)[-1] if " " in text else text
                         await tts.speak(msg, agent)
 

@@ -172,11 +172,11 @@ def set_content_kind(message: Message, kind: ContentKind) -> None:
 def get_content_kind(message: Message | None) -> ContentKind | None:
     """Read the content-kind discriminator from a Message, or ``None`` if absent.
 
-    Returns ``None`` for unmigrated specialists that emit without the
-    metadata tag — the host falls back to the legacy emoji-prefix
-    detection in that case. Unknown kind values also return ``None`` so
-    the host can route them through the legacy path until the producer
-    is updated.
+    Returns ``None`` when the metadata tag is missing or the value is
+    unrecognized. Strict M18 hosts (CLI streaming, vn_bridge) treat
+    ``None`` as not-dialogue — any production emitter that forgets to
+    tag will silently disappear from TTS rather than fall back to a
+    prose-keyword guess.
     """
     if message is None:
         return None
@@ -320,8 +320,9 @@ async def send_working_status(
     ``kind`` tags the outbound message under
     ``KOURAI_STREAMING_EXT_URI``. Hosts route by kind: ``KIND_STATUS``
     skips TTS and fires-and-forgets; ``KIND_DIALOGUE`` keeps the current
-    speak-and-gate behavior. Leaving ``kind=None`` preserves the v0.x
-    text-parsing path so unmigrated agents keep working.
+    speak-and-gate behavior. Leaving ``kind=None`` produces an untagged
+    message — strict M18 hosts treat that as not-dialogue, so always
+    pass an explicit ``KIND_*`` from production code.
     """
     msg = updater.new_agent_message(parts=[text_part(f"{emoji} {message}")])
     if kind is not None:
@@ -338,9 +339,9 @@ async def send_input_required(
 ) -> None:
     """Request user input and mark the task as paused.
 
-    ``kind`` defaults to ``None`` for backwards compatibility, but
-    callers should pass ``KIND_DIALOGUE`` — input-required prompts are
-    addressed to the player and TTS-eligible.
+    Input-required prompts are addressed to the player and TTS-eligible
+    — pass ``kind=KIND_DIALOGUE`` from production callers. Untagged
+    prompts won't speak under strict M18 routing.
     """
     msg = updater.new_agent_message(parts=[text_part(message)])
     if kind is not None:

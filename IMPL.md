@@ -7,9 +7,10 @@ Git history is the archive — these docs are plans + scratchpad, not a
 historical record.
 
 Updated: 2026-05-02 · Active focus: **M18 Phase 2 (SSML inside dialogue
-bodies)**. main is clean; issue #126 (upstream-blocked
-`@xmldom/xmldom@0.8.12` HIGH bundled inside npm 11.13.0) is auto-managed
-by `.github/workflows/issue-126-rescan.yml` — Saturdays 14:17 UTC from
+bodies)**. M18 Phase 3 Part A (strict kind routing) shipped today. main
+is clean; issue #126 (upstream-blocked `@xmldom/xmldom@0.8.12` HIGH
+bundled inside npm 11.13.0) is auto-managed by
+`.github/workflows/issue-126-rescan.yml` — Saturdays 14:17 UTC from
 2026-05-16, auto-closes once upstream lands `>=0.8.13`.
 
 ## M18 Phase 2 — SSML inside dialogue bodies (active)
@@ -52,22 +53,21 @@ downstream.
 - **Per-specialist persona prosody** (Hephaestus gruff vs Kallos lilting) —
   defer to a follow-on once structural plumbing is in.
 
-## M18 Phase 3 — KIND_CODE / KIND_SPEC distinct render paths (next)
+## M18 Phase 3 — KIND_CODE / KIND_SPEC distinct render paths (deferred)
 
-Once Phase 2 lands:
-- Drop the `or kind is None` legacy fallback in `hosts/cli/streaming.py`
-  and `agents/vn_bridge/__main__.py` — every specialist tags now (verified
-  by the 2026-05-01 GREEN smoke), so the fallback never executes in
-  production.
-- Distinct render paths for `KIND_CODE` (monospace, syntax highlighting,
-  no TTS) and `KIND_SPEC` (wide markdown render, no TTS) — currently both
-  collapse to "not dialogue, render as status". Splits them so spec output
-  renders in a wide markdown panel (vs the narrow status box) and code
-  output renders in a monospace block.
+**Part A — strict kind routing** shipped ahead of Phase 2 since it stood
+on its own. The two surviving forwarders (hephaestus's pipeline-status
+re-emitter; `BaseAgentExecutor`'s empty-input prompt) now tag explicitly,
+so the `kind is None or` fallback is gone from `hosts/cli/streaming.py`
+and the prose-keyword `DIALOGUE_KEYWORDS` heuristic is gone from
+`agents/vn_bridge/__main__.py`. Untagged messages are now routed as
+not-dialogue everywhere.
 
-`KIND_CODE` and `KIND_SPEC` are reserved tokens today; only `KIND_DIALOGUE`
-and `KIND_STATUS` are emitted by any specialist. Phase 3 covers the
-producer-side adoption.
+**Part B — distinct render paths for `KIND_CODE` / `KIND_SPEC`** is
+deferred. Both kinds are reserved tokens with no producer; building host-
+side render paths before any specialist emits them is anticipatory infra.
+Re-enter Part B once a specialist (likely techne for code, metis for spec)
+opts into emitting these kinds.
 
 ## Notes / open invariants
 
@@ -98,16 +98,16 @@ practice before any implementation, architectural fix over expedient patch.
 Pick by impact + caller reality, not file-of-origin.
 
 1. **M18 Phase 2 — SSML inside dialogue bodies** (active focus above).
-2. **M18 Phase 3 — KIND_CODE / KIND_SPEC distinct render paths** + retire
-   the `or kind is None` legacy fallback.
-3. **M20 — Audio-text synchronization.** Builds on M18 (kind routing) +
+2. **M20 — Audio-text synchronization.** Builds on M18 (kind routing) +
    M19 (RealtimeTTS word-timing API already wired via `on_word=` callback).
    9-14s text-precedes-audio gap is a player-notices UX issue.
-4. **Live VN smoke** — exercises the new vn_bridge `/tts` →
+3. **Live VN smoke** — exercises the new vn_bridge `/tts` →
    `RealtimeTTSEngine.synthesize_to_wav` path AND metadata-based dialogue
    routing.
-5. **`docs/architecture/puck-first-run-tutorial.md`** — pairs with the M6
+4. **`docs/architecture/puck-first-run-tutorial.md`** — pairs with the M6
    player-onboarding theme.
+5. **M18 Phase 3 Part B** — distinct render paths for `KIND_CODE` /
+   `KIND_SPEC`. Blocked on a specialist actually emitting either kind.
 6. **M5 / M12 / M15 / M6 follow-ons** — see ROADMAP for scope.
 
 Music playlist (#11) — content-driven; AJ adds tracks to

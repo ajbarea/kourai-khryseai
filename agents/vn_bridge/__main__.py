@@ -72,13 +72,6 @@ AGENT_NAMES = {
     "aletheia",
 }
 
-# Legacy dialogue-vs-status discrimination via prose-keyword match. Used as a
-# fallback for untagged emissions (specialists that haven't opted into M18's
-# content-kind metadata yet). Retires when every specialist tags its
-# `send_working_status` calls with an explicit `kind=KIND_*` and `kind is
-# None` no longer occurs in practice.
-DIALOGUE_KEYWORDS = ["pipeline:", "dispatching", "complete", "failed", "error"]
-
 # Short personality hints for gossip generation — keeps prompts small and fast.
 GOSSIP_HINTS: dict[str, str] = {
     "hephaestus": "Gruff forge-master. Laconic. Shows approval through craft metaphors.",
@@ -357,20 +350,14 @@ async def handle_message(request: Request) -> StreamingResponse:
                             current_agent = name
                             break
                     log.info(f"Status ({current_agent}): {status_msg[:100]}")
-                    # M18: route by content-kind metadata when present. Migrated
-                    # specialists tag dialogue vs status explicitly so we drop
-                    # the prose-keyword guess in favor of a typed predicate.
-                    # `kind is None` covers unmigrated specialists during the
-                    # rollout window — falls back to the DIALOGUE_KEYWORDS
-                    # heuristic. The fallback retires once every specialist
-                    # opts in.
+                    # Strict M18 routing: only KIND_DIALOGUE surfaces to
+                    # the VN dialogue layer. Status/code/spec render
+                    # behind the scenes. Untagged messages (kind is None)
+                    # never reach production — every emitter tags
+                    # explicitly — so treating them as not-dialogue here
+                    # is the right default if anything slips through.
                     kind = get_content_kind(event.status.message)
-                    if kind == KIND_DIALOGUE:
-                        is_dialogue = True
-                    elif kind is not None:
-                        is_dialogue = False
-                    else:
-                        is_dialogue = any(kw in lower for kw in DIALOGUE_KEYWORDS)
+                    is_dialogue = kind == KIND_DIALOGUE
 
                     if is_dialogue:
                         yield (
