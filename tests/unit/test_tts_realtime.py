@@ -389,17 +389,24 @@ class TestKokoroLanguagePreWarm:
         assert called_lang_codes == expected_lang_codes
 
     def test_prewarms_only_once_per_lang_code(self, mock_realtimetts):
+        """Language pre-warm dedupes; voice pre-warm fans out per agent.
+
+        ``_prewarm_agent_languages`` calls ``_get_pipeline`` once per
+        unique lang_code (dedup against many ``"a"`` entries in
+        AGENT_VOICE_MAP). The follow-up ``_prewarm_agent_voices`` then
+        calls ``_get_pipeline(cfg.lang_code)`` once per agent voice,
+        relying on KokoroEngine's idempotent cache to skip rebuilds.
+        Net call count = unique lang_codes + len(AGENT_VOICE_MAP).
+        """
         _, mock_kokoro, _, _ = mock_realtimetts
         from kourai_common.tts_backend import AGENT_VOICE_MAP
         from kourai_common.tts_realtime import RealtimeTTSEngine
 
         RealtimeTTSEngine()
 
-        # AGENT_VOICE_MAP has many "a" entries (most agents) but pre-warm
-        # must dedupe so KPipeline is only constructed once per language.
-        assert mock_kokoro._get_pipeline.call_count == len(
-            {cfg.lang_code for cfg in AGENT_VOICE_MAP.values()}
-        )
+        unique_langs = {cfg.lang_code for cfg in AGENT_VOICE_MAP.values()}
+        expected_calls = len(unique_langs) + len(AGENT_VOICE_MAP)
+        assert mock_kokoro._get_pipeline.call_count == expected_calls
 
     def test_prewarm_failure_does_not_raise(self, mock_realtimetts):
         _, mock_kokoro, _, _ = mock_realtimetts
@@ -409,6 +416,46 @@ class TestKokoroLanguagePreWarm:
 
         # Init must succeed even when pre-warm raises — TTS warmup is
         # best-effort; the lazy path still works downstream.
+        engine = RealtimeTTSEngine()
+        assert engine is not None
+
+
+# ===================================================================
+# Per-agent Kokoro voice tensor pre-warm (M20 sub-task 1)
+# ===================================================================
+
+
+class TestKokoroVoicePreWarm:
+    """Engine init must materialize each agent's voice tensor.
+
+    KPipeline.load_single_voice downloads + parses a ~5-10MB .pt file
+    on first call per voice, then caches the tensor. Pre-loading at
+    init pays that cost once instead of stacking per-voice lag onto
+    the first per-agent utterance.
+    """
+
+    def test_prewarms_every_agent_voice(self, mock_realtimetts):
+        _, mock_kokoro, _, _ = mock_realtimetts
+        from kourai_common.tts_backend import AGENT_VOICE_MAP
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        RealtimeTTSEngine()
+
+        pipeline_mock = mock_kokoro._get_pipeline.return_value
+        called_voice_ids = {call.args[0] for call in pipeline_mock.load_single_voice.call_args_list}
+        expected_voice_ids = {cfg.voice_id for cfg in AGENT_VOICE_MAP.values()}
+        assert called_voice_ids == expected_voice_ids
+
+    def test_voice_prewarm_failure_does_not_raise(self, mock_realtimetts):
+        _, mock_kokoro, _, _ = mock_realtimetts
+        mock_kokoro._get_pipeline.return_value.load_single_voice.side_effect = RuntimeError(
+            "voice download failed"
+        )
+
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        # Init must succeed even when a single voice fails to materialize —
+        # the lazy path inside synthesize() still works for that voice.
         engine = RealtimeTTSEngine()
         assert engine is not None
 

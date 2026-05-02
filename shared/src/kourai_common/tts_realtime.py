@@ -142,6 +142,13 @@ class RealtimeTTSEngine:
         # Paying that cost upfront is the right call for a long-running
         # interactive REPL. (#23)
         self._prewarm_agent_languages()
+        # Voice tensors are .pt files (~5-10MB) that KPipeline only
+        # loads on first ``load_single_voice`` per voice — first call
+        # downloads from HF Hub (cold cache) or reads from disk (warm).
+        # M20 sub-task 1: pre-load every agent voice now so the first
+        # per-agent utterance lands without per-voice lag stacked on
+        # top of synthesis time.
+        self._prewarm_agent_voices()
 
         logger.info(
             "RealtimeTTSEngine initialized: voice=af_heart, volume=%s, effects=%s",
@@ -171,6 +178,34 @@ class RealtimeTTSEngine:
             except Exception as exc:
                 logger.debug(
                     "Kokoro pre-warm skipped for lang_code=%s (%s: %s)",
+                    lang_code,
+                    type(exc).__name__,
+                    exc,
+                )
+
+    def _prewarm_agent_voices(self) -> None:
+        """Materialize every agent's voice tensor into KPipeline's voice cache.
+
+        Called from ``__init__`` after ``_prewarm_agent_languages``.
+        Iterates ``AGENT_VOICE_MAP`` and calls
+        ``KPipeline.load_single_voice(voice_id)`` for each entry,
+        which downloads the ``voices/<voice_id>.pt`` file from HF Hub
+        (or reads it from the local ``huggingface_hub`` cache on a
+        warm install) and stashes the tensor in ``pipeline.voices``.
+        Subsequent ``set_voice(voice_id) + synthesize()`` calls hit the
+        cache and skip the per-voice download / parse cost. Failures
+        are non-fatal — TTS warmup is best-effort and the lazy path
+        still works downstream if a single voice fails to load.
+        """
+        for cfg in AGENT_VOICE_MAP.values():
+            lang_code = getattr(cfg, "lang_code", "a")
+            try:
+                pipeline = self._engine._get_pipeline(lang_code)
+                pipeline.load_single_voice(cfg.voice_id)
+            except Exception as exc:
+                logger.debug(
+                    "Kokoro voice pre-warm skipped for voice=%s lang=%s (%s: %s)",
+                    cfg.voice_id,
                     lang_code,
                     type(exc).__name__,
                     exc,

@@ -7,11 +7,12 @@ Git history is the archive — these docs are plans + scratchpad, not a
 historical record.
 
 Updated: 2026-05-02 · Active focus: **M18 Phase 2 (SSML inside dialogue
-bodies)**. M18 Phase 3 Part A (strict kind routing) shipped today. main
-is clean; issue #126 (upstream-blocked `@xmldom/xmldom@0.8.12` HIGH
-bundled inside npm 11.13.0) is auto-managed by
-`.github/workflows/issue-126-rescan.yml` — Saturdays 14:17 UTC from
-2026-05-16, auto-closes once upstream lands `>=0.8.13`.
+bodies)**. M18 Phase 3 Part A (strict kind routing) and M20 sub-task 1
+(Kokoro voice tensor pre-warm) shipped today. main is clean; issue #126
+(upstream-blocked `@xmldom/xmldom@0.8.12` HIGH bundled inside npm
+11.13.0) is auto-managed by `.github/workflows/issue-126-rescan.yml` —
+Saturdays 14:17 UTC from 2026-05-16, auto-closes once upstream lands
+`>=0.8.13`.
 
 ## M18 Phase 2 — SSML inside dialogue bodies (active)
 
@@ -100,7 +101,13 @@ Pick by impact + caller reality, not file-of-origin.
 1. **M18 Phase 2 — SSML inside dialogue bodies** (active focus above).
 2. **M20 — Audio-text synchronization.** Builds on M18 (kind routing) +
    M19 (RealtimeTTS word-timing API already wired via `on_word=` callback).
-   9-14s text-precedes-audio gap is a player-notices UX issue.
+   9-14s text-precedes-audio gap is a player-notices UX issue. **Sub-task 1
+   shipped:** Kokoro voice tensor pre-warm (`_prewarm_agent_voices` loads
+   all 10 .pt voice tensors at engine init alongside the existing
+   pipeline pre-warm). Sub-task 2 (audio-led text reveal — word-by-word
+   reveal driven by RealtimeTTS `on_word` callback for English voices)
+   and sub-task 3 (three-surface implementation across CLI / GUI / VN)
+   remain.
 3. **Live VN smoke** — exercises the new vn_bridge `/tts` →
    `RealtimeTTSEngine.synthesize_to_wav` path AND metadata-based dialogue
    routing.

@@ -268,11 +268,13 @@ under the same URI without colliding with other extensions.
 
 ## M20 — Audio-text synchronization across CLI / GUI / VN
 
-> Status: planned · Surfaced 2026-04-29 (post-rebuild CLI session) ·
-> Depends on M19 (RealtimeTTS provides word-level timing callbacks
-> for Kokoro English voices) and M18 (content-kind metadata routes
-> dialogue-only to the synced reveal path) · Player- and developer-
-> experience improvement spanning all three player surfaces
+> Status: in progress · Sub-task 1 (Kokoro voice + pipeline pre-warm)
+> shipped 2026-05-02 · Sub-tasks 2-4 planned · Surfaced 2026-04-29
+> (post-rebuild CLI session) · Depends on M19 (RealtimeTTS provides
+> word-level timing callbacks for Kokoro English voices) and M18
+> (content-kind metadata routes dialogue-only to the synced reveal
+> path) · Player- and developer-experience improvement spanning all
+> three player surfaces
 
 ### Why
 
@@ -305,13 +307,18 @@ callbacks (Phase 1 of M19 unlocks the API).
 
 ### Scope
 
-**1. Pre-warm Kokoro at startup, per language code.** Eliminates
-the 10-14s first-speak cold-start. `VOICE_ROSTER` enumerates every
-agent's voice + lang_code at TTSEngine init time — load each
-unique lang_code in a fire-and-forget background task before the
-greeting fires. Trades startup latency (deterministic, ~10s
-window where the player sees a "Tuning the forge…" progress
-indicator) for a smooth first-utterance.
+**1. Pre-warm Kokoro at startup, per language code AND per voice.**
+Eliminates the 10-14s first-speak cold-start. Two layers, both at
+`RealtimeTTSEngine.__init__`: (a) `_prewarm_agent_languages` calls
+`KokoroEngine._get_pipeline(lang_code)` once per unique
+`AGENT_VOICE_MAP` lang_code, loading model weights + G2P (~80MB
+per language) — already shipped pre-M20; (b) `_prewarm_agent_voices`
+iterates every agent voice and calls `KPipeline.load_single_voice`
+to materialize the .pt tensor (~5-10MB each) into the per-pipeline
+voice cache so the first per-agent utterance skips the per-voice
+download/parse cost. Trades startup latency (deterministic, ~7-10s
+window) for a smooth first-utterance per agent. Both layers
+shipped 2026-05-02.
 
 **2. Audio-led text reveal.** Replace immediate text rendering with
 deferred-render gated on TTS readiness. Two precision tiers:
