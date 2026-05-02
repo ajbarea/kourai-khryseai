@@ -221,10 +221,35 @@ jobs:
           SERVICE_VERSION=0.1.0
           EOF
 
-      - name: Build MCP sidecar images for integration tests
-        run: |
-          docker build -f docker/context7-mcp.Dockerfile -t ${DOCKER_HUB_USERNAME}/kourai-khryseai:context7-mcp .
-          docker build -f docker/memory-mcp.Dockerfile -t ${DOCKER_HUB_USERNAME}/kourai-khryseai:memory-mcp .
+      - name: Set up Docker Buildx
+        # Required for GHA layer caching (cache-from/cache-to type=gha).
+        uses: docker/setup-buildx-action@v4.0.0
+
+      - name: Build context7-mcp sidecar image
+        # GHA layer cache: first run populates, subsequent runs reuse the
+        # FROM node:20-slim layer + npm-install layer until package
+        # versions in the Dockerfile change. mode=max also caches
+        # intermediate layers (matters here — npm install is one layer
+        # and we want it back). load=true puts the image in the local
+        # docker daemon for the integration tests to use.
+        uses: docker/build-push-action@v7.1.0
+        with:
+          context: .
+          file: docker/context7-mcp.Dockerfile
+          tags: ${{ env.DOCKER_HUB_USERNAME }}/kourai-khryseai:context7-mcp
+          cache-from: type=gha,scope=context7-mcp
+          cache-to: type=gha,mode=max,scope=context7-mcp
+          load: true
+
+      - name: Build memory-mcp sidecar image
+        uses: docker/build-push-action@v7.1.0
+        with:
+          context: .
+          file: docker/memory-mcp.Dockerfile
+          tags: ${{ env.DOCKER_HUB_USERNAME }}/kourai-khryseai:memory-mcp
+          cache-from: type=gha,scope=memory-mcp
+          cache-to: type=gha,mode=max,scope=memory-mcp
+          load: true
 
       - name: Create logs directory
         run: mkdir -p logs
