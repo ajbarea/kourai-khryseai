@@ -129,20 +129,21 @@ strictly the live REPL loop.
       6a — Techne did more reads, plus the dead-zone before pipeline
       announcement varied between runs).
 
-### Follow-up issues filed during the run (see ROADMAP M6 future)
+### Follow-up issues filed during the run
 
-- Branch label sanitization: 6a's branch was
-  `forge/20260426-114210-please-add-a-function-\`d` (trailing backtick from
-  the prompt). Strip non-alphanumeric in `forge_session.py:start(label=...)`.
-- `read_file` schema description: Techne misused `read_file` on directory
-  paths in both runs. Schema description in `forge_tools.py` should say
-  "must be a regular file path, not a directory".
-- Git context discovery: every agent shows `🔍 $ git status --short` →
-  `🔍 exit 128` because containers' default cwd (`/app`) isn't the worktree.
-- Logging architecture: agent log volume mounts to host are stale (M15).
-- CLI greeting: kaomoji rendered without maiden name attribution; players
-  have to memorize the emoji-to-name mapping.
-- WSL audio: ALSA cascade noise on every CLI startup under WSL2.
+All five player-facing bullets shipped in focused PRs since this run; only
+the M15 logging architecture work is left, and that lives on the M15
+roadmap entry rather than as a Round 6 follow-up. Git history has the
+canonical record:
+
+- ✅ Branch label sanitization (#34)
+- ✅ `read_file` schema description rejects directory paths (#34)
+- ✅ Git context discovery — agents now run `git status` with `cwd=` set
+  to the worktree (#42 + per-agent executors)
+- ✅ CLI greeting names the speaking maiden (#35)
+- ✅ WSL audio: PortAudio ALSA/JACK cascade silenced at TTS init (#133)
+- ⏳ Logging architecture: agent log volume mounts to host are stale —
+  tracked under M15 (forge logging architecture).
 
 ### M1 fully shipped (2026-04-26)
 
