@@ -23,10 +23,7 @@ _CONSOLE_SILENCED_LIBS = (
     "a2a.client.card_resolver",
 )
 
-# Paths whose 2xx access logs are pure noise. Docker healthchecks hit
-# ``/.well-known/agent-card.json`` every 15s on every agent (4 lines/min/agent
-# × 11 agents = 44 lines/min cluster-wide of "200 OK" chatter). Filter at
-# uvicorn.access so failed healthchecks (WARN+) still surface.
+# 2xx access logs from these paths are pure healthcheck noise.
 _HEALTHCHECK_PATHS = ("/.well-known/agent-card.json",)
 
 
@@ -46,14 +43,10 @@ class _ConsoleSilenceFilter(logging.Filter):
 
 
 class _UvicornAccessPathFilter(logging.Filter):
-    """Drop ``uvicorn.access`` records whose request path matches an entry in
-    ``paths``. Records at WARNING or higher always pass — a 5xx healthcheck
-    response should still surface even if the path is in the silence list.
+    """Drop ``uvicorn.access`` INFO records whose path is in ``paths``.
 
-    Matches uvicorn's emission shape: ``access_logger.info('%s - "%s %s
-    HTTP/%s" %d', client_addr, method, path_with_query, http_version,
-    status_code)``. ``record.args[2]`` is the path (with query string),
-    so we strip the query before comparing.
+    WARNING+ always passes (5xx healthchecks still surface). Matches
+    uvicorn's emission shape — ``record.args[2]`` is path-with-query.
     """
 
     __slots__ = ("_paths",)
@@ -193,9 +186,8 @@ def setup_logging(name: str, *, level: str | None = None) -> logging.Logger:
         file_handler.addFilter(trace_filter)
         root.addHandler(file_handler)
 
-    # Install on uvicorn.access at the logger level so the filter applies
-    # regardless of which handler emits the record (uvicorn configures its
-    # own StreamHandler outside our root chain).
+    # Logger-level install (not handler) so it applies regardless of which
+    # handler emits — uvicorn configures its own StreamHandler outside root.
     access_logger = logging.getLogger("uvicorn.access")
     if not any(isinstance(f, _UvicornAccessPathFilter) for f in access_logger.filters):
         access_logger.addFilter(_UvicornAccessPathFilter(_HEALTHCHECK_PATHS))
