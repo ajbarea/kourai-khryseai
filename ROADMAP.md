@@ -631,6 +631,24 @@ architectural moves; valuable but not the first lift.
 One-line per item, newest first. Detail moves to git history when work
 lands — these docs are plans + scratchpad, not a historical archive.
 
+- 2026-05-02 — **Smoke-driven polish wave** [#140] [#141] [#142] [#143].
+  Four follow-on fixes surfaced by driving `make cli` /
+  `python -m hosts.cli --prompt` from the host instead of theorizing.
+  `[#140]` Adds elapsed-time + voice/agent fields to the existing
+  `TTS: playback complete` log + a parallel line for
+  `synthesize_to_wav` so per-utterance lag is empirically measurable.
+  `[#141]` Adds INFO summary log per Kokoro pre-warm phase
+  (`langs N/M elapsed=Xs`, `voices N/M elapsed=Xs`) so a clean
+  startup leaves visible evidence the prewarm fired (was only
+  logging failures via `logger.debug` before). `[#142]` Adds
+  `get_host_agent_url` so direct `python -m hosts.cli` /
+  `python -m hosts.gui` invocations reach agents through
+  `localhost:<port>/` instead of the unresolved Docker service name
+  (`make cli` was papering over this with a `--agent` override).
+  `[#143]` Bumps Hephaestus's router `max_tokens=200→800` —
+  conversational CHAT-mode responses (e.g. "what can you do?") were
+  truncating mid-sentence at the 200-token cap that was set when
+  the router only emitted short structured outputs.
 - 2026-05-02 — **`/aj-deslop` sweep on this session's three feature
   PRs** [#138]. -102 LoC of multi-paragraph docstrings + rationale
   comment blocks trimmed from `audio_env.py`, `tts_realtime.py`,
