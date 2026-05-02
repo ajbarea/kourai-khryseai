@@ -52,7 +52,7 @@ from hosts.cli.streaming import _connect_with_url_override, get_last_result, sen
 from hosts.cli.styling import _DIM, _GOLD, _GOLD_BOLD, _GOLD_BRIGHT, _ITALIC, _RED, _RESET
 from kourai_common.a2a_utils import make_a2a_http_client
 from kourai_common.audio import AudioManager
-from kourai_common.config import MODEL_TIER, PROVIDER, get_agent_url, get_model
+from kourai_common.config import MODEL_TIER, PROVIDER, get_host_agent_url, get_model
 from kourai_common.federation.host_helpers import derive_scene_id
 from kourai_common.federation.memoir import Memoir
 from kourai_common.forge_session import ForgeSession, ForgeSessionError
@@ -540,7 +540,7 @@ async def main(
         return
 
     if not agent:
-        agent = get_agent_url("hephaestus")
+        agent = get_host_agent_url("hephaestus")
 
     # Load persistent settings
     settings = CLISettings.load()

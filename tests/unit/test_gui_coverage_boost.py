@@ -1034,8 +1034,8 @@ class TestGuiClientHelpers:
         recv_q: _queue.Queue = _queue.Queue()
         gc = GuiClient(send_q, recv_q, "not-a-url")
 
-        with patch("hosts.gui.client.get_agent_url", return_value="http://kallos:10004/"):
-            assert gc._resolve_target_url("kallos") == "http://kallos:10004/"
+        with patch("hosts.gui.client.get_host_agent_url", return_value="http://localhost:10004/"):
+            assert gc._resolve_target_url("kallos") == "http://localhost:10004/"
 
     def test_extract_status_empty(self):
         from hosts.gui.client import GuiClient
