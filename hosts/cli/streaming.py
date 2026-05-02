@@ -135,6 +135,7 @@ async def send_and_stream(
     attachments: list[tuple[str, str]] | None = None,
     tts: RealtimeTTSEngine | None = None,
     gossip_enabled: bool = True,
+    captions_enabled: bool = True,
     *,
     memoir: Memoir | None = None,
     scene_id: str | None = None,
@@ -225,7 +226,6 @@ async def send_and_stream(
                 text = _extract_status_text(event)
                 if text:
                     formatted, agent = _maidenify_status(text)
-                    _echo(formatted)
                     # M18: TTS only fires for dialogue-kind emissions.
                     # ``status`` / ``code`` / ``spec`` render visually only,
                     # so the next event isn't gated on narration completion.
@@ -236,6 +236,15 @@ async def send_and_stream(
                     # ``or kind is None`` branch can retire.
                     kind = get_content_kind(event.status.message)
                     should_speak = kind is None or kind == KIND_DIALOGUE
+                    # Captions OFF + TTS speaking dialogue → audio-only
+                    # (skip the visual). Captions OFF without TTS would
+                    # silently drop dialogue, so the visual always lands
+                    # if there's no engine to speak it.
+                    suppress_visual = (
+                        kind == KIND_DIALOGUE and tts is not None and not captions_enabled
+                    )
+                    if not suppress_visual:
+                        _echo(formatted)
                     if should_speak and tts and agent:
                         # Extract the status message without the name box etc.
                         # For now, just speak the raw status (it doesn't have markdown)
@@ -375,6 +384,7 @@ async def send_and_stream(
             verbose,
             tts=tts,
             gossip_enabled=gossip_enabled,
+            captions_enabled=captions_enabled,
             forge_metadata=follow_up_metadata or None,
         )
 

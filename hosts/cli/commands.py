@@ -103,16 +103,18 @@ _SETTINGS_MAPPING: dict[str, str] = {
     "1": "voice_enabled",
     "2": "music_enabled",
     "3": "ambient_enabled",
-    "4": "romance_enabled",
-    "5": "gossip_enabled",
-    "6": "metrics_tracking_enabled",
-    "7": "romance_nudges_enabled",
-    "8": "gossip_nudges_enabled",
+    "4": "captions_enabled",
+    "5": "romance_enabled",
+    "6": "gossip_enabled",
+    "7": "metrics_tracking_enabled",
+    "8": "romance_nudges_enabled",
+    "9": "gossip_nudges_enabled",
 }
 _SETTINGS_LABELS: dict[str, str] = {
     "voice_enabled": "Voice",
     "music_enabled": "Background Music",
     "ambient_enabled": "Forge Ambience",
+    "captions_enabled": "Dialogue Captions",
     "romance_enabled": "Romance System",
     "gossip_enabled": "Idle Gossip",
     "metrics_tracking_enabled": "Metrics Tracking",
@@ -135,12 +137,13 @@ def _print_settings_panel(settings: CLISettings) -> None:
         f"  [3] Forge Ambience: {'ON' if settings.ambient_enabled else 'OFF'}"
         f"  {_DIM}vol {settings.ambient_volume:.2f}{_RESET}"
     )
-    _echo(f"  [4] Romance System: {'ON' if settings.romance_enabled else 'OFF'}")
-    _echo(f"  [5] Idle Gossip:    {'ON' if settings.gossip_enabled else 'OFF'}")
-    _echo(f"  [6] Metrics Track:  {'ON' if settings.metrics_tracking_enabled else 'OFF'}")
-    _echo(f"  [7] Romance Nudges: {'ON' if settings.romance_nudges_enabled else 'OFF'}")
-    _echo(f"  [8] Gossip Nudges:  {'ON' if settings.gossip_nudges_enabled else 'OFF'}")
-    _echo("  [9] Reset Progression Data")
+    _echo(f"  [4] Dialogue Caps:  {'ON' if settings.captions_enabled else 'OFF'}")
+    _echo(f"  [5] Romance System: {'ON' if settings.romance_enabled else 'OFF'}")
+    _echo(f"  [6] Idle Gossip:    {'ON' if settings.gossip_enabled else 'OFF'}")
+    _echo(f"  [7] Metrics Track:  {'ON' if settings.metrics_tracking_enabled else 'OFF'}")
+    _echo(f"  [8] Romance Nudges: {'ON' if settings.romance_nudges_enabled else 'OFF'}")
+    _echo(f"  [9] Gossip Nudges:  {'ON' if settings.gossip_nudges_enabled else 'OFF'}")
+    _echo("  [r] Reset Progression Data")
     _echo(f"  [v] Adjust volumes  {_DIM}(music / ambient / voice / sfx){_RESET}")
 
 
@@ -196,7 +199,7 @@ def _apply_settings_choice(choice: str) -> bool:
         )
         _echo(f"  {_DIM}Applied immediately for this session.{_RESET}")
         return True
-    if choice == "9":
+    if choice.lower() == "r":
         _reset_progression_data()
         return True
     if choice.lower() == "v":

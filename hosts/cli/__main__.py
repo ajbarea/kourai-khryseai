@@ -900,6 +900,7 @@ async def main(
                     attachments=attachments or None,
                     tts=tts,
                     gossip_enabled=settings.gossip_enabled,
+                    captions_enabled=settings.captions_enabled,
                     forge_metadata=forge_metadata or None,
                     memoir=memoir_arg,
                     scene_id=scene_id_arg,

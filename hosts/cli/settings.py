@@ -28,6 +28,9 @@ class CLISettings:
     metrics_tracking_enabled: bool = True
     romance_nudges_enabled: bool = True
     gossip_nudges_enabled: bool = True
+    # OFF + voice ON = audio-only mode (dialogue speaks but skips
+    # the comms-window). voice OFF forces effective ON in streaming.
+    captions_enabled: bool = True
     # Currently selected player project (project_id), or None for "no project".
     # When set, the REPL wraps each turn in a forge worktree session.
     active_project_id: str | None = None
