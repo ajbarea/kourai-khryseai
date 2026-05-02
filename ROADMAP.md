@@ -631,6 +631,15 @@ architectural moves; valuable but not the first lift.
 One-line per item, newest first. Detail moves to git history when work
 lands — these docs are plans + scratchpad, not a historical archive.
 
+- 2026-05-02 — **M20 sub-task 1 — Kokoro voice tensor pre-warm** [#136].
+  Added `_prewarm_agent_voices` alongside `_prewarm_agent_languages`
+  at `RealtimeTTSEngine.__init__`; calls `KPipeline.load_single_voice`
+  for every entry in `AGENT_VOICE_MAP`, materializing all 10 voice
+  tensors into the per-pipeline voice cache. Eliminates the 1-3s
+  per-voice download/parse cost stacked on top of synthesis lag for
+  the first per-agent utterance. Live verification: 7.38s init time,
+  all 10 agent voices materialized. Sub-tasks 2 + 3 (audio-led text
+  reveal across CLI/GUI/VN) remain.
 - 2026-05-02 — **M18 Phase 3 Part A — strict kind routing** [#134].
   Tagged the last two unmigrated forwarders (hephaestus pipeline
   forwarder + `BaseAgentExecutor` empty-input prompt), dropped the
