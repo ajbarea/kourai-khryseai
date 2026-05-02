@@ -40,9 +40,8 @@ from kourai_common.tts_backend import (
     get_voice_for_agent,
 )
 
-# Module-load side effect: install the libasound noop handler before
-# `_TextToAudioStream(...)` triggers PortAudio's ALSA enumeration in
-# `__init__` below. Idempotent and a no-op when KOURAI_AUDIO_DEBUG=1.
+# Module-load side effect: kill libasound's stderr cascade before
+# `_TextToAudioStream(...)` enumerates ALSA in `__init__` below.
 silence_alsa_lib_errors()
 
 if TYPE_CHECKING:
@@ -113,12 +112,8 @@ class RealtimeTTSEngine:
         # (which can happen during KokoroEngine warmup) is already filtered.
         _install_phonemizer_word_count_filter()
         self._engine = _KokoroEngine(voice="af_heart", default_speed=1.0, debug=False)
-        # `_TextToAudioStream(...)` constructs PyAudio, which probes JACK
-        # after ALSA — libasound noise is killed at module load by
-        # silence_alsa_lib_errors(); libjack still writes to fd 2, so
-        # wrap this call with the fd-redirect window. KokoroEngine init
-        # above stays outside the window so HF Hub / torch warnings stay
-        # visible to the user.
+        # PyAudio probes JACK after ALSA inside `_TextToAudioStream`;
+        # wrap only that call so torch / HF Hub warnings stay visible.
         with silence_audio_init_noise():
             self._stream = _TextToAudioStream(
                 engine=self._engine,
@@ -134,20 +129,9 @@ class RealtimeTTSEngine:
 
         self._stream.set_volume(self._effective_volume())
 
-        # Pre-warm one KPipeline per language code that any agent voice
-        # targets. KokoroEngine's __init__ already caches the default
-        # voice's language ("a"); other languages (notably "b" for
-        # Techne's bf_emma voice) lazily build on first set_voice() call,
-        # which adds a noticeable pause to the first Techne emission.
-        # Paying that cost upfront is the right call for a long-running
-        # interactive REPL. (#23)
+        # Eat the Kokoro cold-start window upfront: pipelines per
+        # language (#23), then voice tensors per agent (M20 sub-task 1).
         self._prewarm_agent_languages()
-        # Voice tensors are .pt files (~5-10MB) that KPipeline only
-        # loads on first ``load_single_voice`` per voice — first call
-        # downloads from HF Hub (cold cache) or reads from disk (warm).
-        # M20 sub-task 1: pre-load every agent voice now so the first
-        # per-agent utterance lands without per-voice lag stacked on
-        # top of synthesis time.
         self._prewarm_agent_voices()
 
         logger.info(
@@ -157,15 +141,9 @@ class RealtimeTTSEngine:
         )
 
     def _prewarm_agent_languages(self) -> None:
-        """Force KokoroEngine to build a pipeline for every agent voice's language.
+        """Build a KPipeline for every unique ``AGENT_VOICE_MAP`` lang_code.
 
-        Called from ``__init__``. Iterates ``AGENT_VOICE_MAP`` and calls
-        ``KokoroEngine._get_pipeline(lang_code)`` once per unique code.
-        ``"a"`` is already cached by ``KokoroEngine.__init__`` for the
-        default voice, so that call is a no-op cache hit; other codes
-        ("b" for British via Techne) actually build at this point. Failures
-        are non-fatal — TTS warmup is best-effort, and the lazy path still
-        works downstream if pre-warm misses.
+        Failures are non-fatal — the lazy path still works if pre-warm misses.
         """
         seen: set[str] = set()
         for cfg in AGENT_VOICE_MAP.values():
@@ -184,18 +162,9 @@ class RealtimeTTSEngine:
                 )
 
     def _prewarm_agent_voices(self) -> None:
-        """Materialize every agent's voice tensor into KPipeline's voice cache.
+        """Materialize each agent's voice tensor (.pt) into KPipeline's voice cache.
 
-        Called from ``__init__`` after ``_prewarm_agent_languages``.
-        Iterates ``AGENT_VOICE_MAP`` and calls
-        ``KPipeline.load_single_voice(voice_id)`` for each entry,
-        which downloads the ``voices/<voice_id>.pt`` file from HF Hub
-        (or reads it from the local ``huggingface_hub`` cache on a
-        warm install) and stashes the tensor in ``pipeline.voices``.
-        Subsequent ``set_voice(voice_id) + synthesize()`` calls hit the
-        cache and skip the per-voice download / parse cost. Failures
-        are non-fatal — TTS warmup is best-effort and the lazy path
-        still works downstream if a single voice fails to load.
+        Failures are non-fatal — single-voice failure falls back to the lazy path.
         """
         for cfg in AGENT_VOICE_MAP.values():
             lang_code = getattr(cfg, "lang_code", "a")

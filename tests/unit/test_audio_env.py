@@ -98,8 +98,7 @@ def test_audio_module_import_triggers_sdl_configure(monkeypatch) -> None:
 
 
 def test_silence_alsa_lib_errors_installs_handler(monkeypatch) -> None:
-    """First call loads libasound, sets a no-op error handler, flips the
-    module flag, and stashes the ctypes function so it's not GC'd."""
+    """First call loads libasound, sets a no-op handler, stashes the ctypes ref."""
     monkeypatch.setattr(audio_env, "_alsa_silenced", False)
     monkeypatch.setattr(audio_env, "_ALSA_ERROR_HANDLER", None)
     monkeypatch.delenv("KOURAI_AUDIO_DEBUG", raising=False)
@@ -117,9 +116,7 @@ def test_silence_alsa_lib_errors_installs_handler(monkeypatch) -> None:
 
 
 def test_silence_alsa_lib_errors_idempotent(monkeypatch) -> None:
-    """Second call after a successful install is a no-op — never re-loads
-    libasound, so callers can sprinkle it at multiple init sites without
-    leaking handler refs."""
+    """Second call after install is a no-op (no re-load, no leaked handler ref)."""
     monkeypatch.setattr(audio_env, "_alsa_silenced", True)
     monkeypatch.setattr(audio_env, "_ALSA_ERROR_HANDLER", object())
     monkeypatch.delenv("KOURAI_AUDIO_DEBUG", raising=False)
@@ -131,8 +128,7 @@ def test_silence_alsa_lib_errors_idempotent(monkeypatch) -> None:
 
 
 def test_silence_alsa_lib_errors_skipped_when_debug_env_set(monkeypatch) -> None:
-    """KOURAI_AUDIO_DEBUG=1 keeps the cascade visible so a developer
-    diagnosing real audio failures isn't blinded by the fix."""
+    """KOURAI_AUDIO_DEBUG=1 keeps the cascade visible for diagnostics."""
     monkeypatch.setattr(audio_env, "_alsa_silenced", False)
     monkeypatch.setattr(audio_env, "_ALSA_ERROR_HANDLER", None)
     monkeypatch.setenv("KOURAI_AUDIO_DEBUG", "1")
@@ -145,8 +141,7 @@ def test_silence_alsa_lib_errors_skipped_when_debug_env_set(monkeypatch) -> None
 
 
 def test_silence_alsa_lib_errors_skipped_when_libasound_missing(monkeypatch) -> None:
-    """Non-Linux hosts (macOS, Windows) lack libasound — bail out cleanly
-    rather than raising on LoadLibrary."""
+    """Non-Linux hosts lack libasound — bail cleanly without LoadLibrary."""
     monkeypatch.setattr(audio_env, "_alsa_silenced", False)
     monkeypatch.setattr(audio_env, "_ALSA_ERROR_HANDLER", None)
     monkeypatch.delenv("KOURAI_AUDIO_DEBUG", raising=False)
@@ -162,8 +157,7 @@ def test_silence_alsa_lib_errors_skipped_when_libasound_missing(monkeypatch) -> 
 
 
 def test_silence_alsa_lib_errors_handles_load_failure(monkeypatch) -> None:
-    """find_library can return a name that nonetheless fails to load
-    (mismatched soname, broken install). Don't crash — log and skip."""
+    """find_library hit + LoadLibrary failure → log and skip, don't raise."""
     monkeypatch.setattr(audio_env, "_alsa_silenced", False)
     monkeypatch.setattr(audio_env, "_ALSA_ERROR_HANDLER", None)
     monkeypatch.delenv("KOURAI_AUDIO_DEBUG", raising=False)
@@ -186,9 +180,7 @@ def test_silence_alsa_lib_errors_handles_load_failure(monkeypatch) -> None:
 
 
 def test_silence_audio_init_noise_redirects_fd2(monkeypatch, tmp_path) -> None:
-    """Inside the context manager, fd 2 points at /dev/null so libjack's
-    fprintf-based error messages are dropped; on exit fd 2 is restored.
-    Fork into a subprocess so we can dup the original stderr safely."""
+    """Inside the context, fd 2 → /dev/null; on exit, fd 2 restored."""
     monkeypatch.delenv("KOURAI_AUDIO_DEBUG", raising=False)
 
     sentinel = tmp_path / "stderr-capture.txt"
@@ -211,7 +203,7 @@ def test_silence_audio_init_noise_redirects_fd2(monkeypatch, tmp_path) -> None:
 
 
 def test_silence_audio_init_noise_passthrough_when_debug_env_set(monkeypatch, tmp_path) -> None:
-    """KOURAI_AUDIO_DEBUG=1 disables the redirect so devs see everything."""
+    """KOURAI_AUDIO_DEBUG=1 disables the redirect."""
     monkeypatch.setenv("KOURAI_AUDIO_DEBUG", "1")
 
     sentinel = tmp_path / "stderr-capture.txt"
@@ -232,8 +224,7 @@ def test_silence_audio_init_noise_passthrough_when_debug_env_set(monkeypatch, tm
 
 
 def test_silence_audio_init_noise_restores_on_exception(monkeypatch, tmp_path) -> None:
-    """Exception inside the body must not leak the dup'd fd or leave
-    fd 2 redirected — finally clause runs."""
+    """Exception inside the body must not leak the dup'd fd."""
     monkeypatch.delenv("KOURAI_AUDIO_DEBUG", raising=False)
 
     sentinel = tmp_path / "stderr-capture.txt"
