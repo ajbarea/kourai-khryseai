@@ -149,3 +149,22 @@ class TestGetAgentUrl:
             assert url.startswith("http://")
             assert agent_name in url
             assert url.endswith("/")
+
+
+class TestGetHostAgentUrl:
+    """get_host_agent_url() returns the host-reachable URL — localhost + port."""
+
+    def test_returns_localhost_with_agent_port(self):
+        assert config.get_host_agent_url("hephaestus") == "http://localhost:10000/"
+        assert config.get_host_agent_url("metis") == "http://localhost:10001/"
+
+    def test_does_not_use_docker_service_name(self):
+        """Bug guard: must NOT return ``http://hephaestus:10000/`` from the host."""
+        url = config.get_host_agent_url("hephaestus")
+        assert "hephaestus:" not in url
+
+    def test_all_agents_have_valid_host_urls(self):
+        for agent_name in config.AGENT_PORTS:
+            url = config.get_host_agent_url(agent_name)
+            assert url.startswith("http://localhost:")
+            assert url.endswith("/")

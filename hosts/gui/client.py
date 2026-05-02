@@ -28,7 +28,7 @@ from kourai_common.a2a_events import (
     extract_artifact_text,
     extract_status_text,
 )
-from kourai_common.config import AGENT_PORTS, get_agent_url
+from kourai_common.config import AGENT_PORTS, get_host_agent_url
 from kourai_common.messaging import file_part_from_b64, send_request, stream_event, user_message
 
 if TYPE_CHECKING:
@@ -49,7 +49,7 @@ class GuiClient:
     ) -> None:
         self._send = send_q
         self._recv = recv_q
-        self._default_url = agent_url or get_agent_url("hephaestus")
+        self._default_url = agent_url or get_host_agent_url("hephaestus")
 
     def _resolve_target_url(self, target_agent: str) -> str:
         """Resolve host-reachable URL for the selected target agent."""
@@ -69,7 +69,7 @@ class GuiClient:
                 target_agent,
             )
             try:
-                return get_agent_url(target_agent)
+                return get_host_agent_url(target_agent)
             except Exception:
                 return self._default_url
 

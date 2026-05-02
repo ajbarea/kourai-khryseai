@@ -183,3 +183,17 @@ def get_agent_url(agent_name: str) -> str:
     """Get the URL for an agent. Uses Docker service names."""
     port = AGENT_PORTS[agent_name]
     return f"http://{agent_name}:{port}/"
+
+
+def get_host_agent_url(agent_name: str) -> str:
+    """Get the host-reachable URL for an agent (CLI/GUI clients).
+
+    Docker service names like ``http://hephaestus:10000/`` only resolve from
+    inside the docker-compose network. Host-side clients reach agents through
+    the published port on ``localhost``. ``make cli`` paves over this by
+    passing ``--agent http://localhost:10000/`` explicitly; this helper makes
+    direct ``python -m hosts.cli`` / ``python -m hosts.gui`` invocations work
+    too.
+    """
+    port = AGENT_PORTS[agent_name]
+    return f"http://localhost:{port}/"
