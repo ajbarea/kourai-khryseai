@@ -335,12 +335,6 @@ implementation, architectural fix over expedient patch.
 5. **Live VN smoke** — exercises the new vn_bridge ``/tts`` →
    ``RealtimeTTSEngine.synthesize_to_wav`` path AND the new
    metadata-based dialogue routing.
-6. **Drift cleanup — ``AGENT_METADATA`` color fields**. The
-   ``color`` (RGB) and ``hex_color`` (hex) keys in
-   ``shared/src/kourai_common/agents.py:AGENT_METADATA`` are dead
-   code (no consumer reads them; values disagree with the live GUI
-   ``hosts/gui/maidens.py:AGENTS["color"]``). Delete or unify before
-   #10 wires real per-agent colors.
-7. **``docs/architecture/puck-first-run-tutorial.md``** — pairs with
+6. **``docs/architecture/puck-first-run-tutorial.md``** — pairs with
    the M6 player-onboarding theme.
-8. **M5 / M12 / M15 / M6 follow-ons** — see ROADMAP for scope.
+7. **M5 / M12 / M15 / M6 follow-ons** — see ROADMAP for scope.
