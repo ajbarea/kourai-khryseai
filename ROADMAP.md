@@ -624,6 +624,24 @@ architectural moves; valuable but not the first lift.
 One-line per item, newest first. Detail moves to git history when work
 lands — these docs are plans + scratchpad, not a historical archive.
 
+- 2026-05-02 — **M18 Phase 3 Part A — strict kind routing** [#134].
+  Tagged the last two unmigrated forwarders (hephaestus pipeline
+  forwarder + `BaseAgentExecutor` empty-input prompt), dropped the
+  `kind is None` fallback in `streaming.py`, retired the
+  `DIALOGUE_KEYWORDS` prose-keyword path in `vn_bridge`. Untagged
+  messages route as not-dialogue everywhere — surfaces any future
+  producer that forgets to tag rather than masking the bug. Phase 3
+  Part B (`KIND_CODE`/`KIND_SPEC` distinct render paths) deferred
+  until a producer actually emits either kind.
+- 2026-05-02 — **WSL audio cascade silenced** [#133]. PortAudio's
+  ALSA enumeration (~50 stderr lines) plus libjack connect-error
+  chatter (5 lines) on every CLI/GUI/vn_bridge startup under WSL2 /
+  headless Linux now suppressed via libasound noop handler (ctypes
+  `snd_lib_error_set_handler`) at TTS module load + fd-redirect
+  context manager around `_TextToAudioStream(...)`. Both gated by
+  `KOURAI_AUDIO_DEBUG=1` opt-out. Closes the last fixable Round 6
+  player-smoke follow-up bullet (only M15 logging architecture
+  remains from that list).
 - 2026-05-02 — **Wolfi base-image migration** (closes #98) across all
   thirteen Docker images (10 agents + vn_bridge + sandbox + 2 MCP
   sidecars + the `templates/backend` reference Techne reads), 0H
