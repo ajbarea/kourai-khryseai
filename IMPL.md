@@ -15,7 +15,7 @@ flag + KOURAI_TTS env + virtues fail-soft + smoke gate-ack regex,
 ``[#116]`` soft-fail banner also fires on pipeline abort before
 mneme, ``[#117]`` uvicorn.access filter (silences Docker healthcheck
 log noise — 44 lines/min cluster-wide → 0). UX/DX + CI + security
-batch shipped 2026-05-02 (eleven PRs): ``[#118]`` dead
+batch shipped 2026-05-02 (thirteen PRs): ``[#118]`` dead
 ``AGENT_METADATA`` color fields dropped, ``[#119]`` Okabe-Ito CVD-safe
 agent badges (closes #10), ``[#120]`` captions toggle for audio-only
 dialogue mode (closes #19), ``[#121]`` apt cache for
@@ -29,7 +29,12 @@ templates/backend/Dockerfile to Wolfi so Techne-scaffolded player
 projects inherit the 0-CVE base, ``[#128]`` ``/aj-deslop`` sweep on
 streaming + log soft-fail + filter blocks (-24 LoC), ``[#129]``
 ``/aj-deslop`` sweep on CI workflow comment blocks (-21 LoC, closes
-the IMPL TODO). Active focus: M18 Phase 2
+the IMPL TODO), ``[#130]`` GH Actions scheduled rescan workflow for
+issue #126 (one-shot-ish, fires Saturdays from 2026-05-16 until the
+bundled @xmldom/xmldom lands >=0.8.13), ``[#131]`` silence two
+pre-existing ty warnings surfaced by ``/aj-ci-audit`` (record.args
+tuple-narrowing in log.py + ContentKind literal in the captions
+test). Active focus: M18 Phase 2
 (SSML inside dialogue bodies — Kokoro doesn't natively consume
 SSML so transitional strip-then-synthesize, ElevenLabs migration
 on M6 unblocks full SSML downstream; web-searched 2026-05-02
@@ -405,6 +410,31 @@ markdown markup aloud.
   back across runs), and the ``-m "not slow"`` Kokoro-skip
   explanation. -21 LoC. Closes the ``/aj-deslop`` IMPL TODO
   across all three originally-noted targets (#124 + #128 + #129).
+- ``[#130]`` — GH Actions scheduled rescan workflow for issue
+  #126 (the upstream-blocked ``@xmldom/xmldom@0.8.12`` HIGH
+  bundled inside npm 11.13.0). Saturdays 14:17 UTC; date-gated
+  to start firing 2026-05-16 (≈2 weeks out from filing). On
+  each fire: rebuilds the three affected images, inspects the
+  bundled xmldom version per image, comments on issue #126 with
+  the per-image version table, auto-closes the issue if all
+  three land ``>=0.8.13``. Issue-state gate makes it a no-op
+  once #126 closes. ``workflow_dispatch`` available for manual
+  override. The original in-Claude ``CronCreate`` registered
+  session-only despite ``durable: true`` so this is the durable
+  replacement.
+- ``[#131]`` — silence two pre-existing ty
+  ``warning[invalid-argument-type]`` items surfaced by
+  ``/aj-ci-audit``. (a) ``record.args`` is typed
+  ``Tuple | Mapping | None`` in the stdlib stub; ty couldn't
+  bridge ``len()`` on the union to ``[2]`` indexing without an
+  explicit ``isinstance(record.args, tuple)`` narrow in
+  ``_UvicornAccessPathFilter``. (b) ``_status_event(kind)`` in
+  ``test_cli_streaming_captions.py`` was typed ``str``; bumped
+  to ``ContentKind`` literal so it propagates to
+  ``kind_message`` (existing callers all pass typed
+  ``KIND_DIALOGUE`` / ``KIND_STATUS`` constants, so the narrow
+  is safe). ``make lint`` now reports ``All checks passed!``
+  with zero warnings.
 
 **2026-05-01 full-pipeline smoke — GREEN end-to-end:** First
 successful run of ``make smoke-m18`` against M18-Phase-1-rebuilt
