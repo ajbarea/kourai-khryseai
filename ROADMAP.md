@@ -231,20 +231,25 @@ what the swarm actually did.
 
 ## M18 — Structured streaming with content-kind metadata
 
-> Status: Phase 1 shipped 2026-04-30 · Phase 2 + 3 active in [IMPL.md](./IMPL.md)
+> Status: Phase 1 + Phase 3 Part A shipped · Phase 2 (SSML) active in
+> [IMPL.md](./IMPL.md) · Phase 3 Part B (KIND_CODE/SPEC render paths)
+> deferred until a producer emits either kind
 
 URI-namespaced extension key
 `https://kourai.khryseai/ext/streaming/v1` carries
 `{"content_kind": "dialogue" | "status" | "code" | "spec"}` on
 `Message.metadata`. All eleven agents (10 producers + 1 consumer)
-tag emissions; host CLI gates TTS on `kind is None or kind ==
-KIND_DIALOGUE`; vn_bridge mirrors the predicate for Ren'Py routing.
-Phase 2 (SSML inside dialogue bodies — strip-then-synthesize for
-Kokoro, full subset for Azure/Google/non-v3-ElevenLabs downstream)
-and Phase 3 (`KIND_CODE` / `KIND_SPEC` distinct render paths +
-retire the `or kind is None` legacy fallback now that the
-2026-05-01 GREEN smoke confirmed no untagged production emissions)
-are the next architectural work — see IMPL.md for the live spec.
+tag emissions, plus the hephaestus pipeline forwarder and
+`BaseAgentExecutor`'s empty-input prompt. Hosts route by metadata
+strictly: `kind == KIND_DIALOGUE` is the only TTS-eligible path on
+the CLI; vn_bridge mirrors the same predicate for Ren'Py routing.
+Untagged messages (`kind is None`) no longer fall back to a prose-
+keyword guess — they're treated as not-dialogue, so any future
+producer that forgets to tag will silently miss TTS rather than
+mask the bug. Phase 2 (SSML inside dialogue bodies — strip-then-
+synthesize for Kokoro, full subset for Azure/Google/non-v3-
+ElevenLabs downstream) is the next architectural work; see
+IMPL.md for the live spec.
 
 ### Content-kind taxonomy
 

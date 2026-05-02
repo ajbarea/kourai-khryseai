@@ -11,9 +11,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
-from a2a.types import UnsupportedOperationError
+from a2a.types import TaskState, TaskStatusUpdateEvent, UnsupportedOperationError
 
-from kourai_common.messaging import user_message
+from kourai_common.messaging import KIND_DIALOGUE, KIND_STATUS, get_content_kind, user_message
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -54,6 +54,25 @@ def _collect_events(queue: AsyncMock) -> list:
     return [call.args[0] for call in queue.enqueue_event.call_args_list]
 
 
+def _input_required_events(queue: AsyncMock) -> list[TaskStatusUpdateEvent]:
+    """Return every status event that flips the task to input_required."""
+    return [
+        e
+        for e in _collect_events(queue)
+        if isinstance(e, TaskStatusUpdateEvent)
+        and e.status.state == TaskState.TASK_STATE_INPUT_REQUIRED
+    ]
+
+
+def _working_status_events(queue: AsyncMock) -> list[TaskStatusUpdateEvent]:
+    """Return every status event in the WORKING state — pipeline forwarders surface here."""
+    return [
+        e
+        for e in _collect_events(queue)
+        if isinstance(e, TaskStatusUpdateEvent) and e.status.state == TaskState.TASK_STATE_WORKING
+    ]
+
+
 # ---------------------------------------------------------------------------
 # Parametrized common tests for all executors
 # ---------------------------------------------------------------------------
@@ -76,7 +95,14 @@ class TestExecutorCommonBehavior:
     async def test_empty_input_returns_input_required(
         self, agent_name: str, module_path: str, class_name: str
     ):
-        """All executors should return input_required status for empty input."""
+        """All executors return input_required status tagged KIND_DIALOGUE.
+
+        The empty-input prompt is addressed to the player and TTS-eligible,
+        so under strict M18 routing it must carry an explicit
+        ``KIND_DIALOGUE`` content-kind. Untagged (legacy) prompts no
+        longer fall through to TTS via the prose-keyword guess — they
+        just disappear, so the tag is load-bearing.
+        """
         executor_module = __import__(module_path, fromlist=[class_name])
         executor_class = getattr(executor_module, class_name)
 
@@ -87,8 +113,17 @@ class TestExecutorCommonBehavior:
         with patch(f"{module_path}.create_span"):
             await executor.execute(ctx, queue)
 
-        # Should have enqueued at least a task creation event
+        # Should have enqueued at least a task creation event.
         assert queue.enqueue_event.call_count >= 1
+
+        events = _input_required_events(queue)
+        assert events, f"{agent_name} did not flip task to input_required for empty input"
+        for event in events:
+            assert get_content_kind(event.status.message) == KIND_DIALOGUE, (
+                f"{agent_name}'s empty-input prompt must be tagged KIND_DIALOGUE "
+                "so strict-routing hosts route it to TTS — "
+                "untagged means silent under M18 Phase 3."
+            )
 
     @pytest.mark.parametrize("agent_name,module_path,class_name", AGENT_EXECUTORS)
     @pytest.mark.asyncio
@@ -411,6 +446,30 @@ class TestHephaestusExecutor:
             await executor.execute(ctx, queue)
 
         assert queue.enqueue_event.call_count >= 5
+
+        # Pipeline forwarder re-emits each specialist status as a fresh
+        # message, dropping the original metadata. M18 Phase 3 fixes that
+        # by re-tagging every forwarded status as KIND_STATUS — without
+        # this, strict-routing hosts would never speak any of the per-
+        # specialist progress lines AND would never know to render them
+        # as status (vs treating untagged as default-not-dialogue, which
+        # is correct in this case but only by accident).
+        forwarded_texts = [
+            "Spec generated",
+            "Code written",
+            "Pipeline complete",
+        ]
+        working_events = _working_status_events(queue)
+        for forwarded in forwarded_texts:
+            matches = [
+                e for e in working_events if e.status.message and forwarded in str(e.status.message)
+            ]
+            assert matches, f"Forwarded status {forwarded!r} not enqueued"
+            for event in matches:
+                assert get_content_kind(event.status.message) == KIND_STATUS, (
+                    f"Forwarded status {forwarded!r} must be tagged KIND_STATUS "
+                    "by the hephaestus forwarder under strict M18 routing."
+                )
 
     @pytest.mark.asyncio
     async def test_ask_user_returns_input_required(self):

@@ -295,15 +295,17 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
                     break
 
                 emoji = AGENT_EMOJI.get(agent_name, "")
-                # M18 rollout: forwarded specialist statuses stay untagged
-                # until each specialist's executor opts in. The host's
-                # legacy emoji-prefix detection still routes them correctly
-                # in the meantime — this is the coexistence window.
+                # `execute_pipeline` flattens specialist status events to
+                # plain strings, so the original kind metadata doesn't
+                # ride along. Forwarded pipeline progress is always
+                # KIND_STATUS by definition (specialist dialogue surfaces
+                # via the INPUT_REQUIRED branch above), so re-tag here.
                 await send_working_status(
                     updater,
                     task,
                     status,
                     emoji=emoji,
+                    kind=KIND_STATUS,
                 )
                 # Track the last real agent output for the final artifact
                 if agent_output:

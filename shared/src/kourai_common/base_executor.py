@@ -18,7 +18,7 @@ from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.tasks import TaskUpdater
 from a2a.types import InternalError, Task
 
-from kourai_common.messaging import send_input_required
+from kourai_common.messaging import KIND_DIALOGUE, send_input_required
 
 if TYPE_CHECKING:
     from a2a.server.events import EventQueue
@@ -76,6 +76,7 @@ class BaseAgentExecutor(AgentExecutor, ABC):
                 updater,
                 task,
                 self.get_input_required_message(),
+                kind=KIND_DIALOGUE,
             )
             return
 
