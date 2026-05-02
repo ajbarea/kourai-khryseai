@@ -14,16 +14,19 @@ specialist cascade through hephaestus → metis → techne → dokimasia
 flag + KOURAI_TTS env + virtues fail-soft + smoke gate-ack regex,
 ``[#116]`` soft-fail banner also fires on pipeline abort before
 mneme, ``[#117]`` uvicorn.access filter (silences Docker healthcheck
-log noise — 44 lines/min cluster-wide → 0). UX/DX wins shipped
-2026-05-02: ``[#118]`` dropped dead ``AGENT_METADATA`` color
-fields (three palettes silently disagreed; none were read), ``[#119]``
-per-agent Okabe-Ito CVD-safe badges in comms-window headers (closes
-bug #10) — palette honors NO_COLOR + truecolor detection, dokimasia
-yellow gets bold-black for contrast. Active focus: M18 Phase 2
-(SSML inside dialogue bodies — Kokoro doesn't natively consume SSML
-so transitional strip-then-synthesize, ElevenLabs migration on M6
-unblocks full SSML downstream; web-searched 2026-05-02 provider
-compat findings recorded in the Phase 2 section below).**
+log noise — 44 lines/min cluster-wide → 0). UX/DX + CI batch
+shipped 2026-05-02 (seven PRs): ``[#118]`` dead ``AGENT_METADATA``
+color fields dropped, ``[#119]`` Okabe-Ito CVD-safe agent badges
+(closes #10), ``[#120]`` captions toggle for audio-only dialogue
+mode (closes #19), ``[#121]`` apt cache for ``portaudio19-dev``
+(15+min mirror-flake → ~5s on warm cache), ``[#122]`` GHA layer
+cache for MCP Docker builds, ``[#123]`` NO_COLOR honored across
+the rest of the CLI palette, ``[#124]`` ``/aj-deslop`` sweep on
+recent justification prose (-73 LoC). Active focus: M18 Phase 2
+(SSML inside dialogue bodies — Kokoro doesn't natively consume
+SSML so transitional strip-then-synthesize, ElevenLabs migration
+on M6 unblocks full SSML downstream; web-searched 2026-05-02
+provider compat findings recorded in the Phase 2 section below).**
 
 ## M18 Phase 1 — what shipped (eight PRs, 2026-04-30)
 
@@ -294,6 +297,50 @@ markdown markup aloud.
   the "hardcoded RGB bypasses theme" failure mode the truecolor +
   NO_COLOR gates avoid. 8 new unit tests; live-rendered preview
   for all 11 agents.
+- ``[#120]`` (#19) — captions toggle for audio-only dialogue mode.
+  New ``captions_enabled`` setting (default ON, settings panel
+  slot ``[4]``) gates whether KIND_DIALOGUE emissions render in
+  the comms-window when TTS is on. Off + voice on = audio-only
+  mode (dialogue still speaks, no visual clutter); voice off
+  forces effective ON so dialogue is never silently dropped.
+  Status / code / spec emissions and the artifact block are
+  unaffected. Web-searched WCAG 2.1 + video-game accessibility
+  best practices; description-density toggle deferred until
+  non-dialogue audio events exist. 4 new unit tests covering
+  the four-cell behavior matrix.
+- ``[#121]`` — CI: ``portaudio19-dev`` apt install cached via
+  ``awalsh128/cache-apt-pkgs-action@v1.6.0``. A live PR run took
+  15+ min stuck on ``apt-get update`` because GitHub's Azure
+  mirror was flaking; the install repeats across 4 jobs in
+  ``tests.yml`` + 1 in ``nightly.yml``. Now: ~5s on cache hit
+  vs. 60-120s cold (or pathological 15+ min when mirrors flake).
+  Cache key ``version: 1.0`` invalidates manually.
+- ``[#122]`` — CI: GHA layer cache for MCP sidecar Docker builds
+  via ``docker/build-push-action@v7.1.0`` + ``docker/setup-buildx-action@v4.0.0``.
+  The integration job rebuilds context7-mcp + memory-mcp images
+  every run; ``cache-from: type=gha`` + ``mode=max`` reuses the
+  ``FROM node:20-slim`` and ``npm install`` layers across runs
+  unless Dockerfile content changes. Separate ``scope=`` per
+  image so they don't evict each other. Expected ~1-2 min saved
+  per integration run on warm cache.
+- ``[#123]`` — NO_COLOR honored across the rest of ``styling.py``.
+  ``[#119]`` added the gate for ``agent_badge`` only; gold
+  separators, red error banners, cyan emphasis still ignored
+  the env var. Now: ``_GOLD`` / ``_GOLD_BRIGHT`` / ``_GREEN`` /
+  ``_RED`` strip to empty under NO_COLOR; combined-style
+  ``_GOLD_BOLD`` / ``_CYAN`` collapse to plain ``_BOLD`` so
+  emphasis survives. ``_BOLD`` / ``_ITALIC`` / ``_DIM`` /
+  ``_RESET`` unchanged per no-color.org spec.
+- ``[#124]`` — ``/aj-deslop``-style sweep on the long
+  justification prose in recent contributions (``#117`` log
+  filter, ``#119`` badges). -73 LoC across 3 files, no
+  behavior change. Kept behavior warnings + non-obvious
+  invariants + env-var enumerations; cut WCAG framing
+  repetition + bug-number prose + "the visible signal that
+  lets the player scan a transcript" rationale. Pre-release
+  stance from
+  ``feedback_terse_field_comments.md``: only keep comments
+  that help a reader execute, drop "why we picked this".
 
 **2026-05-01 full-pipeline smoke — GREEN end-to-end:** First
 successful run of ``make smoke-m18`` against M18-Phase-1-rebuilt
@@ -335,9 +382,8 @@ Open follow-ups surfaced by the smoke (small PR shapes each):
   meantime.
 
 **Independent UX bugs (still open):**
-- Music playlist sparse — 2 tracks (#11)
-- Explicit captions / TTS subtitle toggle for accessibility (#19) —
-  feature, not a bug; needs UX design.
+- Music playlist sparse — 2 tracks (#11) — content-driven; AJ
+  adds tracks to ``assets/audio/music/`` over time. No code work.
 
 ## Notes / open questions
 
@@ -387,9 +433,10 @@ implementation, architectural fix over expedient patch.
    + M19 (RealtimeTTS word-timing API already wired via ``on_word=``
    callback). 9-14s text-precedes-audio gap is a player-notices UX
    issue.
-4. **Remaining independent UX bugs** — captions toggle (#19, needs
-   UX design), playlist expansion (#11, content-driven). Each sized
-   for a single PR. (Per-agent badges #10 closed by [#119].)
+4. **Remaining independent UX bugs** — playlist expansion (#11)
+   only, and that's content-driven (AJ adds tracks over time, no
+   code). Per-agent badges (#10) and captions toggle (#19) closed
+   by [#119] and [#120].
 5. **Live VN smoke** — exercises the new vn_bridge ``/tts`` →
    ``RealtimeTTSEngine.synthesize_to_wav`` path AND the new
    metadata-based dialogue routing.
