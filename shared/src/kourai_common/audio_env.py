@@ -1,14 +1,22 @@
 """Audio runtime environment helpers.
 
-Configure SDL audio backend defaults for predictable cross-platform behavior.
+Configure SDL audio backend defaults for predictable cross-platform behavior,
+and quiet PortAudio's ALSA/JACK device-enumeration cascade on systems that
+route audio through PulseAudio (WSL2/WSLg) or have no audio device (CI).
 """
 
 from __future__ import annotations
 
+import contextlib
+import ctypes
 import logging
 import os
 import sys
 from ctypes.util import find_library
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 logger = logging.getLogger(__name__)
 
@@ -58,3 +66,94 @@ def configure_sdl_audio_driver() -> str | None:
         return "dummy"
 
     return None
+
+
+_alsa_silenced: bool = False
+_ALSA_ERROR_HANDLER: object | None = None
+
+
+def _audio_debug_enabled() -> bool:
+    return bool(os.environ.get("KOURAI_AUDIO_DEBUG"))
+
+
+def silence_alsa_lib_errors() -> None:
+    """Install a no-op libasound error handler so PortAudio's
+    "cannot find card '0'" cascade doesn't pollute CLI/GUI startup.
+
+    PortAudio enumerates ALSA devices during ``PyAudio()`` init. On
+    WSL2 (no native ALSA card; WSLg routes audio through PulseAudio),
+    headless Linux, or any system without a hardware ALSA setup, that
+    enumeration emits 30-50 lines of ``cannot find card '0'`` /
+    ``Unknown PCM cards.pcm.front`` etc. straight from libasound's
+    default fprintf-based handler. Setting an empty handler via
+    ``snd_lib_error_set_handler`` drops them at the C boundary without
+    touching Python-side stderr. Safe on systems with real audio: the
+    handler only fires on actual ALSA errors, which on healthy hosts
+    don't fire at module-load time.
+
+    Idempotent. Skipped when ``KOURAI_AUDIO_DEBUG=1`` (devs diagnosing
+    real audio failures want the diagnostic noise back).
+    """
+    global _alsa_silenced, _ALSA_ERROR_HANDLER
+    if _alsa_silenced or _audio_debug_enabled():
+        return
+    if not find_library("asound"):
+        return
+    try:
+        asound = ctypes.cdll.LoadLibrary("libasound.so.2")
+    except OSError as exc:
+        logger.debug("Skipping ALSA error suppression: %s", exc)
+        return
+
+    handler_t = ctypes.CFUNCTYPE(
+        None,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+    )
+
+    def _noop(
+        filename: bytes | None,
+        line: int,
+        function: bytes | None,
+        err: int,
+        fmt: bytes | None,
+    ) -> None:
+        return
+
+    _ALSA_ERROR_HANDLER = handler_t(_noop)
+    asound.snd_lib_error_set_handler(_ALSA_ERROR_HANDLER)
+    _alsa_silenced = True
+    logger.debug("Installed no-op libasound error handler")
+
+
+@contextlib.contextmanager
+def silence_audio_init_noise() -> Iterator[None]:
+    """Drop fd-level stderr so libjack's connect-error chatter is hidden.
+
+    ``Cannot connect to server socket`` / ``jack server is not running``
+    come from libjack via fprintf and bypass Python logging. PortAudio
+    probes JACK after ALSA during ``PyAudio()`` init, so the body should
+    wrap exactly that constructor — keep the window tight to avoid
+    swallowing unrelated stderr (Hugging Face hub warnings, torch
+    UserWarnings, etc.).
+
+    Skipped when ``KOURAI_AUDIO_DEBUG=1``.
+    """
+    if _audio_debug_enabled():
+        yield
+        return
+
+    saved_fd = os.dup(2)
+    devnull_fd = os.open(os.devnull, os.O_WRONLY)
+    try:
+        sys.stderr.flush()
+        os.dup2(devnull_fd, 2)
+        yield
+    finally:
+        sys.stderr.flush()
+        os.dup2(saved_fd, 2)
+        os.close(devnull_fd)
+        os.close(saved_fd)
