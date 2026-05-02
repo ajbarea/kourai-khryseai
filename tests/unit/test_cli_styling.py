@@ -88,6 +88,27 @@ def test_comms_window_renders_agent_badge():
     assert "METIS" in out
 
 
+def test_no_color_strips_module_palette_but_keeps_bold_italic_dim():
+    """NO_COLOR strips color, keeps bold/italic/dim. Combined codes → bold."""
+    with _styling({"NO_COLOR": "1", "COLORTERM": "truecolor"}) as s:
+        assert s._GOLD == ""
+        assert s._GOLD_BRIGHT == ""
+        assert s._GREEN == ""
+        assert s._RED == ""
+        assert s._GOLD_BOLD == s._BOLD
+        assert s._CYAN == s._BOLD
+        assert s._BOLD == "\x1b[1m"
+        assert s._ITALIC == "\x1b[3m"
+        assert s._DIM == "\x1b[2m"
+        assert s._RESET == "\x1b[0m"
+
+
+def test_no_color_unset_keeps_truecolor_palette():
+    with _styling({"COLORTERM": "truecolor"}) as s:
+        assert "\x1b[38;2;201;148;74m" in s._GOLD
+        assert s._RED == "\x1b[0;31m"
+
+
 def test_badge_padded_with_spaces_so_bg_extends_around_name():
     """Badge visible content is " NAME " — leading/trailing space makes a chip."""
     with _styling({"COLORTERM": "truecolor"}) as s:

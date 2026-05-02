@@ -39,6 +39,15 @@ if not _has_truecolor:
     _GOLD_BOLD = "\033[1;33m"
     _GREEN = "\033[1;32m"
 
+# NO_COLOR overrides truecolor + 16-color: strip color, keep bold/dim/italic.
+if _no_color:
+    _GOLD = ""
+    _GOLD_BRIGHT = ""
+    _GOLD_BOLD = _BOLD
+    _CYAN = _BOLD
+    _GREEN = ""
+    _RED = ""
+
 
 # Specialists each get a distinct Okabe-Ito hue; companions/support land
 # on neutral gray or share with a thematic sibling.
