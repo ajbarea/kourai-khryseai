@@ -361,6 +361,13 @@ Open follow-ups surfaced by the smoke (small PR shapes each):
   Mondays 12:00 UTC) opens drift PRs and a rollup issue automatically
   for action-pin / toolchain-pin / merge-setting / open-PR / local-main
   divergence findings.
+- **TODO: ``/aj-deslop`` sweep on long justification comments.**
+  Pre-release stance — long architectural-justification comments
+  inflate LoC without earning their keep. Keep only what helps a
+  future reader (AI or human) execute; drop "why we picked this"
+  prose. Targets: streaming.py soft-fail block, log.py filter
+  docstrings, recent CI workflow comments, anywhere multi-line
+  comments justify a decision rather than warn about a behavior.
 
 ## Up next — priority order
 
