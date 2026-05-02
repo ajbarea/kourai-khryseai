@@ -25,7 +25,7 @@ Set the key matching your provider:
 
 | Provider | Variable | Where to get it |
 |---|---|---|
-| `anthropic` (default) | `ANTHROPIC_API_KEY` | [console.anthropic.com](https://console.anthropic.com) |
+| `anthropic` (default) | `ANTHROPIC_API_KEY` | [platform.claude.com](https://platform.claude.com) |
 | `google` | `GEMINI_API_KEY` | [aistudio.google.com](https://aistudio.google.com) |
 | `local` | *(none)* | [Ollama](https://ollama.com/) runs locally |
 
