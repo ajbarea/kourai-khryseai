@@ -5,19 +5,25 @@ milestone lands, the matching detail block in [ROADMAP.md](./ROADMAP.md)
 collapses to a one-liner under "Shipped" and this file gets reset to the
 next milestone.
 
-Updated: 2026-05-01 · Working on: **M18 Phase 1 SHIPPED 2026-04-30
+Updated: 2026-05-02 · Working on: **M18 Phase 1 SHIPPED 2026-04-30
 (eight PRs: #99/#100/#101/#102/#103/#104/#105/#106). Phase 1 verified
 GREEN end-to-end via the 2026-05-01 ``make smoke-m18`` run (full
 specialist cascade through hephaestus → metis → techne → dokimasia
-→ kallos → mneme, ``✨ Forged in 57.4s``). DX cleanup post-smoke
-shipped: ``[#114]`` honest rebuild-failure timer, ``[#115]`` no-voice
+→ kallos → mneme, ``✨ Forged in 57.4s``). DX cleanup batch shipped
+2026-05-01: ``[#114]`` honest rebuild-failure timer, ``[#115]`` no-voice
 flag + KOURAI_TTS env + virtues fail-soft + smoke gate-ack regex,
 ``[#116]`` soft-fail banner also fires on pipeline abort before
 mneme, ``[#117]`` uvicorn.access filter (silences Docker healthcheck
-log noise — 44 lines/min cluster-wide → 0). Active focus: M18 Phase 2
+log noise — 44 lines/min cluster-wide → 0). UX/DX wins shipped
+2026-05-02: ``[#118]`` dropped dead ``AGENT_METADATA`` color
+fields (three palettes silently disagreed; none were read), ``[#119]``
+per-agent Okabe-Ito CVD-safe badges in comms-window headers (closes
+bug #10) — palette honors NO_COLOR + truecolor detection, dokimasia
+yellow gets bold-black for contrast. Active focus: M18 Phase 2
 (SSML inside dialogue bodies — Kokoro doesn't natively consume SSML
 so transitional strip-then-synthesize, ElevenLabs migration on M6
-unblocks full SSML downstream).**
+unblocks full SSML downstream; web-searched 2026-05-02 provider
+compat findings recorded in the Phase 2 section below).**
 
 ## M18 Phase 1 — what shipped (eight PRs, 2026-04-30)
 
@@ -265,6 +271,30 @@ markdown markup aloud.
   strips query string. Live-verified: restarted aletheia → 0
   healthcheck access lines in 30s vs 2 lines on idle peer.
 
+**Shipped 2026-05-02 (UX/DX wins):**
+- ``[#118]`` — dropped dead ``color`` and ``hex_color`` fields from
+  ``shared/src/kourai_common/agents.py:AGENT_METADATA``. Three
+  separate dicts independently tracked agent colors
+  (``AGENT_METADATA``, ``hosts/gui/maidens.py:AGENTS``,
+  ``hosts/gui/agent_personality_indicators.py``) and they all
+  disagreed; nothing actually read the canonical pair. Tightened
+  type annotation, updated module docstring to point at the live
+  GUI palette locations. Net -19 dead lines, no behavior change.
+- ``[#119]`` (#10) — per-agent Okabe-Ito CVD-safe badges in the
+  comms-window header. Each maiden's name now renders as a colored-
+  background chip — ``hephaestus`` orange, ``metis`` sky blue,
+  ``techne`` green, ``dokimasia`` yellow (with bold-black fg for
+  WCAG contrast), ``kallos`` blue, ``mneme`` mauve, ``cupid``
+  vermillion, ``puck`` shares green, ``aletheia``/``aidos`` gray.
+  Standards honored: NO_COLOR (no-color.org spec — strips bg+fg
+  but keeps bold per spec), ``_has_truecolor`` (16-color terminals
+  fall back to bold-only — no degraded approximation). Web-search
+  confirmed Okabe-Ito remains the 2026 categorical-accessibility
+  standard; March-2026 Claude Code issue #34702 surfaced exactly
+  the "hardcoded RGB bypasses theme" failure mode the truecolor +
+  NO_COLOR gates avoid. 8 new unit tests; live-rendered preview
+  for all 11 agents.
+
 **2026-05-01 full-pipeline smoke — GREEN end-to-end:** First
 successful run of ``make smoke-m18`` against M18-Phase-1-rebuilt
 containers. All five specialists fired:
@@ -305,8 +335,6 @@ Open follow-ups surfaced by the smoke (small PR shapes each):
   meantime.
 
 **Independent UX bugs (still open):**
-- Per-agent CLI color coding via colored-background "badge" pattern
-  (Okabe-Ito CVD-safe, NO_COLOR-aware) (#10)
 - Music playlist sparse — 2 tracks (#11)
 - Explicit captions / TTS subtitle toggle for accessibility (#19) —
   feature, not a bug; needs UX design.
@@ -352,10 +380,9 @@ implementation, architectural fix over expedient patch.
    + M19 (RealtimeTTS word-timing API already wired via ``on_word=``
    callback). 9-14s text-precedes-audio gap is a player-notices UX
    issue.
-4. **Remaining independent UX bugs** — per-agent CLI color badges
-   (#10, needs Okabe-Ito palette mapping), captions toggle (#19,
-   needs UX design), playlist expansion (#11, content-driven).
-   Each sized for a single PR.
+4. **Remaining independent UX bugs** — captions toggle (#19, needs
+   UX design), playlist expansion (#11, content-driven). Each sized
+   for a single PR. (Per-agent badges #10 closed by [#119].)
 5. **Live VN smoke** — exercises the new vn_bridge ``/tts`` →
    ``RealtimeTTSEngine.synthesize_to_wav`` path AND the new
    metadata-based dialogue routing.
