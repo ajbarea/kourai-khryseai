@@ -102,17 +102,41 @@ Amazon / ElevenLabs. Kokoro doesn't natively consume SSML; we
 strip-then-synthesize as a transitional layer. ElevenLabs migration on
 M6 unblocks full SSML downstream.
 
-Open questions for Phase 2 (web-search before any implementation, per
-standing rule):
+**Web-searched 2026-05-02 — provider compatibility constraints:**
+- **W3C SSML 1.1** has been a stable Recommendation since 2010. No
+  spec drift to plan against; the markup itself is durable.
+- **Kokoro has zero native SSML support** (multiple open feature
+  requests on `hexgrad/kokoro` and `Kokoro-FastAPI`). Strip-then-
+  synthesize is the only viable path while Kokoro is the engine.
+- **ElevenLabs** supports `break`, `phoneme`, `prosody`, `emphasis`
+  on most models — but **NOT on Eleven v3** (their current flagship).
+  If the M6 migration targets v3, SSML support is a regression vector;
+  if it targets Flash V2 / Turbo V2 / English V1, full subset works.
+- **Azure + Google Cloud** both support the full subset including
+  `prosody` (rate/pitch/range/volume/contour), `break`, `emphasis`,
+  `say-as`, `phoneme`, `sub`, `p`, `s`, `audio`.
+- **Portable subset** (works across ElevenLabs-non-v3 + Azure + Google,
+  i.e., the safe baseline if we want provider-fungibility): `break`,
+  `prosody`, `emphasis`, `say-as`. Avoid `phoneme` if v3-on-ElevenLabs
+  is on the roadmap; avoid `audio` (provider-side resource fetch).
+
+Open questions for Phase 2:
 - **Where does SSML get added — at producer, consumer, or both?**
   Producer side (specialist's ``send_input_required`` / dialogue
-  emissions) means each specialist owns its prosody. Consumer side
-  (host CLI / vn_bridge wraps in default SSML) means a single layer
-  controls the cadence baseline.
+  emissions) means each specialist owns its prosody — Kallos's lilt
+  versus Hephaestus's gruff cadence stays a per-agent concern,
+  matching the Phase 1 content-kind tagging architecture. Consumer
+  side (host CLI / vn_bridge wraps in default SSML) means a single
+  layer controls the cadence baseline; specialists stay text-only and
+  prosody is uniform. Producer-side composes better with the existing
+  per-agent persona work; consumer-side is faster to ship.
 - **Strip-then-synthesize layer placement.** Current Kokoro path is
   via ``kourai_common.tts_realtime.RealtimeTTSEngine``. SSML strip
-  could live in the engine itself (so callers stay SSML-agnostic) or
-  in the host (so SSML is end-to-end visible in logs).
+  could live in the engine itself (so callers stay SSML-agnostic and
+  any future engine swap inherits the strip layer) or in the host
+  (so SSML is end-to-end visible in logs and the strip is explicit
+  at the engine boundary). Engine-side parallels how Azure/Google SDKs
+  handle SSML internally.
 - **Per-specialist persona prosody** (e.g., Hephaestus gruff vs Kallos
   lilting) — defer to a follow-on once structural plumbing is in.
 
