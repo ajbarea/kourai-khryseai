@@ -37,9 +37,13 @@ jobs:
       - name: Install system audio dependencies
         # PyAudio (pulled in by RealtimeTTS via hosts/gui) builds against
         # PortAudio headers; ubuntu-latest doesn't ship them by default.
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y portaudio19-dev
+        # Cache the .deb between runs — first run populates, subsequent
+        # runs hit warm cache (~5s vs 60-120s cold, or 15+min when
+        # GitHub's Azure apt mirror is flaking).
+        uses: awalsh128/cache-apt-pkgs-action@v1.6.0
+        with:
+          packages: portaudio19-dev
+          version: 1.0
 
       - name: Install dependencies
         run: uv sync --all-packages --dev --frozen
@@ -73,9 +77,13 @@ jobs:
       - name: Install system audio dependencies
         # PyAudio (pulled in by RealtimeTTS via hosts/gui) builds against
         # PortAudio headers; ubuntu-latest doesn't ship them by default.
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y portaudio19-dev
+        # Cache the .deb between runs — first run populates, subsequent
+        # runs hit warm cache (~5s vs 60-120s cold, or 15+min when
+        # GitHub's Azure apt mirror is flaking).
+        uses: awalsh128/cache-apt-pkgs-action@v1.6.0
+        with:
+          packages: portaudio19-dev
+          version: 1.0
 
       - name: Install dependencies
         run: uv sync --all-packages --dev --frozen
@@ -130,9 +138,13 @@ jobs:
       - name: Install system audio dependencies
         # PyAudio (pulled in by RealtimeTTS via hosts/gui) builds against
         # PortAudio headers; ubuntu-latest doesn't ship them by default.
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y portaudio19-dev
+        # Cache the .deb between runs — first run populates, subsequent
+        # runs hit warm cache (~5s vs 60-120s cold, or 15+min when
+        # GitHub's Azure apt mirror is flaking).
+        uses: awalsh128/cache-apt-pkgs-action@v1.6.0
+        with:
+          packages: portaudio19-dev
+          version: 1.0
 
       - name: Install dependencies
         run: uv sync --all-packages --dev --frozen
@@ -187,9 +199,13 @@ jobs:
       - name: Install system audio dependencies
         # PyAudio (pulled in by RealtimeTTS via hosts/gui) builds against
         # PortAudio headers; ubuntu-latest doesn't ship them by default.
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y portaudio19-dev
+        # Cache the .deb between runs — first run populates, subsequent
+        # runs hit warm cache (~5s vs 60-120s cold, or 15+min when
+        # GitHub's Azure apt mirror is flaking).
+        uses: awalsh128/cache-apt-pkgs-action@v1.6.0
+        with:
+          packages: portaudio19-dev
+          version: 1.0
 
       - name: Install dependencies
         run: uv sync --all-packages --dev --frozen
