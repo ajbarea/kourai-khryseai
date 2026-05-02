@@ -23,6 +23,7 @@ from __future__ import annotations
 import asyncio
 import io
 import logging
+import time
 import wave
 from typing import TYPE_CHECKING
 
@@ -219,6 +220,7 @@ class RealtimeTTSEngine:
 
         effective_speed = speed if speed is not None else voice_cfg.speed
 
+        t_start = time.monotonic()
         try:
             logger.info(
                 "TTS: starting RealtimeTTS speech — agent=%s, voice=%s, speed=%.2f, text=%r",
@@ -240,7 +242,13 @@ class RealtimeTTSEngine:
             loop = asyncio.get_event_loop()
             await loop.run_in_executor(None, self._stream.play)
 
-            logger.info("TTS: playback complete")
+            logger.info(
+                "TTS: playback complete agent=%s voice=%s elapsed=%.2fs chars=%d",
+                agent_name,
+                voice_cfg.voice_id,
+                time.monotonic() - t_start,
+                len(text),
+            )
         except Exception as e:
             # TTS is non-critical; keep the console line terse.
             logger.warning("TTS playback skipped (%s: %s)", type(e).__name__, e)
@@ -302,6 +310,7 @@ class RealtimeTTSEngine:
         effective_speed = speed if speed is not None else voice_cfg.speed
 
         chunks: list[bytes] = []
+        t_start = time.monotonic()
 
         self._engine.set_voice(voice_cfg.voice_id)
         self._engine.set_speed(effective_speed)
@@ -313,16 +322,33 @@ class RealtimeTTSEngine:
             lambda: self._stream.play(muted=True, on_audio_chunk=chunks.append),
         )
 
+        synth_elapsed = time.monotonic() - t_start
+
         if not chunks:
+            logger.info(
+                "TTS: synthesize_to_wav produced no audio agent=%s voice=%s elapsed=%.2fs",
+                agent_name,
+                voice_cfg.voice_id,
+                synth_elapsed,
+            )
             return b""
 
         fmt, channels, sample_rate = self._engine.get_stream_info()
-        return _pcm_to_wav(
+        wav = _pcm_to_wav(
             b"".join(chunks),
             channels=channels,
             sample_rate=sample_rate,
             sample_width=pyaudio.get_sample_size(fmt),
         )
+        logger.info(
+            "TTS: synthesize_to_wav agent=%s voice=%s elapsed=%.2fs chars=%d bytes=%d",
+            agent_name,
+            voice_cfg.voice_id,
+            synth_elapsed,
+            len(text),
+            len(wav),
+        )
+        return wav
 
     def stop(self) -> None:
         """Stop current playback gracefully."""
