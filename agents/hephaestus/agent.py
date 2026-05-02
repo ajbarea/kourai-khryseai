@@ -318,8 +318,13 @@ async def determine_pipeline(
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_request},
         ]
+        # 800 tokens covers all four router outputs (agent list / ASK_USER /
+        # CONFIRM_ORDER / CHAT) — agent lists + read-backs are short, but a
+        # CHAT response to a meta question (e.g., player asks what the forge
+        # does) was truncating mid-sentence at 200. Anthropic bills actual
+        # output, not the cap, so the higher ceiling is free for short turns.
         response = await chat(
-            "hephaestus", messages, temperature=0.1, max_tokens=200, context_id=context_id
+            "hephaestus", messages, temperature=0.1, max_tokens=800, context_id=context_id
         )
         response = response.strip()
 
