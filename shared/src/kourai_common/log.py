@@ -196,3 +196,31 @@ def setup_logging(name: str, *, level: str | None = None) -> logging.Logger:
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
     return logger
+
+
+def run_uvicorn(
+    app: object,
+    *,
+    host: str,
+    port: int,
+    log_level: str = "info",
+) -> None:
+    """Wrap ``uvicorn.run`` with ``log_config=None`` so app loggers survive.
+
+    Uvicorn's default ``LOGGING_CONFIG`` is applied via ``dictConfig`` inside
+    ``run()`` and silently nukes any handler our :func:`setup_logging` already
+    installed on the root logger — that was the silent observability hole #145
+    fixed for vn_bridge. Pass ``log_config=None`` so uvicorn skips the takeover
+    and our root handlers stay intact; uvicorn's own ``uvicorn.error`` and
+    ``uvicorn.access`` loggers still emit through that root handler.
+
+    research(2026-05): both ``log_config=None`` and a custom dictConfig are
+    valid 2026 approaches. None is simpler when the app already owns root
+    logging via :func:`setup_logging`; we don't need uvicorn's pretty
+    formatting since our own formatter already includes timestamps + names.
+
+    Every Kourai agent should call this instead of ``uvicorn.run`` directly.
+    """
+    import uvicorn
+
+    uvicorn.run(app, host=host, port=port, log_level=log_level, log_config=None)

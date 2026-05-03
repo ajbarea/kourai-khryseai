@@ -17,7 +17,6 @@ from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING, cast
 from uuid import uuid4
 
-import uvicorn
 from a2a.client import A2ACardResolver, ClientConfig, create_client
 from a2a.types import (
     Message,
@@ -38,6 +37,7 @@ from kourai_common.a2a_utils import make_a2a_http_client
 from kourai_common.companion import infer_portrait_state
 from kourai_common.config import get_agent_url
 from kourai_common.facts import process_agent_output
+from kourai_common.log import run_uvicorn
 from kourai_common.messaging import (
     KIND_DIALOGUE,
     get_content_kind,
@@ -447,9 +447,4 @@ app = Starlette(
 
 
 if __name__ == "__main__":
-    # research(2026-05): log_config=None disables uvicorn's default
-    # dictConfig takeover, which otherwise nukes our basicConfig +
-    # silences every kourai_common.* logger (including #140 TTS timing
-    # and #136/#141 Kokoro pre-warm). Uvicorn's own access logs still
-    # flow through the root handler we set above.
-    uvicorn.run(app, host="0.0.0.0", port=PORT, log_level="info", log_config=None)  # noqa: S104
+    run_uvicorn(app, host="0.0.0.0", port=PORT)  # noqa: S104
