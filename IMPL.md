@@ -55,12 +55,17 @@ downstream.
   once the producer-side plumbing has at least one specialist
   emitting SSML.
 
-**Status 2026-05-03:** strip layer + tests landed [#147]. Next
-sub-task: producer-side wrap pilot — pick one specialist (hephaestus
-is the obvious starting point, biggest LLM context), update its
-prompt template to wrap dialogue Parts in `<speak>...</speak>` with
-optional `<break>` for natural pauses, smoke through CLI + vn_bridge
-to confirm no regression, then roll out one specialist at a time.
+**Status 2026-05-03:** strip layer + tests landed [#147]; uvicorn-
+takeover sweep [#148] unblocks observability across all 10 specialists
+(same root cause #145 fixed for vn_bridge). Hephaestus producer-side
+pilot landed [#149]: `HEPH_HANDOFFS` now emits SSML envelopes with
+`<break>` markers at natural pauses; `_maidenify_status` (CLI) and the
+vn_bridge NDJSON yield both apply `strip_ssml` at the display
+boundary; TTS engine path stays raw so future M6 ElevenLabs swap
+inherits the prosody hints. Next sub-tasks: roll the same SSML
+treatment to other specialists' static lines (kallos handoffs,
+metis greetings, etc.), then teach LLM prompts to emit SSML in
+generated dialogue.
 
 ## M18 Phase 3 — KIND_CODE / KIND_SPEC distinct render paths (deferred)
 

@@ -21,6 +21,7 @@ from kourai_common.a2a_events import (
     extract_artifact_text as _extract_artifact_text_shared,
     extract_status_text as _extract_status_text_shared,
 )
+from kourai_common.ssml import strip_ssml
 
 if TYPE_CHECKING:
     from a2a.types import TaskArtifactUpdateEvent, TaskStatusUpdateEvent
@@ -93,7 +94,11 @@ def _maidenify_status(text: str) -> tuple[str, str | None]:
 
     for emoji, (agent_name, _face) in _EMOJI_TO_MAIDEN.items():
         if text.lstrip().startswith(emoji):
-            status_msg = text.replace(emoji, "", 1).strip()
+            # M18 Phase 2: producer (hephaestus) may emit SSML in dialogue
+            # bodies. Strip here so the comms window renders clean text;
+            # the TTS engine still receives raw SSML via streaming.py for
+            # future ElevenLabs prosody passthrough.
+            status_msg = strip_ssml(text.replace(emoji, "", 1).strip())
 
             # Detect agent switch → handoff chatter (pilot comms transition)
             if _last_seen_agent and _last_seen_agent != agent_name and _pipeline_chatter_enabled:

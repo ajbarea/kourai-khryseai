@@ -45,6 +45,7 @@ from kourai_common.messaging import (
     stream_event,
     user_message,
 )
+from kourai_common.ssml import strip_ssml
 from kourai_common.tts_realtime import RealtimeTTSEngine
 
 if TYPE_CHECKING:
@@ -366,11 +367,16 @@ async def handle_message(request: Request) -> StreamingResponse:
                     is_dialogue = kind == KIND_DIALOGUE
 
                     if is_dialogue:
+                        # M18 Phase 2: strip SSML before yielding to Ren'Py.
+                        # /tts re-strips on its own path, so a producer's
+                        # SSML still reaches the engine via the strip layer
+                        # in tts_realtime.synthesize_to_wav.
+                        display_msg = strip_ssml(status_msg)[:200]
                         yield (
                             json.dumps(
                                 {
                                     "agent": "hephaestus",
-                                    "message": status_msg[:200],
+                                    "message": display_msg,
                                     "portrait": "neutral",
                                 }
                             )

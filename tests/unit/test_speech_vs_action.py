@@ -26,6 +26,7 @@ from agents.hephaestus.agent import HEPH_HANDOFFS, ROUTING_PROMPT, get_heph_narr
 from hosts.cli.rendering import _comms_window
 from hosts.cli.styling import _ITALIC
 from kourai_common.prompts import UNIVERSAL_RULES, build_system_prompt
+from kourai_common.ssml import strip_ssml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -75,34 +76,51 @@ class TestHephaestusRoutingPrompt:
 
 
 class TestHephaestusHandoffs:
-    """Every HEPH_HANDOFFS value is dialogue and must be quote-wrapped."""
+    """Every HEPH_HANDOFFS value is SSML-wrapped dialogue. The displayable
+    form (after strip_ssml) must still open and close with double quotes
+    so the host's quoted-line italic convention survives the strip.
+    """
 
-    def test_all_handoff_lines_open_with_quote(self):
+    def test_all_handoff_lines_are_ssml_wrapped(self):
         offenders = [
             (agent, line)
             for agent, lines in HEPH_HANDOFFS.items()
             for line in lines
-            if not line.startswith('"')
+            if not (line.startswith("<speak>") and line.endswith("</speak>"))
         ]
-        assert offenders == [], f"unquoted handoff lines: {offenders}"
+        assert offenders == [], f"non-SSML handoff lines: {offenders}"
 
-    def test_all_handoff_lines_close_with_quote(self):
+    def test_stripped_handoff_lines_open_with_quote(self):
         offenders = [
-            (agent, line)
+            (agent, line, strip_ssml(line))
             for agent, lines in HEPH_HANDOFFS.items()
             for line in lines
-            if not line.endswith('"')
+            if not strip_ssml(line).startswith('"')
         ]
-        assert offenders == [], f"handoff lines missing closing quote: {offenders}"
+        assert offenders == [], f"stripped handoff lines missing opening quote: {offenders}"
 
-    def test_get_heph_narration_returns_quoted_line_for_known_agent(self):
+    def test_stripped_handoff_lines_close_with_quote(self):
+        offenders = [
+            (agent, line, strip_ssml(line))
+            for agent, lines in HEPH_HANDOFFS.items()
+            for line in lines
+            if not strip_ssml(line).endswith('"')
+        ]
+        assert offenders == [], f"stripped handoff lines missing closing quote: {offenders}"
+
+    def test_get_heph_narration_returns_ssml_for_known_agent(self):
         line = get_heph_narration("metis")
-        assert line.startswith('"') and line.endswith('"')
+        assert line.startswith("<speak>") and line.endswith("</speak>")
+        # And the spoken form is quoted dialogue.
+        stripped = strip_ssml(line)
+        assert stripped.startswith('"') and stripped.endswith('"')
 
-    def test_get_heph_narration_returns_quoted_line_for_unknown_agent(self):
-        # The fallback must obey the convention too.
+    def test_get_heph_narration_returns_ssml_for_unknown_agent(self):
+        # The fallback must obey both invariants too.
         line = get_heph_narration("zzz_not_an_agent")
-        assert line.startswith('"') and line.endswith('"')
+        assert line.startswith("<speak>") and line.endswith("</speak>")
+        stripped = strip_ssml(line)
+        assert stripped.startswith('"') and stripped.endswith('"')
 
 
 class TestCommsWindowItalic:
@@ -124,6 +142,31 @@ class TestCommsWindowItalic:
     def test_whisper_unquoted_skips_italic(self):
         rendered = _comms_window("techne", "compiling fixtures", style="whisper")
         assert _ITALIC not in rendered
+
+
+class TestMaidenifyStatusStripsSsml:
+    """M18 Phase 2: producer dialogue arrives as SSML; the host display
+    boundary strips so the player sees clean text. The TTS engine still
+    receives raw SSML upstream of this so prosody can be used by future
+    SSML-native engines (M6 ElevenLabs).
+    """
+
+    def test_ssml_dialogue_renders_stripped_and_italic(self):
+        from hosts.cli import events
+
+        # Reset the module-level _last_seen_agent so handoff chatter
+        # doesn't fire mid-test and pollute the assertion.
+        events._last_seen_agent = None
+        ssml = '\U0001f525 <speak>"Metis! Draw up the plans. <break time="200ms"/>And no improvising."</speak>'
+
+        formatted, agent = events._maidenify_status(ssml)
+        assert agent == "hephaestus"
+        # No raw SSML tags survive into the rendered comms window.
+        assert "<speak>" not in formatted and "<break" not in formatted
+        # Quote convention preserved → italic styling kicks in.
+        assert _ITALIC in formatted
+        # Break collapses to a single space, content reads naturally.
+        assert '"Metis! Draw up the plans. And no improvising."' in formatted
 
 
 class TestGuiIsQuotedDialogue:
