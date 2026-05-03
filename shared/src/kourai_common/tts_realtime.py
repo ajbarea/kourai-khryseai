@@ -250,13 +250,14 @@ class RealtimeTTSEngine:
             logger.debug("Empty text, skipping TTS")
             return
 
-        # M18 Phase 2: producers emit SSML; engine strips for Kokoro (no
-        # native SSML, hexgrad/kokoro#36 still open). Future ElevenLabs
-        # / Azure / Google engine swaps that take SSML verbatim will skip
-        # this call site.
+        # Defensive strip — guards against future LLM output that wraps
+        # text in `<speak>` or other XML-shaped markup (Kokoro would
+        # phonemize the angle brackets literally). See
+        # kourai_common.ssml docstring for the walked-back M18 Phase 2
+        # SSML producer plan and why this stays defensive-only.
         text = strip_ssml(text)
         if not text.strip():
-            logger.debug("SSML stripped to empty, skipping TTS")
+            logger.debug("Stripped to empty, skipping TTS")
             return
 
         # Resolve voice
@@ -358,9 +359,8 @@ class RealtimeTTSEngine:
         if not text.strip():
             return b""
 
-        # M18 Phase 2: SSML strip mirrors speak() so vn_bridge inherits
-        # the same input contract as CLI/GUI — producers emit SSML, every
-        # consumer feeds Kokoro plain text.
+        # Defensive strip mirrors speak() — same defense-in-depth boundary
+        # against future LLM-emitted markup. See kourai_common.ssml docstring.
         text = strip_ssml(text)
         if not text.strip():
             return b""

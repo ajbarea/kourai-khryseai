@@ -174,11 +174,12 @@ def _comms_window(agent_name: str, dialogue: str, *, style: str = "speak") -> st
     Returns:
         Formatted multi-line string ready for _echo().
     """
-    # M18 Phase 2: SSML may arrive from any producer (HEPH_HANDOFFS,
-    # HANDOFF_LINES, VICTORY_LINES, future LLM-generated SSML). Strip
-    # at the display chokepoint so every caller of _comms_window gets
-    # clean text without remembering to strip first. strip_ssml is
-    # idempotent and fast on plain text (early return on no `<`).
+    # Defensive strip at the display chokepoint — no producer currently
+    # emits SSML (the M18 Phase 2 markup was reverted; see
+    # kourai_common.ssml docstring). Guards against future LLM output
+    # that decides to wrap text in `<speak>` or other XML-shaped tags
+    # leaking literal `<...>` chars into the comms window. Idempotent
+    # and fast on plain text via the `<`-substring early-return.
     dialogue = strip_ssml(dialogue)
 
     m = _MAIDENS.get(agent_name)

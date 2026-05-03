@@ -5,7 +5,7 @@ A public, living plan for where the forge is heading. Items here are either
 *currently working on* lives in [IMPL.md](./IMPL.md) — when it lands, the
 matching milestone here collapses to a single line under "Shipped".
 
-Last reviewed: 2026-05-02. Active focus: **M18 Phase 2 (SSML inside dialogue bodies)** — see [IMPL.md](./IMPL.md) for the active work, the open invariants, and the priority-ordered "Up next" list. Pre-release perfection stance unchanged: May 2026 best practice no matter the cost, web-search before any implementation, architectural fix over expedient patch. Sister-repo audit weekly cron runs Mondays 12:00 UTC.
+Last reviewed: 2026-05-03. Active focus: **M6 ElevenLabs hybrid as pre-player-release blocker** (promoted 2026-05-03 after walking back the M18 Phase 2 SSML investment — ElevenLabs v3's actual May 2026 docs don't support SSML break tags, so the producer-side SSML markup was wrong for the M6 target; see Shipped log entry for #152). See [IMPL.md](./IMPL.md) for the active work, the open invariants, and the priority-ordered "Up next" list. Pre-release perfection stance unchanged: May 2026 best practice no matter the cost, **web-search the SPECIFIC target's primary docs at the planning step** (not just at implementation), architectural fix over expedient patch. Sister-repo audit weekly cron runs Mondays 12:00 UTC.
 
 ---
 
@@ -414,7 +414,27 @@ M20 on M18+M19 is one coordinated UX wave rather than three drips.
 
 ---
 
-## M6 — Future / unprioritized
+## M6 — ElevenLabs hybrid (pre-player-release blocker)
+
+Promoted from "future-future" 2026-05-03 after strategic review of the
+character-voice-quality gap between Kokoro (current) and ElevenLabs.
+Character voice IS the product (per-maiden personality is the core
+mechanic); Kokoro can play 10 different voicepacks but cannot deliver
+per-character emotional control. ElevenLabs can. See IMPL.md "M6
+ElevenLabs hybrid" for current model strategy + cost projections +
+required add-ons (audio caching layer, per-engine markup adapter,
+per-persona prosody design pass).
+
+[VOICE_CASTING_PLAN.md](../tools/voice-lab/VOICE_CASTING_PLAN.md)
+already has voice IDs + settings cast for each maiden. The
+`tools/voice-lab/` Next.js app is the casting/preview surface that
+landed pre-2026-05; production wiring (M6) is the swap from Kokoro
+into the same `RealtimeTTSEngine` interface.
+
+The detail items below were surfaced under the old "M6 — Future /
+unprioritized" framing for unrelated CLI host / UX work; many are
+still relevant but should be re-prioritized against the ElevenLabs
+swap timeline at next planning step.
 
 ### Surfaced 2026-04-26 from external research (OSS Claude Code clones, Typer, MCP/A2A specs)
 
@@ -644,6 +664,26 @@ architectural moves; valuable but not the first lift.
 One-line per item, newest first. Detail moves to git history when work
 lands — these docs are plans + scratchpad, not a historical archive.
 
+- 2026-05-03 — **Walked back M18 Phase 2 SSML markup investment** [#152].
+  Reverted dialogue-content SSML from #149 (HEPH_HANDOFFS) and #150
+  (HANDOFF_LINES, HANDOFF_FALLBACKS, VICTORY_LINES, plus the AGENT_QUOTES
+  + user_quotes that PR #151 had queued — that PR closed as
+  superseded). After AJ flagged the M6 ElevenLabs target, web-searched
+  ElevenLabs's actual May 2026 best-practices docs and found: Eleven v3
+  (the high-impact-line target per VOICE_CASTING_PLAN.md) does NOT
+  support SSML break tags; uses `[bracket]` audio tags + ellipses +
+  natural punctuation. Eleven Flash V2.5 supports `<break>` but
+  ElevenLabs warns against overuse. So `<speak>...<break time="200ms"/>...</speak>`
+  was the wrong markup for both Kokoro AND the planned M6 target. Plain
+  text with rich punctuation reads naturally on both. **What stayed:**
+  the `kourai_common.ssml.strip_ssml` helper + defusedxml dep + every
+  display-chokepoint and TTS-engine strip call as defensive
+  infrastructure for any future LLM-emitted markup. **Lesson:**
+  web-search the SPECIFIC target's primary docs at the planning step,
+  not just at implementation; logged in
+  `feedback_websearch_before_arch_decision` memory record. M6 ElevenLabs
+  hybrid promoted from "future-future" to pre-player-release blocker
+  in the same conversation. ROADMAP M6 + IMPL "Up next" updated.
 - 2026-05-03 — **M18 Phase 2 SSML rollout — handoff/victory dicts +
   display chokepoint** [#150]. Sibling PR to #149's hephaestus pilot,
   expanded one layer up. (a) `HANDOFF_LINES` (11 entries),
