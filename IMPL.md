@@ -144,24 +144,21 @@ see [feedback_websearch_before_arch_decision](../../.claude/projects/-home-ajbar
 architectural fix over expedient patch. Pick by impact + caller
 reality, not file-of-origin.
 
-1. **M20 sub-task 2 — audio-led text reveal.** Confirmed load-bearing
-   on both surfaces by the 2026-05-03 measurement (3s streaming, 4-7s
-   vn_bridge full-WAV). **Tier 2 CLI [#153]; Tier 1 karaoke CLI [#154];
-   GUI Tier 1 word-paced typewriter [#156]:** the engine grew per-call
-   `on_audio_start` + `on_word` kwargs dispatched via stable
-   trampolines, and `speak_sync` forwards them so the GUI's
-   `speak_async` daemon-thread wrapper can drive the typewriter
-   without blocking the pygame loop. `TypewriterManager.start_word_paced`
-   + `advance_word` + `flush_remaining` give the GUI a word-paced
-   mode where the cursor advances on each TTS `on_word` event
-   (`displayed_chars` is a single int write — safe under the GIL for
-   the 60Hz draw loop). `queue_event_handler` routes dialogue
-   through the word-paced path when TTS will speak; falls back to
-   time-based typewriter (existing behavior) when TTS is off /
-   auto-muted / not wired. **VN surface (vn_bridge → Ren'Py `voice` +
-   `cps` driven by word-timing metadata over the bridge) follows
-   next.** Settings toggle (`dialogue_sync_mode = audio-led | instant`)
-   is sub-task 4.
+1. **M20 sub-task 2 — audio-led text reveal.** All three surfaces
+   shipped: **CLI Tier 2 [#153]**, **CLI Tier 1 karaoke [#154]**,
+   **GUI Tier 1 word-paced typewriter [#156]**, **VN audio-led cps
+   [#157]**. The engine grew per-call `on_audio_start` + `on_word`
+   kwargs dispatched via stable trampolines; `speak_sync` forwards
+   them so the GUI's daemon-thread wrapper can drive the typewriter
+   without blocking the pygame loop. The VN surface uses a different
+   primitive — `vn_bridge` `/tts` returns an `X-TTS-Duration-Seconds`
+   header (computed from the WAV frames / framerate), Ren'Py's
+   `bridge.request_tts` parses it and the main loop wraps each say
+   in `{cps=N}...{/cps}` so the typewriter finishes when the voice
+   does. **Live VN smoke needed** to verify the cps math feels right
+   end-to-end (Ren'Py-side change can only be live-tested with AJ
+   at the keyboard). Settings toggle
+   (`dialogue_sync_mode = audio-led | instant`) is sub-task 4.
 
    Open follow-ups within sub-task 2 itself:
    - Optional typing indicator during the synthesis-wait window
