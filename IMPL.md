@@ -6,9 +6,10 @@ to a one-liner under "Shipped" and this file resets to the next milestone.
 Git history is the archive — these docs are plans + scratchpad, not a
 historical record.
 
-Updated: 2026-05-02 · Active focus: **M18 Phase 2 (SSML inside dialogue
-bodies)**. M18 Phase 3 Part A (strict kind routing) and M20 sub-task 1
-(Kokoro voice tensor pre-warm) shipped today. main is clean; issue #126
+Updated: 2026-05-03 · Active focus: **M18 Phase 2 producer-side wrap
+pilot (hephaestus first)**. Engine-side strip layer landed 2026-05-03
+[#147] alongside vn_bridge headless unblock [#145] and cross-platform
+TTS auto-mute fallback [#146]. main is clean; issue #126
 (upstream-blocked `@xmldom/xmldom@0.8.12` HIGH bundled inside npm
 11.13.0) is auto-managed by `.github/workflows/issue-126-rescan.yml` —
 Saturdays 14:17 UTC from 2026-05-16, auto-closes once upstream lands
@@ -38,21 +39,28 @@ downstream.
   `break`, `prosody`, `emphasis`, `say-as`. Avoid `phoneme` if v3-on-ElevenLabs
   is on the roadmap; avoid `audio` (provider-side resource fetch).
 
-**Open questions:**
-- **Producer vs consumer SSML wrapping?** Producer-side (each specialist's
-  emissions) means each specialist owns its prosody — Kallos's lilt vs
-  Hephaestus's gruff cadence stays per-agent, matching the Phase 1 content-
-  kind tagging architecture. Consumer-side (host CLI / vn_bridge wraps in
-  default SSML) means a single layer controls the cadence baseline;
-  specialists stay text-only and prosody is uniform. Producer-side composes
-  better with per-agent persona work; consumer-side ships faster.
-- **Strip-then-synthesize layer placement.** SSML strip in
-  `kourai_common.tts_realtime.RealtimeTTSEngine` keeps callers SSML-agnostic
-  and a future engine swap inherits the strip layer; SSML strip in the host
-  keeps it end-to-end visible in logs and explicit at the engine boundary.
-  Engine-side parallels how Azure/Google SDKs handle SSML internally.
-- **Per-specialist persona prosody** (Hephaestus gruff vs Kallos lilting) —
-  defer to a follow-on once structural plumbing is in.
+**Resolved 2026-05-03:**
+- **Producer vs consumer wrap → producer-side.** Each specialist
+  emits SSML in its dialogue body. Per-agent prosody (Kallos lilt,
+  Hephaestus gruff) stays per-agent and matches Phase 1's content-
+  kind tagging architecture. Consumer-side uniformity would have
+  thrown away the per-maiden voice angle.
+- **Strip layer placement → engine-side.** Lives in
+  `kourai_common.tts_realtime.RealtimeTTSEngine` (and via shared
+  helper `kourai_common.ssml.strip_ssml`). Single SSML-aware
+  boundary; M6 ElevenLabs swap becomes a one-line change (skip the
+  strip on engines that take SSML verbatim). Mirrors how
+  Azure/Google SDKs handle SSML internally.
+- **Per-specialist persona prosody** — still deferred to a follow-on
+  once the producer-side plumbing has at least one specialist
+  emitting SSML.
+
+**Status 2026-05-03:** strip layer + tests landed [#147]. Next
+sub-task: producer-side wrap pilot — pick one specialist (hephaestus
+is the obvious starting point, biggest LLM context), update its
+prompt template to wrap dialogue Parts in `<speak>...</speak>` with
+optional `<break>` for natural pauses, smoke through CLI + vn_bridge
+to confirm no regression, then roll out one specialist at a time.
 
 ## M18 Phase 3 — KIND_CODE / KIND_SPEC distinct render paths (deferred)
 
@@ -98,24 +106,32 @@ Pre-release perfection stance: no workarounds, web-search 2026 best
 practice before any implementation, architectural fix over expedient patch.
 Pick by impact + caller reality, not file-of-origin.
 
-1. **M18 Phase 2 — SSML inside dialogue bodies** (active focus above).
-2. **M20 — Audio-text synchronization.** Builds on M18 (kind routing) +
-   M19 (RealtimeTTS word-timing API already wired via `on_word=` callback).
-   9-14s text-precedes-audio gap is a player-notices UX issue. **Sub-task 1
-   shipped:** Kokoro voice tensor pre-warm (`_prewarm_agent_voices` loads
-   all 10 .pt voice tensors at engine init alongside the existing
-   pipeline pre-warm). Sub-task 2 (audio-led text reveal — word-by-word
-   reveal driven by RealtimeTTS `on_word` callback for English voices)
-   and sub-task 3 (three-surface implementation across CLI / GUI / VN)
-   remain.
-3. **Live VN smoke** — exercises the new vn_bridge `/tts` →
-   `RealtimeTTSEngine.synthesize_to_wav` path AND metadata-based dialogue
-   routing.
-4. **`docs/architecture/puck-first-run-tutorial.md`** — pairs with the M6
-   player-onboarding theme.
-5. **M18 Phase 3 Part B** — distinct render paths for `KIND_CODE` /
+1. **M18 Phase 2 producer-side wrap pilot — hephaestus first.** Strip
+   layer is in [#147]; next is teaching one specialist to actually
+   emit SSML in dialogue bodies. Hephaestus is the cleanest pilot
+   (largest LLM context, established voice). Smoke through CLI +
+   vn_bridge before rolling out other specialists. Per-persona
+   prosody (`<prosody rate>`/`<prosody pitch>` per maiden) follows.
+2. **M20 sub-task 2 — audio-led text reveal.** Confirmed load-bearing
+   on both surfaces by the 2026-05-03 measurement (3s streaming, 4-7s
+   vn_bridge full-WAV). Replaces immediate text rendering with
+   deferred-render gated on TTS readiness; word-by-word for English
+   (RealtimeTTS `on_word` callback) and full-text-on-first-chunk for
+   non-English / Edge TTS. Sub-task 3 (three-surface implementation
+   across CLI / GUI / VN) follows the same plumbing.
+3. **Uvicorn-takeover sweep across specialist agents.** All 10
+   agents (`hephaestus`, `kallos`, …) call `uvicorn.run(app, ...)`
+   without `log_config=None`, so any `log.info(...)` they emit is
+   silently dropped — same root cause #145 fixed for vn_bridge.
+   Mechanical sweep across `agents/*/__main__.py`.
+4. **Live VN smoke** — exercises the new vn_bridge `/tts` →
+   `RealtimeTTSEngine.synthesize_to_wav` path AND metadata-based
+   dialogue routing. Needs AJ at the keyboard.
+5. **`docs/architecture/puck-first-run-tutorial.md`** — pairs with
+   the M6 player-onboarding theme. Tractable autonomously.
+6. **M18 Phase 3 Part B** — distinct render paths for `KIND_CODE` /
    `KIND_SPEC`. Blocked on a specialist actually emitting either kind.
-6. **M5 / M12 / M15 / M6 follow-ons** — see ROADMAP for scope.
+7. **M5 / M12 / M15 / M6 follow-ons** — see ROADMAP for scope.
 
 Music playlist (#11) — content-driven; AJ adds tracks to
 `assets/audio/music/` over time. No code work.

@@ -39,6 +39,7 @@ from kourai_common.audio_env import (
     silence_alsa_lib_errors,
     silence_audio_init_noise,
 )
+from kourai_common.ssml import strip_ssml
 from kourai_common.tts_backend import (
     AGENT_VOICE_MAP,
     TTSVoiceConfig,
@@ -249,6 +250,15 @@ class RealtimeTTSEngine:
             logger.debug("Empty text, skipping TTS")
             return
 
+        # M18 Phase 2: producers emit SSML; engine strips for Kokoro (no
+        # native SSML, hexgrad/kokoro#36 still open). Future ElevenLabs
+        # / Azure / Google engine swaps that take SSML verbatim will skip
+        # this call site.
+        text = strip_ssml(text)
+        if not text.strip():
+            logger.debug("SSML stripped to empty, skipping TTS")
+            return
+
         # Resolve voice
         if voice_key is not None:
             voice_cfg = VOICE_ROSTER.get(voice_key, get_voice_for_agent(None))
@@ -345,6 +355,13 @@ class RealtimeTTSEngine:
         runtime ``muted=True`` here only stops audio frame writes; it
         does not prevent the device-open probe inside RealtimeTTS.
         """
+        if not text.strip():
+            return b""
+
+        # M18 Phase 2: SSML strip mirrors speak() so vn_bridge inherits
+        # the same input contract as CLI/GUI — producers emit SSML, every
+        # consumer feeds Kokoro plain text.
+        text = strip_ssml(text)
         if not text.strip():
             return b""
 

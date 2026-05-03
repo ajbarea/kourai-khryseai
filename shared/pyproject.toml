@@ -20,6 +20,13 @@ dependencies = [
     "opentelemetry-exporter-otlp-proto-http>=1.20.0",
     "huggingface-hub>=1.5.0",
     "pydantic>=2.0,<3.0",
+    # M18 Phase 2: SSML strip layer (`kourai_common.ssml`) parses LLM-
+    # generated SSML before feeding Kokoro. Stdlib `xml.etree` is
+    # vulnerable to billion-laughs / XXE on untrusted input; defusedxml
+    # is the canonical hardening drop-in (Python docs still recommend
+    # it as of 2026-05 — module-level patch is deprecated but the
+    # safe parser classes stay).
+    "defusedxml>=0.7.1",
 ]
 
 [project.scripts]

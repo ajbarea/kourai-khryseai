@@ -1,0 +1,91 @@
+"""SSML strip-then-synthesize layer for TTS engines without native SSML.
+
+Specialists emit dialogue as SSML (`<speak>...<break time="200ms"/>...</speak>`),
+the engine strips tags and feeds plain text to Kokoro. When a future engine
+swap (M6: ElevenLabs Flash V2 / Azure / Google) supports SSML natively, callers
+that bypass `strip_ssml` get the markup verbatim.
+
+research(2026-05): Kokoro mainline (`hexgrad/kokoro#36`) and Kokoro-FastAPI
+(`remsky/Kokoro-FastAPI#396`) both still have SSML support as open feature
+requests — no progress as of May 2026, so the strip layer remains mandatory.
+ElevenLabs deliberately does not feature SSML (neural prosody handles it),
+so the portable subset matters less than the strip itself.
+"""
+
+from __future__ import annotations
+
+import logging
+import re
+from typing import TYPE_CHECKING
+
+# defusedxml hardens stdlib's ElementTree against billion-laughs / XXE on
+# LLM-emitted SSML — recommended by Python docs through 2026 even though
+# its module-level patch shim is deprecated. Only the parse path is
+# untrusted; Element type hints use the stdlib class.
+from defusedxml.ElementTree import ParseError, fromstring
+
+if TYPE_CHECKING:
+    from xml.etree.ElementTree import Element
+
+logger = logging.getLogger(__name__)
+
+# Tags that imply audible whitespace when stripped — `<break>` adds a pause,
+# so the text on either side shouldn't run together. Keep the gap tiny so
+# Kokoro's own sentence chunker doesn't read it as a punctuation marker.
+_BREAK_LIKE_TAGS = frozenset({"break", "p", "s"})
+
+_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def strip_ssml(text: str) -> str:
+    """Return the text content of an SSML document, dropping all tags.
+
+    Plain text passes through unchanged. Well-formed SSML is parsed via
+    :mod:`xml.etree.ElementTree` so structural tags become spaces and the
+    payload reads cleanly. Malformed input falls back to a regex strip —
+    a producer bug shouldn't kill TTS, just skip the prosody hints.
+    """
+    if not text or "<" not in text:
+        return text
+
+    cleaned = _strip_via_etree(text)
+    if cleaned is not None:
+        return cleaned
+
+    # Fallback: regex tag scrub. Less precise (no break-tag whitespace) but
+    # always returns *something* synthesizable.
+    logger.debug("SSML parse failed, falling back to regex strip")
+    return _TAG_RE.sub(" ", text).strip()
+
+
+def _strip_via_etree(text: str) -> str | None:
+    """Parse with defusedxml's safe ET and concatenate text nodes. None on failure."""
+    # ET expects a single root. `<speak>...</speak>` already provides one;
+    # bare fragments need a synthetic wrapper.
+    wrapped = text if text.lstrip().startswith("<speak") else f"<speak>{text}</speak>"
+    try:
+        root = fromstring(wrapped)
+    except ParseError:
+        return None
+    parts: list[str] = []
+    _walk(root, parts)
+    return _collapse_whitespace("".join(parts))
+
+
+def _walk(node: Element, parts: list[str]) -> None:
+    """Depth-first text accumulator. Emits a space for break-like tags so
+    `<break/>` between two sentences doesn't glue them.
+    """
+    tag_local = node.tag.rsplit("}", 1)[-1].lower()  # strip namespace
+    if tag_local in _BREAK_LIKE_TAGS:
+        parts.append(" ")
+    if node.text:
+        parts.append(node.text)
+    for child in node:
+        _walk(child, parts)
+        if child.tail:
+            parts.append(child.tail)
+
+
+def _collapse_whitespace(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip()
