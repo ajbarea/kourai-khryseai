@@ -146,17 +146,24 @@ reality, not file-of-origin.
 
 1. **M20 sub-task 2 — audio-led text reveal.** Confirmed load-bearing
    on both surfaces by the 2026-05-03 measurement (3s streaming, 4-7s
-   vn_bridge full-WAV). **Tier 2 (CLI surface) shipped [#153]:**
-   `_format_greeting` (startup banner) and the streaming.py KIND_DIALOGUE
-   path now defer the comms-window echo until the engine's
-   `on_audio_start` trampoline fires, eliminating the
-   "text-precedes-audio" disconnect. Auto-mute / engine-error / muted
-   paths echo via the finally-fallback so dialogue is never lost.
-   **Tier 1 (word-by-word reveal via RealtimeTTS `on_word` callback)
-   for English voices follows next.** Sub-task 3 (GUI + VN surfaces)
-   reuses the same plumbing. Worth driving on Kokoro now since the
-   callback API path is engine-agnostic — any work here carries to
-   ElevenLabs unchanged.
+   vn_bridge full-WAV). **Tier 2 (CLI surface) shipped [#153];
+   Tier 1 karaoke shipped [#154]:** the engine grew per-call
+   `on_audio_start` + `on_word` kwargs dispatched via stable
+   trampolines (RealtimeTTS only accepts these at TextToAudioStream
+   construction). CLI streaming + greeting paths now use a karaoke
+   single-line render — header on audio start, words appended via
+   `on_word` for English voices (all maidens), close on completion.
+   Tier 2 box stays as the fallback when on_audio_start never fires
+   (auto-muted, engine error). **Sub-task 3 (GUI + VN surfaces)
+   follows next** — same trampoline pattern but different rendering
+   loops. Settings toggle (`dialogue_sync_mode = audio-led | instant`)
+   is sub-task 4.
+
+   Open follow-ups within sub-task 2 itself:
+   - Optional typing indicator during the synthesis-wait window
+     (~3s on Kokoro CPU) so the player has visible feedback.
+   - Box-with-progressive-body alternative if AJ wants the comms
+     window aesthetic preserved during the karaoke reveal.
 2. **Live VN smoke** — exercises the vn_bridge `/tts` →
    `RealtimeTTSEngine.synthesize_to_wav` path + metadata-based
    dialogue routing end-to-end. Needs AJ at the keyboard.
