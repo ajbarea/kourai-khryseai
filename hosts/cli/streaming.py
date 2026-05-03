@@ -144,6 +144,7 @@ async def send_and_stream(
     tts: RealtimeTTSEngine | None = None,
     gossip_enabled: bool = True,
     captions_enabled: bool = True,
+    dialogue_sync_mode: str = "audio-led",
     *,
     memoir: Memoir | None = None,
     scene_id: str | None = None,
@@ -240,8 +241,9 @@ async def send_and_stream(
                     )
                     will_speak = kind == KIND_DIALOGUE and tts is not None and bool(agent)
                     will_display = not suppress_visual
+                    audio_led = dialogue_sync_mode == "audio-led"
 
-                    if will_display and will_speak:
+                    if will_display and will_speak and audio_led:
                         # M20 sub-task 2 Tier 1 (karaoke single-line) +
                         # Tier 2 (deferred box) fallback. The closures
                         # are invoked synchronously inside this iteration's
@@ -290,6 +292,12 @@ async def send_and_stream(
                                 # nor on_word fired (auto-muted, engine
                                 # never reached playback).
                                 _echo(formatted)
+                    elif will_display and will_speak:
+                        # M20 sub-task 4 "instant" mode: legacy behavior
+                        # — text appears immediately, audio catches up.
+                        _echo(formatted)
+                        msg = text.split(" ", 1)[-1] if " " in text else text
+                        await tts.speak(msg, agent)
                     elif will_display:
                         _echo(formatted)
                     elif will_speak:

@@ -219,6 +219,54 @@ async def test_dialogue_karaoke_close_fires_even_if_no_words_revealed(_captured)
 
 
 @pytest.mark.asyncio
+async def test_instant_mode_echoes_immediately_then_speaks(_captured):
+    """M20 sub-task 4: when dialogue_sync_mode='instant', the legacy
+    behavior returns — formatted text echoes immediately and TTS fires
+    in parallel without on_audio_start / on_word callbacks. No karaoke
+    deferral.
+    """
+    tts = MagicMock()
+    tts.speak = AsyncMock()
+    dialogue = _status_event('"Welcome back to the forge."', KIND_DIALOGUE)
+    client = _client_yielding([dialogue, _completed_task()])
+
+    await send_and_stream(
+        client,
+        "prompt",
+        "ctx-1",
+        tts=tts,
+        captions_enabled=True,
+        dialogue_sync_mode="instant",
+    )
+
+    # Visual echoed exactly once via the immediate-render path.
+    visual_lines = [line for line in _captured if "[FORMATTED]" in line]
+    assert len(visual_lines) == 1
+    # speak() called WITHOUT the audio-led callbacks.
+    tts.speak.assert_awaited_once()
+    call_kwargs = tts.speak.await_args.kwargs
+    assert "on_audio_start" not in call_kwargs
+    assert "on_word" not in call_kwargs
+
+
+@pytest.mark.asyncio
+async def test_audio_led_mode_is_default_when_kwarg_omitted(_captured):
+    """Backwards-compat — `dialogue_sync_mode` defaults to 'audio-led'
+    so existing callers get the karaoke path without opting in."""
+    tts = MagicMock()
+    tts.speak = AsyncMock()
+    dialogue = _status_event('"Welcome back to the forge."', KIND_DIALOGUE)
+    client = _client_yielding([dialogue, _completed_task()])
+
+    await send_and_stream(client, "prompt", "ctx-1", tts=tts, captions_enabled=True)
+
+    # No kwarg passed → default audio-led → karaoke path → on_word + on_audio_start present.
+    call_kwargs = tts.speak.await_args.kwargs
+    assert callable(call_kwargs.get("on_audio_start"))
+    assert callable(call_kwargs.get("on_word"))
+
+
+@pytest.mark.asyncio
 async def test_dialogue_visual_falls_back_when_on_audio_start_never_fires(_captured):
     """If TTS auto-mute is on or the engine errors before audio starts,
     on_audio_start never fires and the finally-fallback echoes the

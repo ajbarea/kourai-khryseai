@@ -636,6 +636,14 @@ screen preferences():
                     textbutton _("Disabled") action SetVariable("persistent.tts_enabled", False)
                 text "(Agent voices via edge-tts — requires vn-bridge /tts service)" size 14 color "#A0A0A0"
 
+                # M20 sub-task 4 — dialogue / audio sync mode
+                text _("Dialogue Pacing") size 22 color "#C9944A"
+                hbox:
+                    spacing 20
+                    textbutton _("Audio-led") action SetVariable("persistent.dialogue_sync_mode", "audio-led")
+                    textbutton _("Instant") action SetVariable("persistent.dialogue_sync_mode", "instant")
+                text "(Audio-led: typewriter matches voice. Instant: text first, audio catches up.)" size 14 color "#A0A0A0"
+
 
 style pref_label is gui_label
 style pref_label_text is gui_label_text

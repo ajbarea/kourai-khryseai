@@ -63,6 +63,14 @@ label start:
         if not hasattr(persistent, "tts_enabled"):
             persistent.tts_enabled = False
 
+        # M20 sub-task 4 — dialogue/audio sync mode for the VN typewriter:
+        #   "audio-led" (default): per-line cps computed from audio
+        #     duration so the typewriter finishes when the voice does.
+        #   "instant": Ren'Py's default cps; text reveals at its own
+        #     pace and audio catches up.
+        if not hasattr(persistent, "dialogue_sync_mode"):
+            persistent.dialogue_sync_mode = "audio-led"
+
         # Forge Virtues wellness guardrails
         if not hasattr(persistent, "wellness_warning_seen"):
             persistent.wellness_warning_seen = False
