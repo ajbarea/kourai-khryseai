@@ -644,6 +644,20 @@ architectural moves; valuable but not the first lift.
 One-line per item, newest first. Detail moves to git history when work
 lands — these docs are plans + scratchpad, not a historical archive.
 
+- 2026-05-03 — **M18 Phase 2 SSML rollout — greetings + gossip
+  quotes** [#151]. Completes the static-dialogue rollout in
+  `shared/src/kourai_common/agents.py`: `AGENT_QUOTES` (24 entries)
+  and `AGENT_METADATA["user_quotes"]` (18 entries across 6 maidens)
+  now SSML-wrapped via the same `xml.sax.saxutils.escape` +
+  sentence-break programmatic conversion as #150. Caught one
+  abbreviation false-positive ("Mr. Soot-and-Leather" got an
+  unwanted mid-name break) and reverted that line by hand;
+  `Get. To. Work.` was confirmed intentional emphatic phrasing
+  (the breaks are the prosody point). New display-strip sites:
+  `_format_greeting` (CLI startup banner) and `_maiden_card` (CLI
+  `/maidens` gallery). TTS path stays raw. The
+  `test_agent_dialogue_ssml.py` parameterized invariant suite now
+  covers all 5 dialogue dicts (330 assertions).
 - 2026-05-03 — **M18 Phase 2 SSML rollout — handoff/victory dicts +
   display chokepoint** [#150]. Sibling PR to #149's hephaestus pilot,
   expanded one layer up. (a) `HANDOFF_LINES` (11 entries),

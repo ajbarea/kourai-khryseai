@@ -55,25 +55,24 @@ downstream.
   once the producer-side plumbing has at least one specialist
   emitting SSML.
 
-**Status 2026-05-03:** Phase 2 plumbing complete across the routing
-layer. Strip layer + tests landed [#147]; uvicorn-takeover sweep
-[#148] unblocks observability across all 10 specialists; hephaestus
-pilot [#149] proved the producer→strip→display flow end-to-end;
-[#150] rolled SSML to the centralized `HANDOFF_LINES` /
-`HANDOFF_FALLBACKS` / `VICTORY_LINES` dicts in
-`shared/src/kourai_common/agents.py` AND moved the strip into
-`_comms_window` itself so every CLI dialogue source gets stripped at
-the chokepoint without per-callsite changes. Open follow-ups:
+**Status 2026-05-03:** every static dialogue dict in
+`shared/src/kourai_common/agents.py` is now SSML — `HANDOFF_LINES`,
+`HANDOFF_FALLBACKS`, `VICTORY_LINES`, `AGENT_QUOTES`, and
+`AGENT_METADATA["user_quotes"]` (across [#147] strip layer, [#148]
+uvicorn sweep, [#149] hephaestus pilot, [#150] handoff/victory
+rollout, [#151] greeting/gossip rollout). `_comms_window` is the
+universal strip chokepoint for the comms-window display path;
+greeting + maiden-card sites strip explicitly via `_format_greeting`
+and `_maiden_card`. TTS engine receives raw SSML so M6's ElevenLabs
+swap inherits prosody hints. Open follow-ups:
 
 - LLM-generated dialogue (`CHAT:`, `CONFIRM_ORDER:`) — risk-managed
   prompt engineering, separate PR per agent.
 - Per-persona prosody (Kallos lilt, Hephaestus gruff via
   `<prosody rate>` / `<prosody pitch>` per maiden) — design pass
   needed.
-- AGENT_QUOTES gossip + `AGENT_METADATA["user_quotes"]` greetings —
-  same conversion treatment, mechanical follow-up.
-- GUI's separate `hosts/gui/maidens.py` HANDOFF_LINES copy — needs
-  the same SSML rollout once the GUI surface is touched.
+- GUI's separate `hosts/gui/maidens.py` dialogue copy — diverged
+  content, needs deduplication design pass before SSML rollout.
 - VN-side prosody preservation — Ren'Py loses prosody on the
   display→/tts roundtrip; vn_bridge needs to either send raw SSML in
   a parallel NDJSON field or drive `/tts` proactively. Defer until

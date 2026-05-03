@@ -15,7 +15,13 @@ from __future__ import annotations
 
 import pytest
 
-from kourai_common.agents import HANDOFF_FALLBACKS, HANDOFF_LINES, VICTORY_LINES
+from kourai_common.agents import (
+    AGENT_METADATA,
+    AGENT_QUOTES,
+    HANDOFF_FALLBACKS,
+    HANDOFF_LINES,
+    VICTORY_LINES,
+)
 from kourai_common.ssml import strip_ssml
 
 
@@ -30,6 +36,12 @@ def _all_lines():
     for agent, lines in VICTORY_LINES.items():
         for line in lines:
             yield ("VICTORY_LINES", agent, line)
+    for agent, lines in AGENT_QUOTES.items():
+        for line in lines:
+            yield ("AGENT_QUOTES", agent, line)
+    for agent, meta in AGENT_METADATA.items():
+        for line in meta.get("user_quotes", []):
+            yield ("user_quotes", agent, line)
 
 
 _ALL = list(_all_lines())

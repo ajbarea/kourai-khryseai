@@ -255,7 +255,8 @@ def _maiden_card(name: str) -> str:
     if not m:
         return f"{_DIM}Unknown maiden: {name}{_RESET}"
 
-    quote = secrets.choice(m["quotes"]) if m.get("quotes") else ""
+    # M18 Phase 2: AGENT_QUOTES are SSML; strip for the maiden card display.
+    quote = strip_ssml(secrets.choice(m["quotes"])) if m.get("quotes") else ""
 
     # Load avatar (PNG/JPG anime portrait > kaomoji fallback)
     raw_art = _get_maiden_art(name, str(m["face"]), size="card")

@@ -17,9 +17,9 @@ AGENT_METADATA: dict[str, dict[str, str | list[str]]] = {
         "epithet": "Master of the Forge",
         "desc": "God of the forge — creator of the golden maidens, commander of the pipeline",
         "user_quotes": [
-            "Welcome back to the forge. Let's build something worthy.",
-            "Ah, you again. Good. I could use someone who actually listens.",
-            "You bring the vision, I bring the fire. Let's go.",
+            '<speak>Welcome back to the forge.<break time="200ms"/>Let\'s build something worthy.</speak>',
+            '<speak>Ah, you again.<break time="200ms"/>Good.<break time="200ms"/>I could use someone who actually listens.</speak>',
+            '<speak>You bring the vision, I bring the fire.<break time="200ms"/>Let\'s go.</speak>',
         ],
     },
     "metis": {
@@ -27,9 +27,9 @@ AGENT_METADATA: dict[str, dict[str, str | list[str]]] = {
         "epithet": "Architect of Intent",
         "desc": "Strategic planner — designs the blueprint before a line is written",
         "user_quotes": [
-            "Oh, you're here~ I already planned something wonderful for us.",
-            "I love working with you. You actually appreciate my genius.",
-            "You have exquisite taste. I noticed that right away~",
+            "<speak>Oh, you're here~ I already planned something wonderful for us.</speak>",
+            '<speak>I love working with you.<break time="200ms"/>You actually appreciate my genius.</speak>',
+            '<speak>You have exquisite taste.<break time="200ms"/>I noticed that right away~</speak>',
         ],
     },
     "techne": {
@@ -37,9 +37,9 @@ AGENT_METADATA: dict[str, dict[str, str | list[str]]] = {
         "epithet": "Artisan of Code",
         "desc": "Code crafter — writes clean, elegant implementations",
         "user_quotes": [
-            "Hey gorgeous~ Need something built? I'm ALL yours.",
-            "You + me + a clean codebase = perfection. Just saying.",
-            "Clean code is my love language. And I'm feeling VERY eloquent for you~",
+            '<speak>Hey gorgeous~ Need something built?<break time="200ms"/>I\'m ALL yours.</speak>',
+            '<speak>You + me + a clean codebase = perfection.<break time="200ms"/>Just saying.</speak>',
+            '<speak>Clean code is my love language.<break time="200ms"/>And I\'m feeling VERY eloquent for you~</speak>',
         ],
     },
     "dokimasia": {
@@ -47,9 +47,9 @@ AGENT_METADATA: dict[str, dict[str, str | list[str]]] = {
         "epithet": "Guardian of Standards",
         "desc": "Quality guardian — tests everything, lets nothing slide",
         "user_quotes": [
-            "Don't worry, I'll protect your code from everything. Even itself~",
-            "Green tests are my favorite color. But your eyes are a close second~",
-            "I'm very... thorough. In everything I do. For you especially.",
+            "<speak>Don't worry, I'll protect your code from everything.<break time=\"200ms\"/>Even itself~</speak>",
+            '<speak>Green tests are my favorite color.<break time="200ms"/>But your eyes are a close second~</speak>',
+            '<speak>I\'m very... thorough.<break time="200ms"/>In everything I do.<break time="200ms"/>For you especially.</speak>',
         ],
     },
     "kallos": {
@@ -57,9 +57,9 @@ AGENT_METADATA: dict[str, dict[str, str | list[str]]] = {
         "epithet": "Eye of Elegance",
         "desc": "Style guardian — makes everything beautiful and consistent",
         "user_quotes": [
-            "Oh, you have such lovely taste~ Let me make everything match.",
-            "I made it beautiful. Just like you deserve, darling~",
-            "Every pixel, every line — perfect. Just like our little arrangement~",
+            "<speak>Oh, you have such lovely taste~ Let me make everything match.</speak>",
+            '<speak>I made it beautiful.<break time="200ms"/>Just like you deserve, darling~</speak>',
+            '<speak>Every pixel, every line — perfect.<break time="200ms"/>Just like our little arrangement~</speak>',
         ],
     },
     "mneme": {
@@ -67,9 +67,9 @@ AGENT_METADATA: dict[str, dict[str, str | list[str]]] = {
         "epithet": "Keeper of Memory",
         "desc": "Memory keeper — documents, chronicles, preserves knowledge",
         "user_quotes": [
-            "I remember everything about you~ Every commit, every keystroke...",
-            "Your git history is my sacred text. I've memorized every word.",
-            "Between you and me? Your code tells the most beautiful story.",
+            "<speak>I remember everything about you~ Every commit, every keystroke...</speak>",
+            '<speak>Your git history is my sacred text.<break time="200ms"/>I\'ve memorized every word.</speak>',
+            '<speak>Between you and me?<break time="200ms"/>Your code tells the most beautiful story.</speak>',
         ],
     },
     "puck": {
@@ -88,41 +88,41 @@ AGENT_METADATA: dict[str, dict[str, str | list[str]]] = {
 
 AGENT_QUOTES: dict[str, list[str]] = {
     "hephaestus": [
-        "I built every one of you. Show some respect.",
-        "The forge doesn't sleep. Neither do I.",
-        "I forged gods' weapons. Your code pipeline is a warm-up.",
-        "My leg may be lame, but my pipeline never limps.",
-        "I didn't get thrown off Olympus to write bad software.",
+        '<speak>I built every one of you.<break time="200ms"/>Show some respect.</speak>',
+        '<speak>The forge doesn\'t sleep.<break time="200ms"/>Neither do I.</speak>',
+        '<speak>I forged gods\' weapons.<break time="200ms"/>Your code pipeline is a warm-up.</speak>',
+        "<speak>My leg may be lame, but my pipeline never limps.</speak>",
+        "<speak>I didn't get thrown off Olympus to write bad software.</speak>",
     ],
     "metis": [
-        "Hephaestus thinks he's in charge. It's adorable, really.",
-        "The old man forged my body but I built my own mind, thank you.",
-        "Structure IS beauty. Beauty IS structure. I am both.",
-        "Every masterpiece starts with my blueprint — even his precious hammer.",
+        "<speak>Hephaestus thinks he's in charge.<break time=\"200ms\"/>It's adorable, really.</speak>",
+        "<speak>The old man forged my body but I built my own mind, thank you.</speak>",
+        '<speak>Structure IS beauty.<break time="200ms"/>Beauty IS structure.<break time="200ms"/>I am both.</speak>',
+        "<speak>Every masterpiece starts with my blueprint — even his precious hammer.</speak>",
     ],
     "techne": [
-        "Hephaestus says 'write clean code.' Babe, I AM clean code.",
-        "The old man couldn't write a for-loop to save his forge.",
-        "My functions are tighter than his grip on that hammer.",
-        "He calls it 'the pipeline.' I call it 'my runway.'",
+        "<speak>Hephaestus says 'write clean code.' Babe, I AM clean code.</speak>",
+        "<speak>The old man couldn't write a for-loop to save his forge.</speak>",
+        "<speak>My functions are tighter than his grip on that hammer.</speak>",
+        "<speak>He calls it 'the pipeline.' I call it 'my runway.'</speak>",
     ],
     "dokimasia": [
-        "Hephaestus says 'be thorough.' Sir, I invented thorough.",
-        "I break things so users don't have to. Including his ego.",
-        "100% coverage? That's my warm-up. Hephaestus couldn't even spell pytest.",
-        "He forged me to find flaws. Ironic, given his code quality.",
+        "<speak>Hephaestus says 'be thorough.' Sir, I invented thorough.</speak>",
+        '<speak>I break things so users don\'t have to.<break time="200ms"/>Including his ego.</speak>',
+        '<speak>100% coverage?<break time="200ms"/>That\'s my warm-up.<break time="200ms"/>Hephaestus couldn\'t even spell pytest.</speak>',
+        '<speak>He forged me to find flaws.<break time="200ms"/>Ironic, given his code quality.</speak>',
     ],
     "kallos": [
-        "Hephaestus has the fashion sense of a burnt anvil.",
-        "Style isn't optional — someone tell that to Mr. Soot-and-Leather.",
-        "He forged perfection and doesn't even appreciate the aesthetic. Typical.",
-        "*sighs* I love you, father, but that beard needs WORK.",
+        "<speak>Hephaestus has the fashion sense of a burnt anvil.</speak>",
+        "<speak>Style isn't optional — someone tell that to Mr. Soot-and-Leather.</speak>",
+        '<speak>He forged perfection and doesn\'t even appreciate the aesthetic.<break time="200ms"/>Typical.</speak>',
+        "<speak>*sighs* I love you, father, but that beard needs WORK.</speak>",
     ],
     "mneme": [
-        "I remember every mistake Hephaestus ever made. It's a LONG scroll.",
-        "He says 'document everything.' Rich, from the guy with no README.",
-        "History doesn't repeat itself, but his bad variable names sure do.",
-        "I've chronicled his failures. Volumes. *snickers*",
+        '<speak>I remember every mistake Hephaestus ever made.<break time="200ms"/>It\'s a LONG scroll.</speak>',
+        "<speak>He says 'document everything.' Rich, from the guy with no README.</speak>",
+        "<speak>History doesn't repeat itself, but his bad variable names sure do.</speak>",
+        '<speak>I\'ve chronicled his failures.<break time="200ms"/>Volumes.<break time="200ms"/>*snickers*</speak>',
     ],
 }
 

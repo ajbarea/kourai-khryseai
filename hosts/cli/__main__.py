@@ -61,6 +61,7 @@ from kourai_common.log import setup_logging
 from kourai_common.memory import list_agents_with_history
 from kourai_common.player import PlayerProfile, get_all_affinities
 from kourai_common.projects import derive_project_id
+from kourai_common.ssml import strip_ssml
 from kourai_common.tts_realtime import RealtimeTTSEngine
 from kourai_common.virtues import FORGE_VIRTUES, get_virtue_deltas, get_virtue_scores
 
@@ -326,11 +327,16 @@ def _format_greeting(name: str, face: str, quote: str) -> str:
     speaking. Prepending the capitalized name and wrapping the quote in
     ``"..."`` makes the speech-vs-action convention (italic = dialogue)
     read naturally.
+
+    M18 Phase 2: ``user_quotes`` and ``AGENT_QUOTES`` are SSML; strip
+    here so the greeting doesn't display literal ``<speak>`` tags. TTS
+    receives raw SSML upstream of this format call so prosody hints
+    survive for future SSML-native engines.
     """
     return (
         f"  {_GOLD_BOLD}{name.capitalize()}{_RESET} "
         f"{_GOLD}{face}{_RESET} "
-        f'{_ITALIC}"{quote}"{_RESET}'
+        f'{_ITALIC}"{strip_ssml(quote)}"{_RESET}'
     )
 
 
