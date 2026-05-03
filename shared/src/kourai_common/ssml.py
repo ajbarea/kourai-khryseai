@@ -1,15 +1,35 @@
-"""SSML strip-then-synthesize layer for TTS engines without native SSML.
+"""Defensive SSML strip helper.
 
-Specialists emit dialogue as SSML (`<speak>...<break time="200ms"/>...</speak>`),
-the engine strips tags and feeds plain text to Kokoro. When a future engine
-swap (M6: ElevenLabs Flash V2 / Azure / Google) supports SSML natively, callers
-that bypass `strip_ssml` get the markup verbatim.
+Kept as infrastructure even though no producer in the current codebase
+emits SSML — defends against any future LLM-emitted markup (the LLM
+might decide on its own to wrap text in `<speak>` or other XML-shaped
+tags) leaking literal angle brackets into the comms window or into
+Kokoro's phonemizer.
 
-research(2026-05): Kokoro mainline (`hexgrad/kokoro#36`) and Kokoro-FastAPI
-(`remsky/Kokoro-FastAPI#396`) both still have SSML support as open feature
-requests — no progress as of May 2026, so the strip layer remains mandatory.
-ElevenLabs deliberately does not feature SSML (neural prosody handles it),
-so the portable subset matters less than the strip itself.
+research(2026-05, walked back from earlier plan): The original M18 Phase 2
+plan was producer-side SSML emission anticipating an M6 ElevenLabs swap.
+Verifying against ElevenLabs docs at decision time would have shown:
+
+- Eleven v3 (the M6 high-impact-line target per VOICE_CASTING_PLAN.md)
+  does NOT support SSML break tags. Their idiom is `[bracket]` audio
+  tags (`[whispers]`, `[sarcastic]`) plus ellipses + natural punctuation.
+- Eleven Flash V2.5 (the M6 routine-dialogue target) technically supports
+  break tags but ElevenLabs warns against them ("too many cause
+  instability") and recommends ellipses/dashes anyway.
+- Kokoro mainline still has zero native SSML (`hexgrad/kokoro#36` open).
+
+So SSML envelopes were the wrong markup for both Kokoro AND the planned
+M6 target. PRs #149/#150 (and proposed #151) were reverted in favor of
+plain text with rich punctuation — periods, commas, ellipses, em-dashes
+already create natural pauses in Kokoro and ElevenLabs alike.
+
+The helper stays so any future producer that DOES emit SSML (or any
+other XML-shaped markup that arrives via LLM output) doesn't bleed
+literal `<tag>` characters to the player. `_comms_window`, the TTS
+engine's `speak()` and `synthesize_to_wav()`, and the maiden-card +
+greeting display sites all call this defensively. strip_ssml is
+idempotent and has a fast plain-text path (`if "<" not in text:
+return text`) so the cost on plain input is one substring check.
 """
 
 from __future__ import annotations

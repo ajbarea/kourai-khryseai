@@ -115,44 +115,40 @@ Response format — reply with EXACTLY ONE of these:
 AVAILABLE_AGENTS = {"metis", "techne", "dokimasia", "kallos", "mneme"}
 
 # Hephaestus handoff narration (Forge Master persona).
-# M18 Phase 2 pilot: each line is an SSML document — the engine strips
-# for Kokoro (no native SSML) and the CLI/vn_bridge display layers strip
-# for visual rendering. The double-quotes stay inside the <speak>
-# wrapper so the existing speech-vs-action italic convention survives
-# the strip. <break time="200ms"/> markers go at natural sentence
-# pauses; Kokoro ignores them today, M6's ElevenLabs swap will use them.
+# Quote-wrapped per the speech-vs-action convention so the host renders
+# them as italicized dialogue against the plain status stream.
 HEPH_HANDOFFS = {
     "metis": [
-        '<speak>"Metis! Draw up the plans. <break time="200ms"/>And no improvising."</speak>',
-        '<speak>"Architect — you\'re up. <break time="200ms"/>Make it clean."</speak>',
-        '<speak>"Metis, I need blueprints, not poetry. <break time="200ms"/>Get to it."</speak>',
+        '"Metis! Draw up the plans. And no improvising."',
+        '"Architect — you\'re up. Make it clean."',
+        '"Metis, I need blueprints, not poetry. Get to it."',
     ],
     "techne": [
-        '<speak>"Techne! Write something worthy of my forge."</speak>',
-        '<speak>"Artisan — the metal\'s hot. <break time="300ms"/>Get. <break time="150ms"/>To. <break time="150ms"/>Work."</speak>',
-        '<speak>"Techne, build it solid. <break time="200ms"/>I didn\'t forge you for sloppy work."</speak>',
+        '"Techne! Write something worthy of my forge."',
+        '"Artisan — the metal\'s hot. Get. To. Work."',
+        '"Techne, build it solid. I didn\'t forge you for sloppy work."',
     ],
     "dokimasia": [
-        '<speak>"Dokimasia — find every flaw. <break time="200ms"/>Leave nothing."</speak>',
-        '<speak>"Crucible! Test it \'til it screams. <break time="200ms"/>Then test it again."</speak>',
-        '<speak>"Your turn, bug-hunter. Make me proud. <break time="400ms"/>...Don\'t tell them I said that."</speak>',
+        '"Dokimasia — find every flaw. Leave nothing."',
+        '"Crucible! Test it \'til it screams. Then test it again."',
+        '"Your turn, bug-hunter. Make me proud. ...Don\'t tell them I said that."',
     ],
     "kallos": [
-        '<speak>"Kallos, go make it pretty or whatever you do."</speak>',
-        '<speak>"Muse! Polish time. <break time="200ms"/>And yes, it does need it. <break time="200ms"/>Don\'t gloat."</speak>',
-        '<speak>"Kallos — style it. <break time="200ms"/>And spare me the commentary this time."</speak>',
+        '"Kallos, go make it pretty or whatever you do."',
+        '"Muse! Polish time. And yes, it does need it. Don\'t gloat."',
+        '"Kallos — style it. And spare me the commentary this time."',
     ],
     "mneme": [
-        '<speak>"Mneme, write it down. <break time="200ms"/>The FACTS, not your opinions."</speak>',
-        '<speak>"Oracle! Chronicle duty. <break time="200ms"/>And keep it under ten scrolls this time."</speak>',
-        '<speak>"Mneme — document everything. <break time="200ms"/>You know the drill, old friend."</speak>',
+        '"Mneme, write it down. The FACTS, not your opinions."',
+        '"Oracle! Chronicle duty. And keep it under ten scrolls this time."',
+        '"Mneme — document everything. You know the drill, old friend."',
     ],
 }
 
 
 def get_heph_narration(agent_name: str) -> str:
-    """Get a random Forge Master handoff line (SSML) for the given agent."""
-    lines = HEPH_HANDOFFS.get(agent_name, ['<speak>"Next specialist. NOW."</speak>'])
+    """Get a random Forge Master handoff line for the given agent."""
+    lines = HEPH_HANDOFFS.get(agent_name, ['"Next specialist. NOW."'])
     return random.choice(lines)  # noqa: S311
 
 

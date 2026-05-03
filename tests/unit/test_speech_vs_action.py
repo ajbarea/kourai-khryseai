@@ -26,7 +26,6 @@ from agents.hephaestus.agent import HEPH_HANDOFFS, ROUTING_PROMPT, get_heph_narr
 from hosts.cli.rendering import _comms_window
 from hosts.cli.styling import _ITALIC
 from kourai_common.prompts import UNIVERSAL_RULES, build_system_prompt
-from kourai_common.ssml import strip_ssml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -76,51 +75,36 @@ class TestHephaestusRoutingPrompt:
 
 
 class TestHephaestusHandoffs:
-    """Every HEPH_HANDOFFS value is SSML-wrapped dialogue. The displayable
-    form (after strip_ssml) must still open and close with double quotes
-    so the host's quoted-line italic convention survives the strip.
+    """Every HEPH_HANDOFFS value is dialogue and must be quote-wrapped so
+    the host's speech-vs-action italic convention fires.
     """
 
-    def test_all_handoff_lines_are_ssml_wrapped(self):
+    def test_all_handoff_lines_open_with_quote(self):
         offenders = [
             (agent, line)
             for agent, lines in HEPH_HANDOFFS.items()
             for line in lines
-            if not (line.startswith("<speak>") and line.endswith("</speak>"))
+            if not line.startswith('"')
         ]
-        assert offenders == [], f"non-SSML handoff lines: {offenders}"
+        assert offenders == [], f"unquoted handoff lines: {offenders}"
 
-    def test_stripped_handoff_lines_open_with_quote(self):
+    def test_all_handoff_lines_close_with_quote(self):
         offenders = [
-            (agent, line, strip_ssml(line))
+            (agent, line)
             for agent, lines in HEPH_HANDOFFS.items()
             for line in lines
-            if not strip_ssml(line).startswith('"')
+            if not line.endswith('"')
         ]
-        assert offenders == [], f"stripped handoff lines missing opening quote: {offenders}"
+        assert offenders == [], f"handoff lines missing closing quote: {offenders}"
 
-    def test_stripped_handoff_lines_close_with_quote(self):
-        offenders = [
-            (agent, line, strip_ssml(line))
-            for agent, lines in HEPH_HANDOFFS.items()
-            for line in lines
-            if not strip_ssml(line).endswith('"')
-        ]
-        assert offenders == [], f"stripped handoff lines missing closing quote: {offenders}"
-
-    def test_get_heph_narration_returns_ssml_for_known_agent(self):
+    def test_get_heph_narration_returns_quoted_line_for_known_agent(self):
         line = get_heph_narration("metis")
-        assert line.startswith("<speak>") and line.endswith("</speak>")
-        # And the spoken form is quoted dialogue.
-        stripped = strip_ssml(line)
-        assert stripped.startswith('"') and stripped.endswith('"')
+        assert line.startswith('"') and line.endswith('"')
 
-    def test_get_heph_narration_returns_ssml_for_unknown_agent(self):
-        # The fallback must obey both invariants too.
+    def test_get_heph_narration_returns_quoted_line_for_unknown_agent(self):
+        # The fallback must obey the convention too.
         line = get_heph_narration("zzz_not_an_agent")
-        assert line.startswith("<speak>") and line.endswith("</speak>")
-        stripped = strip_ssml(line)
-        assert stripped.startswith('"') and stripped.endswith('"')
+        assert line.startswith('"') and line.endswith('"')
 
 
 class TestCommsWindowItalic:

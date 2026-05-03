@@ -94,10 +94,10 @@ def _maidenify_status(text: str) -> tuple[str, str | None]:
 
     for emoji, (agent_name, _face) in _EMOJI_TO_MAIDEN.items():
         if text.lstrip().startswith(emoji):
-            # M18 Phase 2: producer (hephaestus) may emit SSML in dialogue
-            # bodies. Strip here so the comms window renders clean text;
-            # the TTS engine still receives raw SSML via streaming.py for
-            # future ElevenLabs prosody passthrough.
+            # Defensive strip — guards against future LLM output that
+            # might wrap dialogue in `<speak>` or other XML-shaped markup.
+            # No producer currently emits SSML (see kourai_common.ssml
+            # docstring for the walked-back M18 Phase 2 plan).
             status_msg = strip_ssml(text.replace(emoji, "", 1).strip())
 
             # Detect agent switch → handoff chatter (pilot comms transition)
