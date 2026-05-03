@@ -281,12 +281,25 @@ under the same URI without colliding with other extensions.
 A maiden's dialogue text appears in the CLI / GUI immediately, then
 TTS audio plays whenever Kokoro is ready. The first speak() per
 session pays a ~10-14 second cold-start (Kokoro lazy-loads pipelines
-per `lang_code` on first use); subsequent calls have ~1-2s synthesis
-lag for 50-100 char dialogue. Concrete 2026-04-29 example: AJ
+per `lang_code` on first use). Concrete 2026-04-29 example: AJ
 launched `make cli`, saw Hephaestus's opening line `"I didn't get
 thrown off Olympus to write bad software."` printed at 12:55:49,
 heard the same line at 12:55:58 — **9 seconds of "text shown but
 no audio" silence**, then 4 seconds of audible delivery.
+
+**Steady-state lag (measured 2026-05-03 after sub-task 1 + #145
+unblocked vn_bridge observability):**
+
+| surface             | path                       | lag                  |
+|---------------------|----------------------------|----------------------|
+| CLI / GUI streaming | `RealtimeTTS.play()`       | ~3s to first chunk   |
+| VN (vn_bridge)     | `synthesize_to_wav` (full) | ~4-7s for 50-char    |
+
+Throughput is ~45 ms/char on streaming `play()` (audio + synthesis
+overlap), ~120 ms/char on `synthesize_to_wav` (no overlap, full WAV
+returned before Ren'Py plays). The ROADMAP's earlier "~1-2s
+steady-state" framing was wrong on both surfaces — sub-task 2 is
+load-bearing for both, not aesthetic-only on either.
 
 The visible+audible disconnect breaks the character-presence
 illusion the maidens depend on. Hephaestus's deadpan line lands in
@@ -631,6 +644,43 @@ architectural moves; valuable but not the first lift.
 One-line per item, newest first. Detail moves to git history when work
 lands — these docs are plans + scratchpad, not a historical archive.
 
+- 2026-05-03 — **M18 Phase 2 — engine-side SSML strip layer** [#147].
+  New `kourai_common.ssml.strip_ssml` parses producer-emitted SSML via
+  `defusedxml` (XXE / billion-laughs hardened) and feeds plain text to
+  Kokoro — `<break>` / `<p>` / `<s>` inject whitespace, content tags
+  (`<emphasis>`, `<prosody>`, `<say-as>`) preserve their text,
+  malformed input falls back to a regex strip so a producer bug never
+  kills TTS. Wired into both `speak()` and `synthesize_to_wav()` so
+  vn_bridge inherits the same SSML contract as CLI/GUI. Kokoro mainline
+  still has no native SSML (`hexgrad/kokoro#36` open as of 2026-05),
+  so the strip layer stays mandatory until M6 swaps engines. Producer-
+  side wrap (next sub-task) ships separately, starting with hephaestus.
+- 2026-05-03 — **Cross-platform graceful TTS fallback** [#146].
+  `audio_env.is_audio_output_available()` probes via PortAudio's
+  `Pa_GetDefaultOutputDevice` / `paNoDevice` sentinel after cheap-NO
+  gates (`KOURAI_TTS=off`, WSL2-without-WSLg, headless Linux);
+  `RealtimeTTSEngine.__init__` defaults `muted=None` (auto-detect) and
+  logs a one-line per-platform fix recipe when it auto-mutes.
+  `speak()` widens `except Exception` → `except (Exception, SystemExit)`
+  for the phantom-device edge case where RealtimeTTS's deep `exit(0)`
+  bypasses the init probe. Live verified on this WSL2 (no PortAudio
+  device): CLI auto-mutes with warning, reaches the prompt, runs muted
+  synthesis without crashing. Bonus: streaming-speak first-chunk lag
+  is now measurable — 2.91s for 65 chars on CPU.
+- 2026-05-03 — **vn_bridge headless TTS unblock + observability** [#145].
+  Three connected fixes for the synthesis surface, surfaced by smoke-
+  driving `/tts` directly: `RealtimeTTSEngine(muted=True)` at
+  construction (only construction-time muted skips the
+  `stream_player.open_stream` audio-device probe — runtime
+  `play(muted=True)` doesn't); `log_config=None` on `uvicorn.run` to
+  stop uvicorn's default `dictConfig` from wiping basicConfig;
+  `force=True` on `basicConfig` so transitive imports
+  (RealtimeTTS / pydub / torch) can't no-op the handler install.
+  Prior to this PR, `#136`/`#140`/`#141` timing logs were silently
+  invisible in vn_bridge since merge — observability was effectively
+  zero on the synthesis surface. Verified pre-warm + per-utterance
+  timing logs now appear; same uvicorn-takeover affects all 10
+  specialist agents (flagged for follow-up sweep).
 - 2026-05-02 — **Smoke-driven polish wave** [#140] [#141] [#142] [#143].
   Four follow-on fixes surfaced by driving `make cli` /
   `python -m hosts.cli --prompt` from the host instead of theorizing.

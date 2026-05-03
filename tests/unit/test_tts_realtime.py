@@ -255,6 +255,25 @@ class TestRealtimeTTSEngineSpeak:
         cb.assert_called_once()
 
     @pytest.mark.asyncio
+    async def test_speak_strips_ssml_before_feeding(self, mock_realtimetts):
+        """M18 Phase 2: producers emit SSML, engine strips for Kokoro."""
+        _, _, _, mock_stream = mock_realtimetts
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        engine = RealtimeTTSEngine()
+        await engine.speak('<speak>hello <break time="200ms"/>world</speak>')
+        mock_stream.feed.assert_called_once_with("hello world")
+
+    @pytest.mark.asyncio
+    async def test_speak_skips_when_ssml_strips_to_empty(self, mock_realtimetts):
+        _, _, _, mock_stream = mock_realtimetts
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        engine = RealtimeTTSEngine()
+        await engine.speak('<speak><break time="200ms"/></speak>')
+        mock_stream.feed.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_speak_handles_systemexit_from_realtimetts(self, mock_realtimetts):
         """RealtimeTTS calls exit(0) deep in stream_player.open_stream when
         no audio device. SystemExit isn't an Exception, so without the
@@ -543,6 +562,26 @@ class TestRealtimeTTSEngineSynthesizeToWav:
         engine = RealtimeTTSEngine()
         assert await engine.synthesize_to_wav("") == b""
         assert await engine.synthesize_to_wav("   ") == b""
+
+    @pytest.mark.asyncio
+    async def test_strips_ssml_before_feeding(self, mock_realtimetts):
+        """M18 Phase 2: vn_bridge inherits the same SSML contract as CLI/GUI."""
+        _, mock_kokoro, _, mock_stream = mock_realtimetts
+        mock_kokoro.get_stream_info.return_value = (8, 1, 24000)
+        _wire_chunked_play(mock_stream, [b"\x00\x01" * 12])
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        engine = RealtimeTTSEngine()
+        await engine.synthesize_to_wav('<speak>hello <break time="200ms"/>world</speak>')
+        mock_stream.feed.assert_called_once_with("hello world")
+
+    @pytest.mark.asyncio
+    async def test_returns_empty_when_ssml_strips_to_empty(self, mock_realtimetts):
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        engine = RealtimeTTSEngine()
+        result = await engine.synthesize_to_wav('<speak><break time="200ms"/></speak>')
+        assert result == b""
 
     @pytest.mark.asyncio
     async def test_resolves_agent_voice(self, mock_realtimetts):
