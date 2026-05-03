@@ -54,8 +54,13 @@ PORT = 10010
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     stream=sys.stderr,
+    # research(2026-05): force=True wipes any handler installed by a
+    # transitive import (RealtimeTTS / pydub / torch all attach to root
+    # at import). Without it, basicConfig is a no-op and every logger
+    # in the kourai_common tree silently drops messages.
+    force=True,
 )
 log = logging.getLogger("vn_bridge")
 
@@ -110,7 +115,12 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
     except Exception as e:
         log.error(f"Failed to connect to Hephaestus: {e}")
         app.state.a2a_client = None
-    app.state.tts_engine = RealtimeTTSEngine()
+    # research(2026-05): muted=True at construction is the documented
+    # RealtimeTTS pattern for synth-only callers — runtime muted=True on
+    # play() doesn't skip audio device opening, only construction-time
+    # muted does (stream_player.AudioConfiguration.muted gate). vn_bridge
+    # never calls speak(), so headless = correct.
+    app.state.tts_engine = RealtimeTTSEngine(muted=True)
     app.state.context_id = uuid4().hex
     yield
     app.state.tts_engine.cleanup()
@@ -437,4 +447,9 @@ app = Starlette(
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=PORT, log_level="info")  # noqa: S104
+    # research(2026-05): log_config=None disables uvicorn's default
+    # dictConfig takeover, which otherwise nukes our basicConfig +
+    # silences every kourai_common.* logger (including #140 TTS timing
+    # and #136/#141 Kokoro pre-warm). Uvicorn's own access logs still
+    # flow through the root handler we set above.
+    uvicorn.run(app, host="0.0.0.0", port=PORT, log_level="info", log_config=None)  # noqa: S104
