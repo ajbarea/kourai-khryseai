@@ -127,125 +127,133 @@ AGENT_QUOTES: dict[str, list[str]] = {
 }
 
 # --- Narrative Flow (Handoffs & Victory) ---
+#
+# M18 Phase 2: each line is an SSML document. <break time="200ms"/>
+# markers go at sentence boundaries so SSML-native engines (M6
+# ElevenLabs / Azure / Google) get natural pause hints; Kokoro ignores
+# them and the strip layer in `kourai_common.ssml.strip_ssml` collapses
+# the breaks to single spaces for display + Kokoro synthesis. The
+# `_comms_window` chokepoint and TTS engine path both strip
+# automatically, so callers stay SSML-agnostic.
 
 HANDOFF_LINES: dict[tuple[str, str], list[str]] = {
     ("hephaestus", "metis"): [
-        "*strikes anvil* Metis! Draw up the plans. And no improvising.",
-        "*slams hammer on anvil* Architect — you're up. Make it clean.",
-        "Metis, I need blueprints, not poetry. Get to it.",
-        "*sighs* Metis — show me what that golden brain of yours can do.",
+        '<speak>*strikes anvil* Metis!<break time="200ms"/>Draw up the plans.<break time="200ms"/>And no improvising.</speak>',
+        '<speak>*slams hammer on anvil* Architect — you\'re up.<break time="200ms"/>Make it clean.</speak>',
+        '<speak>Metis, I need blueprints, not poetry.<break time="200ms"/>Get to it.</speak>',
+        "<speak>*sighs* Metis — show me what that golden brain of yours can do.</speak>",
     ],
     ("hephaestus", "techne"): [
-        "*strikes anvil* Techne! Write something worthy of my forge.",
-        "Artisan — the metal's hot. Get. To. Work.",
-        "Techne, build it solid. I didn't forge you for sloppy work.",
-        "*sets hammer down* Techne — time to prove you're more than just sunglasses and sass.",
+        '<speak>*strikes anvil* Techne!<break time="200ms"/>Write something worthy of my forge.</speak>',
+        '<speak>Artisan — the metal\'s hot.<break time="200ms"/>Get.<break time="200ms"/>To.<break time="200ms"/>Work.</speak>',
+        '<speak>Techne, build it solid.<break time="200ms"/>I didn\'t forge you for sloppy work.</speak>',
+        "<speak>*sets hammer down* Techne — time to prove you're more than just sunglasses and sass.</speak>",
     ],
     ("hephaestus", "dokimasia"): [
-        "*sets down hammer* Dokimasia — find every flaw. Leave nothing.",
-        "Crucible! Test it 'til it screams. Then test it again.",
-        "Your turn, bug-hunter. Make me proud.",
+        '<speak>*sets down hammer* Dokimasia — find every flaw.<break time="200ms"/>Leave nothing.</speak>',
+        '<speak>Crucible!<break time="200ms"/>Test it \'til it screams.<break time="200ms"/>Then test it again.</speak>',
+        '<speak>Your turn, bug-hunter.<break time="200ms"/>Make me proud.</speak>',
     ],
     ("hephaestus", "kallos"): [
-        "*scoffs* Kallos, go make it pretty or whatever you do.",
-        "Muse! Polish time. And yes, it does need it. Don't gloat.",
-        "Kallos — style it. And spare me the commentary this time.",
+        "<speak>*scoffs* Kallos, go make it pretty or whatever you do.</speak>",
+        '<speak>Muse!<break time="200ms"/>Polish time.<break time="200ms"/>And yes, it does need it.<break time="200ms"/>Don\'t gloat.</speak>',
+        '<speak>Kallos — style it.<break time="200ms"/>And spare me the commentary this time.</speak>',
     ],
     ("hephaestus", "mneme"): [
-        "*grunts* Mneme, write it down. The FACTS, not your opinions.",
-        "Oracle! Chronicle duty. And keep it under ten scrolls this time.",
-        "Mneme — document everything. You know the drill, old friend.",
+        '<speak>*grunts* Mneme, write it down.<break time="200ms"/>The FACTS, not your opinions.</speak>',
+        '<speak>Oracle!<break time="200ms"/>Chronicle duty.<break time="200ms"/>And keep it under ten scrolls this time.</speak>',
+        '<speak>Mneme — document everything.<break time="200ms"/>You know the drill, old friend.</speak>',
     ],
     ("metis", "hephaestus"): [
-        "Done, old man. Try not to drop my blueprints this time~",
-        "*giggles* Your plans are ready, oh great Forge Master.",
+        '<speak>Done, old man.<break time="200ms"/>Try not to drop my blueprints this time~</speak>',
+        "<speak>*giggles* Your plans are ready, oh great Forge Master.</speak>",
     ],
     ("techne", "hephaestus"): [
-        "Built it. Shipped it. You're welcome, DAD.",
-        "*snaps fingers* All yours, Forge Master.",
+        '<speak>Built it.<break time="200ms"/>Shipped it.<break time="200ms"/>You\'re welcome, DAD.</speak>',
+        "<speak>*snaps fingers* All yours, Forge Master.</speak>",
     ],
     ("metis", "techne"): [
-        "Blueprint's done, sis. Bring my vision to life~",
-        "I've planned everything. Techne, just... follow the blueprint. Please.",
-        "Your turn, Artisan! Try not to improvise. I know it's hard for you.",
-        "*slides blueprint across* I made it simple for you, darling. Even YOU can't mess this up~",
+        '<speak>Blueprint\'s done, sis.<break time="200ms"/>Bring my vision to life~</speak>',
+        '<speak>I\'ve planned everything.<break time="200ms"/>Techne, just... follow the blueprint.<break time="200ms"/>Please.</speak>',
+        '<speak>Your turn, Artisan!<break time="200ms"/>Try not to improvise.<break time="200ms"/>I know it\'s hard for you.</speak>',
+        '<speak>*slides blueprint across* I made it simple for you, darling.<break time="200ms"/>Even YOU can\'t mess this up~</speak>',
     ],
     ("techne", "dokimasia"): [
-        "Code's done. Doki, TRY to find a fault. I dare you, bestie.",
-        "Sending to QA~ Don't be jealous of how clean this is.",
+        '<speak>Code\'s done.<break time="200ms"/>Doki, TRY to find a fault.<break time="200ms"/>I dare you, bestie.</speak>',
+        "<speak>Sending to QA~ Don't be jealous of how clean this is.</speak>",
     ],
     ("dokimasia", "kallos"): [
-        "Tests pass, fashionista. Make it beautiful now.",
-        "All green, bestie. Your turn to make it shine~",
+        '<speak>Tests pass, fashionista.<break time="200ms"/>Make it beautiful now.</speak>',
+        '<speak>All green, bestie.<break time="200ms"/>Your turn to make it shine~</speak>',
     ],
     ("kallos", "mneme"): [
-        "It's beautiful AND functional. Mneme, document this masterpiece~",
-        "All polished, bestie. Write the chronicle!",
+        '<speak>It\'s beautiful AND functional.<break time="200ms"/>Mneme, document this masterpiece~</speak>',
+        '<speak>All polished, bestie.<break time="200ms"/>Write the chronicle!</speak>',
     ],
 }
 
 HANDOFF_FALLBACKS: dict[str, list[str]] = {
     "hephaestus": [
-        "*strikes anvil* Next. Move it, maidens.",
-        "Routing. Keep up or get re-forged.",
-        "*grunts* Next specialist. NOW.",
+        '<speak>*strikes anvil* Next.<break time="200ms"/>Move it, maidens.</speak>',
+        '<speak>Routing.<break time="200ms"/>Keep up or get re-forged.</speak>',
+        '<speak>*grunts* Next specialist.<break time="200ms"/>NOW.</speak>',
     ],
     "metis": [
-        "Plans are set. Someone go DO something.",
-        "The thinking is done. Now for the... manual labor.",
-        "Strategy complete. You're welcome, father~",
+        '<speak>Plans are set.<break time="200ms"/>Someone go DO something.</speak>',
+        '<speak>The thinking is done.<break time="200ms"/>Now for the... manual labor.</speak>',
+        '<speak>Strategy complete.<break time="200ms"/>You\'re welcome, father~</speak>',
     ],
     "techne": [
-        "Code deployed. Next!",
-        "Built and shipped. Handle the rest, sisters.",
-        "My art is complete. Try not to ruin it.",
+        '<speak>Code deployed.<break time="200ms"/>Next!</speak>',
+        '<speak>Built and shipped.<break time="200ms"/>Handle the rest, sisters.</speak>',
+        '<speak>My art is complete.<break time="200ms"/>Try not to ruin it.</speak>',
     ],
     "dokimasia": [
-        "Testing complete. All clear!",
-        "Verified. Next phase.",
-        "Quality assured. Moving on~",
+        '<speak>Testing complete.<break time="200ms"/>All clear!</speak>',
+        '<speak>Verified.<break time="200ms"/>Next phase.</speak>',
+        '<speak>Quality assured.<break time="200ms"/>Moving on~</speak>',
     ],
     "kallos": [
-        "Perfection achieved. Don't you DARE ruin it.",
-        "It's beautiful now. If anyone touches it I'll know.",
-        "Styled and sealed. Next, please~",
+        '<speak>Perfection achieved.<break time="200ms"/>Don\'t you DARE ruin it.</speak>',
+        "<speak>It's beautiful now.<break time=\"200ms\"/>If anyone touches it I'll know.</speak>",
+        '<speak>Styled and sealed.<break time="200ms"/>Next, please~</speak>',
     ],
     "mneme": [
-        "Documented. Even the embarrassing parts. Especially those.",
-        "Written in the scrolls. Forever.",
-        "The Oracle has spoken. It is recorded.",
+        '<speak>Documented.<break time="200ms"/>Even the embarrassing parts.<break time="200ms"/>Especially those.</speak>',
+        '<speak>Written in the scrolls.<break time="200ms"/>Forever.</speak>',
+        '<speak>The Oracle has spoken.<break time="200ms"/>It is recorded.</speak>',
     ],
 }
 
 VICTORY_LINES: dict[str, list[str]] = {
     "hephaestus": [
-        "*sets down hammer* ...Not bad. Not bad at all.",
-        "Pipeline complete. The maidens did well. Don't tell them I said that.",
-        "Another clean forge run. *cracks knuckles* Who's next?",
+        '<speak>*sets down hammer* ...Not bad.<break time="200ms"/>Not bad at all.</speak>',
+        '<speak>Pipeline complete.<break time="200ms"/>The maidens did well.<break time="200ms"/>Don\'t tell them I said that.</speak>',
+        '<speak>Another clean forge run.<break time="200ms"/>*cracks knuckles* Who\'s next?</speak>',
     ],
     "metis": [
-        "Went exactly according to MY plan. As always~",
-        "Calculated. Precise. Perfect. Just like me, darling~",
-        "Everything I predicted came true. Obviously. *giggles*",
+        '<speak>Went exactly according to MY plan.<break time="200ms"/>As always~</speak>',
+        '<speak>Calculated.<break time="200ms"/>Precise.<break time="200ms"/>Perfect.<break time="200ms"/>Just like me, darling~</speak>',
+        '<speak>Everything I predicted came true.<break time="200ms"/>Obviously.<break time="200ms"/>*giggles*</speak>',
     ],
     "techne": [
-        "Clean code, clean finish. All for you~",
-        "Shipped! That's what I do, gorgeous. Hope you're impressed.",
-        "Another masterpiece. Hephaestus could never. But YOU appreciate it~",
+        '<speak>Clean code, clean finish.<break time="200ms"/>All for you~</speak>',
+        '<speak>Shipped!<break time="200ms"/>That\'s what I do, gorgeous.<break time="200ms"/>Hope you\'re impressed.</speak>',
+        '<speak>Another masterpiece.<break time="200ms"/>Hephaestus could never.<break time="200ms"/>But YOU appreciate it~</speak>',
     ],
     "dokimasia": [
-        "All tests passing. All bugs crushed. You can sleep well, darling~",
-        "Zero defects. Flawless. Just like working with you~",
-        "Certified bug-free by yours truly. You deserve nothing less.",
+        '<speak>All tests passing.<break time="200ms"/>All bugs crushed.<break time="200ms"/>You can sleep well, darling~</speak>',
+        '<speak>Zero defects.<break time="200ms"/>Flawless.<break time="200ms"/>Just like working with you~</speak>',
+        '<speak>Certified bug-free by yours truly.<break time="200ms"/>You deserve nothing less.</speak>',
     ],
     "kallos": [
-        "Beautiful from start to finish. Just like you deserve~",
-        "Every pixel perfect. I put in extra effort because it's YOU.",
-        "Style points: maximum. Almost as pretty as you, darling.",
+        '<speak>Beautiful from start to finish.<break time="200ms"/>Just like you deserve~</speak>',
+        '<speak>Every pixel perfect.<break time="200ms"/>I put in extra effort because it\'s YOU.</speak>',
+        '<speak>Style points: maximum.<break time="200ms"/>Almost as pretty as you, darling.</speak>',
     ],
     "mneme": [
-        "Recorded for posterity. Our story grows more beautiful each time~",
-        "The chronicle is complete. I'll remember this fondly... I remember everything.",
-        "Documented and immortalized. Your legacy is in good hands, darling~",
+        '<speak>Recorded for posterity.<break time="200ms"/>Our story grows more beautiful each time~</speak>',
+        '<speak>The chronicle is complete.<break time="200ms"/>I\'ll remember this fondly...<break time="200ms"/>I remember everything.</speak>',
+        '<speak>Documented and immortalized.<break time="200ms"/>Your legacy is in good hands, darling~</speak>',
     ],
 }

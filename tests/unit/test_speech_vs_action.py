@@ -144,6 +144,32 @@ class TestCommsWindowItalic:
         assert _ITALIC not in rendered
 
 
+class TestCommsWindowStripsSsml:
+    """`_comms_window` is the universal display chokepoint — every
+    dialogue source (HEPH_HANDOFFS, HANDOFF_LINES, VICTORY_LINES, future
+    LLM SSML) hits it eventually. Strip here means callers can stay
+    SSML-agnostic.
+    """
+
+    def test_speak_wrapped_dialogue_renders_clean_text(self):
+        rendered = _comms_window(
+            "hephaestus",
+            '<speak>"The bronze must be heated <break time="200ms"/>until it sings."</speak>',
+        )
+        assert "<speak>" not in rendered
+        assert "<break" not in rendered
+        # Quote convention preserved post-strip → italic styling fires.
+        assert _ITALIC in rendered
+        # Break collapses to single space.
+        assert '"The bronze must be heated until it sings."' in rendered
+
+    def test_plain_text_dialogue_unchanged(self):
+        # Fast path — strip is idempotent on plain text.
+        plain_rendered = _comms_window("hephaestus", '"The forge is hot."')
+        assert '"The forge is hot."' in plain_rendered
+        assert _ITALIC in plain_rendered
+
+
 class TestMaidenifyStatusStripsSsml:
     """M18 Phase 2: producer dialogue arrives as SSML; the host display
     boundary strips so the player sees clean text. The TTS engine still

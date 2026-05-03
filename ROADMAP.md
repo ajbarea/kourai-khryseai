@@ -644,6 +644,41 @@ architectural moves; valuable but not the first lift.
 One-line per item, newest first. Detail moves to git history when work
 lands — these docs are plans + scratchpad, not a historical archive.
 
+- 2026-05-03 — **M18 Phase 2 SSML rollout — handoff/victory dicts +
+  display chokepoint** [#150]. Sibling PR to #149's hephaestus pilot,
+  expanded one layer up. (a) `HANDOFF_LINES` (11 entries),
+  `HANDOFF_FALLBACKS` (6 entries), and `VICTORY_LINES` (6 entries)
+  in `shared/src/kourai_common/agents.py` are now SSML — every line
+  wrapped in `<speak>` with `<break time="200ms"/>` markers at
+  sentence boundaries. (b) `_comms_window` in `hosts/cli/rendering.py`
+  applies `strip_ssml` at the universal display chokepoint, so every
+  caller (handoff chatter, victory chatter, _maidenify_status, future
+  emitters) gets clean text without remembering to strip. Defense-in-
+  depth: `_maidenify_status`'s strip from #149 stays as a second
+  layer. New `tests/unit/test_agent_dialogue_ssml.py` parameterizes
+  over every line (203 cases) to assert the SSML invariants.
+  Programmatic conversion via xml.sax.saxutils.escape; verified
+  every stripped line is non-empty, well-formed, and free of leftover
+  `<` / `>` characters. AGENT_QUOTES + user_quotes greetings still
+  pending for a follow-up PR.
+- 2026-05-03 — **M18 Phase 2 hephaestus producer-side pilot** [#149].
+  First specialist to emit SSML: `HEPH_HANDOFFS` strings now wrapped
+  in `<speak>` envelopes with `<break>` markers; `_maidenify_status`
+  (CLI) and the vn_bridge NDJSON yield apply `strip_ssml` at the
+  display boundary; TTS engine path stays raw for future M6
+  ElevenLabs prosody passthrough. Tests verify quote-wrap convention
+  survives the strip so existing italic styling fires. LLM-generated
+  dialogue and per-persona prosody deferred to follow-ups.
+- 2026-05-03 — **Uvicorn-takeover sweep across 10 specialists** [#148].
+  Same root cause #145 fixed for vn_bridge: every specialist's
+  `log.info(...)` was being silently dropped because their
+  `uvicorn.run(app, host, port)` call let uvicorn's default
+  dictConfig wipe `setup_logging`'s root handlers. New
+  `kourai_common.log.run_uvicorn` helper centralizes the
+  `log_config=None` right-default; 10 specialist `__main__.py` files
+  swap `uvicorn.run` for the helper, vn_bridge follows suit for
+  consistency. Live verified: hephaestus's `🔥 Hephaestus starting
+  on 0.0.0.0:10000` now appears in `docker logs`.
 - 2026-05-03 — **M18 Phase 2 — engine-side SSML strip layer** [#147].
   New `kourai_common.ssml.strip_ssml` parses producer-emitted SSML via
   `defusedxml` (XXE / billion-laughs hardened) and feeds plain text to

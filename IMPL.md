@@ -55,17 +55,29 @@ downstream.
   once the producer-side plumbing has at least one specialist
   emitting SSML.
 
-**Status 2026-05-03:** strip layer + tests landed [#147]; uvicorn-
-takeover sweep [#148] unblocks observability across all 10 specialists
-(same root cause #145 fixed for vn_bridge). Hephaestus producer-side
-pilot landed [#149]: `HEPH_HANDOFFS` now emits SSML envelopes with
-`<break>` markers at natural pauses; `_maidenify_status` (CLI) and the
-vn_bridge NDJSON yield both apply `strip_ssml` at the display
-boundary; TTS engine path stays raw so future M6 ElevenLabs swap
-inherits the prosody hints. Next sub-tasks: roll the same SSML
-treatment to other specialists' static lines (kallos handoffs,
-metis greetings, etc.), then teach LLM prompts to emit SSML in
-generated dialogue.
+**Status 2026-05-03:** Phase 2 plumbing complete across the routing
+layer. Strip layer + tests landed [#147]; uvicorn-takeover sweep
+[#148] unblocks observability across all 10 specialists; hephaestus
+pilot [#149] proved the producer→strip→display flow end-to-end;
+[#150] rolled SSML to the centralized `HANDOFF_LINES` /
+`HANDOFF_FALLBACKS` / `VICTORY_LINES` dicts in
+`shared/src/kourai_common/agents.py` AND moved the strip into
+`_comms_window` itself so every CLI dialogue source gets stripped at
+the chokepoint without per-callsite changes. Open follow-ups:
+
+- LLM-generated dialogue (`CHAT:`, `CONFIRM_ORDER:`) — risk-managed
+  prompt engineering, separate PR per agent.
+- Per-persona prosody (Kallos lilt, Hephaestus gruff via
+  `<prosody rate>` / `<prosody pitch>` per maiden) — design pass
+  needed.
+- AGENT_QUOTES gossip + `AGENT_METADATA["user_quotes"]` greetings —
+  same conversion treatment, mechanical follow-up.
+- GUI's separate `hosts/gui/maidens.py` HANDOFF_LINES copy — needs
+  the same SSML rollout once the GUI surface is touched.
+- VN-side prosody preservation — Ren'Py loses prosody on the
+  display→/tts roundtrip; vn_bridge needs to either send raw SSML in
+  a parallel NDJSON field or drive `/tts` proactively. Defer until
+  M6 (when prosody actually matters to the engine).
 
 ## M18 Phase 3 — KIND_CODE / KIND_SPEC distinct render paths (deferred)
 
