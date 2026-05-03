@@ -882,3 +882,50 @@ class TestApplyAudioSettingsMusicOff:
         audio.set_ambient_volume.assert_called_with(0.1)
         audio.set_voice_volume.assert_called_with(settings.voice_volume)
         audio.set_sfx_volume.assert_called_with(settings.sfx_volume)
+
+
+class TestSettingsSyncModeChoice:
+    """M20 sub-task 4 — `/settings s` cycles dialogue_sync_mode between
+    audio-led and instant. Persists to disk, applied to next dialogue line.
+    """
+
+    def test_s_choice_cycles_audio_led_to_instant(self, tmp_path, monkeypatch):
+        from hosts.cli.commands import _apply_settings_choice
+
+        path = tmp_path / "cli_settings.json"
+        monkeypatch.setattr("hosts.cli.settings._SETTINGS_FILE", path)
+        # Seed disk state to audio-led (the default).
+        CLISettings().save()
+
+        changed = _apply_settings_choice("s")
+        assert changed is True
+
+        reloaded = CLISettings.load()
+        assert reloaded.dialogue_sync_mode == "instant"
+
+    def test_s_choice_cycles_instant_back_to_audio_led(self, tmp_path, monkeypatch):
+        from hosts.cli.commands import _apply_settings_choice
+
+        path = tmp_path / "cli_settings.json"
+        monkeypatch.setattr("hosts.cli.settings._SETTINGS_FILE", path)
+        s = CLISettings()
+        s.dialogue_sync_mode = "instant"
+        s.save()
+
+        changed = _apply_settings_choice("s")
+        assert changed is True
+
+        reloaded = CLISettings.load()
+        assert reloaded.dialogue_sync_mode == "audio-led"
+
+    def test_uppercase_s_also_works(self, tmp_path, monkeypatch):
+        """Match the case-insensitivity of the existing r/v shortcuts."""
+        from hosts.cli.commands import _apply_settings_choice
+
+        path = tmp_path / "cli_settings.json"
+        monkeypatch.setattr("hosts.cli.settings._SETTINGS_FILE", path)
+        CLISettings().save()
+
+        changed = _apply_settings_choice("S")
+        assert changed is True
+        assert CLISettings.load().dialogue_sync_mode == "instant"

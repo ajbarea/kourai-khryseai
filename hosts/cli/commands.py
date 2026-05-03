@@ -143,6 +143,7 @@ def _print_settings_panel(settings: CLISettings) -> None:
     _echo(f"  [7] Metrics Track:  {'ON' if settings.metrics_tracking_enabled else 'OFF'}")
     _echo(f"  [8] Romance Nudges: {'ON' if settings.romance_nudges_enabled else 'OFF'}")
     _echo(f"  [9] Gossip Nudges:  {'ON' if settings.gossip_nudges_enabled else 'OFF'}")
+    _echo(f"  [s] Sync Mode:      {settings.dialogue_sync_mode}")
     _echo("  [r] Reset Progression Data")
     _echo(f"  [v] Adjust volumes  {_DIM}(music / ambient / voice / sfx){_RESET}")
 
@@ -198,6 +199,16 @@ def _apply_settings_choice(choice: str) -> bool:
             f"{'ON' if new_val else 'OFF'}{_RESET}"
         )
         _echo(f"  {_DIM}Applied immediately for this session.{_RESET}")
+        return True
+    if choice.lower() == "s":
+        # M20 sub-task 4 \u2014 cycle dialogue_sync_mode through its two
+        # values. Bool toggle() doesn't fit a string field, so handle
+        # explicitly here.
+        new_val = "instant" if settings.dialogue_sync_mode == "audio-led" else "audio-led"
+        settings.dialogue_sync_mode = new_val
+        settings.save()
+        _echo(f"\n  {_GOLD_BRIGHT}\u2728 Dialogue Sync Mode is now {new_val}{_RESET}")
+        _echo(f"  {_DIM}Applied to the next dialogue line.{_RESET}")
         return True
     if choice.lower() == "r":
         _reset_progression_data()
