@@ -75,6 +75,21 @@ class TestRealtimeTTSEngineInit:
         kwargs = mock_stream_cls.call_args.kwargs
         assert kwargs.get("on_word") is cb
 
+    def test_init_wires_audio_start_trampoline(self, mock_realtimetts):
+        """M20 sub-task 2 Tier 2: TextToAudioStream must receive the engine's
+        stable trampoline at construction so per-call handlers attached via
+        speak()'s on_audio_start can dispatch through it.
+        """
+        _, _, mock_stream_cls, _ = mock_realtimetts
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        engine = RealtimeTTSEngine()
+        kwargs = mock_stream_cls.call_args.kwargs
+        wired = kwargs.get("on_audio_stream_start")
+        assert wired is not None, "on_audio_stream_start must be wired at construction"
+        # Bound methods compare equal when bound to same instance + function.
+        assert wired == engine._dispatch_audio_start
+
     def test_init_seeds_stream_volume(self, mock_realtimetts):
         _, _, _, mock_stream = mock_realtimetts
         from kourai_common.tts_realtime import RealtimeTTSEngine
@@ -272,6 +287,58 @@ class TestRealtimeTTSEngineSpeak:
         engine = RealtimeTTSEngine()
         await engine.speak('<speak><break time="200ms"/></speak>')
         mock_stream.feed.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_speak_fires_on_audio_start_via_trampoline(self, mock_realtimetts):
+        """M20 sub-task 2 Tier 2: per-call on_audio_start callback dispatches
+        through the engine's stable trampoline. The trampoline is wired into
+        TextToAudioStream at construction; speak() sets the per-call handler
+        and the dispatcher invokes it when RealtimeTTS reports audio start.
+        """
+        _, _, _, mock_stream = mock_realtimetts
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        engine = RealtimeTTSEngine()
+        callback = MagicMock()
+        # Simulate RealtimeTTS firing on_audio_stream_start during play() —
+        # use feed.side_effect (called inside speak) to invoke the trampoline.
+        mock_stream.feed.side_effect = lambda _text: engine._dispatch_audio_start()
+
+        await engine.speak("hello", agent_name="hephaestus", on_audio_start=callback)
+        callback.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_speak_restores_prior_on_audio_start_after_call(self, mock_realtimetts):
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        engine = RealtimeTTSEngine()
+        cb1 = MagicMock(name="outer")
+        cb2 = MagicMock(name="inner")
+        engine._on_audio_start_current = cb1
+
+        await engine.speak("hi", agent_name="hephaestus", on_audio_start=cb2)
+        # After speak() returns, prior callback restored.
+        assert engine._on_audio_start_current is cb1
+
+    @pytest.mark.asyncio
+    async def test_speak_without_on_audio_start_leaves_trampoline_idle(self, mock_realtimetts):
+        _, _, _, mock_stream = mock_realtimetts
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        engine = RealtimeTTSEngine()
+        # Force dispatch — should be a noop because no per-call handler set.
+        await engine.speak("hi", agent_name="hephaestus")
+        # No exception raised by trampoline on missing handler.
+        engine._dispatch_audio_start()  # should not raise
+
+    @pytest.mark.asyncio
+    async def test_dispatch_audio_start_swallows_callback_exceptions(self, mock_realtimetts):
+        """A buggy display-flush callback must not break TTS playback."""
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        engine = RealtimeTTSEngine()
+        engine._on_audio_start_current = MagicMock(side_effect=RuntimeError("boom"))
+        engine._dispatch_audio_start()  # should not raise
 
     @pytest.mark.asyncio
     async def test_speak_handles_systemexit_from_realtimetts(self, mock_realtimetts):

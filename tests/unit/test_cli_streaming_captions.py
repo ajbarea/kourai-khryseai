@@ -128,3 +128,53 @@ async def test_captions_off_does_not_affect_status_events(_captured):
     assert "[FORMATTED]" in visual
     # Status-tagged emissions never speak.
     tts.speak.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_dialogue_visual_deferred_until_on_audio_start_fires(_captured):
+    """M20 sub-task 2 Tier 2: when both display + TTS are active for a
+    KIND_DIALOGUE event, the visual echo fires inside the speak() await
+    via the on_audio_start callback — not before, not after.
+
+    The fixture's tts.speak is an AsyncMock that invokes its
+    on_audio_start kwarg synchronously to mimic RealtimeTTS firing the
+    audio-start trampoline mid-play.
+    """
+
+    async def _speak_that_fires_audio_start(*args, on_audio_start=None, **kwargs):
+        if on_audio_start is not None:
+            on_audio_start()
+
+    tts = MagicMock()
+    tts.speak = AsyncMock(side_effect=_speak_that_fires_audio_start)
+    dialogue = _status_event('"Welcome back to the forge."', KIND_DIALOGUE)
+    client = _client_yielding([dialogue, _completed_task()])
+
+    await send_and_stream(client, "prompt", "ctx-1", tts=tts, captions_enabled=True)
+
+    # Visual echoed exactly once — by the on_audio_start callback, not
+    # twice via the finally-fallback also firing.
+    visual_lines = [line for line in _captured if "[FORMATTED]" in line]
+    assert len(visual_lines) == 1, f"expected 1 visual echo, got {visual_lines!r}"
+    # Confirm speak() was called with our on_audio_start kwarg.
+    call_kwargs = tts.speak.await_args.kwargs
+    assert "on_audio_start" in call_kwargs
+    assert callable(call_kwargs["on_audio_start"])
+
+
+@pytest.mark.asyncio
+async def test_dialogue_visual_falls_back_when_on_audio_start_never_fires(_captured):
+    """If TTS auto-mute is on or the engine errors before audio starts,
+    on_audio_start never fires and the finally-fallback echoes the
+    dialogue so it isn't silently lost.
+    """
+    tts = MagicMock()
+    tts.speak = AsyncMock()  # default: doesn't fire on_audio_start
+    dialogue = _status_event('"Welcome back to the forge."', KIND_DIALOGUE)
+    client = _client_yielding([dialogue, _completed_task()])
+
+    await send_and_stream(client, "prompt", "ctx-1", tts=tts, captions_enabled=True)
+
+    visual_lines = [line for line in _captured if "[FORMATTED]" in line]
+    assert len(visual_lines) == 1, "fallback echo must fire when callback didn't"
+    tts.speak.assert_awaited()
