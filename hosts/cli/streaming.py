@@ -29,7 +29,15 @@ from hosts.cli.events import (
     reset_last_seen_agent,
     set_pipeline_chatter_enabled,
 )
-from hosts.cli.rendering import _comms_window, _echo, _render_markdown
+from hosts.cli.maidens import _MAIDEN_FACES
+from hosts.cli.rendering import (
+    _comms_window,
+    _echo,
+    _render_markdown,
+    karaoke_dialogue_close,
+    karaoke_dialogue_open,
+    karaoke_word_separator,
+)
 from hosts.cli.styling import _DIM, _GOLD, _GOLD_BRIGHT, _RED, _RESET
 from kourai_common.a2a_events import extract_artifact_data
 from kourai_common.federation.host_helpers import build_pipeline_turn_entry
@@ -234,31 +242,53 @@ async def send_and_stream(
                     will_display = not suppress_visual
 
                     if will_display and will_speak:
-                        # M20 sub-task 2 Tier 2 deferred-render: hold the
-                        # comms-window echo until TTS playback actually
-                        # starts (`on_audio_start` trampoline). Eliminates
-                        # the "text precedes audio" disconnect for slow
-                        # synthesis. If TTS auto-muted or the callback
-                        # never fires (engine error, headless probe
-                        # missed phantom device), the finally-fallback
-                        # echoes immediately so dialogue is never lost.
-                        # The closure is invoked synchronously inside this
-                        # iteration's `await tts.speak(...)` and never
-                        # outlives it, so the loop-variable bindings are
-                        # safe — `formatted` and `flushed` cannot rebind
-                        # before _flush runs. Suppressed with B023 inline.
-                        flushed = [False]
+                        # M20 sub-task 2 Tier 1 (karaoke single-line) +
+                        # Tier 2 (deferred box) fallback. The closures
+                        # are invoked synchronously inside this iteration's
+                        # `await tts.speak(...)` and never outlive it, so
+                        # `formatted`, `agent`, `karaoke_started`, and
+                        # `last_was_word` cannot rebind before either
+                        # callback runs. Suppressed with B023 inline.
+                        karaoke_started = [False]
+                        last_was_word = [False]
 
-                        def _flush() -> None:
-                            if not flushed[0]:  # noqa: B023
-                                _echo(formatted)  # noqa: B023
-                                flushed[0] = True  # noqa: B023
+                        def _open_karaoke() -> None:
+                            if karaoke_started[0]:  # noqa: B023
+                                return
+                            face = _MAIDEN_FACES.get(agent or "", "")  # noqa: B023
+                            _echo(
+                                karaoke_dialogue_open(agent or "", face),  # noqa: B023
+                                nl=False,
+                            )
+                            karaoke_started[0] = True  # noqa: B023
+
+                        def _reveal_word(word: object) -> None:
+                            w = getattr(word, "word", "")
+                            if not w:
+                                return
+                            sep = karaoke_word_separator(w, last_was_word[0])  # noqa: B023
+                            _echo(sep + w, nl=False)
+                            last_was_word[0] = True  # noqa: B023
 
                         msg = text.split(" ", 1)[-1] if " " in text else text
                         try:
-                            await tts.speak(msg, agent, on_audio_start=_flush)
+                            await tts.speak(
+                                msg,
+                                agent,
+                                on_audio_start=_open_karaoke,
+                                on_word=_reveal_word,
+                            )
                         finally:
-                            if not flushed[0]:
+                            if karaoke_started[0]:
+                                # Close the open quote regardless of
+                                # whether on_word fired (engine could
+                                # error after audio_start but before any
+                                # word).
+                                _echo(karaoke_dialogue_close(), nl=False)
+                            else:
+                                # Tier 2 fallback — neither audio_start
+                                # nor on_word fired (auto-muted, engine
+                                # never reached playback).
                                 _echo(formatted)
                     elif will_display:
                         _echo(formatted)

@@ -66,14 +66,17 @@ class TestRealtimeTTSEngineInit:
         mock_kokoro_cls.assert_called_once()
         mock_stream_cls.assert_called_once()
 
-    def test_init_passes_on_word_to_stream(self, mock_realtimetts):
-        _, _, mock_stream_cls, _ = mock_realtimetts
+    def test_init_stores_static_on_word_under_trampoline(self, mock_realtimetts):
+        """Constructor-time on_word now layers under the per-call trampoline
+        (M20 sub-task 2 Tier 1) — TextToAudioStream gets the trampoline,
+        the static handler is preserved on the engine for the dispatcher
+        to invoke alongside any per-call handler.
+        """
         from kourai_common.tts_realtime import RealtimeTTSEngine
 
         cb = MagicMock()
-        RealtimeTTSEngine(on_word=cb)
-        kwargs = mock_stream_cls.call_args.kwargs
-        assert kwargs.get("on_word") is cb
+        engine = RealtimeTTSEngine(on_word=cb)
+        assert engine._on_word_static is cb
 
     def test_init_wires_audio_start_trampoline(self, mock_realtimetts):
         """M20 sub-task 2 Tier 2: TextToAudioStream must receive the engine's
@@ -89,6 +92,36 @@ class TestRealtimeTTSEngineInit:
         assert wired is not None, "on_audio_stream_start must be wired at construction"
         # Bound methods compare equal when bound to same instance + function.
         assert wired == engine._dispatch_audio_start
+
+    def test_init_wires_on_word_trampoline(self, mock_realtimetts):
+        """M20 sub-task 2 Tier 1: on_word trampoline at construction so
+        per-call handlers attached via speak()'s on_word can dispatch.
+        """
+        _, _, mock_stream_cls, _ = mock_realtimetts
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        engine = RealtimeTTSEngine()
+        kwargs = mock_stream_cls.call_args.kwargs
+        wired = kwargs.get("on_word")
+        assert wired is not None, "on_word must be wired at construction"
+        assert wired == engine._dispatch_on_word
+
+    def test_init_static_on_word_layered_under_per_call(self, mock_realtimetts):
+        """Constructor-time on_word stays installed; the trampoline fires
+        BOTH the static handler and any per-call handler set by speak().
+        """
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        static_cb = MagicMock(name="static")
+        engine = RealtimeTTSEngine(on_word=static_cb)
+        per_call_cb = MagicMock(name="per_call")
+        engine._on_word_current = per_call_cb
+
+        word = MagicMock(word="hello")
+        engine._dispatch_on_word(word)
+
+        static_cb.assert_called_once_with(word)
+        per_call_cb.assert_called_once_with(word)
 
     def test_init_seeds_stream_volume(self, mock_realtimetts):
         _, _, _, mock_stream = mock_realtimetts
@@ -339,6 +372,58 @@ class TestRealtimeTTSEngineSpeak:
         engine = RealtimeTTSEngine()
         engine._on_audio_start_current = MagicMock(side_effect=RuntimeError("boom"))
         engine._dispatch_audio_start()  # should not raise
+
+    @pytest.mark.asyncio
+    async def test_speak_fires_on_word_via_trampoline(self, mock_realtimetts):
+        """M20 sub-task 2 Tier 1: per-call on_word callback dispatches
+        through the engine's stable trampoline. The trampoline wires
+        TextToAudioStream's on_word at construction; speak() sets the
+        per-call handler and the dispatcher invokes it for each TimingInfo
+        RealtimeTTS emits while playing.
+        """
+        _, _, _, mock_stream = mock_realtimetts
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        engine = RealtimeTTSEngine()
+        callback = MagicMock(name="word_cb")
+        word_a = MagicMock(word="hello")
+        word_b = MagicMock(word="world")
+
+        # Simulate RealtimeTTS firing on_word twice during play().
+        def _simulate_play(_text: str) -> None:
+            engine._dispatch_on_word(word_a)
+            engine._dispatch_on_word(word_b)
+
+        mock_stream.feed.side_effect = _simulate_play
+
+        await engine.speak("hello world", agent_name="hephaestus", on_word=callback)
+
+        assert callback.call_args_list == [
+            ((word_a,),),
+            ((word_b,),),
+        ]
+
+    @pytest.mark.asyncio
+    async def test_speak_restores_prior_on_word_after_call(self, mock_realtimetts):
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        engine = RealtimeTTSEngine()
+        outer = MagicMock(name="outer")
+        inner = MagicMock(name="inner")
+        engine._on_word_current = outer
+
+        await engine.speak("hi", agent_name="hephaestus", on_word=inner)
+        assert engine._on_word_current is outer
+
+    @pytest.mark.asyncio
+    async def test_dispatch_on_word_swallows_callback_exceptions(self, mock_realtimetts):
+        """A buggy karaoke-reveal callback must not break TTS playback."""
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        engine = RealtimeTTSEngine()
+        engine._on_word_current = MagicMock(side_effect=RuntimeError("boom"))
+        word = MagicMock(word="hi")
+        engine._dispatch_on_word(word)  # should not raise
 
     @pytest.mark.asyncio
     async def test_speak_handles_systemexit_from_realtimetts(self, mock_realtimetts):

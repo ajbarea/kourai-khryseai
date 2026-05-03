@@ -128,6 +128,46 @@ class TestCommsWindowItalic:
         assert _ITALIC not in rendered
 
 
+class TestKaraokeHelpers:
+    """M20 sub-task 2 Tier 1 helpers — header opens with name+face+quote,
+    close ends with quote+newline, separator handles punctuation cleanly.
+    """
+
+    def test_open_includes_name_and_opening_quote(self):
+        from hosts.cli.rendering import karaoke_dialogue_open
+
+        rendered = karaoke_dialogue_open("hephaestus", "🔥")
+        assert "Hephaestus" in rendered
+        assert "🔥" in rendered
+        assert rendered.endswith('"')
+        assert "\n" not in rendered
+
+    def test_close_ends_with_quote_and_newline(self):
+        from hosts.cli.rendering import karaoke_dialogue_close
+
+        rendered = karaoke_dialogue_close()
+        assert rendered.endswith('"\n') is False  # has trailing reset codes
+        assert '"' in rendered
+        assert rendered.endswith("\n")
+
+    def test_separator_blank_for_first_word(self):
+        from hosts.cli.rendering import karaoke_word_separator
+
+        assert karaoke_word_separator("hello", last_was_word=False) == ""
+
+    def test_separator_space_between_normal_words(self):
+        from hosts.cli.rendering import karaoke_word_separator
+
+        assert karaoke_word_separator("world", last_was_word=True) == " "
+
+    def test_separator_no_space_before_punctuation(self):
+        from hosts.cli.rendering import karaoke_word_separator
+
+        assert karaoke_word_separator(".", last_was_word=True) == ""
+        assert karaoke_word_separator(",", last_was_word=True) == ""
+        assert karaoke_word_separator("?", last_was_word=True) == ""
+
+
 class TestCommsWindowStripsSsml:
     """`_comms_window` is the universal display chokepoint — every
     dialogue source (HEPH_HANDOFFS, HANDOFF_LINES, VICTORY_LINES, future

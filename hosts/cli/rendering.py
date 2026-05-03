@@ -8,6 +8,7 @@ from __future__ import annotations
 import re
 import secrets
 import shutil
+import string
 import sys
 import textwrap
 from datetime import datetime
@@ -248,6 +249,41 @@ def _comms_window(agent_name: str, dialogue: str, *, style: str = "speak") -> st
     output.append(f"  {border}\u2570{bot_bar}\u256f{_RESET}")
 
     return "\n".join(output)
+
+
+def karaoke_dialogue_open(agent_name: str, face: str) -> str:
+    """Header prefix for the M20 sub-task 2 Tier 1 karaoke single-line render.
+
+    Returns ``"  Hephaestus 🔥 \""`` style — name, kaomoji face, opening
+    italic + opening quote — with NO trailing newline. Words append on
+    each ``on_word`` callback fire; the close (`karaoke_dialogue_close`)
+    finishes the quote + newline after playback completes.
+
+    Trade-off vs `_comms_window`: loses the box border for a clean
+    single-line karaoke effect that surfaces RealtimeTTS's word-timing
+    primitive directly. Box rendering stays for non-TTS / muted /
+    non-English-voice fallback paths.
+    """
+    name_pretty = agent_name.capitalize()
+    return f'  {_GOLD_BOLD}{name_pretty}{_RESET} {_GOLD}{face}{_RESET} {_ITALIC}"'
+
+
+def karaoke_dialogue_close() -> str:
+    """Closing suffix for the karaoke render — close-quote + ANSI reset + newline."""
+    return f'"{_RESET}\n'
+
+
+def karaoke_word_separator(word_text: str, last_was_word: bool) -> str:
+    """Compute the spacing between karaoke-revealed words.
+
+    Mirrors the RealtimeTTS reference example (`tests/kokoro_test.py`):
+    no leading space before the very first word, no leading space when
+    the next token is punctuation, single space otherwise.
+    """
+    is_punct = word_text in set(string.punctuation)
+    if last_was_word and not is_punct:
+        return " "
+    return ""
 
 
 def _maiden_card(name: str) -> str:

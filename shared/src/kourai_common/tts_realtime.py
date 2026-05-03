@@ -132,19 +132,23 @@ class RealtimeTTSEngine:
         # (which can happen during KokoroEngine warmup) is already filtered.
         _install_phonemizer_word_count_filter()
         self._engine = _KokoroEngine(voice="af_heart", default_speed=1.0, debug=False)
-        # M20 sub-task 2 (Tier 2 deferred-render): per-call audio-start
-        # callback dispatched via stable trampoline. RealtimeTTS only
-        # accepts on_audio_stream_start at TextToAudioStream construction;
-        # the trampoline reads `_on_audio_start_current` (mutated by
-        # `speak()` per call) so each utterance can attach its own
-        # display-flush callback without rebuilding the stream.
+        # M20 sub-task 2: per-call audio-start (Tier 2) + on_word (Tier 1)
+        # callbacks dispatched via stable trampolines. RealtimeTTS only
+        # accepts these handlers at TextToAudioStream construction; each
+        # trampoline reads its `_*_current` slot (mutated by `speak()`
+        # per call) so each utterance can attach its own display
+        # callbacks without rebuilding the stream. The constructor-time
+        # `on_word=` argument (engine-wide static handler) layers under
+        # the per-call trampoline — both fire if both are set.
         self._on_audio_start_current: Callable[[], None] | None = None
+        self._on_word_current: Callable[[object], None] | None = None
+        self._on_word_static: Callable[[object], None] | None = on_word
         # PyAudio probes JACK after ALSA inside `_TextToAudioStream`;
         # wrap only that call so torch / HF Hub warnings stay visible.
         with silence_audio_init_noise():
             self._stream = _TextToAudioStream(
                 engine=self._engine,
-                on_word=on_word,
+                on_word=self._dispatch_on_word,
                 on_audio_stream_start=self._dispatch_audio_start,
                 muted=muted,
                 level=logging.WARNING,
@@ -254,6 +258,24 @@ class RealtimeTTSEngine:
         except Exception as e:
             logger.warning("on_audio_start callback raised (%s: %s)", type(e).__name__, e)
 
+    def _dispatch_on_word(self, word: object) -> None:
+        """Trampoline for ``on_word`` — fires both the static (constructor)
+        handler and the per-call (speak) handler if either is set. Per-call
+        handler is mutated by :meth:`speak` and cleared in finally.
+
+        ``word`` is a ``RealtimeTTS.engines.base_engine.TimingInfo`` instance
+        with at least a ``.word`` attribute (string). Per the May 2026
+        RealtimeTTS docs, fires AT PLAYBACK TIME for English voices of
+        ``KokoroEngine`` — the karaoke-reveal primitive for Tier 1.
+        """
+        for cb in (self._on_word_static, self._on_word_current):
+            if cb is None:
+                continue
+            try:
+                cb(word)
+            except Exception as e:
+                logger.warning("on_word callback raised (%s: %s)", type(e).__name__, e)
+
     async def speak(
         self,
         text: str,
@@ -262,6 +284,7 @@ class RealtimeTTSEngine:
         speed: float | None = None,
         pitch: float | None = None,
         on_audio_start: Callable[[], None] | None = None,
+        on_word: Callable[[object], None] | None = None,
     ) -> None:
         """Generate and play speech asynchronously.
 
@@ -273,9 +296,18 @@ class RealtimeTTSEngine:
         begins, after synthesis has produced a playable chunk. Used by
         the CLI / GUI / VN to defer text rendering until the audio is
         actually about to be heard, eliminating the "text precedes
-        audio" disconnect on slow synthesis. Save/restore around the
-        await keeps nested ``speak()`` calls safe even though the
-        current code paths only call sequentially.
+        audio" disconnect on slow synthesis.
+
+        ``on_word`` (M20 sub-task 2 Tier 1) fires once per word AT
+        PLAYBACK TIME with a ``TimingInfo`` object (``.word``,
+        ``.start_time``, ``.end_time``). Supported on English voices of
+        ``KokoroEngine``. Used by the CLI for karaoke-style word-by-word
+        reveal in lockstep with audio. Stacks under any constructor-
+        time ``on_word`` (both fire if both set).
+
+        Both per-call handlers save/restore around the await so nested
+        ``speak()`` calls stay safe even though current code paths only
+        call sequentially.
         """
         if not text.strip():
             logger.debug("Empty text, skipping TTS")
@@ -300,8 +332,11 @@ class RealtimeTTSEngine:
         effective_speed = speed if speed is not None else voice_cfg.speed
 
         prior_on_audio_start = self._on_audio_start_current
+        prior_on_word = self._on_word_current
         if on_audio_start is not None:
             self._on_audio_start_current = on_audio_start
+        if on_word is not None:
+            self._on_word_current = on_word
 
         t_start = time.monotonic()
         try:
@@ -344,6 +379,7 @@ class RealtimeTTSEngine:
         finally:
             self.is_playing = False
             self._on_audio_start_current = prior_on_audio_start
+            self._on_word_current = prior_on_word
             if self._on_complete:
                 self._on_complete()
 

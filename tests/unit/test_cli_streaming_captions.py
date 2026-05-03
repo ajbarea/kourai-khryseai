@@ -43,9 +43,18 @@ def _status_event(text: str, kind: ContentKind) -> MagicMock:
 @pytest.fixture
 def _captured(monkeypatch):
     """Capture every visual ``_echo`` call. Stub markdown render and the
-    status-formatting helper so the captured string is easy to assert on."""
+    status-formatting helper so the captured string is easy to assert on.
+    Accepts ``nl=`` kwarg for M20 sub-task 2 Tier 1 karaoke writes that
+    use ``_echo(text, nl=False)`` to stream words without trailing
+    newlines.
+    """
     captured: list[str] = []
-    monkeypatch.setattr("hosts.cli.streaming._echo", captured.append)
+
+    def _capture(text: str = "", nl: bool = True) -> None:
+        del nl  # _echo signature parity; only `text` matters for assertions
+        captured.append(text)
+
+    monkeypatch.setattr("hosts.cli.streaming._echo", _capture)
     monkeypatch.setattr("hosts.cli.streaming._render_markdown", lambda text: text)
     monkeypatch.setattr("hosts.cli.streaming._extract_artifact_text", lambda _: "")
     monkeypatch.setattr(
@@ -131,35 +140,82 @@ async def test_captions_off_does_not_affect_status_events(_captured):
 
 
 @pytest.mark.asyncio
-async def test_dialogue_visual_deferred_until_on_audio_start_fires(_captured):
-    """M20 sub-task 2 Tier 2: when both display + TTS are active for a
-    KIND_DIALOGUE event, the visual echo fires inside the speak() await
-    via the on_audio_start callback — not before, not after.
-
-    The fixture's tts.speak is an AsyncMock that invokes its
-    on_audio_start kwarg synchronously to mimic RealtimeTTS firing the
-    audio-start trampoline mid-play.
+async def test_speak_invoked_with_audio_start_and_word_callbacks(_captured):
+    """Both the Tier 2 (audio_start) and Tier 1 (on_word) per-call
+    handlers must be passed to engine.speak() — the engine trampolines
+    dispatch to them from RealtimeTTS's playback events.
     """
-
-    async def _speak_that_fires_audio_start(*args, on_audio_start=None, **kwargs):
-        if on_audio_start is not None:
-            on_audio_start()
-
     tts = MagicMock()
-    tts.speak = AsyncMock(side_effect=_speak_that_fires_audio_start)
+    tts.speak = AsyncMock()
     dialogue = _status_event('"Welcome back to the forge."', KIND_DIALOGUE)
     client = _client_yielding([dialogue, _completed_task()])
 
     await send_and_stream(client, "prompt", "ctx-1", tts=tts, captions_enabled=True)
 
-    # Visual echoed exactly once — by the on_audio_start callback, not
-    # twice via the finally-fallback also firing.
-    visual_lines = [line for line in _captured if "[FORMATTED]" in line]
-    assert len(visual_lines) == 1, f"expected 1 visual echo, got {visual_lines!r}"
-    # Confirm speak() was called with our on_audio_start kwarg.
     call_kwargs = tts.speak.await_args.kwargs
-    assert "on_audio_start" in call_kwargs
-    assert callable(call_kwargs["on_audio_start"])
+    assert "on_audio_start" in call_kwargs and callable(call_kwargs["on_audio_start"])
+    assert "on_word" in call_kwargs and callable(call_kwargs["on_word"])
+
+
+@pytest.mark.asyncio
+async def test_dialogue_karaoke_reveals_words_progressively(_captured):
+    """M20 sub-task 2 Tier 1: when TTS fires on_audio_start AND on_word
+    during speak(), the dialogue surfaces as a single-line karaoke
+    render (header → words → close) rather than the box. Each word
+    appears in its own write so a player tailing stdout sees the
+    progressive reveal.
+    """
+
+    async def _karaoke_speak(*args, on_audio_start=None, on_word=None, **kwargs):
+        if on_audio_start is not None:
+            on_audio_start()
+        if on_word is not None:
+            on_word(MagicMock(word="hello"))
+            on_word(MagicMock(word="world"))
+            on_word(MagicMock(word="."))
+
+    tts = MagicMock()
+    tts.speak = AsyncMock(side_effect=_karaoke_speak)
+    dialogue = _status_event('"Hello world."', KIND_DIALOGUE)
+    client = _client_yielding([dialogue, _completed_task()])
+
+    await send_and_stream(client, "prompt", "ctx-1", tts=tts, captions_enabled=True)
+
+    # Karaoke uses _echo per word (no trailing newlines), then close.
+    # Tier 2's `[FORMATTED]` box must NOT appear — Tier 1 took the path.
+    visual = "\n".join(_captured)
+    assert "[FORMATTED]" not in visual
+    # Header opens the quote, words then appear, close ends with a quote+newline.
+    assert any("hello" in line for line in _captured)
+    assert any("world" in line for line in _captured)
+    # Punctuation has no leading space — period attaches to "world".
+    assert "." in _captured  # standalone punctuation echo
+
+
+@pytest.mark.asyncio
+async def test_dialogue_karaoke_close_fires_even_if_no_words_revealed(_captured):
+    """If on_audio_start fires but on_word never does (engine error
+    after audio_start, mock test, etc.), the open quote still gets
+    closed in the finally block — no dangling open ANSI/quote state.
+    """
+
+    async def _audio_only_speak(*args, on_audio_start=None, on_word=None, **kwargs):
+        if on_audio_start is not None:
+            on_audio_start()
+        # No on_word call.
+
+    tts = MagicMock()
+    tts.speak = AsyncMock(side_effect=_audio_only_speak)
+    dialogue = _status_event('"Welcome back to the forge."', KIND_DIALOGUE)
+    client = _client_yielding([dialogue, _completed_task()])
+
+    await send_and_stream(client, "prompt", "ctx-1", tts=tts, captions_enabled=True)
+
+    visual = "".join(_captured)
+    # No fallback Tier 2 box — karaoke header opened, just no body.
+    assert "[FORMATTED]" not in visual
+    # Closing quote landed.
+    assert '"' in visual
 
 
 @pytest.mark.asyncio

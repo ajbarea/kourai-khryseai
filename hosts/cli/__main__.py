@@ -45,6 +45,9 @@ from hosts.cli.rendering import (
     _echo,
     _maiden_card,
     _maiden_gallery,
+    karaoke_dialogue_close,
+    karaoke_dialogue_open,
+    karaoke_word_separator,
     set_raw_out,
 )
 from hosts.cli.settings import CLISettings
@@ -627,22 +630,42 @@ async def main(
     _greet_quote = secrets.choice(_greet_quotes)
     _echo("")
     if tts:
-        # M20 sub-task 2 Tier 2: defer the greeting echo until TTS audio
-        # actually starts. Eliminates the ~3s "text shown but no audio"
-        # disconnect on the FIRST thing the player sees. Falls back to
-        # immediate echo if TTS auto-muted or callback never fires.
+        # M20 sub-task 2 Tier 1 (karaoke single-line) + Tier 2
+        # (deferred box) fallback. Reveals the greeting word-by-word
+        # in lockstep with audio for the FIRST thing the player sees.
+        # If TTS auto-muted or playback never reaches audio_start, the
+        # finally-fallback prints the full box so the greeting isn't
+        # silently lost.
         _greet_line = _format_greeting(_greet_name, _MAIDEN_FACES[_greet_name], _greet_quote)
-        _greeting_flushed = [False]
+        _greet_face = _MAIDEN_FACES[_greet_name]
+        _karaoke_started = [False]
+        _last_was_word = [False]
 
-        def _flush_greeting() -> None:
-            if not _greeting_flushed[0]:
-                _echo(_greet_line)
-                _greeting_flushed[0] = True
+        def _open_greeting_karaoke() -> None:
+            if _karaoke_started[0]:
+                return
+            _echo(karaoke_dialogue_open(_greet_name, _greet_face), nl=False)
+            _karaoke_started[0] = True
+
+        def _reveal_greeting_word(word: object) -> None:
+            w = getattr(word, "word", "")
+            if not w:
+                return
+            sep = karaoke_word_separator(w, _last_was_word[0])
+            _echo(sep + w, nl=False)
+            _last_was_word[0] = True
 
         try:
-            await tts.speak(_greet_quote, _greet_name, on_audio_start=_flush_greeting)
+            await tts.speak(
+                _greet_quote,
+                _greet_name,
+                on_audio_start=_open_greeting_karaoke,
+                on_word=_reveal_greeting_word,
+            )
         finally:
-            if not _greeting_flushed[0]:
+            if _karaoke_started[0]:
+                _echo(karaoke_dialogue_close(), nl=False)
+            else:
                 _echo(_greet_line)
     else:
         _echo(_format_greeting(_greet_name, _MAIDEN_FACES[_greet_name], _greet_quote))
