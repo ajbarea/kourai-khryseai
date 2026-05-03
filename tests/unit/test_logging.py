@@ -395,3 +395,46 @@ class TestOtelTraceInjection:
             assert any(isinstance(f, _OtelTraceFilter) for f in h.filters), (
                 f"handler {h!r} missing _OtelTraceFilter"
             )
+
+
+class TestRunUvicorn:
+    """run_uvicorn must always pass log_config=None — that's the whole point.
+    Without it, uvicorn's default dictConfig wipes setup_logging's root
+    handlers and the agent goes silently observability-blind (the bug
+    PR #145 first surfaced for vn_bridge).
+    """
+
+    def test_passes_log_config_none(self, monkeypatch):
+        from unittest.mock import MagicMock
+
+        from kourai_common.log import run_uvicorn
+
+        fake_run = MagicMock(name="uvicorn.run")
+        fake_uvicorn = MagicMock(run=fake_run)
+        monkeypatch.setitem(__import__("sys").modules, "uvicorn", fake_uvicorn)
+
+        sentinel_app = object()
+        run_uvicorn(sentinel_app, host="127.0.0.1", port=10000)
+
+        fake_run.assert_called_once_with(
+            sentinel_app,
+            host="127.0.0.1",
+            port=10000,
+            log_level="info",
+            log_config=None,
+        )
+
+    def test_log_level_override(self, monkeypatch):
+        from unittest.mock import MagicMock
+
+        from kourai_common.log import run_uvicorn
+
+        fake_run = MagicMock(name="uvicorn.run")
+        fake_uvicorn = MagicMock(run=fake_run)
+        monkeypatch.setitem(__import__("sys").modules, "uvicorn", fake_uvicorn)
+
+        run_uvicorn(object(), host="127.0.0.1", port=8000, log_level="debug")
+
+        kwargs = fake_run.call_args.kwargs
+        assert kwargs["log_level"] == "debug"
+        assert kwargs["log_config"] is None
