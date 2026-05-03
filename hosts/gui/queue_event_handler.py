@@ -171,7 +171,7 @@ class QueueEventHandler:
         else:
             speakable = extract_speakable(text)
             if self._will_speak(speakable):
-                # M20 sub-task 2 Tier 1: typewriter pace = TTS word events.
+                # M20 sub-task 2 Tier 1 (audio-led): typewriter pace = TTS word events.
                 self._add_with_word_paced_typewriter(DialogueEntry(agent, text))
                 play_emote_sfx(text, agent, self.audio_manager)
                 speak_async(
@@ -182,9 +182,13 @@ class QueueEventHandler:
                     on_audio_start=self._on_tts_audio_start,
                 )
             else:
-                # Fallback: no TTS → time-based typewriter, no audio.
+                # Time-based typewriter. M20 sub-task 4: in "instant"
+                # mode TTS still fires (audio catches up to text);
+                # legacy behavior for players who prefer text-first.
                 self._add_with_typewriter(DialogueEntry(agent, text))
                 play_emote_sfx(text, agent, self.audio_manager)
+                if self._tts_unsynced_enabled(speakable):
+                    speak_async(speakable, agent, self.tts_manager)
 
     def _handle_result(self, event: dict) -> None:
         text = event["text"]
@@ -204,6 +208,8 @@ class QueueEventHandler:
         else:
             self._add_with_typewriter(DialogueEntry(self.state.result_agent, text, is_result=True))
             self.history.scroll_to_bottom()
+            if self._tts_unsynced_enabled(speakable):
+                speak_async(speakable, self.state.result_agent, self.tts_manager)
 
     # -- Tier 1 callbacks (fire from TTS daemon thread) ----------------------
 
@@ -311,11 +317,29 @@ class QueueEventHandler:
             logger.exception("Error adding word-paced dialogue entry: %s", e)
 
     def _will_speak(self, speakable: str) -> bool:
-        """True iff TTS is wired AND enabled AND will actually emit on_word
-        events for the given speakable text. Gates the word-paced typewriter
-        path; callers fall back to time-based when this returns False.
+        """True iff TTS is wired AND enabled AND the player picked
+        ``dialogue_sync_mode = "audio-led"`` (M20 sub-task 4). Gates
+        the word-paced typewriter path; callers fall back to the
+        time-based typewriter (and instant TTS, audio catches up to
+        text) when this returns False.
         """
         if not speakable:
             return False
         engine = getattr(self.tts_manager, "tts_engine", None)
-        return engine is not None and bool(getattr(self.tts_manager, "enable_tts", False))
+        if engine is None or not bool(getattr(self.tts_manager, "enable_tts", False)):
+            return False
+        return getattr(self.tts_manager, "dialogue_sync_mode", "audio-led") == "audio-led"
+
+    def _tts_unsynced_enabled(self, speakable: str) -> bool:
+        """True iff TTS should fire WITHOUT word-pace synchronization —
+        the M20 sub-task 4 ``"instant"`` mode where audio catches up to
+        an immediately-revealed text typewriter. Returns False when TTS
+        is off entirely or when the player picked ``audio-led`` (which
+        goes through ``_will_speak`` instead).
+        """
+        if not speakable:
+            return False
+        engine = getattr(self.tts_manager, "tts_engine", None)
+        if engine is None or not bool(getattr(self.tts_manager, "enable_tts", False)):
+            return False
+        return getattr(self.tts_manager, "dialogue_sync_mode", "audio-led") != "audio-led"

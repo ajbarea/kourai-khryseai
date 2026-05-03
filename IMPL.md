@@ -144,10 +144,15 @@ see [feedback_websearch_before_arch_decision](../../.claude/projects/-home-ajbar
 architectural fix over expedient patch. Pick by impact + caller
 reality, not file-of-origin.
 
-1. **M20 sub-task 2 — audio-led text reveal.** All three surfaces
-   shipped: **CLI Tier 2 [#153]**, **CLI Tier 1 karaoke [#154]**,
-   **GUI Tier 1 word-paced typewriter [#156]**, **VN audio-led cps
-   [#157]**. The engine grew per-call `on_audio_start` + `on_word`
+1. **M20 sub-task 2 + 4 — audio-led text reveal + opt-out toggle.**
+   Sub-task 2 shipped on all three surfaces: **CLI Tier 2 [#153]**,
+   **CLI Tier 1 karaoke [#154]**, **GUI Tier 1 word-paced typewriter
+   [#156]**, **VN audio-led cps [#157]**. Sub-task 4 settings toggle
+   shipped [#158]: `dialogue_sync_mode = audio-led | instant` across
+   all three surfaces (CLISettings + GUI TTSGUIManager + VN
+   persistent + screens_menu). Default audio-led so behavior is
+   unchanged for players who don't touch settings; "instant" reverts
+   to the legacy text-first / audio-catches-up path on each surface. The engine grew per-call `on_audio_start` + `on_word`
    kwargs dispatched via stable trampolines; `speak_sync` forwards
    them so the GUI's daemon-thread wrapper can drive the typewriter
    without blocking the pygame loop. The VN surface uses a different

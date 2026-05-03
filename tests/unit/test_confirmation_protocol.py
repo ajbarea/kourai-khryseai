@@ -247,6 +247,32 @@ class TestCLISettingsYoloField:
         assert not hasattr(loaded, "future_field_we_dont_know_about")
 
 
+class TestCLISettingsDialogueSyncMode:
+    """``CLISettings`` persists the M20 sub-task 4 dialogue_sync_mode.
+    Default is "audio-led" so existing players get the karaoke /
+    deferred-render behavior without touching settings; "instant" is
+    the legacy / accessibility opt-out.
+    """
+
+    def test_default_is_audio_led(self):
+        from hosts.cli.settings import CLISettings
+
+        assert CLISettings().dialogue_sync_mode == "audio-led"
+
+    def test_setting_persists_across_load(self, tmp_path, monkeypatch):
+        settings_file = tmp_path / "cli_settings.json"
+        monkeypatch.setattr("hosts.cli.settings._SETTINGS_FILE", settings_file)
+
+        from hosts.cli.settings import CLISettings
+
+        settings = CLISettings()
+        settings.dialogue_sync_mode = "instant"
+        settings.save()
+
+        reloaded = CLISettings.load()
+        assert reloaded.dialogue_sync_mode == "instant"
+
+
 class TestCLISettingsAutoApproveReadsField:
     """``CLISettings`` carries the persisted auto_approve_reads flag."""
 

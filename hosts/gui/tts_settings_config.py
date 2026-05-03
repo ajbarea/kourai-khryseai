@@ -24,6 +24,12 @@ class TTSSettingsConfig:
         "thinking_pause_enabled": True,
         "thinking_pause_duration": 0.5,
         "min_chars_per_second": 50.0,
+        # M20 sub-task 4 — dialogue/audio sync mode.
+        # "audio-led" (default): word-paced typewriter advances on TTS
+        #   on_word events, text reveals in lockstep with audio.
+        # "instant": legacy time-based typewriter, text appears at its
+        #   own pace and audio catches up.
+        "dialogue_sync_mode": "audio-led",
     }
 
     def __init__(self, config_path: Path | None = None):
@@ -87,6 +93,10 @@ class TTSSettingsConfig:
         if "min_chars_per_second" in self.settings:
             manager.pacer.config.min_chars_per_second = self.settings["min_chars_per_second"]
 
+        # M20 sub-task 4 — dialogue sync mode (audio-led | instant)
+        if "dialogue_sync_mode" in self.settings:
+            manager.dialogue_sync_mode = self.settings["dialogue_sync_mode"]
+
     def update_from_manager(self, manager: TTSGUIManager) -> None:
         """Update settings from current manager state.
 
@@ -98,6 +108,7 @@ class TTSSettingsConfig:
         self.settings["thinking_pause_enabled"] = manager.pacer.config.enable_thinking_pause
         self.settings["thinking_pause_duration"] = manager.pacer.config.thinking_pause_duration
         self.settings["min_chars_per_second"] = manager.pacer.config.min_chars_per_second
+        self.settings["dialogue_sync_mode"] = getattr(manager, "dialogue_sync_mode", "audio-led")
 
     def reset_to_defaults(self) -> None:
         """Reset all settings to defaults."""

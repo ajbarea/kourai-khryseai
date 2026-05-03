@@ -141,6 +141,8 @@ label main_loop:
                 # cps so the typewriter finishes when the voice does
                 # (audio-led pacing). Falls back to Ren'Py's global cps
                 # when duration is unknown (older bridge, malformed WAV).
+                # M20 sub-task 4: only compute cps when sync_mode is
+                # "audio-led"; "instant" uses default cps + parallel TTS.
                 $ _tts_cps = 0  # 0 = use global cps
                 if persistent.tts_enabled:
                     python:
@@ -148,7 +150,8 @@ label main_loop:
                         if _tts_result:
                             _tts_path, _tts_duration = _tts_result
                             renpy.voice(_tts_path)
-                            if _tts_duration and _tts_duration > 0:
+                            _audio_led = getattr(persistent, "dialogue_sync_mode", "audio-led") == "audio-led"
+                            if _audio_led and _tts_duration and _tts_duration > 0:
                                 # Clamp cps to a readable floor (5 cps =
                                 # ~0.2s/char) so very short audio doesn't
                                 # produce an unreadable text-flash.

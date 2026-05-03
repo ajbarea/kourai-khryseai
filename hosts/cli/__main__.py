@@ -629,14 +629,14 @@ async def main(
     )
     _greet_quote = secrets.choice(_greet_quotes)
     _echo("")
-    if tts:
+    _greet_line = _format_greeting(_greet_name, _MAIDEN_FACES[_greet_name], _greet_quote)
+    if tts and settings.dialogue_sync_mode == "audio-led":
         # M20 sub-task 2 Tier 1 (karaoke single-line) + Tier 2
         # (deferred box) fallback. Reveals the greeting word-by-word
         # in lockstep with audio for the FIRST thing the player sees.
         # If TTS auto-muted or playback never reaches audio_start, the
         # finally-fallback prints the full box so the greeting isn't
         # silently lost.
-        _greet_line = _format_greeting(_greet_name, _MAIDEN_FACES[_greet_name], _greet_quote)
         _greet_face = _MAIDEN_FACES[_greet_name]
         _karaoke_started = [False]
         _last_was_word = [False]
@@ -667,8 +667,13 @@ async def main(
                 _echo(karaoke_dialogue_close(), nl=False)
             else:
                 _echo(_greet_line)
+    elif tts:
+        # M20 sub-task 4 "instant" mode: legacy behavior — greeting
+        # text appears immediately, audio catches up.
+        _echo(_greet_line)
+        await tts.speak(_greet_quote, _greet_name)
     else:
-        _echo(_format_greeting(_greet_name, _MAIDEN_FACES[_greet_name], _greet_quote))
+        _echo(_greet_line)
     _echo("")
 
     context_id: str = uuid4().hex
@@ -941,6 +946,7 @@ async def main(
                     tts=tts,
                     gossip_enabled=settings.gossip_enabled,
                     captions_enabled=settings.captions_enabled,
+                    dialogue_sync_mode=settings.dialogue_sync_mode,
                     forge_metadata=forge_metadata or None,
                     memoir=memoir_arg,
                     scene_id=scene_id_arg,

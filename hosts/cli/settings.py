@@ -53,6 +53,16 @@ class CLISettings:
     ambient_volume: float = 0.50
     voice_volume: float = 1.0
     sfx_volume: float = 0.85
+    # M20 sub-task 4 — dialogue/audio synchronization mode.
+    # "audio-led" (default): the dialogue echo is held until TTS audio
+    #   actually starts, then revealed word-by-word in lockstep with
+    #   playback (Tier 1 karaoke for English voices, Tier 2 deferred-
+    #   render for the fallback path). Eliminates the "text precedes
+    #   audio" disconnect.
+    # "instant": legacy behavior — dialogue prints immediately and
+    #   TTS audio catches up. Some readers prefer text-first; toggle
+    #   exists for that preference and for accessibility.
+    dialogue_sync_mode: str = "audio-led"
 
     @classmethod
     def load(cls) -> CLISettings:

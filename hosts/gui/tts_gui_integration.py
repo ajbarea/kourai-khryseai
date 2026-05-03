@@ -150,6 +150,11 @@ class TTSGUIManager:
         self.pacer = DialoguePacer(PacingConfig(mode=pacing_mode))
         self._tts_thread: threading.Thread | None = None
         self._current_agent: str | None = None
+        # M20 sub-task 4 — "audio-led" pace dialogue word-by-word with TTS
+        # via the on_word trampoline; "instant" reverts to time-based
+        # typewriter (pre-#156 legacy behavior). Players who prefer
+        # text-first reading toggle this in the settings panel.
+        self.dialogue_sync_mode: str = "audio-led"
         logger.info(
             "TTSGUIManager initialized: enable_tts=%s, pacing_mode=%s, engine=%s",
             enable_tts,
