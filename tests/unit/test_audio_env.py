@@ -246,3 +246,147 @@ def test_silence_audio_init_noise_restores_on_exception(monkeypatch, tmp_path) -
 
     captured = sentinel.read_bytes()
     assert b"AFTER" in captured, "fd 2 must be restored even when body raises"
+
+
+# ===================================================================
+# is_audio_output_available — cross-platform device probe
+# ===================================================================
+
+
+def _isolate_audio_env(monkeypatch) -> None:
+    """Strip env vars and platform signals so each test starts neutral."""
+    for key in ("KOURAI_TTS", "WSL_DISTRO_NAME", "PULSE_SERVER", "DISPLAY", "WAYLAND_DISPLAY"):
+        monkeypatch.delenv(key, raising=False)
+
+
+def test_is_audio_output_available_kourai_tts_off(monkeypatch) -> None:
+    _isolate_audio_env(monkeypatch)
+    monkeypatch.setenv("KOURAI_TTS", "off")
+    assert audio_env.is_audio_output_available() is False
+
+
+def test_is_audio_output_available_macos_defers_to_portaudio(monkeypatch) -> None:
+    """macOS doesn't short-circuit — devices can still be missing
+    (no speakers, BT disconnected, etc.). PortAudio is the source of truth.
+    """
+    _isolate_audio_env(monkeypatch)
+    monkeypatch.setattr(audio_env.sys, "platform", "darwin", raising=False)
+    with patch(
+        "kourai_common.audio_env._portaudio_has_default_output",
+        return_value=True,
+    ):
+        assert audio_env.is_audio_output_available() is True
+    with patch(
+        "kourai_common.audio_env._portaudio_has_default_output",
+        return_value=False,
+    ):
+        assert audio_env.is_audio_output_available() is False
+
+
+def test_is_audio_output_available_windows_defers_to_portaudio(monkeypatch) -> None:
+    _isolate_audio_env(monkeypatch)
+    monkeypatch.setattr(audio_env.sys, "platform", "win32", raising=False)
+    with patch(
+        "kourai_common.audio_env._portaudio_has_default_output",
+        return_value=True,
+    ):
+        assert audio_env.is_audio_output_available() is True
+
+
+def test_is_audio_output_available_wsl_with_wslg_defers_to_portaudio(monkeypatch) -> None:
+    """WSL2+WSLg passes the cheap-NO gate but still needs PortAudio's
+    verdict: stock PyAudio is ALSA-only and may not see the WSLg
+    PulseAudio bridge even when SDL does.
+    """
+    _isolate_audio_env(monkeypatch)
+    monkeypatch.setattr(audio_env.sys, "platform", "linux", raising=False)
+    monkeypatch.setenv("WSL_DISTRO_NAME", "Ubuntu")
+    monkeypatch.setenv("PULSE_SERVER", "unix:/mnt/wslg/PulseServer")
+    monkeypatch.setenv("DISPLAY", ":0")  # WSLg provides this
+    with (
+        patch("kourai_common.audio_env.find_library", return_value="libpulse"),
+        patch(
+            "kourai_common.audio_env._portaudio_has_default_output",
+            return_value=False,
+        ),
+    ):
+        assert audio_env.is_audio_output_available() is False
+    with (
+        patch("kourai_common.audio_env.find_library", return_value="libpulse"),
+        patch(
+            "kourai_common.audio_env._portaudio_has_default_output",
+            return_value=True,
+        ),
+    ):
+        assert audio_env.is_audio_output_available() is True
+
+
+def test_is_audio_output_available_wsl_without_pulse_server(monkeypatch) -> None:
+    _isolate_audio_env(monkeypatch)
+    monkeypatch.setattr(audio_env.sys, "platform", "linux", raising=False)
+    monkeypatch.setenv("WSL_DISTRO_NAME", "Ubuntu")
+    assert audio_env.is_audio_output_available() is False
+
+
+def test_is_audio_output_available_wsl_pulse_server_no_libpulse(monkeypatch) -> None:
+    _isolate_audio_env(monkeypatch)
+    monkeypatch.setattr(audio_env.sys, "platform", "linux", raising=False)
+    monkeypatch.setenv("WSL_DISTRO_NAME", "Ubuntu")
+    monkeypatch.setenv("PULSE_SERVER", "unix:/mnt/wslg/PulseServer")
+    with patch("kourai_common.audio_env.find_library", return_value=None):
+        assert audio_env.is_audio_output_available() is False
+
+
+def test_is_audio_output_available_headless_linux(monkeypatch) -> None:
+    _isolate_audio_env(monkeypatch)
+    monkeypatch.setattr(audio_env.sys, "platform", "linux", raising=False)
+    assert audio_env.is_audio_output_available() is False
+
+
+def test_is_audio_output_available_linux_with_display_portaudio_present(monkeypatch) -> None:
+    _isolate_audio_env(monkeypatch)
+    monkeypatch.setattr(audio_env.sys, "platform", "linux", raising=False)
+    monkeypatch.setenv("DISPLAY", ":0")
+    with patch(
+        "kourai_common.audio_env._portaudio_has_default_output",
+        return_value=True,
+    ):
+        assert audio_env.is_audio_output_available() is True
+
+
+def test_is_audio_output_available_linux_with_display_no_portaudio_device(monkeypatch) -> None:
+    _isolate_audio_env(monkeypatch)
+    monkeypatch.setattr(audio_env.sys, "platform", "linux", raising=False)
+    monkeypatch.setenv("DISPLAY", ":0")
+    with patch(
+        "kourai_common.audio_env._portaudio_has_default_output",
+        return_value=False,
+    ):
+        assert audio_env.is_audio_output_available() is False
+
+
+def test_portaudio_has_default_output_no_pyaudio_module() -> None:
+    """ImportError on `import pyaudio` → False, no crash."""
+    with patch.dict("sys.modules", {"pyaudio": None}):
+        # Forcing pyaudio to None makes import fail with ImportError.
+        assert audio_env._portaudio_has_default_output() is False
+
+
+def test_portaudio_has_default_output_device_present() -> None:
+    fake_pa = MagicMock()
+    fake_pa.get_default_host_api_info.return_value = {"defaultOutputDevice": 3}
+    fake_pa_cls = MagicMock(return_value=fake_pa)
+    fake_pyaudio = MagicMock(PyAudio=fake_pa_cls)
+    with patch.dict("sys.modules", {"pyaudio": fake_pyaudio}):
+        assert audio_env._portaudio_has_default_output() is True
+    fake_pa.terminate.assert_called_once()
+
+
+def test_portaudio_has_default_output_device_absent() -> None:
+    fake_pa = MagicMock()
+    fake_pa.get_default_host_api_info.return_value = {"defaultOutputDevice": -1}
+    fake_pa_cls = MagicMock(return_value=fake_pa)
+    fake_pyaudio = MagicMock(PyAudio=fake_pa_cls)
+    with patch.dict("sys.modules", {"pyaudio": fake_pyaudio}):
+        assert audio_env._portaudio_has_default_output() is False
+    fake_pa.terminate.assert_called_once()

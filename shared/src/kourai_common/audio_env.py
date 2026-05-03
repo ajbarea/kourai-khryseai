@@ -35,6 +35,57 @@ def _is_headless_linux() -> bool:
     return not os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY")
 
 
+def is_audio_output_available() -> bool:
+    """Cross-platform probe: is a usable audio output device present?
+
+    Decision chain — cheap OS signals rule out *definite no* cases;
+    PortAudio probe is the source of truth for everything else:
+
+    1. ``KOURAI_TTS=off|0|false|no`` → False (manual override).
+    2. WSL2 without WSLg (no ``PULSE_SERVER`` or no libpulse) → False.
+    3. Headless Linux (no ``DISPLAY`` / ``WAYLAND_DISPLAY``) → False.
+    4. Otherwise → ``Pa_GetDefaultOutputDevice`` via PyAudio.
+
+    Note: WSL2 *with* WSLg still falls through to the PortAudio probe.
+    WSLg exposes audio over PulseAudio, but stock PyAudio wheels link
+    PortAudio against ALSA only — so WSLg-routed audio may be invisible
+    to PyAudio even when SDL/PulseAudio see it. Trust the probe.
+
+    research(2026-05): PortAudio's ``paNoDevice`` sentinel is the
+    canonical cross-platform "no output" signal — identical semantics
+    across ALSA, PulseAudio, CoreAudio, WASAPI. Probe-before-construct
+    avoids RealtimeTTS's deep ``exit(0)`` trap inside
+    ``stream_player.open_stream``.
+    """
+    if os.environ.get("KOURAI_TTS", "").strip().lower() in ("off", "0", "false", "no"):
+        return False
+    if _is_wsl() and not (os.environ.get("PULSE_SERVER") and _has_pulseaudio_runtime()):
+        return False
+    if _is_headless_linux():
+        return False
+    return _portaudio_has_default_output()
+
+
+def _portaudio_has_default_output() -> bool:
+    """PortAudio's ``Pa_GetDefaultOutputDevice`` via PyAudio. False on any error."""
+    try:
+        import pyaudio
+    except Exception:
+        return False
+    with silence_audio_init_noise():
+        try:
+            pa = pyaudio.PyAudio()
+        except Exception:
+            return False
+        try:
+            info = pa.get_default_host_api_info()
+            return int(info.get("defaultOutputDevice", -1)) >= 0
+        except Exception:
+            return False
+        finally:
+            pa.terminate()
+
+
 def configure_sdl_audio_driver() -> str | None:
     """Set SDL_AUDIODRIVER defaults when the user did not specify one.
 

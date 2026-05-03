@@ -91,6 +91,58 @@ class TestRealtimeTTSEngineInit:
         mock_stream.set_volume.assert_called_with(0.6)
 
 
+class TestRealtimeTTSEngineMutedAutoDetect:
+    """muted=None auto-detects via is_audio_output_available; explicit
+    True/False overrides bypass detection. Defends the cross-platform
+    fallback path AJ ships in 2026-05.
+    """
+
+    def test_muted_none_auto_mutes_when_no_audio(self, mock_realtimetts, monkeypatch, caplog):
+        _, _, mock_stream_cls, _ = mock_realtimetts
+        monkeypatch.setattr(
+            "kourai_common.tts_realtime.is_audio_output_available",
+            lambda: False,
+        )
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        with caplog.at_level("WARNING"):
+            RealtimeTTSEngine()  # muted defaults to None
+
+        assert mock_stream_cls.call_args.kwargs["muted"] is True
+        assert "auto-muted" in caplog.text.lower()
+
+    def test_muted_none_unmutes_when_audio_available(self, mock_realtimetts, monkeypatch):
+        _, _, mock_stream_cls, _ = mock_realtimetts
+        monkeypatch.setattr(
+            "kourai_common.tts_realtime.is_audio_output_available",
+            lambda: True,
+        )
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        RealtimeTTSEngine()
+        assert mock_stream_cls.call_args.kwargs["muted"] is False
+
+    def test_explicit_muted_true_skips_detect(self, mock_realtimetts, monkeypatch):
+        _, _, mock_stream_cls, _ = mock_realtimetts
+        probe = MagicMock(name="is_audio_output_available")
+        monkeypatch.setattr("kourai_common.tts_realtime.is_audio_output_available", probe)
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        RealtimeTTSEngine(muted=True)
+        assert mock_stream_cls.call_args.kwargs["muted"] is True
+        probe.assert_not_called()
+
+    def test_explicit_muted_false_skips_detect(self, mock_realtimetts, monkeypatch):
+        _, _, mock_stream_cls, _ = mock_realtimetts
+        probe = MagicMock(name="is_audio_output_available")
+        monkeypatch.setattr("kourai_common.tts_realtime.is_audio_output_available", probe)
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        RealtimeTTSEngine(muted=False)
+        assert mock_stream_cls.call_args.kwargs["muted"] is False
+        probe.assert_not_called()
+
+
 # ===================================================================
 # Volume + lifecycle hooks
 # ===================================================================
@@ -199,6 +251,23 @@ class TestRealtimeTTSEngineSpeak:
         cb = MagicMock()
         engine.set_on_complete(cb)
         await engine.speak("hello")  # must not raise
+        assert engine.is_playing is False
+        cb.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_speak_handles_systemexit_from_realtimetts(self, mock_realtimetts):
+        """RealtimeTTS calls exit(0) deep in stream_player.open_stream when
+        no audio device. SystemExit isn't an Exception, so without the
+        widened catch the asyncio loop dies and the CLI exits.
+        """
+        _, _, _, mock_stream = mock_realtimetts
+        mock_stream.feed.side_effect = SystemExit(0)
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        engine = RealtimeTTSEngine()
+        cb = MagicMock()
+        engine.set_on_complete(cb)
+        await engine.speak("hello")  # must not bubble SystemExit
         assert engine.is_playing is False
         cb.assert_called_once()
 
