@@ -311,11 +311,16 @@ class RealtimeTTSEngine:
         """Generate speech as a self-contained WAV without playback.
 
         Drives ``TextToAudioStream`` with ``muted=True`` and an
-        ``on_audio_chunk`` collector — RealtimeTTS's documented bytes-only
-        path — then wraps the int16 PCM in one WAV header sized from
-        ``KokoroEngine.get_stream_info()``. Used by ``agents/vn_bridge/``
-        which feeds WAV bytes into Ren'Py's audio system rather than
-        playing them itself.
+        ``on_audio_chunk`` collector, then wraps the int16 PCM in one
+        WAV header sized from ``KokoroEngine.get_stream_info()``. Used by
+        ``agents/vn_bridge/`` which feeds WAV bytes into Ren'Py's audio
+        system rather than playing them itself.
+
+        For headless callers (no audio device — Docker, CI, server
+        deployments), construct the engine with ``muted=True`` so the
+        underlying StreamPlayer skips ``open_stream()`` entirely. The
+        runtime ``muted=True`` here only stops audio frame writes; it
+        does not prevent the device-open probe inside RealtimeTTS.
         """
         if not text.strip():
             return b""
