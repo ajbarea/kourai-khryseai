@@ -132,12 +132,20 @@ class RealtimeTTSEngine:
         # (which can happen during KokoroEngine warmup) is already filtered.
         _install_phonemizer_word_count_filter()
         self._engine = _KokoroEngine(voice="af_heart", default_speed=1.0, debug=False)
+        # M20 sub-task 2 (Tier 2 deferred-render): per-call audio-start
+        # callback dispatched via stable trampoline. RealtimeTTS only
+        # accepts on_audio_stream_start at TextToAudioStream construction;
+        # the trampoline reads `_on_audio_start_current` (mutated by
+        # `speak()` per call) so each utterance can attach its own
+        # display-flush callback without rebuilding the stream.
+        self._on_audio_start_current: Callable[[], None] | None = None
         # PyAudio probes JACK after ALSA inside `_TextToAudioStream`;
         # wrap only that call so torch / HF Hub warnings stay visible.
         with silence_audio_init_noise():
             self._stream = _TextToAudioStream(
                 engine=self._engine,
                 on_word=on_word,
+                on_audio_stream_start=self._dispatch_audio_start,
                 muted=muted,
                 level=logging.WARNING,
             )
@@ -232,6 +240,20 @@ class RealtimeTTSEngine:
         """Set callback to fire when playback completes."""
         self._on_complete = callback
 
+    def _dispatch_audio_start(self) -> None:
+        """Trampoline for the per-call ``on_audio_start`` callback that
+        :meth:`speak` attaches. Stable callback wired into RealtimeTTS at
+        construction; per-utterance handler comes from
+        ``_on_audio_start_current``.
+        """
+        cb = self._on_audio_start_current
+        if cb is None:
+            return
+        try:
+            cb()
+        except Exception as e:
+            logger.warning("on_audio_start callback raised (%s: %s)", type(e).__name__, e)
+
     async def speak(
         self,
         text: str,
@@ -239,12 +261,21 @@ class RealtimeTTSEngine:
         voice_key: str | None = None,
         speed: float | None = None,
         pitch: float | None = None,
+        on_audio_start: Callable[[], None] | None = None,
     ) -> None:
         """Generate and play speech asynchronously.
 
         ``pitch`` is accepted for ABI parity with ``TTSEngine.speak`` but
         ignored — KokoroEngine has no pitch control (the legacy
         ``KokoroBackend`` also dropped it for the same reason).
+
+        ``on_audio_start`` (M20 sub-task 2 Tier 2) fires once playback
+        begins, after synthesis has produced a playable chunk. Used by
+        the CLI / GUI / VN to defer text rendering until the audio is
+        actually about to be heard, eliminating the "text precedes
+        audio" disconnect on slow synthesis. Save/restore around the
+        await keeps nested ``speak()`` calls safe even though the
+        current code paths only call sequentially.
         """
         if not text.strip():
             logger.debug("Empty text, skipping TTS")
@@ -267,6 +298,10 @@ class RealtimeTTSEngine:
             voice_cfg = get_voice_for_agent(agent_name)
 
         effective_speed = speed if speed is not None else voice_cfg.speed
+
+        prior_on_audio_start = self._on_audio_start_current
+        if on_audio_start is not None:
+            self._on_audio_start_current = on_audio_start
 
         t_start = time.monotonic()
         try:
@@ -308,6 +343,7 @@ class RealtimeTTSEngine:
             logger.debug("TTS playback error detail", exc_info=True)
         finally:
             self.is_playing = False
+            self._on_audio_start_current = prior_on_audio_start
             if self._on_complete:
                 self._on_complete()
 

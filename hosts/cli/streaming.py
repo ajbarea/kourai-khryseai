@@ -230,9 +230,39 @@ async def send_and_stream(
                     suppress_visual = (
                         kind == KIND_DIALOGUE and tts is not None and not captions_enabled
                     )
-                    if not suppress_visual:
+                    will_speak = kind == KIND_DIALOGUE and tts is not None and bool(agent)
+                    will_display = not suppress_visual
+
+                    if will_display and will_speak:
+                        # M20 sub-task 2 Tier 2 deferred-render: hold the
+                        # comms-window echo until TTS playback actually
+                        # starts (`on_audio_start` trampoline). Eliminates
+                        # the "text precedes audio" disconnect for slow
+                        # synthesis. If TTS auto-muted or the callback
+                        # never fires (engine error, headless probe
+                        # missed phantom device), the finally-fallback
+                        # echoes immediately so dialogue is never lost.
+                        # The closure is invoked synchronously inside this
+                        # iteration's `await tts.speak(...)` and never
+                        # outlives it, so the loop-variable bindings are
+                        # safe — `formatted` and `flushed` cannot rebind
+                        # before _flush runs. Suppressed with B023 inline.
+                        flushed = [False]
+
+                        def _flush() -> None:
+                            if not flushed[0]:  # noqa: B023
+                                _echo(formatted)  # noqa: B023
+                                flushed[0] = True  # noqa: B023
+
+                        msg = text.split(" ", 1)[-1] if " " in text else text
+                        try:
+                            await tts.speak(msg, agent, on_audio_start=_flush)
+                        finally:
+                            if not flushed[0]:
+                                _echo(formatted)
+                    elif will_display:
                         _echo(formatted)
-                    if kind == KIND_DIALOGUE and tts and agent:
+                    elif will_speak:
                         msg = text.split(" ", 1)[-1] if " " in text else text
                         await tts.speak(msg, agent)
 

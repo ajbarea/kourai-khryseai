@@ -626,10 +626,27 @@ async def main(
     )
     _greet_quote = secrets.choice(_greet_quotes)
     _echo("")
-    _echo(_format_greeting(_greet_name, _MAIDEN_FACES[_greet_name], _greet_quote))
-    _echo("")
     if tts:
-        await tts.speak(_greet_quote, _greet_name)
+        # M20 sub-task 2 Tier 2: defer the greeting echo until TTS audio
+        # actually starts. Eliminates the ~3s "text shown but no audio"
+        # disconnect on the FIRST thing the player sees. Falls back to
+        # immediate echo if TTS auto-muted or callback never fires.
+        _greet_line = _format_greeting(_greet_name, _MAIDEN_FACES[_greet_name], _greet_quote)
+        _greeting_flushed = [False]
+
+        def _flush_greeting() -> None:
+            if not _greeting_flushed[0]:
+                _echo(_greet_line)
+                _greeting_flushed[0] = True
+
+        try:
+            await tts.speak(_greet_quote, _greet_name, on_audio_start=_flush_greeting)
+        finally:
+            if not _greeting_flushed[0]:
+                _echo(_greet_line)
+    else:
+        _echo(_format_greeting(_greet_name, _MAIDEN_FACES[_greet_name], _greet_quote))
+    _echo("")
 
     context_id: str = uuid4().hex
     pending_images: list[tuple[str, str]] = []  # (base64_bytes, mime_type)

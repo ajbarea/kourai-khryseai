@@ -146,13 +146,17 @@ reality, not file-of-origin.
 
 1. **M20 sub-task 2 — audio-led text reveal.** Confirmed load-bearing
    on both surfaces by the 2026-05-03 measurement (3s streaming, 4-7s
-   vn_bridge full-WAV). Replaces immediate text rendering with
-   deferred-render gated on TTS readiness; word-by-word for English
-   (RealtimeTTS `on_word` callback) and full-text-on-first-chunk for
-   non-English / Edge TTS. Sub-task 3 (three-surface implementation
-   across CLI / GUI / VN) follows the same plumbing. Worth driving
-   on Kokoro now since the API path (`on_word` callback) is
-   engine-agnostic — any work here carries to ElevenLabs unchanged.
+   vn_bridge full-WAV). **Tier 2 (CLI surface) shipped [#153]:**
+   `_format_greeting` (startup banner) and the streaming.py KIND_DIALOGUE
+   path now defer the comms-window echo until the engine's
+   `on_audio_start` trampoline fires, eliminating the
+   "text-precedes-audio" disconnect. Auto-mute / engine-error / muted
+   paths echo via the finally-fallback so dialogue is never lost.
+   **Tier 1 (word-by-word reveal via RealtimeTTS `on_word` callback)
+   for English voices follows next.** Sub-task 3 (GUI + VN surfaces)
+   reuses the same plumbing. Worth driving on Kokoro now since the
+   callback API path is engine-agnostic — any work here carries to
+   ElevenLabs unchanged.
 2. **Live VN smoke** — exercises the vn_bridge `/tts` →
    `RealtimeTTSEngine.synthesize_to_wav` path + metadata-based
    dialogue routing end-to-end. Needs AJ at the keyboard.
