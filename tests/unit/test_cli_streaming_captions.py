@@ -50,7 +50,8 @@ def _captured(monkeypatch):
     """
     captured: list[str] = []
 
-    def _capture(text: str = "", nl: bool = True) -> None:  # noqa: ARG001
+    def _capture(text: str = "", nl: bool = True) -> None:
+        del nl  # _echo signature parity; only `text` matters for assertions
         captured.append(text)
 
     monkeypatch.setattr("hosts.cli.streaming._echo", _capture)
