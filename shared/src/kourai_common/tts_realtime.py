@@ -34,7 +34,11 @@ from typing import TYPE_CHECKING
 import pyaudio
 from RealtimeTTS import KokoroEngine as _KokoroEngine, TextToAudioStream as _TextToAudioStream
 
-from kourai_common.audio_env import silence_alsa_lib_errors, silence_audio_init_noise
+from kourai_common.audio_env import (
+    is_audio_output_available,
+    silence_alsa_lib_errors,
+    silence_audio_init_noise,
+)
 from kourai_common.tts_backend import (
     AGENT_VOICE_MAP,
     TTSVoiceConfig,
@@ -106,9 +110,23 @@ class RealtimeTTSEngine:
         self,
         master_volume: float = 0.8,
         enable_effects: bool = True,
-        muted: bool = False,
+        muted: bool | None = None,
         on_word: Callable[[object], None] | None = None,
     ):
+        # research(2026-05): muted=None means auto-detect via PortAudio's
+        # paNoDevice signal — degrades to silent text-only on Docker
+        # without /dev/snd, WSL2 without WSLg, headless servers, CI.
+        # Explicit muted=True/False overrides (vn_bridge passes True;
+        # tests can pin False to assert playback paths).
+        if muted is None:
+            muted = not is_audio_output_available()
+            if muted:
+                logger.warning(
+                    "TTS auto-muted: no audio output device detected. "
+                    "Set KOURAI_TTS=off to silence; enable WSLg (WSL2), "
+                    "pass --device /dev/snd (Docker), or install audio "
+                    "drivers to play voice."
+                )
         # Install before engine init so misaki's first phonemize() call
         # (which can happen during KokoroEngine warmup) is already filtered.
         _install_phonemizer_word_count_filter()
@@ -268,8 +286,13 @@ class RealtimeTTSEngine:
                 time.monotonic() - t_start,
                 len(text),
             )
-        except Exception as e:
-            # TTS is non-critical; keep the console line terse.
+        except (Exception, SystemExit) as e:
+            # research(2026-05): SystemExit (not Exception) bubbles from
+            # RealtimeTTS's stream_player.open_stream when an audio device
+            # disappears mid-session or PortAudio reports a phantom NULL
+            # default sink. Auto-mute at construction normally prevents
+            # this; widening the catch keeps the CLI alive on edge cases
+            # the init probe can't see.
             logger.warning("TTS playback skipped (%s: %s)", type(e).__name__, e)
             logger.debug("TTS playback error detail", exc_info=True)
         finally:
