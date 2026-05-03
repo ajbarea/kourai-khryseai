@@ -230,13 +230,26 @@ class TestShutdown:
 # ── RenPyBridge — request_tts ────────────────────────────────────────────────
 
 
-def _audio_response(data: bytes = b"\xff\xfb\x90\x00" * 100) -> MagicMock:
-    """Mock urlopen response returning MP3-like audio bytes."""
+def _audio_response(
+    data: bytes = b"\xff\xfb\x90\x00" * 100,
+    *,
+    duration: float | None = None,
+) -> MagicMock:
+    """Mock urlopen response returning MP3-like audio bytes.
+
+    ``duration`` populates ``X-TTS-Duration-Seconds`` (M20 sub-task 2 VN
+    surface) — None means the bridge omitted the header (older bridge
+    or malformed WAV), and the parser should return ``(path, None)``.
+    """
     resp = MagicMock()
     resp.__enter__ = MagicMock(return_value=resp)
     resp.__exit__ = MagicMock(return_value=False)
     resp.status = 200
     resp.read.return_value = data
+    headers: dict[str, str] = {}
+    if duration is not None:
+        headers["X-TTS-Duration-Seconds"] = f"{duration:.3f}"
+    resp.headers = headers
     return resp
 
 
@@ -251,13 +264,38 @@ def _json_response(data: dict, status: int = 200) -> MagicMock:
 
 
 class TestRequestTts:
-    def test_returns_renpy_relative_path_on_success(
+    def test_returns_path_and_duration_tuple_on_success(
         self, bridge: RenPyBridge, tmp_path: Path
     ) -> None:
-        """Successful TTS returns a Ren'Py-relative path like 'audio/tts/tts_techne.mp3'."""
+        """Successful TTS returns ``(path, duration_seconds)``. M20
+        sub-task 2 VN surface — duration drives Ren'Py-side ``cps``
+        for audio-led typewriter pacing.
+        """
+        with patch("urllib.request.urlopen", return_value=_audio_response(duration=3.142)):
+            result = bridge.request_tts("Hello world.", "techne")
+        assert result == ("audio/tts/tts_techne.mp3", 3.142)
+
+    def test_returns_none_duration_when_header_missing(self, bridge: RenPyBridge) -> None:
+        """Older bridge versions (or malformed WAV on the bridge side)
+        omit X-TTS-Duration-Seconds — caller should still get the audio
+        path with ``duration=None`` so it can fall back to global cps.
+        """
         with patch("urllib.request.urlopen", return_value=_audio_response()):
             result = bridge.request_tts("Hello world.", "techne")
-        assert result == "audio/tts/tts_techne.mp3"
+        assert result == ("audio/tts/tts_techne.mp3", None)
+
+    def test_returns_none_duration_when_header_unparseable(self, bridge: RenPyBridge) -> None:
+        resp = _audio_response()
+        resp.headers = {"X-TTS-Duration-Seconds": "not-a-number"}
+        with patch("urllib.request.urlopen", return_value=resp):
+            result = bridge.request_tts("Hello.", "metis")
+        assert result == ("audio/tts/tts_metis.mp3", None)
+
+    def test_returns_none_duration_when_header_zero(self, bridge: RenPyBridge) -> None:
+        """Zero / negative durations are nonsensical — treat as missing."""
+        with patch("urllib.request.urlopen", return_value=_audio_response(duration=0.0)):
+            result = bridge.request_tts("Hello.", "metis")
+        assert result == ("audio/tts/tts_metis.mp3", None)
 
     def test_writes_mp3_file_to_disk(self, bridge: RenPyBridge) -> None:
         """TTS audio bytes are written to game/audio/tts/ directory."""

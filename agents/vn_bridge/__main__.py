@@ -9,10 +9,12 @@ Exposes five endpoints:
 """
 
 import contextlib
+import io
 import json
 import logging
 import re
 import sys
+import wave
 from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING, cast
 from uuid import uuid4
@@ -129,7 +131,19 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
 
 
 async def handle_tts(request: Request) -> Response | JSONResponse:
-    """Synthesize WAV bytes from text for Ren'Py's audio system."""
+    """Synthesize WAV bytes from text for Ren'Py's audio system.
+
+    Response headers (M20 sub-task 2 VN surface — audio-led cps):
+      - ``X-TTS-Duration-Seconds`` — total audio duration parsed from the
+        WAV header (frames / framerate). Ren'Py uses this to compute a
+        per-line ``{cps=N}`` value so the typewriter finishes when the
+        voice finishes. Backwards-compatible: callers that ignore the
+        header still get the same WAV body.
+
+    The header is omitted when the WAV is malformed (defense — treat
+    "no duration" the same as "duration unknown" rather than failing
+    the synthesis call). Ren'Py defaults to its global cps in that case.
+    """
     data: dict = await request.json()
     text = data.get("text", "").strip()
     agent = data.get("agent", "").lower().strip()
@@ -148,7 +162,31 @@ async def handle_tts(request: Request) -> Response | JSONResponse:
     if not wav_bytes:
         return JSONResponse({"error": "TTS produced no audio"}, status_code=500)
 
-    return Response(wav_bytes, media_type="audio/wav")
+    headers: dict[str, str] = {}
+    duration = _wav_duration_seconds(wav_bytes)
+    if duration is not None:
+        headers["X-TTS-Duration-Seconds"] = f"{duration:.3f}"
+        log.info(f"TTS ({agent}): duration={duration:.3f}s chars={len(text)}")
+
+    return Response(wav_bytes, media_type="audio/wav", headers=headers)
+
+
+def _wav_duration_seconds(wav_bytes: bytes) -> float | None:
+    """Parse the WAV header to extract audio duration in seconds.
+
+    Returns None on parse failure. We use Python's stdlib ``wave``
+    module so the parsing is dependency-free and matches what Ren'Py's
+    audio backend does internally.
+    """
+    try:
+        with wave.open(io.BytesIO(wav_bytes), "rb") as wf:
+            frames = wf.getnframes()
+            framerate = wf.getframerate()
+            if framerate <= 0:
+                return None
+            return frames / framerate
+    except (wave.Error, EOFError, OSError):
+        return None
 
 
 async def handle_gossip(request: Request) -> JSONResponse:

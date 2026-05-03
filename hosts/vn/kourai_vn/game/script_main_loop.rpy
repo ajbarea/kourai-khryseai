@@ -135,18 +135,36 @@ label main_loop:
                         # stage dim correctly.
                         kourai_set_speaker(agent_id)
 
-                # TTS — request voice audio before say statement
+                # TTS — request voice audio before say statement.
+                # M20 sub-task 2 VN surface: if the bridge returns a
+                # duration alongside the audio path, compute a per-line
+                # cps so the typewriter finishes when the voice does
+                # (audio-led pacing). Falls back to Ren'Py's global cps
+                # when duration is unknown (older bridge, malformed WAV).
+                $ _tts_cps = 0  # 0 = use global cps
                 if persistent.tts_enabled:
                     python:
-                        _tts_path = bridge.request_tts(message_text, agent_id)
-                        if _tts_path:
+                        _tts_result = bridge.request_tts(message_text, agent_id)
+                        if _tts_result:
+                            _tts_path, _tts_duration = _tts_result
                             renpy.voice(_tts_path)
+                            if _tts_duration and _tts_duration > 0:
+                                # Clamp cps to a readable floor (5 cps =
+                                # ~0.2s/char) so very short audio doesn't
+                                # produce an unreadable text-flash.
+                                _tts_cps = max(5, int(len(message_text) / _tts_duration))
 
                 if char_info:
                     $ _char_obj, _epithet = char_info
-                    _char_obj "[message_text]"
+                    if _tts_cps > 0:
+                        _char_obj "{cps=[_tts_cps]}[message_text]{/cps}"
+                    else:
+                        _char_obj "[message_text]"
                 else:
-                    "[agent_id]" "[message_text]"
+                    if _tts_cps > 0:
+                        "[agent_id]" "{cps=[_tts_cps]}[message_text]{/cps}"
+                    else:
+                        "[agent_id]" "[message_text]"
 
                 $ _beat_idx += 1
 

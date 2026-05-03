@@ -166,11 +166,18 @@ class RenPyBridge:
 
     # ── TTS ────────────────────────────────────────────────────────────────
 
-    def request_tts(self, text: str, agent: str) -> str | None:
+    def request_tts(self, text: str, agent: str) -> tuple[str, float | None] | None:
         """Request TTS audio from the bridge and save to game/audio/tts/.
 
-        Returns a Ren'Py-relative path (e.g. "audio/tts/tts_techne.mp3")
-        suitable for renpy.voice(), or None on failure.
+        Returns ``(path, duration_seconds)`` on success — path is a
+        Ren'Py-relative location (e.g. "audio/tts/tts_techne.mp3")
+        suitable for ``renpy.voice()``; duration is parsed from the
+        ``X-TTS-Duration-Seconds`` response header (M20 sub-task 2 VN
+        surface) and is ``None`` if the bridge omitted it (older bridge
+        version, malformed WAV). Callers wanting audio-led ``cps``
+        pacing fall back to Ren'Py's default cps when duration is None.
+
+        Returns ``None`` on transport failure.
         """
         url = f"{BRIDGE_URL}/tts"
         body = json.dumps({"text": text, "agent": agent}).encode("utf-8")
@@ -186,16 +193,32 @@ class RenPyBridge:
                 if not audio_data:
                     self._log("TTS returned empty audio")
                     return None
+                duration = self._parse_duration_header(resp)
                 # game/audio/tts/ — Ren'Py resolves audio relative to game/
                 audio_dir = self.game_dir / "audio" / "tts"
                 audio_dir.mkdir(parents=True, exist_ok=True)
                 filename = f"tts_{agent}.mp3"
                 (audio_dir / filename).write_bytes(audio_data)
-                self._log(f"TTS saved: {filename} ({len(audio_data)} bytes)")
-                return f"audio/tts/{filename}"
+                self._log(f"TTS saved: {filename} ({len(audio_data)} bytes, duration={duration})")
+                return f"audio/tts/{filename}", duration
         except Exception as e:
             self._log(f"TTS request error: {e}")
             return None
+
+    @staticmethod
+    def _parse_duration_header(resp) -> float | None:
+        """Pull ``X-TTS-Duration-Seconds`` from the response. Returns
+        None if the header is missing or unparseable — callers fall
+        back to Ren'Py's global cps.
+        """
+        raw = resp.headers.get("X-TTS-Duration-Seconds")
+        if not raw:
+            return None
+        try:
+            value = float(raw)
+        except (TypeError, ValueError):
+            return None
+        return value if value > 0 else None
 
     # ── Gossip ──────────────────────────────────────────────────────────────
 
