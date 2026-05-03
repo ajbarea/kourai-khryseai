@@ -146,24 +146,37 @@ reality, not file-of-origin.
 
 1. **M20 sub-task 2 — audio-led text reveal.** Confirmed load-bearing
    on both surfaces by the 2026-05-03 measurement (3s streaming, 4-7s
-   vn_bridge full-WAV). **Tier 2 (CLI surface) shipped [#153];
-   Tier 1 karaoke shipped [#154]:** the engine grew per-call
+   vn_bridge full-WAV). **Tier 2 CLI [#153]; Tier 1 karaoke CLI [#154];
+   GUI Tier 1 word-paced typewriter [#156]:** the engine grew per-call
    `on_audio_start` + `on_word` kwargs dispatched via stable
-   trampolines (RealtimeTTS only accepts these at TextToAudioStream
-   construction). CLI streaming + greeting paths now use a karaoke
-   single-line render — header on audio start, words appended via
-   `on_word` for English voices (all maidens), close on completion.
-   Tier 2 box stays as the fallback when on_audio_start never fires
-   (auto-muted, engine error). **Sub-task 3 (GUI + VN surfaces)
-   follows next** — same trampoline pattern but different rendering
-   loops. Settings toggle (`dialogue_sync_mode = audio-led | instant`)
+   trampolines, and `speak_sync` forwards them so the GUI's
+   `speak_async` daemon-thread wrapper can drive the typewriter
+   without blocking the pygame loop. `TypewriterManager.start_word_paced`
+   + `advance_word` + `flush_remaining` give the GUI a word-paced
+   mode where the cursor advances on each TTS `on_word` event
+   (`displayed_chars` is a single int write — safe under the GIL for
+   the 60Hz draw loop). `queue_event_handler` routes dialogue
+   through the word-paced path when TTS will speak; falls back to
+   time-based typewriter (existing behavior) when TTS is off /
+   auto-muted / not wired. **VN surface (vn_bridge → Ren'Py `voice` +
+   `cps` driven by word-timing metadata over the bridge) follows
+   next.** Settings toggle (`dialogue_sync_mode = audio-led | instant`)
    is sub-task 4.
 
    Open follow-ups within sub-task 2 itself:
    - Optional typing indicator during the synthesis-wait window
      (~3s on Kokoro CPU) so the player has visible feedback.
-   - Box-with-progressive-body alternative if AJ wants the comms
-     window aesthetic preserved during the karaoke reveal.
+   - Box-with-progressive-body alternative if AJ wants the CLI
+     comms window aesthetic preserved during the karaoke reveal.
+   - Concurrent dialogue race: if a NEW dialogue entry arrives while
+     the OLD entry's TTS is still firing on_word, the typewriter
+     reset clears state and stale callbacks become no-ops. Edge-case;
+     observed-tolerable for now.
+   - extract_speakable mismatch: GUI strips action prose / code from
+     spoken text but the typewriter shows full source — TTS word
+     count won't match source word count. Cursor stops short until
+     `flush_remaining` fires. Acceptable Tier 1 trade; revisit if
+     player UX flags it.
 2. **Live VN smoke** — exercises the vn_bridge `/tts` →
    `RealtimeTTSEngine.synthesize_to_wav` path + metadata-based
    dialogue routing end-to-end. Needs AJ at the keyboard.

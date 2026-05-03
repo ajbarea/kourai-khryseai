@@ -49,6 +49,14 @@ class TypewriterManager:
         self.motion_sensitivity_enabled = motion_sensitivity_enabled
         self._timer = 0.0  # Accumulated time in milliseconds
         self._skip_requested = False
+        # M20 sub-task 2 (Tier 1 word-paced mode): when True, dt-based
+        # advance is disabled and the cursor only moves when
+        # advance_word() is called from the TTS engine's on_word
+        # trampoline. _word_end_indices maps word ordinal → end
+        # character position in current_text (set by start_word_paced).
+        self._word_paced = False
+        self._word_end_indices: list[int] = []
+        self._words_revealed = 0
 
     def start(self, text: str, speed_ms: int | None = None) -> None:
         """Start typewriter effect for text.
@@ -66,6 +74,9 @@ class TypewriterManager:
         self._skip_requested = False
         self.paused = False
         self.active = True
+        self._word_paced = False
+        self._word_end_indices = []
+        self._words_revealed = 0
 
         if speed_ms is not None:
             # Clamp speed to valid range
@@ -75,6 +86,70 @@ class TypewriterManager:
         if self.motion_sensitivity_enabled:
             self.displayed_chars = len(self.current_text)
             self.active = False
+
+    def start_word_paced(self, text: str) -> None:
+        """Start typewriter in M20 sub-task 2 Tier 1 word-paced mode.
+
+        The cursor stays at 0 until :meth:`advance_word` is called (by
+        the TTS engine's ``on_word`` trampoline). Each call advances
+        the cursor to the end of the next source-text word + any
+        trailing whitespace. Falls back to the time-based pace if
+        advance_word never fires (engine error, audio unavailable) —
+        callers should drive a Tier-2 finally block to flush the
+        remaining text in that case.
+
+        Motion sensitivity still skips the animation entirely.
+        """
+        self.current_text = text
+        self.displayed_chars = 0
+        self._timer = 0.0
+        self._skip_requested = False
+        self.paused = False
+        self.active = True
+        self._word_paced = True
+        self._word_end_indices = _compute_word_end_indices(text)
+        self._words_revealed = 0
+
+        if self.motion_sensitivity_enabled:
+            self.displayed_chars = len(self.current_text)
+            self.active = False
+            return
+
+    def advance_word(self) -> None:
+        """Reveal the next source-text word in word-paced mode.
+
+        No-op if not in word-paced mode, if the typewriter is paused,
+        or if all words are already revealed. Idempotent at the end of
+        text — extra TTS on_word fires past the source-word count are
+        safely ignored.
+        """
+        if not self._word_paced or self.paused or not self.active:
+            return
+        if self._words_revealed >= len(self._word_end_indices):
+            return
+        end_idx = self._word_end_indices[self._words_revealed]
+        # Include trailing whitespace so the cursor lands at the start
+        # of the NEXT word, not on the space after the previous one.
+        while end_idx < len(self.current_text) and self.current_text[end_idx].isspace():
+            end_idx += 1
+        self.displayed_chars = end_idx
+        self._words_revealed += 1
+        if self.displayed_chars >= len(self.current_text):
+            self.active = False
+            self.displayed_chars = len(self.current_text)
+
+    def flush_remaining(self) -> None:
+        """Reveal the rest of the text immediately.
+
+        Called from the TTS finally block when audio playback ends
+        before all words fired (synthesis error, end-of-audio fallback).
+        Mirrors the CLI's deferred-render fallback so dialogue is never
+        partially-revealed forever.
+        """
+        if not self.active:
+            return
+        self.displayed_chars = len(self.current_text)
+        self.active = False
 
     def update(self, dt: float) -> str:
         """Update effect using delta time and return current displayed text.
@@ -90,6 +165,11 @@ class TypewriterManager:
             The currently displayed text (partial or full).
         """
         if not self.active or self.paused:
+            return self.current_text[: self.displayed_chars]
+
+        # M20 sub-task 2 Tier 1: word-paced mode ignores dt — the cursor
+        # only moves when advance_word() fires from the TTS trampoline.
+        if self._word_paced:
             return self.current_text[: self.displayed_chars]
 
         # Convert dt from seconds to milliseconds
@@ -185,3 +265,29 @@ class TypewriterManager:
         self.displayed_chars = 0
         self._timer = 0.0
         self._skip_requested = False
+        self._word_paced = False
+        self._word_end_indices = []
+        self._words_revealed = 0
+
+
+def _compute_word_end_indices(text: str) -> list[int]:
+    """Build the char-position list of word boundaries for word-paced mode.
+
+    Returns the index immediately after each whitespace-delimited word.
+    Used by :meth:`TypewriterManager.start_word_paced` so each
+    ``advance_word`` call lands the cursor at end-of-current-word.
+
+    Empty / whitespace-only input → empty list (no words to advance).
+    """
+    indices: list[int] = []
+    in_word = False
+    for j, c in enumerate(text):
+        if c.isspace():
+            if in_word:
+                indices.append(j)
+                in_word = False
+        else:
+            in_word = True
+    if in_word:
+        indices.append(len(text))
+    return indices

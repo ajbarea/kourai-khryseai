@@ -566,3 +566,140 @@ class TestTypewriterEdgeCases:
 
         manager.update(0.2)
         assert "\t" in manager.get_displayed_text()
+
+
+# ===================================================================
+# M20 sub-task 2 Tier 1 — word-paced mode
+# ===================================================================
+
+
+class TestTypewriterWordPaced:
+    """Word-paced mode: cursor only advances on advance_word() calls
+    (driven by the TTS engine's on_word trampoline). dt is ignored.
+    """
+
+    def test_start_word_paced_resets_cursor_to_zero(self) -> None:
+        manager = TypewriterManager()
+        manager.start_word_paced("Hello world from Hephaestus")
+        assert manager.displayed_chars == 0
+        assert manager.active is True
+        assert manager._word_paced is True
+
+    def test_advance_word_reveals_next_source_word(self) -> None:
+        manager = TypewriterManager()
+        manager.start_word_paced("Hello world from Hephaestus")
+        manager.advance_word()
+        # First word + trailing space → cursor at start of "world"
+        assert manager.get_displayed_text().rstrip() == "Hello"
+
+    def test_advance_word_walks_through_all_words(self) -> None:
+        manager = TypewriterManager()
+        manager.start_word_paced("Hello world from Hephaestus")
+        manager.advance_word()
+        manager.advance_word()
+        manager.advance_word()
+        # Three of four words revealed
+        assert "Hephaestus" not in manager.get_displayed_text()
+        manager.advance_word()
+        assert manager.get_displayed_text() == "Hello world from Hephaestus"
+        assert manager.is_complete()
+
+    def test_advance_word_idempotent_past_end_of_text(self) -> None:
+        manager = TypewriterManager()
+        manager.start_word_paced("Two words")
+        manager.advance_word()
+        manager.advance_word()
+        # Extra fires must not raise or scramble state.
+        manager.advance_word()
+        manager.advance_word()
+        assert manager.get_displayed_text() == "Two words"
+        assert manager.is_complete()
+
+    def test_word_paced_ignores_dt_updates(self) -> None:
+        """dt-based update() must not advance the cursor in word-paced mode —
+        otherwise the time-based animator races the TTS event stream."""
+        manager = TypewriterManager()
+        manager.start_word_paced("Hello world")
+        manager.update(10.0)  # 10 seconds of dt at 30ms/char would normally fill it
+        assert manager.displayed_chars == 0
+        assert manager.get_displayed_text() == ""
+
+    def test_flush_remaining_completes_animation(self) -> None:
+        """Fallback path when audio stops before all words fired."""
+        manager = TypewriterManager()
+        manager.start_word_paced("One two three four")
+        manager.advance_word()
+        manager.flush_remaining()
+        assert manager.get_displayed_text() == "One two three four"
+        assert manager.is_complete()
+
+    def test_motion_sensitivity_skips_word_paced_animation(self) -> None:
+        manager = TypewriterManager(motion_sensitivity_enabled=True)
+        manager.start_word_paced("Animation should be skipped entirely")
+        assert manager.get_displayed_text() == "Animation should be skipped entirely"
+        assert manager.is_complete()
+
+    def test_advance_word_noop_when_not_word_paced(self) -> None:
+        """Time-based mode must not respond to advance_word() — otherwise a
+        stray on_word callback from a previous TTS call could corrupt the
+        cursor mid-time-paced render."""
+        manager = TypewriterManager()
+        manager.start("Hello world", speed_ms=30)
+        manager.advance_word()
+        assert manager.displayed_chars == 0  # untouched
+
+    def test_paused_word_paced_blocks_advance(self) -> None:
+        manager = TypewriterManager()
+        manager.start_word_paced("Hello world")
+        manager.pause()
+        manager.advance_word()
+        assert manager.displayed_chars == 0  # paused → no advance
+
+    def test_reset_clears_word_paced_state(self) -> None:
+        manager = TypewriterManager()
+        manager.start_word_paced("Hello world")
+        manager.advance_word()
+        manager.reset()
+        assert manager._word_paced is False
+        assert manager._word_end_indices == []
+        assert manager._words_revealed == 0
+
+
+class TestComputeWordEndIndices:
+    """Direct tests for the word-boundary helper."""
+
+    def test_empty_text_returns_empty_list(self) -> None:
+        from hosts.gui.typewriter import _compute_word_end_indices
+
+        assert _compute_word_end_indices("") == []
+
+    def test_whitespace_only_returns_empty_list(self) -> None:
+        from hosts.gui.typewriter import _compute_word_end_indices
+
+        assert _compute_word_end_indices("   \t\n  ") == []
+
+    def test_single_word_returns_end_index(self) -> None:
+        from hosts.gui.typewriter import _compute_word_end_indices
+
+        assert _compute_word_end_indices("Hello") == [5]
+
+    def test_multiple_words_returns_each_end_index(self) -> None:
+        from hosts.gui.typewriter import _compute_word_end_indices
+
+        # "Hello world" — first word ends at index 5, second at 11.
+        assert _compute_word_end_indices("Hello world") == [5, 11]
+
+    def test_collapses_multiple_spaces(self) -> None:
+        from hosts.gui.typewriter import _compute_word_end_indices
+
+        # Multiple spaces between words don't create extra boundaries.
+        assert _compute_word_end_indices("Hello   world") == [5, 13]
+
+    def test_handles_punctuation_as_part_of_word(self) -> None:
+        """We split on whitespace, not punctuation — `"Hello,"` is one
+        word for cursor-advance purposes (TTS may emit punctuation as a
+        separate on_word event but the cursor reveals the punctuation
+        glued to the word it follows)."""
+        from hosts.gui.typewriter import _compute_word_end_indices
+
+        assert _compute_word_end_indices("Hello, world!") == [6, 13]
