@@ -390,8 +390,16 @@ class RealtimeTTSEngine:
         voice_key: str | None = None,
         speed: float | None = None,
         pitch: float | None = None,
+        on_audio_start: Callable[[], None] | None = None,
+        on_word: Callable[[object], None] | None = None,
     ) -> None:
-        """Synchronous wrapper for speak (blocks until complete)."""
+        """Synchronous wrapper for speak (blocks until complete).
+
+        ``on_audio_start`` and ``on_word`` forward to :meth:`speak` for
+        the GUI host's pygame typewriter — same M20 sub-task 2 plumbing
+        as the CLI, just dispatched from a daemon thread instead of
+        the asyncio event loop.
+        """
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
@@ -402,6 +410,8 @@ class RealtimeTTSEngine:
                     voice_key=voice_key,
                     speed=speed,
                     pitch=pitch,
+                    on_audio_start=on_audio_start,
+                    on_word=on_word,
                 )
             )
         finally:

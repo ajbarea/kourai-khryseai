@@ -169,19 +169,61 @@ class QueueEventHandler:
         elif is_scratchpad_content(text):
             self.gui_integration.get_scratchpad().add_plan(text, agent)
         else:
-            self._add_with_typewriter(DialogueEntry(agent, text))
-            play_emote_sfx(text, agent, self.audio_manager)
             speakable = extract_speakable(text)
-            if speakable:
-                speak_async(speakable, agent, self.tts_manager)
+            if self._will_speak(speakable):
+                # M20 sub-task 2 Tier 1: typewriter pace = TTS word events.
+                self._add_with_word_paced_typewriter(DialogueEntry(agent, text))
+                play_emote_sfx(text, agent, self.audio_manager)
+                speak_async(
+                    speakable,
+                    agent,
+                    self.tts_manager,
+                    on_word=self._on_tts_word,
+                    on_audio_start=self._on_tts_audio_start,
+                )
+            else:
+                # Fallback: no TTS → time-based typewriter, no audio.
+                self._add_with_typewriter(DialogueEntry(agent, text))
+                play_emote_sfx(text, agent, self.audio_manager)
 
     def _handle_result(self, event: dict) -> None:
         text = event["text"]
-        self._add_with_typewriter(DialogueEntry(self.state.result_agent, text, is_result=True))
-        self.history.scroll_to_bottom()
         speakable = extract_speakable(text)
-        if speakable:
-            speak_async(speakable, self.state.result_agent, self.tts_manager)
+        if self._will_speak(speakable):
+            self._add_with_word_paced_typewriter(
+                DialogueEntry(self.state.result_agent, text, is_result=True)
+            )
+            self.history.scroll_to_bottom()
+            speak_async(
+                speakable,
+                self.state.result_agent,
+                self.tts_manager,
+                on_word=self._on_tts_word,
+                on_audio_start=self._on_tts_audio_start,
+            )
+        else:
+            self._add_with_typewriter(DialogueEntry(self.state.result_agent, text, is_result=True))
+            self.history.scroll_to_bottom()
+
+    # -- Tier 1 callbacks (fire from TTS daemon thread) ----------------------
+
+    def _on_tts_audio_start(self) -> None:
+        """No-op — present for symmetry with the CLI surface, where it
+        flushes a deferred header. The pygame typewriter doesn't need a
+        marker; the dialogue panel already shows the maiden's portrait
+        + name when the entry was added.
+        """
+
+    def _on_tts_word(self, _word: object) -> None:
+        """Advance the typewriter cursor by one source word. Called from
+        the TTS daemon thread per spoken word — `displayed_chars` is a
+        single int write, safe under the GIL for the pygame draw loop's
+        intermittent reads.
+        """
+        try:
+            self.typewriter.advance_word()
+        except Exception:
+            logger.exception("on_tts_word advance failed")
 
     def _handle_complete(self, event: dict) -> None:
         elapsed = event.get("elapsed", 0.0)
@@ -238,3 +280,42 @@ class QueueEventHandler:
                 self.state.typewriter_full_text = ""
         except Exception as e:
             logger.exception("Error adding dialogue entry: %s", e)
+
+    def _add_with_word_paced_typewriter(self, entry: DialogueEntry) -> None:
+        """M20 sub-task 2 Tier 1 GUI variant of :meth:`_add_with_typewriter`.
+
+        Starts the typewriter in word-paced mode so the cursor only
+        advances when ``advance_word()`` is called from the TTS engine's
+        ``on_word`` trampoline. System / user entries fall back to
+        instant render — those don't go through TTS.
+
+        Note: if a NEW dialogue entry arrives while the OLD entry's TTS
+        is still firing on_word, the reset below clears the old word-
+        pace state and the stale callbacks become no-ops because the
+        new typewriter state has either started fresh or finished.
+        """
+        try:
+            logger.debug("Word-paced dialogue: %s | %s...", entry.agent, entry.text[:50])
+            if self.typewriter.active or self.state.typewriter_full_text:
+                self.history.update_last_text(self.state.typewriter_full_text)
+                self.typewriter.reset()
+            self.state.typewriter_full_text = entry.text
+            if not entry.is_system and not entry.is_user:
+                entry.text = ""
+                self.history.add(entry)
+                self.typewriter.start_word_paced(self.state.typewriter_full_text)
+            else:
+                self.history.add(entry)
+                self.state.typewriter_full_text = ""
+        except Exception as e:
+            logger.exception("Error adding word-paced dialogue entry: %s", e)
+
+    def _will_speak(self, speakable: str) -> bool:
+        """True iff TTS is wired AND enabled AND will actually emit on_word
+        events for the given speakable text. Gates the word-paced typewriter
+        path; callers fall back to time-based when this returns False.
+        """
+        if not speakable:
+            return False
+        engine = getattr(self.tts_manager, "tts_engine", None)
+        return engine is not None and bool(getattr(self.tts_manager, "enable_tts", False))
