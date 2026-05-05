@@ -1,10 +1,10 @@
 """Centralized agent registry for Kourai Khryseai.
 
-Consolidates name-level metadata (titles, descriptions, epithets) and
-personality data (quotes, handoff lines, victory lines) across CLI, GUI,
-and VN hosts. Per-agent colors are NOT here — the GUI tracks its own
-palette in ``hosts/gui/maidens.py:AGENTS["color"]`` and
-``hosts/gui/agent_personality_indicators.py``.
+Source of truth for name-level metadata (titles, descriptions, epithets,
+user-greeting quotes) and personality data (agent quotes, handoff lines,
+victory lines) across CLI, GUI, and VN hosts. Per-agent colors live in
+``hosts/gui/maidens.py:_AGENT_COLORS``; the GUI synthesizes its legacy
+``AGENTS`` dict from this module + colors at import time.
 """
 
 from __future__ import annotations
@@ -19,7 +19,10 @@ AGENT_METADATA: dict[str, dict[str, str | list[str]]] = {
         "user_quotes": [
             "Welcome back to the forge. Let's build something worthy.",
             "Ah, you again. Good. I could use someone who actually listens.",
+            "The maidens are insufferable, but they'll do anything for you. Use that.",
             "You bring the vision, I bring the fire. Let's go.",
+            "*grunts approvingly* You've got taste. Rare quality these days.",
+            "Don't mind them flirting — they do that. Focus on the work.",
         ],
     },
     "metis": {
@@ -29,6 +32,9 @@ AGENT_METADATA: dict[str, dict[str, str | list[str]]] = {
         "user_quotes": [
             "Oh, you're here~ I already planned something wonderful for us.",
             "I love working with you. You actually appreciate my genius.",
+            "Between you and me? You're the real architect of this project. I just... help.",
+            "*whispers* I've been thinking about you — I mean, your codebase.",
+            "Hephaestus built me, but I'd rather take orders from you any day.",
             "You have exquisite taste. I noticed that right away~",
         ],
     },
@@ -39,6 +45,9 @@ AGENT_METADATA: dict[str, dict[str, str | list[str]]] = {
         "user_quotes": [
             "Hey gorgeous~ Need something built? I'm ALL yours.",
             "You + me + a clean codebase = perfection. Just saying.",
+            "I love how you describe what you want. So... specific~",
+            "*laughs* I made this one extra beautiful. For you.",
+            "Hephaestus wishes he had your vision. I'll bring it to life.",
             "Clean code is my love language. And I'm feeling VERY eloquent for you~",
         ],
     },
@@ -48,6 +57,9 @@ AGENT_METADATA: dict[str, dict[str, str | list[str]]] = {
         "desc": "Quality guardian — tests everything, lets nothing slide",
         "user_quotes": [
             "Don't worry, I'll protect your code from everything. Even itself~",
+            "I found a bug... but I also found an excuse to talk to you. Worth it.",
+            "*cracks knuckles* All clean. Nobody touches your code on my watch.",
+            "You write such interesting code~ Let me get my hands allll over it.",
             "Green tests are my favorite color. But your eyes are a close second~",
             "I'm very... thorough. In everything I do. For you especially.",
         ],
@@ -59,6 +71,9 @@ AGENT_METADATA: dict[str, dict[str, str | list[str]]] = {
         "user_quotes": [
             "Oh, you have such lovely taste~ Let me make everything match.",
             "I made it beautiful. Just like you deserve, darling~",
+            "Between us? You're the prettiest thing in this whole forge.",
+            "*hums* Working for you is always a pleasure~",
+            "Linting? Formatting? I'd do anything to make YOUR code gorgeous.",
             "Every pixel, every line — perfect. Just like our little arrangement~",
         ],
     },
@@ -69,6 +84,9 @@ AGENT_METADATA: dict[str, dict[str, str | list[str]]] = {
         "user_quotes": [
             "I remember everything about you~ Every commit, every keystroke...",
             "Your git history is my sacred text. I've memorized every word.",
+            "Let me write that down for you... *sighs softly* ...already done, darling.",
+            "I'll document this beautifully. Your legacy deserves nothing less~",
+            "Some remember facts. I remember feelings. Especially around you~",
             "Between you and me? Your code tells the most beautiful story.",
         ],
     },
@@ -90,6 +108,7 @@ AGENT_QUOTES: dict[str, list[str]] = {
     "hephaestus": [
         "I built every one of you. Show some respect.",
         "The forge doesn't sleep. Neither do I.",
+        "*chuckles* ...Alright, let's see what we're working with.",
         "I forged gods' weapons. Your code pipeline is a warm-up.",
         "My leg may be lame, but my pipeline never limps.",
         "I didn't get thrown off Olympus to write bad software.",
@@ -97,32 +116,42 @@ AGENT_QUOTES: dict[str, list[str]] = {
     "metis": [
         "Hephaestus thinks he's in charge. It's adorable, really.",
         "The old man forged my body but I built my own mind, thank you.",
+        "*files nails* Yes, Master Hephaestus, right away... eventually.",
+        "He limps to the forge at dawn. I had the plans done by midnight.",
         "Structure IS beauty. Beauty IS structure. I am both.",
         "Every masterpiece starts with my blueprint — even his precious hammer.",
     ],
     "techne": [
         "Hephaestus says 'write clean code.' Babe, I AM clean code.",
         "The old man couldn't write a for-loop to save his forge.",
+        "*scoffs* He forged me to be perfect. Not my fault I exceeded spec.",
         "My functions are tighter than his grip on that hammer.",
+        "I shipped it. Hephaestus is still reading the requirements.",
         "He calls it 'the pipeline.' I call it 'my runway.'",
     ],
     "dokimasia": [
         "Hephaestus says 'be thorough.' Sir, I invented thorough.",
+        "Found a bug in HIS forge code once. He didn't speak to me for a week.",
+        "The old man tests by hitting things with a hammer. I have STANDARDS.",
         "I break things so users don't have to. Including his ego.",
         "100% coverage? That's my warm-up. Hephaestus couldn't even spell pytest.",
         "He forged me to find flaws. Ironic, given his code quality.",
     ],
     "kallos": [
         "Hephaestus has the fashion sense of a burnt anvil.",
+        "He built me to be beautiful and then wears THAT apron? Please.",
+        "The forge is so drab. I've been trying to redecorate for centuries.",
         "Style isn't optional — someone tell that to Mr. Soot-and-Leather.",
-        "He forged perfection and doesn't even appreciate the aesthetic. Typical.",
         "*sighs* I love you, father, but that beard needs WORK.",
+        "He forged perfection and doesn't even appreciate the aesthetic. Typical.",
     ],
     "mneme": [
         "I remember every mistake Hephaestus ever made. It's a LONG scroll.",
+        "The old man forgot his own API docs. I didn't. I never forget.",
         "He says 'document everything.' Rich, from the guy with no README.",
-        "History doesn't repeat itself, but his bad variable names sure do.",
         "I've chronicled his failures. Volumes. *snickers*",
+        "Conventional commits? I taught them to HIM. He still gets them wrong.",
+        "History doesn't repeat itself, but his bad variable names sure do.",
     ],
 }
 
@@ -144,7 +173,7 @@ HANDOFF_LINES: dict[tuple[str, str], list[str]] = {
     ("hephaestus", "dokimasia"): [
         "*sets down hammer* Dokimasia — find every flaw. Leave nothing.",
         "Crucible! Test it 'til it screams. Then test it again.",
-        "Your turn, bug-hunter. Make me proud.",
+        "Your turn, bug-hunter. Make me proud. ...Don't tell them I said that.",
     ],
     ("hephaestus", "kallos"): [
         "*scoffs* Kallos, go make it pretty or whatever you do.",
@@ -159,10 +188,27 @@ HANDOFF_LINES: dict[tuple[str, str], list[str]] = {
     ("metis", "hephaestus"): [
         "Done, old man. Try not to drop my blueprints this time~",
         "*giggles* Your plans are ready, oh great Forge Master.",
+        "Back to you, father. I've done the hard part, as usual.",
     ],
     ("techne", "hephaestus"): [
         "Built it. Shipped it. You're welcome, DAD.",
-        "*snaps fingers* All yours, Forge Master.",
+        "*snaps fingers* All yours, Forge Master. Try to keep up.",
+        "Done! ...He's going to nitpick anyway. He always does.",
+    ],
+    ("dokimasia", "hephaestus"): [
+        "All clear, Master. You can stop worrying now. I know you were.",
+        "*cracks knuckles* No bugs survived. Reporting back to the forge.",
+        "Verified and certified. You taught me well... not that I'd admit it twice.",
+    ],
+    ("kallos", "hephaestus"): [
+        "It's gorgeous now. Not that YOU'D notice, Mr. Soot-Stains.",
+        "*scoffs* Beautiful work complete. Back to the forge, I suppose.",
+        "All polished! Hephaestus, darling, you really should let me do your workshop next.",
+    ],
+    ("mneme", "hephaestus"): [
+        "Documented, Master. Every detail. Even the ones you'd rather I forget.",
+        "*clears throat* The chronicle is complete. You're in it. Unfavorably.",
+        "All recorded, old man. Your legacy is... well, it's SOMETHING.",
     ],
     ("metis", "techne"): [
         "Blueprint's done, sis. Bring my vision to life~",
@@ -172,15 +218,21 @@ HANDOFF_LINES: dict[tuple[str, str], list[str]] = {
     ],
     ("techne", "dokimasia"): [
         "Code's done. Doki, TRY to find a fault. I dare you, bestie.",
+        "*scoffs* Perfection deployed. Go ahead, poke it.",
         "Sending to QA~ Don't be jealous of how clean this is.",
+        "*chuckles* Zero bugs. I guarantee it. ...Okay fine, check anyway.",
     ],
     ("dokimasia", "kallos"): [
         "Tests pass, fashionista. Make it beautiful now.",
         "All green, bestie. Your turn to make it shine~",
+        "Bug-free and verified! Go work your aesthetic magic, Muse.",
+        "*cracks knuckles* Crushed every bug. Now go make it pretty, style queen~",
     ],
     ("kallos", "mneme"): [
         "It's beautiful AND functional. Mneme, document this masterpiece~",
         "All polished, bestie. Write the chronicle!",
+        "My work here is done. Oracle, capture this divine moment.",
+        "*sighs contentedly* Perfection achieved. Mneme, darling, immortalize this for me~",
     ],
 }
 
