@@ -282,7 +282,7 @@ https://github.com/csteinmetz1/pyloudnorm).
 
 Foundations first because most items need the new `paths.py`:
 
-1. **Item #8 + #9 — paths + emoji map** ✅ shipped at TBD-after-commit.
+1. **Item #8 + #9 — paths + emoji map** ✅ shipped at c97a11d.
    `kourai_common.paths` now owns `PROJECT_ROOT` (pyproject walk-up
    keyed off `[tool.uv.workspace]`), `assets_dir()`, `cache_dir()`,
    `logs_dir()`, `templates_dir()`, `docs_assets_dir()`,
@@ -298,21 +298,20 @@ Foundations first because most items need the new `paths.py`:
    Tests: `tests/unit/test_paths.py` (15 cases) and
    `tests/unit/test_emoji_prefix.py` (6 cases). 3075/3075 unit pass.
 
-2. **Item #2 — AudioSettings** (the volume-bug fix). Create
-   `shared/src/kourai_common/settings_audio.py` with a frozen
-   `@dataclass AudioSettings` holding `voice_enabled`, `music_enabled`,
-   `ambient_enabled`, `gossip_enabled`, plus the four volume floats.
-   Canonical defaults: `voice=1.0`, `music=0.35`, `ambient=0.30`,
-   `sfx=0.85`. Rationale: GUI's 0.05 music is silent on consumer
-   speakers; CLI's 0.65 music drowns dialogue when both fire. 0.35
-   sits in the comfortable middle and matches the M20 audio-led
-   philosophy ("voice is load-bearing, music is supportive").
-   `CLISettings.__post_init__` (or a class method) reads the shared
-   defaults; GUI's `DEFAULT_SETTINGS` dict pulls from the same. Tests:
-   `tests/unit/test_settings_audio.py` covering schema invariants and
-   confirming both hosts agree on default volumes. **This commit fixes
-   a player-facing bug**: same player switching hosts no longer hears a
-   13× music-level jump.
+2. **Item #2 — AudioSettings** ✅ shipped at TBD-after-commit.
+   `kourai_common.settings_audio` owns the frozen `AudioSettings`
+   dataclass (3 toggles + 4 volumes) plus the `MUSIC_VOLUME_DEFAULT`
+   etc. constants and a `DEFAULT_AUDIO_SETTINGS` snapshot dict.
+   `hosts/cli/settings.py:CLISettings` reads its volume defaults from
+   the shared constants via `field(default=...)`; `hosts/gui/settings.py`
+   spreads `**DEFAULT_AUDIO_SETTINGS` into its `DEFAULT_SETTINGS` dict;
+   `hosts/gui/settings_overlay.py:222` slider-fallback values now
+   reference the same constants. **Bug fix**: GUI's first-launch
+   `music_volume` was 0.05 against CLI's 0.65 — same player switching
+   hosts heard a 13× audio jump. Now: 0.65 on both. Players who saved
+   the silent default in their GUI config still see it (we don't
+   migrate persisted JSON), but new launches and `Reset to Defaults`
+   land on the canonical value. 6 new tests; 3081/3081 unit pass.
 
 3. **Item #3 — onboarding option lists**. Create
    `shared/src/kourai_common/onboarding_data.py` with

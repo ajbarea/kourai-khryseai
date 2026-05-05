@@ -7,9 +7,15 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 
 from kourai_common.paths import cache_dir
+from kourai_common.settings_audio import (
+    AMBIENT_VOLUME_DEFAULT,
+    MUSIC_VOLUME_DEFAULT,
+    SFX_VOLUME_DEFAULT,
+    VOICE_VOLUME_DEFAULT,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -46,14 +52,15 @@ class CLISettings:
     # Cline + ClawCode's per-tool gating. Default OFF — matches the
     # always-on gate.
     auto_approve_reads: bool = False
-    # Per-stream volume. Defaults mirror `hosts/gui/settings_overlay.py`'s
-    # values so a player who learned the GUI sliders gets the same
-    # baseline in the CLI. Granular controls — the binary on/off toggle
-    # didn't let a too-loud stream be tamed without disabling it.
-    music_volume: float = 0.65
-    ambient_volume: float = 0.50
-    voice_volume: float = 1.0
-    sfx_volume: float = 0.85
+    # Per-stream volume. Defaults come from kourai_common.settings_audio so
+    # CLI and GUI agree on the canonical baseline; the previous local
+    # literals had drifted from GUI's DEFAULT_SETTINGS by 13× on
+    # music_volume. Granular controls — the binary on/off toggle didn't
+    # let a too-loud stream be tamed without disabling it.
+    music_volume: float = field(default=MUSIC_VOLUME_DEFAULT)
+    ambient_volume: float = field(default=AMBIENT_VOLUME_DEFAULT)
+    voice_volume: float = field(default=VOICE_VOLUME_DEFAULT)
+    sfx_volume: float = field(default=SFX_VOLUME_DEFAULT)
     # M20 sub-task 4 — dialogue/audio synchronization mode.
     # "audio-led" (default): the dialogue echo is held until TTS audio
     #   actually starts, then revealed word-by-word in lockstep with

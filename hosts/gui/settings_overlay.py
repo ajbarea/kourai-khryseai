@@ -17,6 +17,12 @@ from hosts.gui.settings_widgets import (
     VolumeSlider,
     _ensure_freetype_ready,
 )
+from kourai_common.settings_audio import (
+    AMBIENT_VOLUME_DEFAULT,
+    MUSIC_VOLUME_DEFAULT,
+    SFX_VOLUME_DEFAULT,
+    VOICE_VOLUME_DEFAULT,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -219,10 +225,10 @@ class SettingsOverlay:
         slider_w = self.panel_w - 140
 
         audio_controls = [
-            ("music_volume", "Music", 0.65),
-            ("ambient_volume", "Ambient", 0.50),
-            ("voice_volume", "Voice", 1.0),
-            ("sfx_volume", "SFX", 0.85),
+            ("music_volume", "Music", MUSIC_VOLUME_DEFAULT),
+            ("ambient_volume", "Ambient", AMBIENT_VOLUME_DEFAULT),
+            ("voice_volume", "Voice", VOICE_VOLUME_DEFAULT),
+            ("sfx_volume", "SFX", SFX_VOLUME_DEFAULT),
         ]
 
         for i, (key, label, default) in enumerate(audio_controls):

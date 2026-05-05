@@ -11,10 +11,15 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from kourai_common.settings_audio import DEFAULT_AUDIO_SETTINGS
+
 logger = logging.getLogger(__name__)
 
-# Default settings values
-DEFAULT_SETTINGS = {
+# Default settings values. Audio keys (volume + toggle) come from the
+# shared kourai_common.settings_audio module so CLI and GUI agree on the
+# canonical baseline; this dict's earlier music_volume=0.05 left
+# first-launch GUI players at silent music while CLI shipped 0.65.
+DEFAULT_SETTINGS: dict[str, Any] = {
     "typewriter_speed_ms": 30,
     "typewriter_enabled": True,
     "auto_scroll_enabled": True,
@@ -28,10 +33,7 @@ DEFAULT_SETTINGS = {
     "reduce_motion": False,
     "fullscreen": False,
     "display_mode": "Windowed",
-    "music_volume": 0.05,
-    "ambient_volume": 0.10,
-    "voice_volume": 1.0,
-    "sfx_volume": 0.85,
+    **DEFAULT_AUDIO_SETTINGS,
 }
 
 
