@@ -171,7 +171,7 @@ affinity_tracking_enabled = True
 ### Modifications to existing code
 
 - `hosts/cli/onboarding.py` — `run_onboarding()` is rewritten in terms of the new helpers. Public function signatures (`needs_onboarding`, `run_onboarding`, `increment_session`) stay the same.
-- `hosts/cli/commands.py` — `_print_settings_panel` gains a new entry **[0] Session Mode: gamified/focused**. Selecting it calls `_apply_mode_cascade()` and prints a diegetic line: *"Puck slips back through the door, grinning."* (focused → gamified) or *"The forge falls quiet."* (gamified → focused).
+- `hosts/cli/commands.py` — `_print_settings_panel` gains a new entry **\[0\] Session Mode: gamified/focused**. Selecting it calls `_apply_mode_cascade()` and prints a diegetic line: *"Puck slips back through the door, grinning."* (focused → gamified) or *"The forge falls quiet."* (gamified → focused).
 - `hosts/cli/commands.py` — new slash command `/replay-tutorial` runs `_run_flight_scene()` against the existing profile without resetting anything. Useful for development and replay.
 - `hosts/cli/__main__.py` — after `run_onboarding()` returns, the captured idea-pitch text is sent as the session's first message to Hephaestus. (Today the session opens with a hardcoded greeting; that becomes the player's pitch instead.)
 
