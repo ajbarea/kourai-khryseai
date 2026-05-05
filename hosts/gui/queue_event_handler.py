@@ -214,11 +214,16 @@ class QueueEventHandler:
     # -- Tier 1 callbacks (fire from TTS daemon thread) ----------------------
 
     def _on_tts_audio_start(self) -> None:
-        """No-op — present for symmetry with the CLI surface, where it
-        flushes a deferred header. The pygame typewriter doesn't need a
-        marker; the dialogue panel already shows the maiden's portrait
-        + name when the entry was added.
+        """Drop the synthesis-indicator placeholder when the engine
+        begins playback. The dialogue body returns to its real state
+        (empty until the first ``on_word`` fires); the maiden's
+        portrait + name were already visible from the moment the
+        entry was added.
         """
+        try:
+            self.typewriter.clear_pending_audio()
+        except Exception:
+            logger.exception("on_tts_audio_start clear failed")
 
     def _on_tts_word(self, _word: object) -> None:
         """Advance the typewriter cursor by one source word. Called from
@@ -310,6 +315,11 @@ class QueueEventHandler:
                 entry.text = ""
                 self.history.add(entry)
                 self.typewriter.start_word_paced(self.state.typewriter_full_text)
+                # Arm the synthesis indicator: dialogue body renders
+                # `…` until on_audio_start fires (~3s on Kokoro CPU)
+                # so the player sees the agent is loading instead of
+                # an empty panel below the portrait.
+                self.typewriter.set_pending_audio()
             else:
                 self.history.add(entry)
                 self.state.typewriter_full_text = ""

@@ -301,13 +301,19 @@ reality, not file-of-origin.
    (`dialogue_sync_mode = audio-led | instant`) is sub-task 4.
 
    Open follow-ups within sub-task 2 itself:
-   - **CLI synthesis indicator shipped 2026-05-05** — pre-render
+   - **CLI synthesis indicator shipped 2026-05-05 [#165]** — pre-render
      `Name face …` (dim ellipsis) before `await tts.speak(...)` in
      the audio-led karaoke path; cleared via CR + erase-line ANSI
      when `on_audio_start` fires (or before the Tier 2 box renders
      on auto-mute). Helpers `synthesis_indicator` /
-     `synthesis_indicator_clear` in `hosts/cli/rendering.py`. GUI +
-     VN equivalents still pending.
+     `synthesis_indicator_clear` in `hosts/cli/rendering.py`.
+   - **GUI synthesis indicator shipping 2026-05-05** — `TypewriterManager.set_pending_audio()`
+     renders a single-ellipsis placeholder until the first
+     `advance_word()` (or `clear_pending_audio()`) fires.
+     `_on_tts_audio_start` flipped from no-op to clear the placeholder;
+     `_add_with_word_paced_typewriter` arms it after `start_word_paced`.
+     Motion-sensitivity respected (full text already revealed; no
+     placeholder swap). VN equivalent still pending.
    - Box-with-progressive-body alternative if AJ wants the CLI
      comms window aesthetic preserved during the karaoke reveal.
    - Concurrent dialogue race: if a NEW dialogue entry arrives while

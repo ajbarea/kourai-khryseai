@@ -665,6 +665,102 @@ class TestTypewriterWordPaced:
         assert manager._words_revealed == 0
 
 
+class TestTypewriterPendingAudio:
+    """M20 sub-task 2 polish — synthesis indicator on the GUI surface.
+
+    During the ~3s Kokoro synthesis-wait window the dialogue panel
+    would otherwise show the agent name + portrait above an empty body.
+    `set_pending_audio` injects a single-ellipsis placeholder so the
+    player has visible feedback that the agent is loading; cleared by
+    `clear_pending_audio`, `advance_word`, `flush_remaining`, or
+    `reset`.
+    """
+
+    def test_pending_audio_renders_ellipsis_placeholder(self) -> None:
+        manager = TypewriterManager()
+        manager.start_word_paced("Hello world from Hephaestus")
+        manager.set_pending_audio()
+        assert manager.get_displayed_text() == "…"
+
+    def test_clear_pending_audio_reverts_to_empty_body(self) -> None:
+        manager = TypewriterManager()
+        manager.start_word_paced("Hello world")
+        manager.set_pending_audio()
+        manager.clear_pending_audio()
+        # Back to normal word-paced empty start before any advance_word.
+        assert manager.get_displayed_text() == ""
+
+    def test_advance_word_clears_pending_audio(self) -> None:
+        """First spoken word arriving means audio started — drop the
+        placeholder and show real text from this point on."""
+        manager = TypewriterManager()
+        manager.start_word_paced("Hello world")
+        manager.set_pending_audio()
+        manager.advance_word()
+        # Cursor moved past "Hello"; placeholder must NOT mask the real
+        # revealed text.
+        revealed = manager.get_displayed_text()
+        assert "…" not in revealed
+        assert revealed.rstrip() == "Hello"
+
+    def test_flush_remaining_clears_pending_audio(self) -> None:
+        """End-of-audio fallback reveals everything — no stale placeholder."""
+        manager = TypewriterManager()
+        manager.start_word_paced("Hello world")
+        manager.set_pending_audio()
+        manager.flush_remaining()
+        assert manager.get_displayed_text() == "Hello world"
+
+    def test_reset_clears_pending_audio(self) -> None:
+        manager = TypewriterManager()
+        manager.start_word_paced("Hello world")
+        manager.set_pending_audio()
+        manager.reset()
+        # After reset the manager is inactive and current_text is empty;
+        # get_displayed_text returns empty string, no placeholder leak.
+        assert manager.get_displayed_text() == ""
+
+    def test_set_pending_audio_noop_when_motion_sensitivity_enabled(self) -> None:
+        """Motion-sensitive players see the full text immediately —
+        showing a placeholder would be a regression on that contract."""
+        manager = TypewriterManager(motion_sensitivity_enabled=True)
+        manager.start_word_paced("Hello world from Hephaestus")
+        manager.set_pending_audio()
+        assert manager.get_displayed_text() == "Hello world from Hephaestus"
+
+    def test_set_pending_audio_noop_outside_word_paced_mode(self) -> None:
+        """Time-based mode renders dt-driven; placeholder only makes
+        sense for the audio-led word-paced path."""
+        manager = TypewriterManager()
+        manager.start("Hello world", speed_ms=30)
+        manager.set_pending_audio()
+        # Time-based mode at t=0: no chars displayed yet, no placeholder.
+        assert manager.get_displayed_text() == ""
+
+    def test_update_returns_placeholder_when_pending_audio(self) -> None:
+        """The pygame draw loop reads via `update(dt)`, not just
+        `get_displayed_text()`. Both surfaces must agree on the
+        placeholder."""
+        manager = TypewriterManager()
+        manager.start_word_paced("Hello world")
+        manager.set_pending_audio()
+        # update() with any dt in word-paced mode must not advance —
+        # but the placeholder should still surface.
+        assert manager.update(0.5) == "…"
+
+    def test_set_pending_audio_skipped_after_first_word_already_revealed(self) -> None:
+        """Defensive: if `set_pending_audio` is called AFTER on_word
+        has already advanced the cursor (race / late call), the
+        placeholder must not mask real text."""
+        manager = TypewriterManager()
+        manager.start_word_paced("Hello world")
+        manager.advance_word()
+        manager.set_pending_audio()
+        revealed = manager.get_displayed_text()
+        assert "…" not in revealed
+        assert "Hello" in revealed
+
+
 class TestComputeWordEndIndices:
     """Direct tests for the word-boundary helper."""
 

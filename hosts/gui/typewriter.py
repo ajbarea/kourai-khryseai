@@ -57,6 +57,13 @@ class TypewriterManager:
         self._word_paced = False
         self._word_end_indices: list[int] = []
         self._words_revealed = 0
+        # M20 sub-task 2 polish: while True, get_displayed_text /
+        # update return a single-ellipsis placeholder so the dialogue
+        # panel shows the player visible feedback during the
+        # ~3s Kokoro synthesis-wait window before the first on_word
+        # callback fires. Cleared on first advance_word, on
+        # flush_remaining / reset, or by clear_pending_audio().
+        self._pending_audio = False
 
     def start(self, text: str, speed_ms: int | None = None) -> None:
         """Start typewriter effect for text.
@@ -77,6 +84,7 @@ class TypewriterManager:
         self._word_paced = False
         self._word_end_indices = []
         self._words_revealed = 0
+        self._pending_audio = False
 
         if speed_ms is not None:
             # Clamp speed to valid range
@@ -109,6 +117,7 @@ class TypewriterManager:
         self._word_paced = True
         self._word_end_indices = _compute_word_end_indices(text)
         self._words_revealed = 0
+        self._pending_audio = False
 
         if self.motion_sensitivity_enabled:
             self.displayed_chars = len(self.current_text)
@@ -121,7 +130,8 @@ class TypewriterManager:
         No-op if not in word-paced mode, if the typewriter is paused,
         or if all words are already revealed. Idempotent at the end of
         text — extra TTS on_word fires past the source-word count are
-        safely ignored.
+        safely ignored. Clears the pending-audio placeholder on the
+        first fire (audio has clearly started).
         """
         if not self._word_paced or self.paused or not self.active:
             return
@@ -134,6 +144,7 @@ class TypewriterManager:
             end_idx += 1
         self.displayed_chars = end_idx
         self._words_revealed += 1
+        self._pending_audio = False
         if self.displayed_chars >= len(self.current_text):
             self.active = False
             self.displayed_chars = len(self.current_text)
@@ -150,6 +161,33 @@ class TypewriterManager:
             return
         self.displayed_chars = len(self.current_text)
         self.active = False
+        self._pending_audio = False
+
+    def set_pending_audio(self) -> None:
+        """Render a single-ellipsis placeholder until the first
+        ``advance_word`` fires (or ``clear_pending_audio`` is called).
+
+        No-op outside word-paced mode, when the typewriter is inactive,
+        when motion-sensitivity already revealed the full text, or when
+        the cursor has already moved past zero (race / late call —
+        never mask real text with a placeholder).
+        """
+        if not self._word_paced or not self.active:
+            return
+        if self.motion_sensitivity_enabled:
+            return
+        if self.displayed_chars > 0:
+            return
+        self._pending_audio = True
+
+    def clear_pending_audio(self) -> None:
+        """Drop the synthesis-indicator placeholder.
+
+        Called from the TTS engine's ``on_audio_start`` trampoline so
+        the dialogue body returns to its real state (still empty if no
+        word has fired yet) the moment the engine begins playback.
+        """
+        self._pending_audio = False
 
     def update(self, dt: float) -> str:
         """Update effect using delta time and return current displayed text.
@@ -165,11 +203,15 @@ class TypewriterManager:
             The currently displayed text (partial or full).
         """
         if not self.active or self.paused:
+            if self._pending_audio and self.displayed_chars == 0:
+                return "…"
             return self.current_text[: self.displayed_chars]
 
         # M20 sub-task 2 Tier 1: word-paced mode ignores dt — the cursor
         # only moves when advance_word() fires from the TTS trampoline.
         if self._word_paced:
+            if self._pending_audio and self.displayed_chars == 0:
+                return "…"
             return self.current_text[: self.displayed_chars]
 
         # Convert dt from seconds to milliseconds
@@ -252,6 +294,8 @@ class TypewriterManager:
         Returns:
             The text that should currently be displayed.
         """
+        if self._pending_audio and self.displayed_chars == 0:
+            return "…"
         return self.current_text[: self.displayed_chars]
 
     def reset(self) -> None:
@@ -268,6 +312,7 @@ class TypewriterManager:
         self._word_paced = False
         self._word_end_indices = []
         self._words_revealed = 0
+        self._pending_audio = False
 
 
 def _compute_word_end_indices(text: str) -> list[int]:
