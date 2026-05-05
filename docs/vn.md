@@ -86,7 +86,7 @@ init python hide:
 |--------|---------|--------|
 | `affinity_hud` | Top-right HUD: 6 agents + scores + heart tiers | Done |
 | `gossip_bubble` | Bottom-left flavor text from idle agents (8s auto-dismiss) | Done |
-| `thinking` | Bottom-center "⚒ [status]" with 0.4s refresh | Done |
+| `thinking` | Bottom-center "⚒ \[status\]" with 0.4s refresh | Done |
 | `agent_choice` | Modal choice dialog with forge styling | Done |
 | `agent_portrait` | Left-side portrait display (dramatic rise) | Done |
 | `forge_journal` | Virtue scores, patron agents, session deltas | Placeholder |

@@ -302,7 +302,7 @@ The Pygame GUI includes a full text-to-speech system with neural voices and real
 | **SLOW** | 3.0s | Light-novel style, immersive |
 | **CUSTOM** | User-defined | Custom millisecond-based timing |
 
-See [GUI Reference](gui.md#text-to-speech-system-) for voice profiles and audio customization.
+See [GUI Reference](gui.md#text-to-speech) for voice profiles and audio customization.
 
 ---
 
