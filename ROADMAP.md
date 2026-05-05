@@ -416,25 +416,43 @@ M20 on M18+M19 is one coordinated UX wave rather than three drips.
 
 ## M6 — ElevenLabs hybrid (pre-player-release blocker)
 
+> Status: spec'd 2026-05-05 · Implementation queued · Gated on M20
+> audio-led reveal + VN smoke landing first
+
 Promoted from "future-future" 2026-05-03 after strategic review of the
 character-voice-quality gap between Kokoro (current) and ElevenLabs.
 Character voice IS the product (per-maiden personality is the core
-mechanic); Kokoro can play 10 different voicepacks but cannot deliver
-per-character emotional control. ElevenLabs can. See IMPL.md "M6
-ElevenLabs hybrid" for current model strategy + cost projections +
-required add-ons (audio caching layer, per-engine markup adapter,
-per-persona prosody design pass).
+mechanic); Kokoro plays 10 voicepacks but cannot deliver per-character
+emotional control. ElevenLabs can.
 
-[VOICE_CASTING_PLAN.md](../tools/voice-lab/VOICE_CASTING_PLAN.md)
-already has voice IDs + settings cast for each maiden. The
-`tools/voice-lab/` Next.js app is the casting/preview surface that
-landed pre-2026-05; production wiring (M6) is the swap from Kokoro
-into the same `RealtimeTTSEngine` interface.
+Spec landed 2026-05-05; full detail in [IMPL.md "M6 — ElevenLabs
+hybrid"](./IMPL.md#m6--elevenlabs-hybrid-pre-player-release-blocker) —
+Flash v2.5 + v3 model split (verified against ElevenLabs's May 2026
+docs), per-engine markup adapter design (replaces the walked-back
+SSML approach), client-side audio cache layer (confirmed: ElevenLabs
+has no server-side cache by request hash; the History API indexes by
+`history_item_id` only), per-persona prosody pass, sub-task ordering,
+and cost projections at 100 / 1000 player scale.
 
-The detail items below were surfaced under the old "M6 — Future /
-unprioritized" framing for unrelated CLI host / UX work; many are
-still relevant but should be re-prioritized against the ElevenLabs
-swap timeline at next planning step.
+Production swap gated on M20 audio-led text reveal + VN smoke landing
+first — character voice quality is most visible against a polished
+dialogue UX; doing M6 before audio-led reveal would burn ElevenLabs
+spend chasing UX bugs we already know about.
+
+[VOICE_CASTING_PLAN.md](../tools/voice-lab/VOICE_CASTING_PLAN.md) has
+voice IDs + per-maiden settings cast. The `tools/voice-lab/` Next.js
+app is the casting/preview surface that landed pre-2026-05; production
+wiring (M6) is the swap from Kokoro into the same `RealtimeTTSEngine`
+public surface.
+
+---
+
+## Future / unprioritized backlog
+
+Real items that aren't on a milestone yet. Lifted from the
+"M6 — Future / unprioritized" framing that hosted them before M6 got
+re-purposed for the ElevenLabs hybrid (2026-05-03). Many are tractable;
+pick by caller pain rather than file-of-origin.
 
 ### Surfaced 2026-04-26 from external research (OSS Claude Code clones, Typer, MCP/A2A specs)
 
@@ -582,39 +600,27 @@ architectural moves; valuable but not the first lift.
 - **Anthropic Agent SDK:** evaluate when it stabilises; could replace some
   REPL plumbing in `hosts/cli/__main__.py`.
 - **Sandbox container UID alignment** (M5 implementation choice).
-- **ElevenLabs TTS + SFX migration (replaces Kokoro; repopulates
-  the emote SFX library):** swap the GUI's TTS stack from Kokoro +
-  edge-tts to ElevenLabs, and use the Sound Effects API
+- **ElevenLabs SFX library regeneration:** when M6 lands the TTS
+  swap, also regenerate the `.ogg` library under `assets/audio/sfx/`
+  that `hosts/gui/emote_sfx.py` plays by emote-keyword lookup. Use
+  the Sound Effects API
   (`client.text_to_sound_effects.convert` → `POST /v1/sound-generation`,
-  model `eleven_text_to_sound_v2`, 0.5–30 s clips) to regenerate
-  the `.ogg` library under `assets/audio/sfx/` that
-  `hosts/gui/emote_sfx.py` plays today by emote-keyword lookup.
-  Matches the sibling `tools/voice-lab` Next.js scratchpad.
-  When it lands: drop `kokoro`, `soundfile`, and `edge-tts` from
-  `hosts/gui`; drop `edge-tts` from `agents/hephaestus`; add the
-  ElevenLabs Python SDK (or hit the API via `httpx`). SFX
-  generation is one-shot into the asset tree (checked in or
-  pulled from HF like the other voice assets), **not** per-line
-  at runtime — keeps request latency and credit spend off the
-  hot path. The VN bridge's `PACKAGE_NAME=hephaestus` coupling
-  (see ECOSYSTEM.md "Cross-cutting quirks") still holds —
-  hephaestus stays the VN's voice package, but what it carries
-  shifts from `edge-tts` to the ElevenLabs surface. Tier strategy
-  (verified 2026-04-23): Free tier (10k credits/month) is
-  non-commercial AND requires `elevenlabs.io` in the title of any
-  published content — fine for voice casting inside
-  `tools/voice-lab`, unusable for shipped assets regardless of
-  whether kourai is ever monetized. Cheapest viable path is
-  **Starter at $5/month**: commercial license, 30k credits, and —
-  critically — audio generated during a paid month retains
-  commercial rights *perpetually* after cancellation, so a
-  one-month burn (generate the whole SFX + voice library, then
-  cancel) is a legitimate pattern. Creator (~$22/month, ≈121k
-  credits) is the drop-in when one Starter month isn't enough
-  headroom. Hygiene rule: never commit Free-tier-generated
-  `.mp3/.wav/.ogg` files anywhere in this repo; `.gitignore`
-  doesn't block audio today, so it's a discipline rule, not a
-  tooling guard.
+  model `eleven_text_to_sound_v2`, 0.5–30 s clips). One-shot into the
+  asset tree (checked in or pulled from HF like the other voice
+  assets), **not** per-line at runtime — keeps request latency and
+  credit spend off the hot path. Tier strategy (verified 2026-04-23):
+  Free tier (10k credits/month) is non-commercial AND requires
+  `elevenlabs.io` in the title of any published content — fine for
+  casting inside `tools/voice-lab`, unusable for shipped assets.
+  Cheapest viable path is **Starter at $5/month**: commercial license,
+  30k credits, and audio generated during the paid month retains
+  commercial rights *perpetually* after cancellation, so a one-month
+  burn (generate the whole SFX library, then cancel) is the legitimate
+  pattern. Hygiene rule: never commit Free-tier-generated
+  `.mp3/.wav/.ogg` files anywhere; `.gitignore` doesn't block audio
+  today, so it's a discipline rule, not a tooling guard. (The M6 spec
+  in IMPL.md owns the per-line voice-line caching strategy; this
+  bullet is just the asset-regeneration peer.)
 - **Companion / spirit READMEs (Puck, Cupid, Aidos, Aletheia):** the
   6 main pipeline agents got READMEs on 2026-04-26 (see Shipped); the
   4 secondary agents are deferred until M6 voice-lab / gossip /
