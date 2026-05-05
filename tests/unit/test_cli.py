@@ -929,3 +929,121 @@ class TestSettingsSyncModeChoice:
         changed = _apply_settings_choice("S")
         assert changed is True
         assert CLISettings.load().dialogue_sync_mode == "instant"
+
+
+class TestSettingsSessionModeChoice:
+    """Puck-tutorial spec — `[0] Session Mode` in `/settings` flips
+    between gamified and focused via `apply_mode_cascade`. Diegetic line
+    prints on flip; bidirectional. Spec:
+    `docs/architecture/puck-first-run-tutorial.md` Section 3.
+    """
+
+    def _isolate_stores(self, tmp_path, monkeypatch):
+        """Same pattern as test_mode_cascade._isolated_stores fixture
+        but inline since this test class lives in test_cli.py."""
+        import kourai_common.player as player_mod
+
+        profiles_dir = tmp_path / "profiles"
+        profiles_dir.mkdir()
+        monkeypatch.setattr(player_mod, "PLAYER_DIR", tmp_path)
+        monkeypatch.setattr(player_mod, "PROFILES_DIR", profiles_dir)
+        monkeypatch.setattr(player_mod, "ACTIVE_PROFILE_FILE", tmp_path / "active_profile.txt")
+        monkeypatch.setattr(player_mod, "_LEGACY_PLAYER_FILE", tmp_path / "player.json")
+        if hasattr(player_mod, "_profile_cache"):
+            player_mod._profile_cache = None
+        if hasattr(player_mod, "_profile_cache_ts"):
+            player_mod._profile_cache_ts = 0.0
+        monkeypatch.setattr("hosts.cli.settings._SETTINGS_FILE", tmp_path / "cli_settings.json")
+
+    def test_panel_renders_zero_entry_with_gamified_when_current_is_gamified(
+        self, tmp_path, monkeypatch
+    ):
+        from hosts.cli.commands import _print_settings_panel
+        from kourai_common.player_profile import PlayerProfile
+
+        self._isolate_stores(tmp_path, monkeypatch)
+        profile = PlayerProfile()
+        profile.preferences["experience_mode"] = "gamified"
+        profile.save()
+
+        echoed: list[str] = []
+        monkeypatch.setattr(
+            "hosts.cli.commands._echo",
+            lambda text="": echoed.append(text),
+        )
+        _print_settings_panel(CLISettings.load())
+
+        assert any("[0] Session Mode" in line and "gamified" in line for line in echoed)
+
+    def test_panel_renders_zero_entry_with_focused_when_current_is_focused(
+        self, tmp_path, monkeypatch
+    ):
+        from hosts.cli.commands import _print_settings_panel
+        from kourai_common.player_profile import PlayerProfile
+
+        self._isolate_stores(tmp_path, monkeypatch)
+        profile = PlayerProfile()
+        profile.preferences["experience_mode"] = "focused"
+        profile.save()
+
+        echoed: list[str] = []
+        monkeypatch.setattr(
+            "hosts.cli.commands._echo",
+            lambda text="": echoed.append(text),
+        )
+        _print_settings_panel(CLISettings.load())
+
+        assert any("[0] Session Mode" in line and "focused" in line for line in echoed)
+
+    def test_zero_choice_flips_gamified_to_focused_with_diegetic_line(self, tmp_path, monkeypatch):
+        from hosts.cli.commands import _apply_settings_choice
+        from kourai_common.player_profile import PlayerProfile
+
+        self._isolate_stores(tmp_path, monkeypatch)
+        profile = PlayerProfile()
+        profile.preferences["experience_mode"] = "gamified"
+        profile.save()
+
+        echoed: list[str] = []
+        monkeypatch.setattr(
+            "hosts.cli.commands._echo",
+            lambda text="": echoed.append(text),
+        )
+        changed = _apply_settings_choice("0")
+        assert changed is True
+
+        # Persisted to disk.
+        reloaded = PlayerProfile.load()
+        assert reloaded is not None
+        assert reloaded.preferences["experience_mode"] == "focused"
+        # Cascade actually flipped — gossip should be False under focused.
+        assert CLISettings.load().gossip_enabled is False
+        # Diegetic line per spec — "The forge falls quiet." on the
+        # gamified→focused transition.
+        out = "\n".join(echoed)
+        assert "The forge falls quiet" in out
+
+    def test_zero_choice_flips_focused_to_gamified_with_diegetic_line(self, tmp_path, monkeypatch):
+        from hosts.cli.commands import _apply_settings_choice
+        from kourai_common.player_profile import PlayerProfile
+
+        self._isolate_stores(tmp_path, monkeypatch)
+        profile = PlayerProfile()
+        profile.preferences["experience_mode"] = "focused"
+        profile.save()
+
+        echoed: list[str] = []
+        monkeypatch.setattr(
+            "hosts.cli.commands._echo",
+            lambda text="": echoed.append(text),
+        )
+        changed = _apply_settings_choice("0")
+        assert changed is True
+
+        reloaded = PlayerProfile.load()
+        assert reloaded is not None
+        assert reloaded.preferences["experience_mode"] == "gamified"
+        assert CLISettings.load().gossip_enabled is True
+        out = "\n".join(echoed)
+        # Diegetic line per spec — focused→gamified transition.
+        assert "Puck slips back through the door" in out

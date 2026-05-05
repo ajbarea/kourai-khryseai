@@ -331,10 +331,34 @@ reality, not file-of-origin.
    dialogue routing end-to-end. Needs AJ at the keyboard.
 3. **Puck-led first-run tutorial implementation** — spec at
    `docs/architecture/puck-first-run-tutorial.md` polished + added
-   to docs nav in [#162]; implementation against the spec is the
-   next step. Pairs with M6 player-onboarding theme so first-run
-   voice quality (the load-bearing first impression) lands on
-   ElevenLabs prosody rather than Kokoro.
+   to docs nav in [#162]; implementation underway. Pairs with M6
+   player-onboarding theme so first-run voice quality (the load-
+   bearing first impression) lands on ElevenLabs prosody rather
+   than Kokoro.
+
+   Slices (smallest end-to-end first):
+   - **Slice 1 — mode cascade + `/settings [0]` entry** (shipping
+     2026-05-06) — `apply_mode_cascade(mode)` flips all 7 cascade
+     settings across PlayerProfile.preferences + CLISettings in one
+     pass; idempotent; opinionated (overrides individual toggles).
+     `/settings` panel gains `[0] Session Mode: gamified|focused`
+     entry that reads `current_mode()` and prints diegetic line on
+     flip ("Puck slips back through the door, grinning." for
+     focused→gamified; "The forge falls quiet." for gamified→
+     focused). New module: `hosts/cli/mode_cascade.py`. 15 tests
+     (11 cascade unit + 4 panel integration).
+   - **Slice 2 — `_invoke_agent_live` helper + `/replay-tutorial`
+     command** (next): A2A timeout-and-fallback wrapper, plus the
+     replay slash command that runs the (still-stub) flight scene
+     against the existing profile.
+   - **Slice 3 — flight scene beats 1-14** (substantive): the
+     actual cinematic onboarding rewrite of `run_onboarding`.
+     Replaces the current scripted form with the Puck-narrated
+     flow, integrates the mode cascade at beat 13, captures the
+     idea pitch as the first session message.
+   - **Slice 4 — first-message routing in `__main__.py`**: feeds
+     the captured idea pitch into Hephaestus as the session
+     opener instead of the current hardcoded greeting.
 4. **M6 ElevenLabs hybrid implementation** — spec'd 2026-05-05 (see
    "M6 — ElevenLabs hybrid" above for adapter design, cache layer,
    sub-task ordering). Open questions answered against ElevenLabs's

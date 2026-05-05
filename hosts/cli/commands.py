@@ -16,6 +16,7 @@ from prompt_toolkit.enums import DEFAULT_BUFFER
 from prompt_toolkit.filters import has_completions, has_focus
 from prompt_toolkit.key_binding import KeyBindings
 
+from hosts.cli.mode_cascade import Mode, apply_mode_cascade, current_mode
 from hosts.cli.rendering import _echo
 from hosts.cli.settings import CLISettings
 from hosts.cli.styling import (
@@ -23,6 +24,7 @@ from hosts.cli.styling import (
     _GOLD,
     _GOLD_BOLD,
     _GOLD_BRIGHT,
+    _ITALIC,
     _RED,
     _RESET,
 )
@@ -125,6 +127,7 @@ _SETTINGS_LABELS: dict[str, str] = {
 
 def _print_settings_panel(settings: CLISettings) -> None:
     _echo(f"\n{_GOLD_BOLD}\u2501\u2501\u2501 Forge Settings \u2501\u2501\u2501{_RESET}")
+    _echo(f"  [0] Session Mode:   {current_mode()}")
     _echo(
         f"  [1] Voice (TTS):    {'ON' if settings.voice_enabled else 'OFF'}"
         f"  {_DIM}vol {settings.voice_volume:.2f}{_RESET}"
@@ -191,6 +194,23 @@ def _adjust_volumes(settings: CLISettings) -> bool:
 def _apply_settings_choice(choice: str) -> bool:
     """Apply one settings choice. Returns True if anything changed."""
     settings = CLISettings.load()
+    if choice == "0":
+        # Puck-tutorial mode cascade — flips between gamified and
+        # focused, writes all seven cascade settings across both stores.
+        # Diegetic line per spec; in-fiction "Puck returns / forge
+        # falls quiet" framing matches the onboarding mode-gate scene.
+        active = current_mode()
+        target: Mode = "focused" if active == "gamified" else "gamified"
+        apply_mode_cascade(target)
+        flavor = (
+            "Puck slips back through the door, grinning."
+            if target == "gamified"
+            else "The forge falls quiet."
+        )
+        _echo(f"\n  {_GOLD_BRIGHT}✨ Session Mode is now {target}{_RESET}")
+        _echo(f"  {_ITALIC}{flavor}{_RESET}")
+        _echo(f"  {_DIM}Cascade applied to PlayerProfile + CLISettings.{_RESET}")
+        return True
     if choice in _SETTINGS_MAPPING:
         key = _SETTINGS_MAPPING[choice]
         new_val = settings.toggle(key)
