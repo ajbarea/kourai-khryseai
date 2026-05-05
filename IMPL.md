@@ -298,7 +298,7 @@ Foundations first because most items need the new `paths.py`:
    Tests: `tests/unit/test_paths.py` (15 cases) and
    `tests/unit/test_emoji_prefix.py` (6 cases). 3075/3075 unit pass.
 
-2. **Item #2 — AudioSettings** ✅ shipped at TBD-after-commit.
+2. **Item #2 — AudioSettings** ✅ shipped at 674e6d3.
    `kourai_common.settings_audio` owns the frozen `AudioSettings`
    dataclass (3 toggles + 4 volumes) plus the `MUSIC_VOLUME_DEFAULT`
    etc. constants and a `DEFAULT_AUDIO_SETTINGS` snapshot dict.
@@ -313,17 +313,15 @@ Foundations first because most items need the new `paths.py`:
    migrate persisted JSON), but new launches and `Reset to Defaults`
    land on the canonical value. 6 new tests; 3081/3081 unit pass.
 
-3. **Item #3 — onboarding option lists**. Create
-   `shared/src/kourai_common/onboarding_data.py` with
-   `OnboardingChoice(id, label, description)` and three canonical lists:
-   `ROLE_OPTIONS`, `PRONOUN_OPTIONS`, `EXPERIENCE_OPTIONS`. CLI's
-   `(id, description)` tuple consumers wrap with a 2-tuple property;
-   GUI's `(id, label, desc)` consumers use the dataclass directly.
-   `hosts/cli/onboarding.py:26-56` and `hosts/gui/onboarding_ui.py:39-50`
-   import from shared. VN's `script_start.rpy:99` flow stays inline (Ren'Py
-   `renpy.input` semantics) but a comment cross-references the shared
-   data so a future Ren'Py-side reader knows where the canonical set
-   lives.
+3. **Item #3 — onboarding option lists** ✅ shipped at 138fdfb.
+   `kourai_common.onboarding_data` owns `OnboardingChoice(id, label,
+   description)` plus 5-role `ROLE_OPTIONS` (canonicalized on the
+   GUI/VN set; CLI gained "hero" and dropped "master"/"casual"
+   labels — the IDs still flow through Puck handoff for back-compat),
+   `PRONOUN_OPTIONS` (4), `EXPERIENCE_OPTIONS` (2). Both hosts'
+   onboarding flows iterate the shared lists; CLI's metrics options
+   stay local but use the same `OnboardingChoice` schema. Bundles
+   item #10 (intra-CLI ANSI re-import). 6 new tests; 3087/3087 pass.
 
 4. **Item #1 — demo script as data**. Create
    `shared/src/kourai_common/demo_script.py` with `DemoTurn(speaker,
@@ -365,10 +363,8 @@ Foundations first because most items need the new `paths.py`:
    `kourai_common/message_classifier.py`. Add `emoji>=2.15` to
    `shared/pyproject.toml` deps. Update GUI imports.
 
-9. **Item #10 — CLI styling re-import** (smallest, intra-CLI). Replace
-   the duplicated ANSI constants at `hosts/cli/onboarding.py:18-24`
-   with `from hosts.cli.styling import _GOLD, _GOLD_BRIGHT, _CYAN, _DIM,
-   _BOLD, _ITALIC, _RESET`. Drop the "keep in sync" comment.
+9. **Item #10 — CLI styling re-import** ✅ shipped with item #3 (same
+   file touched, same commit).
 
 ### Acceptance criteria (whole sweep)
 
