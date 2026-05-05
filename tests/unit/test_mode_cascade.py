@@ -20,39 +20,7 @@ from __future__ import annotations
 import pytest
 
 
-@pytest.fixture
-def _isolated_stores(tmp_path, monkeypatch):
-    """Redirect both settings stores to a fresh tmp_path.
-
-    PlayerProfile persists under `~/.kourai_khryseai/profiles/`;
-    CLISettings persists at `<repo>/.cache/cli_settings.json`. Patch
-    both to per-test temp paths so tests start clean and don't leak
-    into the live install. Mirrors the pattern in
-    `tests/unit/test_onboarding_hooks.py::_isolate_db`.
-    """
-    import kourai_common.player as player_mod
-
-    profiles_dir = tmp_path / "profiles"
-    profiles_dir.mkdir()
-    active_profile_file = tmp_path / "active_profile.txt"
-    settings_path = tmp_path / "cli_settings.json"
-
-    monkeypatch.setattr(player_mod, "PLAYER_DIR", tmp_path)
-    monkeypatch.setattr(player_mod, "PROFILES_DIR", profiles_dir)
-    monkeypatch.setattr(player_mod, "ACTIVE_PROFILE_FILE", active_profile_file)
-    monkeypatch.setattr(player_mod, "_LEGACY_PLAYER_FILE", tmp_path / "player.json")
-    # Reset the profile cache the shim module keeps to avoid cross-talk.
-    if hasattr(player_mod, "_profile_cache"):
-        player_mod._profile_cache = None
-    if hasattr(player_mod, "_profile_cache_ts"):
-        player_mod._profile_cache_ts = 0.0
-
-    monkeypatch.setattr("hosts.cli.settings._SETTINGS_FILE", settings_path)
-
-    yield active_profile_file, settings_path
-
-
-def test_focused_cascade_writes_all_seven_to_focused_values(_isolated_stores):
+def test_focused_cascade_writes_all_seven_to_focused_values(isolated_player_stores):
     from hosts.cli.mode_cascade import apply_mode_cascade
     from hosts.cli.settings import CLISettings
     from kourai_common.player_profile import PlayerProfile
@@ -78,7 +46,7 @@ def test_focused_cascade_writes_all_seven_to_focused_values(_isolated_stores):
     assert settings.gossip_nudges_enabled is False
 
 
-def test_gamified_cascade_writes_all_seven_to_gamified_values(_isolated_stores):
+def test_gamified_cascade_writes_all_seven_to_gamified_values(isolated_player_stores):
     from hosts.cli.mode_cascade import apply_mode_cascade
     from hosts.cli.settings import CLISettings
     from kourai_common.player_profile import PlayerProfile
@@ -104,7 +72,7 @@ def test_gamified_cascade_writes_all_seven_to_gamified_values(_isolated_stores):
     assert settings.gossip_nudges_enabled is True
 
 
-def test_cascade_is_idempotent(_isolated_stores):
+def test_cascade_is_idempotent(isolated_player_stores):
     """Re-applying the same mode produces identical state — both
     stores' loaded values match before and after."""
     from hosts.cli.mode_cascade import apply_mode_cascade
@@ -139,7 +107,7 @@ def test_cascade_is_idempotent(_isolated_stores):
         assert getattr(first_settings, field) == getattr(second_settings, field)
 
 
-def test_cascade_overrides_individual_toggles(_isolated_stores):
+def test_cascade_overrides_individual_toggles(isolated_player_stores):
     """The cascade is opinionated — it overrides individual settings
     a player may have toggled independently. Flipping focused → gamified
     after the player had turned metrics OFF still ends gamified-default
@@ -168,7 +136,7 @@ def test_cascade_overrides_individual_toggles(_isolated_stores):
     assert new_settings.gossip_enabled is True
 
 
-def test_cascade_preserves_unrelated_preferences(_isolated_stores):
+def test_cascade_preserves_unrelated_preferences(isolated_player_stores):
     """Cascade touches only the seven cascade keys. Other preference
     bucket entries (display_name analog, virtue_tracking_enabled,
     custom keys) survive intact."""
@@ -189,14 +157,14 @@ def test_cascade_preserves_unrelated_preferences(_isolated_stores):
     assert new_profile.preferences["custom_player_key"] == "preserved"
 
 
-def test_cascade_rejects_unknown_mode(_isolated_stores):
+def test_cascade_rejects_unknown_mode(isolated_player_stores):
     from hosts.cli.mode_cascade import apply_mode_cascade
 
     with pytest.raises(ValueError, match="unknown mode"):
         apply_mode_cascade("hardcore")  # type: ignore[arg-type]
 
 
-def test_cascade_no_op_when_no_active_profile(_isolated_stores, capsys):
+def test_cascade_no_op_when_no_active_profile(isolated_player_stores, capsys):
     """No PlayerProfile on disk → CLISettings still gets written.
 
     Edge case for very first-launch where /settings might be invoked
@@ -212,7 +180,7 @@ def test_cascade_no_op_when_no_active_profile(_isolated_stores, capsys):
     assert settings.metrics_tracking_enabled is False
 
 
-def test_current_mode_reads_from_profile(_isolated_stores):
+def test_current_mode_reads_from_profile(isolated_player_stores):
     from hosts.cli.mode_cascade import current_mode
     from kourai_common.player_profile import PlayerProfile
 
@@ -223,7 +191,7 @@ def test_current_mode_reads_from_profile(_isolated_stores):
     assert current_mode() == "focused"
 
 
-def test_current_mode_defaults_to_gamified_when_unset(_isolated_stores):
+def test_current_mode_defaults_to_gamified_when_unset(isolated_player_stores):
     """Spec default is gamified — matches existing onboarding's
     keep-Puck = default behavior."""
     from hosts.cli.mode_cascade import current_mode
@@ -234,14 +202,14 @@ def test_current_mode_defaults_to_gamified_when_unset(_isolated_stores):
     assert current_mode() == "gamified"
 
 
-def test_current_mode_defaults_to_gamified_when_no_profile(_isolated_stores):
+def test_current_mode_defaults_to_gamified_when_no_profile(isolated_player_stores):
     from hosts.cli.mode_cascade import current_mode
 
     # No profile on disk at all.
     assert current_mode() == "gamified"
 
 
-def test_current_mode_normalizes_unknown_strings_to_gamified(_isolated_stores):
+def test_current_mode_normalizes_unknown_strings_to_gamified(isolated_player_stores):
     """Forward-compat: an old profile with a deprecated mode value
     shouldn't break — fall back to gamified rather than crash."""
     from hosts.cli.mode_cascade import current_mode

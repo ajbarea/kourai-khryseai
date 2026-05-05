@@ -337,16 +337,16 @@ reality, not file-of-origin.
    than Kokoro.
 
    Slices (smallest end-to-end first):
-   - **Slice 1 — mode cascade + `/settings [0]` entry** (shipping
-     2026-05-06) — `apply_mode_cascade(mode)` flips all 7 cascade
-     settings across PlayerProfile.preferences + CLISettings in one
-     pass; idempotent; opinionated (overrides individual toggles).
-     `/settings` panel gains `[0] Session Mode: gamified|focused`
-     entry that reads `current_mode()` and prints diegetic line on
-     flip ("Puck slips back through the door, grinning." for
-     focused→gamified; "The forge falls quiet." for gamified→
-     focused). New module: `hosts/cli/mode_cascade.py`. 15 tests
-     (11 cascade unit + 4 panel integration).
+   - **Slice 1 — mode cascade + `/settings [0]` entry shipped 2026-05-05 [#168]** —
+     `apply_mode_cascade(mode)` flips all 7 cascade settings across
+     PlayerProfile.preferences + CLISettings in one pass; idempotent;
+     opinionated (overrides individual toggles). `/settings` panel
+     gains `[0] Session Mode: gamified|focused` entry that reads
+     `current_mode()` and prints diegetic line on flip ("Puck slips
+     back through the door, grinning." for focused→gamified;
+     "The forge falls quiet." for gamified→focused). New module:
+     `hosts/cli/mode_cascade.py`. 15 tests (11 cascade unit + 4
+     panel integration).
    - **Slice 2 — `_invoke_agent_live` helper + `/replay-tutorial`
      command** (next): A2A timeout-and-fallback wrapper, plus the
      replay slash command that runs the (still-stub) flight scene
