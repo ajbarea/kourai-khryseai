@@ -9,6 +9,43 @@ from a2a.types import Message, Task, TaskArtifactUpdateEvent, TaskStatusUpdateEv
 
 
 @pytest.fixture
+def isolated_player_stores(tmp_path, monkeypatch):
+    """Redirect PlayerProfile + CLISettings persistence to per-test tmp paths.
+
+    Tests that touch player identity / mode preferences need both stores
+    isolated from the live install:
+    - PlayerProfile persists under `~/.kourai_khryseai/profiles/<id>.json`
+    - CLISettings persists at `<repo>/.cache/cli_settings.json`
+
+    Mirrors the heavier `test_onboarding_hooks._isolate_db` pattern but
+    skips the sqlite memory DB setup (this fixture is for tests that
+    only need the JSON-on-disk halves of the player infra).
+
+    Yields ``(active_profile_file, settings_path)`` so individual tests
+    can read the raw on-disk state when an assertion needs byte-level
+    inspection.
+    """
+    import kourai_common.player as player_mod
+
+    profiles_dir = tmp_path / "profiles"
+    profiles_dir.mkdir()
+    active_profile_file = tmp_path / "active_profile.txt"
+    settings_path = tmp_path / "cli_settings.json"
+
+    monkeypatch.setattr(player_mod, "PLAYER_DIR", tmp_path)
+    monkeypatch.setattr(player_mod, "PROFILES_DIR", profiles_dir)
+    monkeypatch.setattr(player_mod, "ACTIVE_PROFILE_FILE", active_profile_file)
+    monkeypatch.setattr(player_mod, "_LEGACY_PLAYER_FILE", tmp_path / "player.json")
+    if hasattr(player_mod, "_profile_cache"):
+        player_mod._profile_cache = None
+    if hasattr(player_mod, "_profile_cache_ts"):
+        player_mod._profile_cache_ts = 0.0
+    monkeypatch.setattr("hosts.cli.settings._SETTINGS_FILE", settings_path)
+
+    yield active_profile_file, settings_path
+
+
+@pytest.fixture
 def agent_ports() -> dict[str, int]:
     """Port assignments for all agents."""
     return {

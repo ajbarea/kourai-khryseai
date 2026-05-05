@@ -936,32 +936,18 @@ class TestSettingsSessionModeChoice:
     between gamified and focused via `apply_mode_cascade`. Diegetic line
     prints on flip; bidirectional. Spec:
     `docs/architecture/puck-first-run-tutorial.md` Section 3.
+
+    Uses the shared `isolated_player_stores` conftest fixture to
+    redirect PlayerProfile + CLISettings persistence to per-test tmp
+    paths.
     """
 
-    def _isolate_stores(self, tmp_path, monkeypatch):
-        """Same pattern as test_mode_cascade._isolated_stores fixture
-        but inline since this test class lives in test_cli.py."""
-        import kourai_common.player as player_mod
-
-        profiles_dir = tmp_path / "profiles"
-        profiles_dir.mkdir()
-        monkeypatch.setattr(player_mod, "PLAYER_DIR", tmp_path)
-        monkeypatch.setattr(player_mod, "PROFILES_DIR", profiles_dir)
-        monkeypatch.setattr(player_mod, "ACTIVE_PROFILE_FILE", tmp_path / "active_profile.txt")
-        monkeypatch.setattr(player_mod, "_LEGACY_PLAYER_FILE", tmp_path / "player.json")
-        if hasattr(player_mod, "_profile_cache"):
-            player_mod._profile_cache = None
-        if hasattr(player_mod, "_profile_cache_ts"):
-            player_mod._profile_cache_ts = 0.0
-        monkeypatch.setattr("hosts.cli.settings._SETTINGS_FILE", tmp_path / "cli_settings.json")
-
     def test_panel_renders_zero_entry_with_gamified_when_current_is_gamified(
-        self, tmp_path, monkeypatch
+        self, isolated_player_stores, monkeypatch
     ):
         from hosts.cli.commands import _print_settings_panel
         from kourai_common.player_profile import PlayerProfile
 
-        self._isolate_stores(tmp_path, monkeypatch)
         profile = PlayerProfile()
         profile.preferences["experience_mode"] = "gamified"
         profile.save()
@@ -976,12 +962,11 @@ class TestSettingsSessionModeChoice:
         assert any("[0] Session Mode" in line and "gamified" in line for line in echoed)
 
     def test_panel_renders_zero_entry_with_focused_when_current_is_focused(
-        self, tmp_path, monkeypatch
+        self, isolated_player_stores, monkeypatch
     ):
         from hosts.cli.commands import _print_settings_panel
         from kourai_common.player_profile import PlayerProfile
 
-        self._isolate_stores(tmp_path, monkeypatch)
         profile = PlayerProfile()
         profile.preferences["experience_mode"] = "focused"
         profile.save()
@@ -995,11 +980,12 @@ class TestSettingsSessionModeChoice:
 
         assert any("[0] Session Mode" in line and "focused" in line for line in echoed)
 
-    def test_zero_choice_flips_gamified_to_focused_with_diegetic_line(self, tmp_path, monkeypatch):
+    def test_zero_choice_flips_gamified_to_focused_with_diegetic_line(
+        self, isolated_player_stores, monkeypatch
+    ):
         from hosts.cli.commands import _apply_settings_choice
         from kourai_common.player_profile import PlayerProfile
 
-        self._isolate_stores(tmp_path, monkeypatch)
         profile = PlayerProfile()
         profile.preferences["experience_mode"] = "gamified"
         profile.save()
@@ -1023,11 +1009,12 @@ class TestSettingsSessionModeChoice:
         out = "\n".join(echoed)
         assert "The forge falls quiet" in out
 
-    def test_zero_choice_flips_focused_to_gamified_with_diegetic_line(self, tmp_path, monkeypatch):
+    def test_zero_choice_flips_focused_to_gamified_with_diegetic_line(
+        self, isolated_player_stores, monkeypatch
+    ):
         from hosts.cli.commands import _apply_settings_choice
         from kourai_common.player_profile import PlayerProfile
 
-        self._isolate_stores(tmp_path, monkeypatch)
         profile = PlayerProfile()
         profile.preferences["experience_mode"] = "focused"
         profile.save()

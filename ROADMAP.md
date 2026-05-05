@@ -670,6 +670,29 @@ architectural moves; valuable but not the first lift.
 One-line per item, newest first. Detail moves to git history when work
 lands — these docs are plans + scratchpad, not a historical archive.
 
+- 2026-05-05 — **Puck tutorial slice 1: mode cascade + `/settings [0]` entry** [#168].
+  First slice of the Puck-led first-run tutorial implementation per
+  `docs/architecture/puck-first-run-tutorial.md`. The cascade helper
+  is the foundational unit — used by both the (future) onboarding
+  mode-gate scene AND the new `/settings` panel toggle. Shipping the
+  cascade + panel pair first because it's end-to-end player-visible
+  without depending on the (substantive) flight-scene rewrite
+  (slices 2-4 queued in IMPL). New module `hosts/cli/mode_cascade.py`
+  exports `apply_mode_cascade(mode)` (idempotent, opinionated, writes
+  all 7 cascade settings across PlayerProfile.preferences +
+  CLISettings) and `current_mode()` (reads from profile, defaults
+  gamified). `_print_settings_panel` gains `[0] Session Mode: <current>`
+  at the top; `_apply_settings_choice("0")` reads → flips → prints
+  the spec's diegetic line ("Puck slips back through the door,
+  grinning." for focused→gamified; "The forge falls quiet." for
+  gamified→focused). `romance_enabled` stays False in BOTH paths
+  per spec — full romance is a separate two-step opt-in, not
+  piggy-backed on the mode preset. 15 tests (11 cascade unit + 4
+  panel integration), 3053 unit tests pass total. `research(2026-05)`:
+  idempotent CLI config writes follow the "overwrite, don't append"
+  + "conditional checks gate non-idempotent work" pattern; cascade
+  module satisfies both. Sources: HackMD CLI best practices,
+  HackerNoon idempotent code guide.
 - 2026-05-05 — **GUI synthesis indicator via `TypewriterManager.set_pending_audio`** [#166].
   Companion to #165's CLI indicator. The GUI's audio-led word-paced
   typewriter sat at `displayed_chars=0` for ~3s on Kokoro CPU between
