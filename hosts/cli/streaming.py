@@ -37,6 +37,8 @@ from hosts.cli.rendering import (
     karaoke_dialogue_close,
     karaoke_dialogue_open,
     karaoke_word_separator,
+    synthesis_indicator,
+    synthesis_indicator_clear,
 )
 from hosts.cli.styling import _DIM, _GOLD, _GOLD_BRIGHT, _RED, _RESET
 from kourai_common.a2a_events import extract_artifact_data
@@ -248,16 +250,28 @@ async def send_and_stream(
                         # Tier 2 (deferred box) fallback. The closures
                         # are invoked synchronously inside this iteration's
                         # `await tts.speak(...)` and never outlive it, so
-                        # `formatted`, `agent`, `karaoke_started`, and
-                        # `last_was_word` cannot rebind before either
-                        # callback runs. Suppressed with B023 inline.
+                        # `formatted`, `agent`, `face`, `karaoke_started`,
+                        # `indicator_shown`, and `last_was_word` cannot
+                        # rebind before either callback runs. Suppressed
+                        # with B023 inline.
                         karaoke_started = [False]
                         last_was_word = [False]
+                        indicator_shown = [False]
+                        face = _MAIDEN_FACES.get(agent or "", "")
+
+                        # Pre-render the synthesis indicator so the player
+                        # sees that the agent is about to speak during the
+                        # ~3s Kokoro CPU synthesis-wait window before
+                        # _open_karaoke fires.
+                        _echo(synthesis_indicator(agent or "", face), nl=False)
+                        indicator_shown[0] = True
 
                         def _open_karaoke() -> None:
                             if karaoke_started[0]:  # noqa: B023
                                 return
-                            face = _MAIDEN_FACES.get(agent or "", "")  # noqa: B023
+                            if indicator_shown[0]:  # noqa: B023
+                                _echo(synthesis_indicator_clear(), nl=False)
+                                indicator_shown[0] = False  # noqa: B023
                             _echo(
                                 karaoke_dialogue_open(agent or "", face),  # noqa: B023
                                 nl=False,
@@ -290,7 +304,12 @@ async def send_and_stream(
                             else:
                                 # Tier 2 fallback — neither audio_start
                                 # nor on_word fired (auto-muted, engine
-                                # never reached playback).
+                                # never reached playback). Wipe the
+                                # indicator first so the box doesn't
+                                # render below a stuck ellipsis line.
+                                if indicator_shown[0]:
+                                    _echo(synthesis_indicator_clear(), nl=False)
+                                    indicator_shown[0] = False
                                 _echo(formatted)
                     elif will_display and will_speak:
                         # M20 sub-task 4 "instant" mode: legacy behavior

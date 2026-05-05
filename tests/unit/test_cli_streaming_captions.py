@@ -282,3 +282,135 @@ async def test_dialogue_visual_falls_back_when_on_audio_start_never_fires(_captu
     visual_lines = [line for line in _captured if "[FORMATTED]" in line]
     assert len(visual_lines) == 1, "fallback echo must fire when callback didn't"
     tts.speak.assert_awaited()
+
+
+@pytest.mark.asyncio
+async def test_synthesis_indicator_renders_before_speak(_captured):
+    """M20 sub-task 2 polish: a per-agent indicator (`Name face …`) is
+    echoed BEFORE `await tts.speak(...)` so the player has visible
+    feedback during the ~3s Kokoro CPU synthesis-wait window. Without
+    this the audio-led path shows nothing on stdout for several seconds
+    after the agent decides to talk.
+    """
+    speak_call_index: list[int] = []
+
+    async def _record_then_speak(*args, on_audio_start=None, on_word=None, **kwargs):
+        # Record how many _echo calls happened before tts.speak() ran.
+        speak_call_index.append(len(_captured))
+        if on_audio_start is not None:
+            on_audio_start()
+        if on_word is not None:
+            on_word(MagicMock(word="hi"))
+
+    tts = MagicMock()
+    tts.speak = AsyncMock(side_effect=_record_then_speak)
+    dialogue = _status_event('"Hi."', KIND_DIALOGUE)
+    client = _client_yielding([dialogue, _completed_task()])
+
+    await send_and_stream(client, "prompt", "ctx-1", tts=tts, captions_enabled=True)
+
+    # At least one _echo call must precede speak().
+    assert speak_call_index and speak_call_index[0] >= 1, (
+        f"expected indicator echo before speak(); got {speak_call_index} pre-speak echoes"
+    )
+    pre_speak = _captured[: speak_call_index[0]]
+    # Indicator carries the ellipsis glyph and the agent name; karaoke
+    # header (post-clear) carries the opening italic-quote — distinct.
+    indicator_line = next((s for s in pre_speak if "…" in s), None)
+    assert indicator_line is not None, (
+        f"expected indicator with ellipsis pre-speak; got {pre_speak!r}"
+    )
+    assert "Kallos" in indicator_line
+
+
+@pytest.mark.asyncio
+async def test_synthesis_indicator_cleared_when_audio_starts(_captured):
+    """When `on_audio_start` fires, the indicator must be wiped (CR +
+    erase-line) before the karaoke header opens — otherwise the player
+    sees the ellipsis line stuck above the karaoke quote."""
+
+    async def _karaoke_speak(*args, on_audio_start=None, on_word=None, **kwargs):
+        if on_audio_start is not None:
+            on_audio_start()
+        if on_word is not None:
+            on_word(MagicMock(word="hi"))
+
+    tts = MagicMock()
+    tts.speak = AsyncMock(side_effect=_karaoke_speak)
+    dialogue = _status_event('"Hi."', KIND_DIALOGUE)
+    client = _client_yielding([dialogue, _completed_task()])
+
+    await send_and_stream(client, "prompt", "ctx-1", tts=tts, captions_enabled=True)
+
+    visual = "".join(_captured)
+    # Erase-line ANSI present somewhere in the output.
+    assert "\033[2K" in visual or "\x1b[2K" in visual, (
+        f"expected indicator-clear ANSI in stream; got {visual!r}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_synthesis_indicator_cleared_when_tier2_fallback(_captured):
+    """When neither `on_audio_start` nor `on_word` fires (auto-mute,
+    engine init failure), the indicator still gets wiped before the
+    Tier 2 box echoes — otherwise the box renders below a stuck
+    ellipsis line.
+    """
+    tts = MagicMock()
+    tts.speak = AsyncMock()  # silent: no callbacks fire
+    dialogue = _status_event('"Hi."', KIND_DIALOGUE)
+    client = _client_yielding([dialogue, _completed_task()])
+
+    await send_and_stream(client, "prompt", "ctx-1", tts=tts, captions_enabled=True)
+
+    visual = "".join(_captured)
+    # Indicator-clear must precede the [FORMATTED] box in the stream.
+    clear_pos = visual.find("\033[2K")
+    box_pos = visual.find("[FORMATTED]")
+    assert clear_pos != -1, "indicator-clear ANSI missing in fallback path"
+    assert box_pos != -1, "Tier 2 box missing in fallback path"
+    assert clear_pos < box_pos, "indicator must be cleared before box renders"
+
+
+@pytest.mark.asyncio
+async def test_synthesis_indicator_skipped_when_captions_off_audio_only(_captured):
+    """Audio-only mode (captions off + TTS on): no visual at all, so
+    the indicator must NOT render either — no flash of "Kallos …" before
+    silent audio playback.
+    """
+    tts = MagicMock()
+    tts.speak = AsyncMock()
+    dialogue = _status_event('"Hi."', KIND_DIALOGUE)
+    client = _client_yielding([dialogue, _completed_task()])
+
+    await send_and_stream(client, "prompt", "ctx-1", tts=tts, captions_enabled=False)
+
+    visual = "".join(_captured)
+    # Audio-only path: no [FORMATTED] box AND no indicator ellipsis.
+    assert "[FORMATTED]" not in visual
+    assert "…" not in visual, f"indicator leaked in audio-only mode: {visual!r}"
+    tts.speak.assert_awaited()
+
+
+@pytest.mark.asyncio
+async def test_synthesis_indicator_skipped_in_instant_mode(_captured):
+    """`dialogue_sync_mode='instant'` skips the audio-led path entirely;
+    the indicator belongs to that path so it must NOT render — instant
+    mode renders the box immediately with no synthesis-wait gap to fill.
+    """
+    tts = MagicMock()
+    tts.speak = AsyncMock()
+    dialogue = _status_event('"Hi."', KIND_DIALOGUE)
+    client = _client_yielding([dialogue, _completed_task()])
+
+    await send_and_stream(
+        client,
+        "prompt",
+        "ctx-1",
+        tts=tts,
+        captions_enabled=True,
+        dialogue_sync_mode="instant",
+    )
+
+    visual = "".join(_captured)
+    assert "…" not in visual, f"indicator leaked in instant mode: {visual!r}"

@@ -168,6 +168,50 @@ class TestKaraokeHelpers:
         assert karaoke_word_separator("?", last_was_word=True) == ""
 
 
+class TestSynthesisIndicator:
+    """M20 sub-task 2 polish — pre-render indicator that gives the player
+    visible feedback during the ~3s Kokoro CPU synthesis-wait window
+    before `on_audio_start` fires. Replaced in-place by the karaoke
+    header (or wiped + Tier 2 box rendered) once the engine yields.
+    """
+
+    def test_indicator_includes_name_and_face_no_opening_quote(self):
+        from hosts.cli.rendering import synthesis_indicator
+
+        rendered = synthesis_indicator("hephaestus", "🔥")
+        assert "Hephaestus" in rendered
+        assert "🔥" in rendered
+        # Distinct from karaoke_dialogue_open: no opening italic-quote;
+        # ends in an ellipsis so the player reads it as "about to speak".
+        assert '"' not in rendered
+        assert "…" in rendered  # … ellipsis
+        assert "\n" not in rendered  # single line, in-place erase
+
+    def test_indicator_clear_uses_carriage_return_and_erase_line(self):
+        from hosts.cli.rendering import synthesis_indicator_clear
+
+        rendered = synthesis_indicator_clear()
+        # CR returns to column 0; CSI 2K erases the entire line.
+        assert "\r" in rendered
+        assert "\033[2K" in rendered
+
+    def test_indicator_capitalizes_lowercase_agent_name(self):
+        from hosts.cli.rendering import synthesis_indicator
+
+        rendered = synthesis_indicator("kallos", "✨")
+        assert "Kallos" in rendered
+        assert "kallos" not in rendered.replace("Kallos", "")
+
+    def test_indicator_handles_empty_face(self):
+        from hosts.cli.rendering import synthesis_indicator
+
+        # vn_bridge / unknown agent surface — face lookup may be empty.
+        # Helper must not crash and must still include the agent name.
+        rendered = synthesis_indicator("hephaestus", "")
+        assert "Hephaestus" in rendered
+        assert "…" in rendered
+
+
 class TestCommsWindowStripsSsml:
     """`_comms_window` is the universal display chokepoint — every
     dialogue source (HEPH_HANDOFFS, HANDOFF_LINES, VICTORY_LINES, future
