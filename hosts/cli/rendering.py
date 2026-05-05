@@ -273,6 +273,33 @@ def karaoke_dialogue_close() -> str:
     return f'"{_RESET}\n'
 
 
+def synthesis_indicator(agent_name: str, face: str) -> str:
+    """Single-line indicator rendered before ``await tts.speak(...)`` in
+    the audio-led path.
+
+    Gives the player visible feedback during the ~3s Kokoro CPU
+    synthesis-wait window before ``on_audio_start`` fires. Layout
+    mirrors `karaoke_dialogue_open` (name + face) but ends in a dim
+    ellipsis instead of an opening italic-quote — visually it reads
+    as "the agent is about to speak". Wiped in-place by
+    `synthesis_indicator_clear` once the engine yields (or when the
+    Tier 2 fallback path takes over).
+    """
+    name_pretty = agent_name.capitalize()
+    return f"  {_GOLD_BOLD}{name_pretty}{_RESET} {_GOLD}{face}{_RESET} {_DIM}…{_RESET}"
+
+
+def synthesis_indicator_clear() -> str:
+    """ANSI sequence to wipe the synthesis indicator: CR + erase-line.
+
+    Cursor returns to column 0 and the line is cleared; the next write
+    starts fresh on the same row. In non-tty contexts the CR may render
+    as a literal ``\\r`` but the next write still lands correctly
+    because nothing depends on the visual erase.
+    """
+    return "\r\033[2K"
+
+
 def karaoke_word_separator(word_text: str, last_was_word: bool) -> str:
     """Compute the spacing between karaoke-revealed words.
 
