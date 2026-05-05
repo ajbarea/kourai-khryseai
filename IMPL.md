@@ -317,8 +317,12 @@ reality, not file-of-origin.
 2. **Live VN smoke** — exercises the vn_bridge `/tts` →
    `RealtimeTTSEngine.synthesize_to_wav` path + metadata-based
    dialogue routing end-to-end. Needs AJ at the keyboard.
-3. **`docs/architecture/puck-first-run-tutorial.md`** — pairs with
-   the M6 player-onboarding theme. Tractable autonomously.
+3. **Puck-led first-run tutorial implementation** — spec at
+   `docs/architecture/puck-first-run-tutorial.md` polished + added
+   to docs nav in [#162]; implementation against the spec is the
+   next step. Pairs with M6 player-onboarding theme so first-run
+   voice quality (the load-bearing first impression) lands on
+   ElevenLabs prosody rather than Kokoro.
 4. **M6 ElevenLabs hybrid implementation** — spec'd 2026-05-05 (see
    "M6 — ElevenLabs hybrid" above for adapter design, cache layer,
    sub-task ordering). Open questions answered against ElevenLabs's
@@ -330,10 +334,7 @@ reality, not file-of-origin.
    dialogue UX is dialed.
 5. **M18 Phase 3 Part B** — distinct render paths for `KIND_CODE` /
    `KIND_SPEC`. Blocked on a specialist actually emitting either kind.
-6. **GUI `hosts/gui/maidens.py` dialogue dedup** — separate copy
-   diverged from `shared/src/kourai_common/agents.py`. Consolidation
-   needs design pass on which copy is canonical (GUI has more entries).
-7. **M5 / M12 / M15 follow-ons** — see ROADMAP for scope.
+6. **M5 / M12 / M15 follow-ons** — see ROADMAP for scope.
 
 Music playlist (#11) — content-driven; AJ adds tracks to
 `assets/audio/music/` over time. No code work.

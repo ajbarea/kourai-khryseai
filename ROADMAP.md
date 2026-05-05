@@ -670,6 +670,49 @@ architectural moves; valuable but not the first lift.
 One-line per item, newest first. Detail moves to git history when work
 lands — these docs are plans + scratchpad, not a historical archive.
 
+- 2026-05-05 — **Puck tutorial spec polish + zensical nav add** [#162].
+  The `docs/architecture/puck-first-run-tutorial.md` spec was orphaned
+  from zensical nav and had stale "not committed" header framing. Status
+  rewritten to match the ROADMAP blockquote convention; cross-referenced
+  2026-05-05 against current May 2026 best practice for AI/CLI
+  onboarding (progressive disclosure + in-fiction integration — what
+  the spec already prescribes; no architectural revision needed).
+  Out-of-scope item 4's GUI maidens-dedup bullet marked closed by #161.
+  Spec now visible under Architecture in the public docs site, labelled
+  `(spec)` to signal forward-looking design.
+- 2026-05-05 — **GUI `maidens.py` dedup against shared/agents.py** [#161].
+  GUI's `hosts/gui/maidens.py` was a 327-line near-duplicate of
+  `shared/src/kourai_common/agents.py` with GUI-only enrichments.
+  Promoted GUI's richer content (extra emote-prefixed quotes; missing
+  return-handoff routes for `dokimasia/kallos/mneme → hephaestus`;
+  extras in `techne → dokimasia` / `dokimasia → kallos` /
+  `kallos → mneme`) into shared as canonical. GUI now imports shared
+  and synthesises the legacy `AGENTS` dict from a local `_AGENT_COLORS`
+  map at module load. `EMOJI_TO_AGENT`, `detect_agent`, `get_avatar_path`
+  stay GUI-local. 327 → 101 lines (~70% smaller); CLI picks up the
+  richer shared quote pools as a knock-on. Lint + 3017 unit tests
+  clean; 200 existing GUI assertions on `AGENTS` / `HANDOFF_LINES` /
+  `VICTORY_LINES` / `detect_agent` / `get_avatar_path` pass unchanged.
+- 2026-05-05 — **Research-grounded M6 ElevenLabs hybrid spec + ROADMAP
+  cleanup** [#160]. Spec'd the M6 ElevenLabs hybrid against
+  ElevenLabs's actual May 2026 docs, applying the planning-step
+  web-search discipline the M18 Phase 2 walkback (#152) showed we
+  missed. **Open question answered:** ElevenLabs has no server-side
+  audio cache by request hash; the History API indexes by
+  `history_item_id` only, so the cache is ours to build per the
+  Supabase cookbook pattern. Per-engine markup adapter design replaces
+  the walked-back SSML approach (keep `[bracket]` audio tags for
+  `eleven_v3` with the 4-5 word decay constraint; strip for Flash v2.5
+  / multilingual_v2 / Kokoro; skip `<break>` everywhere per
+  ElevenLabs's own instability warning). Audio cache spec:
+  `sha256(text + voice_id + model_id + settings)` keyed, XDG-compliant
+  disk store, 500 MB LRU, `cacheable=False` opt-out. Sub-task order:
+  adapter → cache → SDK swap → wiring → prosody. Production swap
+  gated on M20 + VN smoke. ROADMAP cleanup: M6 section was
+  Frankensteined with unrelated CLI host / UX bullets from before its
+  repurposing; new "Future / unprioritized backlog" H2 hosts those
+  without misfiling. The "ElevenLabs TTS + SFX migration" bullet
+  trimmed to SFX-only (TTS portion now M6).
 - 2026-05-03 — **Walked back M18 Phase 2 SSML markup investment** [#152].
   Reverted dialogue-content SSML from #149 (HEPH_HANDOFFS) and #150
   (HANDOFF_LINES, HANDOFF_FALLBACKS, VICTORY_LINES, plus the AGENT_QUOTES
