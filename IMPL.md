@@ -6,10 +6,11 @@ to a one-liner under "Shipped" and this file resets to the next milestone.
 Git history is the archive — these docs are plans + scratchpad, not a
 historical record.
 
-Updated: 2026-05-03 · Active focus: **M6 ElevenLabs hybrid as
-pre-player-release blocker** (promoted from "future-future").
-SSML markup investment reverted [#152]; defensive strip helpers
-stay. main is clean; issue #126 (upstream-blocked
+Updated: 2026-05-05 · Active focus: **M6 ElevenLabs hybrid as
+pre-player-release blocker** (spec'd 2026-05-05 against ElevenLabs
+May 2026 docs — see M6 section below; implementation queued behind
+M20 + VN smoke). SSML markup investment reverted [#152]; defensive
+strip helpers stay. main is clean; issue #126 (upstream-blocked
 `@xmldom/xmldom@0.8.12` HIGH bundled inside npm 11.13.0) is
 auto-managed by `.github/workflows/issue-126-rescan.yml` —
 Saturdays 14:17 UTC from 2026-05-16, auto-closes once upstream
@@ -59,44 +60,178 @@ day 1 instead of after 5 PRs.
 
 ## M6 — ElevenLabs hybrid (pre-player-release blocker)
 
-Promoted from "future-future" based on 2026-05-03 strategic discussion.
-Character voice is the product (Hephaestus gruff vs Kallos lilting);
-Kokoro can't deliver per-character emotional control; ElevenLabs can.
-[VOICE_CASTING_PLAN.md](../tools/voice-lab/VOICE_CASTING_PLAN.md)
-already has voice IDs + settings cast for each maiden.
+Promoted from "future-future" 2026-05-03; spec'd 2026-05-05 against
+ElevenLabs's actual May 2026 docs (see *Research log* below — same
+discipline as the M18 Phase 2 walkback, applied at the planning step
+this time per
+[feedback_websearch_before_arch_decision](../../.claude/projects/-home-ajbar-ajsoftworks/memory/feedback_websearch_before_arch_decision.md)).
 
-**Model strategy** (per VOICE_CASTING_PLAN.md):
-- `eleven_flash_v2_5` for routine live dialogue + handoffs (low latency,
-  $0.06 / 1k chars).
-- `eleven_v3` for high-impact lines — victory lines, key handoffs,
-  onboarding moments ($0.12 / 1k chars, audio-tag emotional control).
+Character voice IS the product (Hephaestus gruff vs Kallos lilting);
+Kokoro swaps voicepacks but can't deliver per-character emotional
+control. ElevenLabs can. [VOICE_CASTING_PLAN.md](../tools/voice-lab/VOICE_CASTING_PLAN.md)
+already casts voice IDs + per-maiden settings.
 
-**Cost projections (2026-05 ElevenLabs API pricing):**
+### Engine + model strategy
+
+| Model | Use | Latency | Price | Markup support |
+|---|---|---|---|---|
+| `eleven_flash_v2_5` | routine dialogue, handoffs | ~75ms | $0.06 / 1k chars | `<break>` works but ElevenLabs warns against overuse — use natural punctuation |
+| `eleven_v3` | victory lines, key handoffs, onboarding | ~1-2s | $0.12 / 1k chars | `[bracket]` audio tags for emotional control; **no** SSML break tags |
+
+### Required add-ons before player release
+
+Three layers, ordered by ship-readiness (smallest first):
+
+#### 1. Per-engine markup adapter (replaces walked-back SSML approach)
+
+Producers emit plain text with optional inline `[bracket]` audio
+direction hints — same lowercase-bracket convention ElevenLabs documents.
+The adapter at the engine boundary translates per target engine:
+
+| Engine | Behavior |
+|---|---|
+| `eleven_v3` | Keep `[bracket]` tags. Tag effect decays after ~4-5 words; producers should write short tagged segments. Layered tags supported (`[nervously][whispers]`). |
+| `eleven_flash_v2_5` / `eleven_multilingual_v2` | Strip brackets — v3 audio tags don't apply. Emotional tone comes from `voice_settings.style` + low `stability` + per-maiden voice training. Skip `<break>` per ElevenLabs's instability warning; punctuation carries pacing. |
+| `kokoro` (current) | Strip brackets. No SSML, no audio tags; punctuation carries everything. |
+
+Tag vocabulary (lift from ElevenLabs's documented set, scoped to
+maidens — skip the cinematic ones that don't fit pipeline dialogue):
+
+- Voice cues: `[whispers]`, `[sighs]`, `[exhales]`, `[laughs]`,
+  `[sarcastic]`, `[curious]`, `[excited]`, `[crying]`
+- Layered (per ElevenLabs docs): `[nervously][whispers]`,
+  `[softly][sighs]`, etc.
+- Skip: `[applause]`, `[clapping]`, `[gasps]`, `[sings]`, accent
+  tags — too rare or character-mismatched for kourai's dialogue mix.
+
+The existing `kourai_common.ssml.strip_ssml` defensive layer stays in
+place as a second line of defence against any LLM that emits
+XML-shaped markup. Order at the engine boundary: strip SSML
+(defensive) → apply engine markup adapter (engine-aware) → synthesize.
+
+`research(2026-05)`: ElevenLabs `prompting/eleven-v3` audio-tag
+list, help-center "How do audio tags work with Eleven v3" 4-5-word
+decay note, help-center "Do pauses and SSML phoneme tags work" model
+support matrix.
+
+#### 2. Audio caching layer (cost control — required for player scale)
+
+**Open question answered (2026-05):** ElevenLabs has **no server-side
+cache by content hash**. The History API stores every generation but
+indexes by server-assigned `history_item_id`, not by request payload
+hash. The cache is ours to build. Pattern follows ElevenLabs's own
+Supabase cookbook: hash request params client-side, store bytes in
+object storage, look up before regenerating.
+
+Spec:
+
+- **Cache key:** `sha256(text + voice_id + model_id + voice_settings_json)`.
+  voice_settings serialized with sorted keys for hash stability.
+- **Storage:** `${XDG_CACHE_HOME:-~/.cache}/kourai/tts/{key[:2]}/{key}.{ext}`.
+  Two-char prefix shard prevents inode bloat in any one directory.
+  Format extension matches `output_format` (mp3 default).
+- **Eviction:** size cap (default 500 MB), oldest-modified-first when
+  over cap. No TTL — cache hit on identical inputs is always valid;
+  same engine + same `seed` is deterministic, our voice_settings are
+  stable per-maiden.
+- **API:** `cached_synthesize(text, voice_id, model_id, settings) -> bytes`.
+  Cache miss → call engine → write bytes to cache → return.
+  Idempotent.
+- **Opt-out:** `cacheable=False` kwarg for one-shot dynamic content
+  where the hit rate would be near-zero (e.g., long LLM-generated
+  responses with high text variance). Default `True`.
+
+Primary cache targets are **static dialogue dicts**: `HANDOFF_LINES`,
+`HANDOFF_FALLBACKS`, `VICTORY_LINES`, `AGENT_QUOTES`, user_quotes
+greetings. These repeat constantly across players — once warm,
+near-100% hit rate.
+
+`research(2026-05)`: ElevenLabs cookbook
+`text-to-speech/streaming-and-caching-with-supabase` (canonical
+client-side caching pattern); `api-reference/history/get` confirms
+`history_item_id`-only lookup, no content-hash semantic.
+
+#### 3. Per-persona prosody design pass
+
+With adapter + cache shipped and ElevenLabs reference audio in hand
+(via `tools/voice-lab` Next.js scratchpad), decide which maidens get
+which emotional defaults:
+
+- Kallos: `[whispers]` for teasing asides, lower stability for
+  expressiveness.
+- Dokimasia: `[sarcastic]` defaults during validation failures.
+- Aidos / Aletheia: highest stability + lowest style for clinical /
+  authoritative validation tone (already in VOICE_CASTING_PLAN.md).
+- Hephaestus: gruff via `style` slider + voice training (no `[gruff]`
+  tag exists).
+
+Deferred under the SSML plan; now design-tractable against real
+reference audio post-adapter-ship.
+
+### Sub-task order + gating
+
+1. **Per-engine markup adapter** — `kourai_common.tts_markup.apply_engine_markup`.
+   Ships when caller exists (i.e., bundled with sub-task 4 below).
+2. **Audio cache layer** — `kourai_common.tts_cache.cached_synthesize`.
+   Wraps the engine call regardless of engine. ~1 disk-stat per call
+   when warm; tiny cost. Could ship under Kokoro first to validate
+   the cache shape, then ride along into the ElevenLabs swap.
+3. **ElevenLabs SDK integration** — `pyproject.toml` adds `elevenlabs`
+   dep; new `ElevenLabsEngine` class implementing the same
+   `RealtimeTTSEngine` public surface (`speak`, `speak_sync`,
+   `synthesize_to_wav`, `on_word`, `on_audio_start`). Engine selected
+   via `KOURAI_TTS_ENGINE=elevenlabs|kokoro` env (default `kokoro`
+   until cutover). `client.text_to_speech.convert(voice_id, text,
+   model_id, voice_settings=VoiceSettings(stability, similarity_boost,
+   style, use_speaker_boost, speed), output_format)` is the SDK call;
+   returns bytes.
+4. **Voice-lab → production wiring** — flip default to `elevenlabs`,
+   smoke through CLI / GUI / VN.
+5. **Per-persona prosody pass** — tune voice_settings + audio tag
+   defaults per maiden against reference audio.
+
+**Production swap gated on M20 + VN smoke landing first** —
+character voice quality is most visible against a polished dialogue
+UX; doing M6 before audio-led reveal lands would burn ElevenLabs
+spend chasing UX bugs we already know about.
+
+### Cost projections (2026-05 ElevenLabs API pricing)
+
 - Pre-release dev (~200 lines/day × 50 chars): ~$22/month.
-- 100 active players (~200 lines/session × 30 sessions): ~$2,160/month.
-- 1000 active players: scales linearly to ~$21,600/month — needs the
-  audio caching add-on below to cut billed chars 50-80%.
+- 100 active players (~200 lines/session × 30 sessions): ~$2,160/month
+  uncached → ~$430-1,080/month after cache layer (50-80% hit rate
+  on static dialogue, near-100% on v3 lines after warm).
+- 1000 active players: ~$21,600/month → ~$4,300-10,800/month with
+  cache.
 
-**Required add-ons before player release:**
-- **Audio caching layer.** Static dialogue (HANDOFF_LINES,
-  VICTORY_LINES, greetings) repeats constantly across players —
-  render WAV bytes ONCE per (text, voice) pair, cache on disk / CDN,
-  serve from cache. Probably 50-80% reduction in billed chars at
-  player scale.
-- **Per-engine markup adapter** at the engine boundary, replacing the
-  reverted SSML approach. Producers emit plain text; the adapter
-  layer adds engine-specific formatting (`[bracket]` audio tags for
-  v3, ellipses for both, optional `<break>` for Flash V2.5 if cost
-  testing shows benefit). Keeps producers engine-agnostic.
-- **Per-persona prosody design pass.** With actual ElevenLabs voices
-  and audio tags, decide which maidens get which emotional defaults
-  ([whispers] for Kallos when teasing, [sarcastic] for Dokimasia,
-  etc.). Was deferred under the SSML plan; now design-tractable
-  against real reference audio.
+### Research log
 
-**Open question:** does ElevenLabs's API support response-level audio
-caching (caching by request hash) or do we have to build it
-client-side? Web-search at implementation start.
+- **Eleven v3 audio tags** — vocabulary + layered-tag syntax + the
+  4-5-word decay constraint that shapes how producers should write
+  tagged segments. Source: ElevenLabs `prompting/eleven-v3` doc +
+  help-center "How do audio tags work with Eleven v3" article.
+  Verified 2026-05-05.
+- **SSML / pause guidance** — `<break>` works on v2/v2.5 but with
+  explicit instability warning; v3 doesn't support break tags;
+  natural punctuation (ellipses, dashes) is the recommended
+  cross-model pattern. Source: ElevenLabs best-practices doc +
+  help-center pause article. Verified 2026-05-05.
+- **No server-side cache by request hash** — confirmed via search
+  of ElevenLabs cookbook, API reference, and 2026 cheat sheet. The
+  Supabase cookbook is the canonical client-side caching pattern.
+  Source:
+  `elevenlabs.io/docs/cookbooks/text-to-speech/streaming-and-caching-with-supabase`.
+  Verified 2026-05-05.
+- **Latency / pricing** — Flash v2.5 ~75ms / $0.06 per 1k chars,
+  v3 ~1-2s / $0.12 per 1k chars, multilingual_v2 ~1-2s. Source:
+  ElevenLabs models doc + Webfuse 2026 cheat sheet. Verified
+  2026-05-05.
+- **Python SDK shape** — `ElevenLabs(api_key=...)`,
+  `client.text_to_speech.convert(voice_id, text, model_id,
+  voice_settings=VoiceSettings(stability, similarity_boost, style,
+  use_speaker_boost, speed), output_format)` returns `bytes`.
+  Source: official SDK README + Context7 mirror. Verified
+  2026-05-05.
 
 ## M18 Phase 3 — KIND_CODE / KIND_SPEC distinct render paths (deferred)
 
@@ -184,11 +319,15 @@ reality, not file-of-origin.
    dialogue routing end-to-end. Needs AJ at the keyboard.
 3. **`docs/architecture/puck-first-run-tutorial.md`** — pairs with
    the M6 player-onboarding theme. Tractable autonomously.
-4. **M6 ElevenLabs hybrid prep** — investigate response-level audio
-   caching (web-search ElevenLabs API at start), spec the per-engine
-   markup adapter, prototype voice-lab → production wiring. Don't
-   ship the actual swap until M20 + VN smoke land — character voice
-   quality matters most when the rest of the dialogue UX is dialed.
+4. **M6 ElevenLabs hybrid implementation** — spec'd 2026-05-05 (see
+   "M6 — ElevenLabs hybrid" above for adapter design, cache layer,
+   sub-task ordering). Open questions answered against ElevenLabs's
+   May 2026 docs: client-side cache (no server-side cache by request
+   hash); v3 keeps brackets, others strip; skip `<break>` everywhere
+   per ElevenLabs's own instability warning. Implementation queued;
+   production swap still gated on M20 + VN smoke landing first —
+   character voice quality matters most when the rest of the
+   dialogue UX is dialed.
 5. **M18 Phase 3 Part B** — distinct render paths for `KIND_CODE` /
    `KIND_SPEC`. Blocked on a specialist actually emitting either kind.
 6. **GUI `hosts/gui/maidens.py` dialogue dedup** — separate copy
