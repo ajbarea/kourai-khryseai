@@ -282,25 +282,21 @@ https://github.com/csteinmetz1/pyloudnorm).
 
 Foundations first because most items need the new `paths.py`:
 
-1. **Item #8 + #9 — paths + emoji map** (1 commit, paired). Create
-   `shared/src/kourai_common/paths.py` with `PROJECT_ROOT` (pyproject
-   walk-up), `assets_dir()`, `cache_dir()`, `logs_dir()`,
-   `avatars_dir(style="anime"|"vn")`, `audio_dir(kind="music"|"sfx"|"ambient"|"tts")`.
-   Migrate the 9 known callsites:
-   `hosts/cli/__main__.py:95`, `hosts/cli/maidens.py:74`,
-   `hosts/cli/settings.py:16`, `hosts/gui/maidens.py:38`,
-   `hosts/gui/loading_screen.py:35`, `hosts/gui/debug_log.py:27`,
-   `hosts/gui/emote_sfx.py:16`, `shared/src/kourai_common/log.py:75`,
-   `shared/src/kourai_common/dev_log.py:51`,
-   `shared/src/kourai_common/projects.py:31`,
-   `shared/src/kourai_common/dev_cli.py:33`. Then add
-   `EMOJI_PREFIX: dict[str, str]` and `detect_agent(text) -> tuple[str | None, str]`
-   to `kourai_common/agents.py`; CLI's `_EMOJI_TO_MAIDEN` and GUI's
-   `EMOJI_TO_AGENT` become thin wrappers around the shared map. Tests:
-   one new `tests/unit/test_paths.py` covering the walk-up under
-   simulated cwds; assertion that all asset accessors resolve to existing
-   directories. One new `tests/unit/test_emoji_prefix.py` covering
-   `detect_agent` with each agent's emoji + a no-prefix fallback.
+1. **Item #8 + #9 — paths + emoji map** ✅ shipped at TBD-after-commit.
+   `kourai_common.paths` now owns `PROJECT_ROOT` (pyproject walk-up
+   keyed off `[tool.uv.workspace]`), `assets_dir()`, `cache_dir()`,
+   `logs_dir()`, `templates_dir()`, `docs_assets_dir()`,
+   `avatars_dir(style="anime"|"vn")`,
+   `audio_dir(kind="music"|"sfx"|"ambient"|"tts")`. 11 callsites
+   migrated to import the helpers; 1 lingering host file (VN's
+   `bridge.py`) deliberately keeps its own walk-up because it runs
+   under Ren'Py-bundled Python without sys.path access to
+   `kourai_common`. `EMOJI_PREFIX` + `detect_agent` live in
+   `kourai_common.agents`; CLI's `_EMOJI_TO_MAIDEN` is now a derived
+   dict comprehension over the shared map; GUI re-exports
+   `EMOJI_TO_AGENT` and `detect_agent` from shared for back-compat.
+   Tests: `tests/unit/test_paths.py` (15 cases) and
+   `tests/unit/test_emoji_prefix.py` (6 cases). 3075/3075 unit pass.
 
 2. **Item #2 — AudioSettings** (the volume-bug fix). Create
    `shared/src/kourai_common/settings_audio.py` with a frozen

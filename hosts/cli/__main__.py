@@ -12,7 +12,6 @@ import asyncio
 import io as _io
 import secrets
 import sys
-from pathlib import Path
 from typing import Any, Literal
 from uuid import uuid4
 
@@ -62,6 +61,7 @@ from kourai_common.forge_session import ForgeSession, ForgeSessionError
 from kourai_common.llm import compact_memory
 from kourai_common.log import setup_logging
 from kourai_common.memory import list_agents_with_history
+from kourai_common.paths import PROJECT_ROOT
 from kourai_common.player import PlayerProfile, get_all_affinities
 from kourai_common.projects import derive_project_id
 from kourai_common.tts_realtime import RealtimeTTSEngine
@@ -91,8 +91,6 @@ if sys.platform == "win32" and hasattr(sys.stdout, "buffer") and "pytest" not in
 # prompt_toolkit's VT parser on Windows — writing to the real stdout
 # bypasses that entirely.  Safe because we only _echo() between prompts,
 set_raw_out(sys.stdout)
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _tier_persona_name(tier: str) -> str:

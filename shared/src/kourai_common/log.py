@@ -9,9 +9,10 @@ from __future__ import annotations
 import logging
 import os
 from logging.handlers import RotatingFileHandler
-from pathlib import Path
 
 from opentelemetry import trace
+
+from kourai_common.paths import logs_dir as _logs_dir
 
 # Libs whose INFO records are noise to an end-user — they still write to the
 # file log, just not the console. Covers httpx request logs and the a2a
@@ -71,9 +72,7 @@ class _UvicornAccessPathFilter(logging.Filter):
         return path_only not in self._paths
 
 
-# Project root — two levels up from shared/src/kourai_common/
-_PROJECT_ROOT = Path(__file__).resolve().parents[3]
-_LOGS_DIR = _PROJECT_ROOT / "logs"
+_LOGS_DIR = _logs_dir()
 
 # _WITH_TRACE renders [trace=<32-char hex>] when an OTel span is active;
 # the plain variant skips it to avoid 32 zeros of noise on non-traced

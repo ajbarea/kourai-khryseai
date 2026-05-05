@@ -5,15 +5,15 @@ Now imports from kourai_common.agents for centralized consistency.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from kourai_common.agents import (
     AGENT_METADATA,
     AGENT_QUOTES,
+    EMOJI_PREFIX,
     HANDOFF_FALLBACKS,
     HANDOFF_LINES,
     VICTORY_LINES,
 )
+from kourai_common.paths import avatars_dir
 
 # ---------------------------------------------------------------------------
 # Banner & personality
@@ -54,15 +54,11 @@ for name, face in _CLI_FACES.items():
 # Quick lookup: agent name → maiden face for inline status messages
 _MAIDEN_FACES: dict[str, str] = {name: str(m["face"]) for name, m in _MAIDENS.items()}
 
-# Map Hephaestus executor emojis → maiden faces for status message replacement
+# Map Hephaestus executor emojis → (agent_name, maiden face).
+# Derived from kourai_common.agents.EMOJI_PREFIX so a new agent's emoji
+# shows up here automatically; the face comes from _MAIDEN_FACES above.
 _EMOJI_TO_MAIDEN: dict[str, tuple[str, str]] = {
-    "\U0001f525": ("hephaestus", _MAIDEN_FACES.get("hephaestus", "")),
-    "\U0001f4d0": ("metis", _MAIDEN_FACES.get("metis", "")),
-    "\u2699\ufe0f": ("techne", _MAIDEN_FACES.get("techne", "")),
-    "\u2699": ("techne", _MAIDEN_FACES.get("techne", "")),
-    "\U0001f9ea": ("dokimasia", _MAIDEN_FACES.get("dokimasia", "")),
-    "\u2728": ("kallos", _MAIDEN_FACES.get("kallos", "")),
-    "\U0001f4dc": ("mneme", _MAIDEN_FACES.get("mneme", "")),
+    emoji: (name, _MAIDEN_FACES.get(name, "")) for emoji, name in EMOJI_PREFIX.items()
 }
 
 # Handoff and Victory lines now use centralized lists (mapped to CLI names)
@@ -71,4 +67,4 @@ _HANDOFF_GENERIC = HANDOFF_FALLBACKS
 _VICTORY_LINES = VICTORY_LINES
 
 # Asset directory for golden maiden portraits
-_ASSETS_DIR = Path(__file__).resolve().parents[2] / "assets" / "avatars" / "anime"
+_ASSETS_DIR = avatars_dir()  # default style: anime

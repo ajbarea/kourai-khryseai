@@ -35,11 +35,13 @@ import shutil
 import subprocess
 import sys
 import time
-from pathlib import Path
 from typing import IO, TYPE_CHECKING, TypedDict
+
+from kourai_common.paths import PROJECT_ROOT as ROOT, logs_dir as _logs_dir
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from pathlib import Path
 
 
 class StepRecord(TypedDict):
@@ -48,8 +50,7 @@ class StepRecord(TypedDict):
     elapsed: float
 
 
-ROOT = Path(__file__).resolve().parents[3]
-LOGS_DIR = ROOT / "logs"
+LOGS_DIR = _logs_dir()
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 SESSION_ENV = "KOURAI_DEV_SESSION"
 

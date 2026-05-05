@@ -8,12 +8,13 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import asdict, dataclass
-from pathlib import Path
+
+from kourai_common.paths import cache_dir
 
 logger = logging.getLogger(__name__)
 
 # Settings file location: project_root/.cache/cli_settings.json
-_SETTINGS_FILE = Path(__file__).resolve().parents[2] / ".cache" / "cli_settings.json"
+_SETTINGS_FILE = cache_dir() / "cli_settings.json"
 
 
 @dataclass

@@ -19,12 +19,13 @@ from __future__ import annotations
 
 import math
 import random
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pygame
 import pygame.freetype
 from PIL import Image as PILImage
+
+from kourai_common.paths import docs_assets_dir
 
 from .constants import DARK_BG, GOLD, GOLD_BRIGHT, GOLD_DIM
 
@@ -32,7 +33,7 @@ if TYPE_CHECKING:
     from collections.abc import Generator
 
 # Path to the splash image
-_SPLASH_IMAGE = Path(__file__).resolve().parents[2] / "docs" / "assets" / "golden-maidens.png"
+_SPLASH_IMAGE = docs_assets_dir() / "golden-maidens.png"
 
 # Timing constants (seconds)
 _CARD_FADE_IN = 1.2

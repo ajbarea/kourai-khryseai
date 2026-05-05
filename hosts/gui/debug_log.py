@@ -16,15 +16,16 @@ import logging
 from collections import deque
 from dataclasses import dataclass, field
 from logging.handlers import RotatingFileHandler
-from pathlib import Path
 
 import pygame
+
+from kourai_common.paths import logs_dir
 
 from .constants import FONT_AGENT, FONT_TITLE, theme
 from .maidens import AGENTS
 
 # GUI-side file logger — writes everything the player sees in the debug panel
-_LOGS_DIR = Path(__file__).resolve().parents[2] / "logs"
+_LOGS_DIR = logs_dir()
 _gui_file_logger: logging.Logger | None = None
 
 

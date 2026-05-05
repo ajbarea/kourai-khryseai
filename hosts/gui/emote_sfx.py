@@ -8,12 +8,17 @@ from __future__ import annotations
 
 import logging
 import re
-from pathlib import Path
+from typing import TYPE_CHECKING
+
+from kourai_common.paths import audio_dir
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 # Root directory for SFX assets
-_SFX_DIR = Path(__file__).parent.parent.parent / "assets" / "audio" / "sfx"
+_SFX_DIR = audio_dir(kind="sfx")
 
 # Pattern for emote cues: *action text*
 _EMOTE_RE = re.compile(r"\*([^*]+)\*")

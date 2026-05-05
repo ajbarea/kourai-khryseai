@@ -301,3 +301,36 @@ VICTORY_LINES: dict[str, list[str]] = {
         "Documented and immortalized. Your legacy is in good hands, darling~",
     ],
 }
+
+# --- Emoji prefix routing ---
+#
+# Hephaestus emits status messages prefixed with an agent emoji
+# (\U0001f525 hephaestus, \U0001f4d0 metis, ⚙ techne, etc.).
+# CLI's _maidenify_status (hosts/cli/events.py) and GUI's queue handler
+# (hosts/gui/queue_event_handler.py) both branch on this prefix to decide
+# the speaker. ⚙ appears bare AND with the FE0F variation selector — list
+# both, since Hephaestus's emit varies by surface.
+
+EMOJI_PREFIX: dict[str, str] = {
+    "\U0001f525": "hephaestus",  # 🔥
+    "\U0001f4d0": "metis",  # 📐
+    "⚙️": "techne",  # ⚙ + variation selector
+    "⚙": "techne",  # ⚙ bare
+    "\U0001f9ea": "dokimasia",  # 🧪
+    "✨": "kallos",  # ✨
+    "\U0001f4dc": "mneme",  # 📜
+}
+
+
+def detect_agent(text: str) -> tuple[str | None, str]:
+    """Identify the speaker from an emoji-prefixed status string.
+
+    Returns ``(agent_name, cleaned_text)`` when the leading emoji matches
+    a known agent, ``(None, original_text)`` otherwise. Leading whitespace
+    before the emoji is tolerated; trailing whitespace after the strip is.
+    """
+    stripped = text.lstrip()
+    for emoji, name in EMOJI_PREFIX.items():
+        if stripped.startswith(emoji):
+            return name, stripped.replace(emoji, "", 1).strip()
+    return None, text
