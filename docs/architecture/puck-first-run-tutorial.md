@@ -1,8 +1,15 @@
 # Puck-Led First-Run Tutorial — Design Spec
 
-**Status:** Working doc · not committed · superseded once implementation lands
-**Scope:** CLI host only (`hosts/cli/onboarding.py`). GUI and VN are explicit follow-ups.
-**Author:** AJ + Claude · 2026-04-24
+> Status: spec'd 2026-04-24 · implementation queued · pairs with M6
+> ElevenLabs hybrid (first-run voice quality is the load-bearing
+> impression — better to land M6 prosody before tutorial wide-release)
+>
+> Scope: CLI host only (`hosts/cli/onboarding.py`). GUI and VN are
+> explicit follow-ups.
+>
+> Cross-referenced 2026-05-05 against current May 2026 best practice
+> for AI/CLI onboarding (progressive disclosure, in-fiction integration,
+> ask-before-destructive). Spec's design moves still hold.
 
 ---
 
@@ -191,7 +198,12 @@ Each gets its own spec when its turn comes:
 2. **GUI port of this tutorial** — `hosts/gui/onboarding_ui.py` (611 lines today) gets the same beat structure with pygame-rendered dialogue.
 3. **VN port of this tutorial** — Ren'Py scene with Puck sprite, forge background, Hephaestus reveal via sprite-swap. The flagship visual treatment of the flight scene.
 4. **Shared-layer cleanup** from the parity audit:
-   - GUI's duplicate inline handoff dict in `hosts/gui/maidens.py` → import from shared
+   - ~~GUI's duplicate inline handoff dict in `hosts/gui/maidens.py` →
+     import from shared~~ — **closed by
+     [#161](https://github.com/ajbarea/kourai-khryseai/pull/161)**
+     (2026-05-05). GUI's `maidens.py` now imports from
+     `kourai_common.agents` and synthesises the legacy `AGENTS` dict
+     from a local color map.
    - `GOSSIP_HINTS` relocation: `agents/vn_bridge.py:72-83` → `shared/`
    - TTS voice config consolidation: GUI's `hosts/gui/tts_helper.py` and shared's `tts_backend.py` → one source of truth
 
