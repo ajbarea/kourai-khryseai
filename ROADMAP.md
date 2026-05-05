@@ -5,7 +5,7 @@ A public, living plan for where the forge is heading. Items here are either
 *currently working on* lives in [IMPL.md](./IMPL.md) — when it lands, the
 matching milestone here collapses to a single line under "Shipped".
 
-Last reviewed: 2026-05-03. Active focus: **M6 ElevenLabs hybrid as pre-player-release blocker** (promoted 2026-05-03 after walking back the M18 Phase 2 SSML investment — ElevenLabs v3's actual May 2026 docs don't support SSML break tags, so the producer-side SSML markup was wrong for the M6 target; see Shipped log entry for #152). See [IMPL.md](./IMPL.md) for the active work, the open invariants, and the priority-ordered "Up next" list. Pre-release perfection stance unchanged: May 2026 best practice no matter the cost, **web-search the SPECIFIC target's primary docs at the planning step** (not just at implementation), architectural fix over expedient patch. Sister-repo audit weekly cron runs Mondays 12:00 UTC.
+Last reviewed: 2026-05-05. Active focus: **M6 ElevenLabs hybrid as pre-player-release blocker** (promoted 2026-05-03 after walking back the M18 Phase 2 SSML investment — ElevenLabs v3's actual May 2026 docs don't support SSML break tags, so the producer-side SSML markup was wrong for the M6 target; see Shipped log entry for #152). See [IMPL.md](./IMPL.md) for the active work, the open invariants, and the priority-ordered "Up next" list. Pre-release perfection stance unchanged: May 2026 best practice no matter the cost, **web-search the SPECIFIC target's primary docs at the planning step** (not just at implementation), architectural fix over expedient patch. Sister-repo audit weekly cron runs Mondays 12:00 UTC.
 
 ---
 
@@ -670,6 +670,51 @@ architectural moves; valuable but not the first lift.
 One-line per item, newest first. Detail moves to git history when work
 lands — these docs are plans + scratchpad, not a historical archive.
 
+- 2026-05-05 — **GUI synthesis indicator via `TypewriterManager.set_pending_audio`** [#166].
+  Companion to #165's CLI indicator. The GUI's audio-led word-paced
+  typewriter sat at `displayed_chars=0` for ~3s on Kokoro CPU between
+  dialogue arrival and the first `on_word` fire — dialogue panel showed
+  agent name + portrait above an empty body during synthesis, looked
+  frozen. `TypewriterManager` gains a pending-audio mode: `set_pending_audio()`
+  arms a single-ellipsis placeholder rendered by both `get_displayed_text()`
+  and `update(dt)` while `displayed_chars == 0`; cleared by
+  `clear_pending_audio()` (called from the engine's `on_audio_start`
+  trampoline), `advance_word` (first word arrives), `flush_remaining`,
+  or `reset`. `QueueEventHandler._on_tts_audio_start` flipped from
+  no-op to clear the placeholder; `_add_with_word_paced_typewriter`
+  arms it after `start_word_paced` (order matters — `set_pending_audio`
+  no-ops outside word-paced mode). Motion-sensitivity respected
+  (full text revealed at start, no placeholder swap). Tests: 12 new
+  (9 typewriter unit + 3 queue-handler integration). VN equivalent
+  still pending; needs live-smoke validation alongside the existing
+  cps-driven typewriter race work.
+- 2026-05-05 — **CLI synthesis indicator during ~3s Kokoro wait window** [#165].
+  Audio-led karaoke path left stdout blank for ~3s on Kokoro CPU
+  between dialogue arrival and `on_audio_start` firing — player had no
+  visible feedback that the agent was about to speak. Pre-renders
+  `Name face …` (dim ellipsis) before `await tts.speak(...)`; `_open_karaoke`
+  wipes it via CR + erase-line ANSI before opening the karaoke header,
+  and the Tier 2 fallback finally-block does the same wipe before
+  echoing the box. New helpers `synthesis_indicator` /
+  `synthesis_indicator_clear` in `hosts/cli/rendering.py`. Indicator
+  path gates on the same `will_display and will_speak and audio_led`
+  predicate as the karaoke render — captions-off audio-only and
+  instant mode both skip it (no synthesis-wait gap to fill). Tests:
+  9 new (4 helper unit + 5 streaming integration). `research(2026-05)`
+  cited: callback-on-stream-begin + cleared-on-first-audio is the
+  convergent pattern across Hermes-agent display reporting and
+  RealtimeTTS reference; matches the `on_audio_start` trampoline
+  already plumbed through the engine in #156.
+- 2026-05-05 — **Cleared 3 pre-existing zensical build warnings** [#164].
+  Mechanical drift sweep covering issues surfaced during last session's
+  #162 Puck-tutorial nav-add work but consciously left for a separate
+  PR. `puck-first-run-tutorial.md:174` escaped `**\[0\]**` settings-
+  menu callout (was parsed as link reference). `configuration.md:305`
+  retargeted stale `gui.md#text-to-speech-system-` anchor to current
+  slug `#text-to-speech` (heading shortened in earlier docs cleanup).
+  `vn.md:89` escaped `\[status\]` placeholder in screen-display table
+  cell (also a link-reference parse). `uv run zensical build --clean`
+  now reports "No issues found" (was "3 issues found").
 - 2026-05-05 — **Puck tutorial spec polish + zensical nav add** [#162].
   The `docs/architecture/puck-first-run-tutorial.md` spec was orphaned
   from zensical nav and had stale "not committed" header framing. Status
