@@ -183,7 +183,7 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
                     await self._cancel_metis(metis_task)
                     chat_body = pipeline.removeprefix("CHAT:").strip()
                     # Check for agent-directed chat: "CHAT:kallos: ..."
-                    # Includes companion spirits puck and cupid
+                    # Includes companion spirits puck, cupid, aidos, aletheia.
                     target_agent = None
                     for agent_name in (
                         "metis",
@@ -193,6 +193,8 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
                         "mneme",
                         "puck",
                         "cupid",
+                        "aidos",
+                        "aletheia",
                     ):
                         prefix = f"{agent_name}:"
                         if chat_body.lower().startswith(prefix):
