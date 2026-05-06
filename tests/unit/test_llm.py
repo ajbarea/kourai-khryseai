@@ -217,6 +217,54 @@ class TestManageMemory:
         mock_mark.assert_called_once()
 
     @pytest.mark.asyncio
+    async def test_summarization_pinned_to_cheap_tier(self):
+        """Summarization is a quick auxiliary call — Anthropic's own
+        context-compaction cookbook recommends Haiku for the compaction
+        sub-call (5× cheaper than Opus, sufficient for "summarize this"
+        extraction). research(2026-05): mirrors M14 metis.discuss_tradeoffs
+        cheap-tier pin pattern; same intent — quick auxiliary call should
+        not run on the agent's primary tier just because the agent does."""
+        msgs = [{"role": "user", "content": f"msg {i}"} for i in range(8)]
+        mock_state = {"semantic_summary": ""}
+        captured: dict = {}
+
+        async def _fake_exec(timeout_seconds, **kwargs):
+            captured["model"] = kwargs.get("model")
+            result = MagicMock()
+            result.choices = [MagicMock(message=MagicMock(content="ok"))]
+            return result
+
+        # Keep KOURAI_MODEL_TIER unset / set to "smart" so we'd otherwise
+        # resolve metis to Opus. The cheap-tier pin must override regardless.
+        import os
+
+        original_tier = os.environ.get("KOURAI_MODEL_TIER")
+        os.environ["KOURAI_MODEL_TIER"] = "smart"
+        try:
+            with (
+                patch("kourai_common.llm.get_unsummarized_messages", return_value=msgs),
+                patch("kourai_common.llm.get_max_unsummarized_idx", return_value=8),
+                patch("kourai_common.llm.get_agent_state", return_value=mock_state),
+                patch("kourai_common.llm._execute_completion", new=_fake_exec),
+                patch("kourai_common.llm.save_agent_state"),
+                patch("kourai_common.llm.mark_messages_summarized"),
+            ):
+                from kourai_common.llm import _manage_memory
+
+                await _manage_memory("ctx-1", "metis")
+        finally:
+            if original_tier is None:
+                os.environ.pop("KOURAI_MODEL_TIER", None)
+            else:
+                os.environ["KOURAI_MODEL_TIER"] = original_tier
+
+        # Resolved model must be the Haiku-class cheap tier, not Opus —
+        # even when the surrounding env says smart.
+        assert captured["model"] == "anthropic/claude-haiku-4-5-20251001", (
+            f"summarization should pin to cheap tier, got {captured['model']}"
+        )
+
+    @pytest.mark.asyncio
     async def test_force_returns_zero_when_too_few_messages(self):
         """No-op even with force=True when there aren't enough messages
         to keep the "last 2 unsummarized" buffer plus anything to fold."""

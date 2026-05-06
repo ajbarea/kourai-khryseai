@@ -338,6 +338,21 @@ opts into emitting these kinds.
   TTL upgrade for the static block (web-search-confirmed Anthropic
   May-2026 best practice for long interactive sessions); collapses to
   one-liner under "Shipped" once the PR merges.
+- **Server-side conversation compaction (Anthropic Opus 4.6+ feature).**
+  Anthropic's 2026-05 cookbook recommends server-side compaction over
+  manual `_manage_memory`-style summarization for Opus 4.6+ — handles
+  context-window management automatically without SDK-level config.
+  Available via `client.beta.messages.tool_runner` with
+  `compaction_control={"enabled": True, "context_token_threshold": ...}`.
+  Migration would be a multi-PR refactor: 1) verify LiteLLM passes through
+  the relevant beta header (uncertain — the feature is Anthropic-specific
+  and LiteLLM's coverage of `client.beta.messages` extensions is
+  inconsistent), 2) dual-provider design (Anthropic uses server-side,
+  Gemini/Ollama keep manual), 3) the existing `_manage_memory` becomes
+  the fallback. File for later when there's a caller / pain point —
+  current cheap-tier pin (#180) covers ~80% of the cost win without the
+  refactor risk. Source:
+  platform.claude.com/cookbook/tool-use-automatic-context-compaction.
 - **Sisters audit weekly cron** (`trig_013uP9ryCLYscBKS7X6PB5og`,
   Mondays 12:00 UTC) opens drift PRs and a rollup issue automatically.
 - **Issue #126 auto-rescan** (`.github/workflows/issue-126-rescan.yml`)
