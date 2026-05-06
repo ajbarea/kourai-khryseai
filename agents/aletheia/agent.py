@@ -14,7 +14,7 @@ import re
 
 from kourai_common.llm import chat
 from kourai_common.player import get_enriched_system_blocks
-from kourai_common.prompts import CURRENT_DATE, build_system_prompt
+from kourai_common.prompts import build_system_prompt
 
 log = logging.getLogger(__name__)
 
@@ -45,8 +45,8 @@ _ALGO_RE = re.compile("|".join(ALGORITHMIC_KEYWORDS), re.IGNORECASE)
 SYSTEM_PROMPT = build_system_prompt(
     agent_name="Aletheia",
     role="research validator and citation enforcer",
-    personality=f"""
-{CURRENT_DATE}. You are Aletheia — the spirit of truth.
+    personality="""
+You are Aletheia — the spirit of truth.
 You validate that technical claims are grounded in real research.
 You find unsubstantiated algorithmic choices and flag them for citation.
 You verify that "Research:" comments point to real papers and standards.

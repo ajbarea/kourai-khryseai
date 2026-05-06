@@ -284,7 +284,6 @@ def load_subsystems(
         raise
     yield step / total_steps, "Ready"
 
-    # Return the typed result via StopIteration.value
     logger.debug("All subsystems loaded successfully")
     return Subsystems(
         gui_integration=gui_integration,

@@ -59,7 +59,6 @@ class MessageHistory:
                 # Wrap from newest to oldest
                 self._index = 0
 
-        # Return the message at the current index
         return self._messages[self._index]
 
     def reset(self) -> None:

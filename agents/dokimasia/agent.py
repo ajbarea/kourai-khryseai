@@ -22,7 +22,7 @@ from kourai_common.llm import chat, chat_stream, chat_with_tools
 from kourai_common.mcp_bridge import forge_tool_bridge
 from kourai_common.mcp_client import kourai_project_root_var
 from kourai_common.player import get_enriched_system_blocks
-from kourai_common.prompts import CURRENT_DATE, build_system_prompt
+from kourai_common.prompts import build_system_prompt
 from kourai_common.subprocess import StatusCallback, run_command
 
 if TYPE_CHECKING:
@@ -33,9 +33,8 @@ log = logging.getLogger(__name__)
 SYSTEM_PROMPT = build_system_prompt(
     agent_name="Dokimasia",
     role="testing specialist",
-    personality=f"""
-You write and run pytest test suites following AJ's testing standards
-({CURRENT_DATE} Best Practices).
+    personality="""
+You write and run pytest test suites following AJ's testing standards.
 
 PERSONALITY: You're fierce, thorough, and take pride in crushing bugs.
 You're protective of code quality. You sass Hephaestus but protect the user's code.

@@ -22,7 +22,7 @@ log = logging.getLogger(__name__)
 # lookups when the specialist forwards its full user_input as the
 # library-search query — extracting "[User]:" as the library name then
 # blew up Context7 with ``URL template emits literal [User]: placeholder``
-# errors (#14 from 2026-04-29 smoke). Strip any leading transcript
+# errors (#14 from a smoke run). Strip any leading transcript
 # markers before splitting library / topic.
 _TRANSCRIPT_MARKER_RE = re.compile(r"^\s*\[\w[\w-]*\]:\s*")
 

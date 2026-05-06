@@ -1,5 +1,5 @@
-# Defines the multi-agent application infrastructure and components.
-# Adheres to best practices: common anchors, explicit dependency management, and healthchecks.
+# Multi-agent stack: shared YAML anchors, explicit depends_on graph,
+# per-service healthchecks. See docker/ for per-image Dockerfiles.
 
 # ----------------------------------------------------------------------
 # EXTENSION FIELDS (Anchors)
@@ -675,10 +675,9 @@ services:
       # Kokoro model + RealtimeTTS pipeline init in vn_bridge's lifespan
       # routinely takes 45-60s on first boot (PyTorch RNN/weight_norm setup
       # + HF model fetch on cold cache). 30s clipped this and triggered a
-      # restart loop on fresh rebuilds. 90s aligns with the April 2026
-      # FastAPI/Starlette best practice for ML-serving containers (start
-      # period covers model load; per-check `interval` + `retries` still
-      # catches genuine wedges within ~45s post-warm-up).
+      # restart loop on fresh rebuilds. 90s start_period covers model load;
+      # per-check `interval` + `retries` still catch genuine wedges within
+      # ~45s post-warm-up.
       start_period: 90s
       retries: 3
     deploy:
@@ -686,8 +685,8 @@ services:
         limits:
           # Kokoro 82M weights are ~1GB at FP16; RealtimeTTS + PyTorch
           # runtime adds CUDA/CPU kernels and buffers totalling 2-3GB
-          # during inference (per HF model card + April 2026 deployment
-          # guides). The legacy 512M limit was sized for edge-tts
+          # during inference (per HF model card + ML-serving deployment
+          # guidance). The legacy 512M limit was sized for edge-tts
           # (no model load) and silently truncated Kokoro's lifespan
           # init on M19 Phase 3 — Python exited 0 mid-load with no
           # OOM-kill signal, hiding the cause behind a restart loop.

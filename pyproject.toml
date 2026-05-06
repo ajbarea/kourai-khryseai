@@ -75,7 +75,7 @@ select = [
     "N",     # PEP 8 naming conventions
     "PIE",   # Misc lints (flake8-pie)
     "FURB",  # Modernization (refurb)
-    "LOG",   # Logging best practices
+    "LOG",   # Logging conventions (flake8-logging)
     "TCH",   # TYPE_CHECKING imports (runtime perf)
     "FLY",   # f-string conversion (flynt)
 ]

@@ -172,7 +172,7 @@ def update_virtue(player_id: str, virtue_key: str, delta: float) -> float:
     function logs a warning and returns the current/default score
     WITHOUT raising. Virtue tracking is bookkeeping; a perms hiccup
     must not abort an otherwise-successful pipeline run, which is what
-    bit dokimasia in the 2026-05-01 smoke.
+    bit dokimasia in an earlier smoke.
     """
     if virtue_key not in FORGE_VIRTUES:
         log.warning("Unknown virtue key: %s", virtue_key)

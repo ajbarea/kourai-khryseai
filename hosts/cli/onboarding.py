@@ -120,13 +120,11 @@ def run_onboarding() -> PlayerProfile:
     _echo(f"  {_ITALIC}The Golden Maidens wish to know their new commander.{_RESET}")
     _echo("")
 
-    # Step 1: Name
     _echo(f"  {_BOLD}What shall the maidens call you?{_RESET}")
     display_name = _input(f"  {_GOLD}Name>{_RESET} ")
     if not display_name:
         display_name = "Commander"
 
-    # Step 2: Pronunciation
     _echo("")
     _echo(f"  {_DIM}The maidens will speak your name aloud via TTS.{_RESET}")
     _echo(f"  {_DIM}If your name has an unusual pronunciation, type how it SOUNDS.{_RESET}")
@@ -163,7 +161,6 @@ def run_onboarding() -> PlayerProfile:
     _echo("")
     _echo(f'  {_CYAN}Puck:{_RESET} {_ITALIC}"{_puck_handoff_line(role)}"{_RESET}')
 
-    # Create and save profile
     profile = PlayerProfile(
         display_name=display_name,
         tts_name=tts_name,

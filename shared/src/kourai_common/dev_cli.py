@@ -252,7 +252,7 @@ TASK_GROUPS: tuple[tuple[str, tuple[tuple[str, Task], ...]], ...] = (
             (
                 "upgrade",
                 Task(
-                    description="Update all dependencies to latest versions",
+                    description="Update all dependencies",
                     command_factory=lambda: python_script("scripts", "upgrade.py"),
                 ),
             ),

@@ -271,9 +271,9 @@ class RealtimeTTSEngine:
         handler is mutated by :meth:`speak` and cleared in finally.
 
         ``word`` is a ``RealtimeTTS.engines.base_engine.TimingInfo`` instance
-        with at least a ``.word`` attribute (string). Per the May 2026
-        RealtimeTTS docs, fires AT PLAYBACK TIME for English voices of
-        ``KokoroEngine`` — the karaoke-reveal primitive for Tier 1.
+        with at least a ``.word`` attribute (string). Per the RealtimeTTS
+        docs, fires AT PLAYBACK TIME for English voices of ``KokoroEngine``
+        — the karaoke-reveal primitive for Tier 1.
         """
         for cb in (self._on_word_static, self._on_word_current):
             if cb is None:

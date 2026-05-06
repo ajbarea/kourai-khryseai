@@ -1,4 +1,4 @@
-"""Per-session token usage accumulator + April 2026 pricing constants.
+"""Per-session token usage accumulator + pricing constants.
 
 Surfaces what every ``chat()`` / ``chat_with_tools()`` call costs so
 the CLI's ``/usage`` slash command can show a per-agent breakdown

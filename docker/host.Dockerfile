@@ -14,7 +14,7 @@
 #
 # research(2026-05): wolfi-base over cgr.dev/chainguard/python — the free
 # public-tier python image's :latest-dev tag tracks the newest Python
-# (3.14 as of 2026-05) and our pyproject pins requires-python <3.14.
+# while our pyproject pins requires-python <3.14.
 # Pinning to python-3.12 via apk on wolfi-base gives a stable 3.12.x
 # without paying for Chainguard's pinned-version tier. Also keeps a
 # shell + git + curl at runtime that distroless :latest doesn't ship.
