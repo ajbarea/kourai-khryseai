@@ -323,7 +323,7 @@ Foundations first because most items need the new `paths.py`:
    stay local but use the same `OnboardingChoice` schema. Bundles
    item #10 (intra-CLI ANSI re-import). 6 new tests; 3087/3087 pass.
 
-4. **Item #1 — demo script as data** ✅ shipped at TBD-after-commit.
+4. **Item #1 — demo script as data** ✅ shipped at cd85892.
    `kourai_common.demo_script` owns `DemoTurn(speaker, kind, text,
    pacing_ms)` and `DemoChoice(key, label, aliases, response_turns)`
    plus `CSV_DEMO_TRIGGER`, `CSV_DEMO_TURNS` (the 7-beat Hephaestus
@@ -338,32 +338,31 @@ Foundations first because most items need the new `paths.py`:
    script-time without bridge gymnastics. 11 new tests; 3098/3098
    unit pass.
 
-5. **Item #4 — emote SFX engine**. Move `extract_emotes()` and
-   `resolve_sfx()` from `hosts/gui/emote_sfx.py` to
-   `kourai_common/emote_sfx.py`. The keyword → SFX-category map is
-   pure data. Keep host-specific playback bindings in each host
-   (pygame channel for GUI, no-op for CLI today, `renpy.sound.play`
-   for VN if a future surface wants it). Re-export the moved symbols
-   from the GUI module for back-compat.
+5. **Items #4 / #5 / #6 / #7 — pure-logic GUI extractions** ✅ shipped
+   in one rollup commit (TBD-after-commit). Four mechanical moves of
+   pure-logic modules from `hosts/gui/` to `shared/src/kourai_common/`,
+   each leaving the GUI module as a thin re-export shim so existing
+   GUI imports + tests keep working unchanged:
+   - `kourai_common/emote_sfx.py` — `extract_emotes`, `resolve_sfx`,
+     `_KEYWORD_MAP`, `_EMOTE_RE`. Host-specific `play_emote_sfx`
+     stays in GUI (pygame AudioManager dependency).
+   - `kourai_common/audio_dsp.py` — `AudioMetrics`, `AudioNormalizer`,
+     `AudioFadeEffect`, `AudioVisualizer`, `PersonalityAudioProfile`,
+     `AGENT_PROFILES`. Behavior preserved exactly; pyloudnorm
+     migration filed as follow-up below.
+   - `kourai_common/dialogue_pacing.py` — `PacingMode` enum,
+     `PacingConfig` dataclass, `DialoguePacer`. Pure timing.
+   - `kourai_common/message_classifier.py` — `is_system_status` and
+     `is_scratchpad_content` (pure regex with `emoji.replace_emoji`
+     pre-strip).
 
-6. **Item #5 — audio DSP**. Move `AudioMetrics`, `AudioNormalizer`,
-   `AudioFadeEffect`, `AudioVisualizer`, `PersonalityAudioProfile` from
-   `hosts/gui/audio_utils.py` to `kourai_common/audio_dsp.py`. Add
-   `numpy>=1.26` to `shared/pyproject.toml` deps (already in GUI deps).
-   **Behavior preserved**: keep the hand-rolled LUFS approximation
-   as-is. `research(2026-05)`: pyloudnorm is the canonical
-   ITU-R BS.1770-4 implementation but migrating is a behavior change
-   (different LUFS readings, possibly different normalization
-   adjustments) — separate decision filed below as follow-up.
-
-7. **Item #6 — dialogue pacing**. Move `PacingMode` enum + `PacingConfig`
-   dataclass from `hosts/gui/dialogue_pacing.py` to
-   `kourai_common/dialogue_pacing.py`. Pure timing logic, no GUI deps.
-
-8. **Item #7 — message classifier**. Move pure regex functions from
-   `hosts/gui/message_classifier.py` to
-   `kourai_common/message_classifier.py`. Add `emoji>=2.15` to
-   `shared/pyproject.toml` deps. Update GUI imports.
+   Shared deps gained `numpy>=1.26` and `emoji>=2.15.0`.
+   `tests/unit/test_gui_pure_logic.py` patch targets repointed from
+   `hosts.gui.dialogue_pacing.asyncio.sleep` to
+   `kourai_common.dialogue_pacing.asyncio.sleep` — the actual lookup
+   site for the awaited call. `tests/unit/test_shared_emote_sfx.py`
+   added (5 cases) covering the moved logic against canonical asset
+   paths. 3103/3103 unit pass.
 
 9. **Item #10 — CLI styling re-import** ✅ shipped with item #3 (same
    file touched, same commit).

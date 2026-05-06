@@ -27,6 +27,13 @@ dependencies = [
     # it as of 2026-05 — module-level patch is deprecated but the
     # safe parser classes stay).
     "defusedxml>=0.7.1",
+    # Pulled in by the cross-host DRY sweep (May 2026):
+    # kourai_common.audio_dsp uses numpy for normalization / fades / waveform
+    # extraction (was GUI-only at hosts/gui/audio_utils.py).
+    # kourai_common.message_classifier strips emoji before regex-classifying
+    # status text (was GUI-only).
+    "numpy>=1.26",
+    "emoji>=2.15.0",
 ]
 
 [project.scripts]
