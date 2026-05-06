@@ -288,27 +288,6 @@ opts into emitting these kinds.
     style; full migration would touch settings persistence,
     slash-command panels, and tests. File when a settings-validation
     pain point surfaces.
-  - **VN companion-spirits brightening (deferred from agent-color
-    follow-up).** The agent-color drift's safe slice shipped as a
-    separate PR: `hex_color` + `rgb` keys re-added to all 8 agents
-    in `AGENT_METADATA` (the GUI's warm-gold palette for the 6
-    maidens, Okabe-Ito CVD-safe for puck/cupid), GUI's
-    `_AGENT_COLORS` derived from shared, stale comment in
-    `script_data.rpy:87` corrected (the colors mentioned there are
-    Sophia/Arete/Mneia *virtue* accents from
-    `screens_relationships.rpy:103,111,119`, not maiden colors).
-    The VN's hardcoded `_puck_color = "#7FBC8C"` and
-    `_cupid_color = "#E8728C"` (15+ sites in
-    `screens_relationships.rpy` and `screens_companion_spirits.rpy`,
-    including alpha-suffixed `#E8728C44 / #E8728C33 / #E8728C66`
-    variants for hover backgrounds) stayed put — `#7FBC8C` is
-    roughly `_bright_hex(AGENT_COLORS["puck"])` (same hue, brighter
-    L), but `#E8728C` is a *different hue* than canonical cupid
-    `#D55E00` (rose vs vermillion-orange) and looks intentional
-    for the companion-spirits surface. Replacing the literals with
-    `_bright_hex(AGENT_COLORS[name])` calls needs live VN smoke to
-    confirm the substitution reads on the parchment background and
-    the cupid swap doesn't lose tonal intent. AJ at the keyboard.
 
 ## Up next — priority order
 
