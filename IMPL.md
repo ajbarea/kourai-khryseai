@@ -6,16 +6,65 @@ to a one-liner under "Shipped" and this file resets to the next milestone.
 Git history is the archive — these docs are plans + scratchpad, not a
 historical record.
 
-Updated: 2026-05-06 · Active focus: **M6 ElevenLabs hybrid** is the
-pre-player-release blocker. Sub-task 2 (audio cache layer) shipped under
-Kokoro [#174]; sub-tasks 1/3/4/5 (markup adapter / SDK integration /
-production swap / per-persona prosody) gate on M20 + VN smoke landing
-first — character voice quality is most visible against a polished
-dialogue UX. Same-turn polish that's not blocking M6: the
-self-contained-workable bucket below (Puck Slice 2 helper, cross-host
-pipeline-status / status-feed / gossip-render / codex). Pre-release
-perfection stance: no workarounds, web-search May 2026 best practice
-**at the planning step**, architectural fix over expedient patch.
+Updated: 2026-05-06 · Active focus pivoted to **NE AI Agents Day 2026
+poster prep** (May 8, Jane Street NYC; one of 55 posters, title
+"Kourai Khryseai: Transparent Human-on-the-Loop Multi-Agent Software
+Development"). The realistic review surface is QR-code-driven repo
+browsing, not a live demo — so the next 48 hours go to: clean
+README + getting-started, slop-free comments and docstrings, a
+fresh-clone path that actually works. Once Friday is past, focus
+returns to **M6 ElevenLabs hybrid** (sub-task 2 audio cache layer
+shipped [#174]; sub-tasks 1/3/4/5 still gate on M20 + VN smoke).
+
+Pre-release perfection stance unchanged: no workarounds, web-search
+current best practice **at the planning step**, architectural fix
+over expedient patch.
+
+## Pre-presentation hygiene (next 48h)
+
+Concrete blocker list for the QR-code reviewer experience.
+
+### Shipped today
+
+- **Docker runtime image fix** [#182]. `kourai_common.paths` walks for
+  the workspace pyproject; runtime stage didn't ship it. All 10 agents
+  plus vn-bridge crash-looped at import (11 Python services total).
+  One-line `COPY` in the runtime stage.
+- **ROADMAP Shipped section collapsed to one-liners** [#183]. 959 →
+  811 lines. Per the section's own header convention.
+- **Pre-presentation slop sweep + doc-accuracy fixes** [#184 — open].
+  4 parallel deslop subagents. ~30 high-confidence edits: dropped
+  `{CURRENT_DATE} Best Practices` template prefix from 9 agent prompts,
+  stripped floating `April 2026` / `as of 2026-05` markers from
+  shared/ + scripts/ + docker-compose / Dockerfile / Makefile /
+  pyproject. Plus README + getting-started accuracy: wrong agent count
+  ("6 agents" → 11), wrong clone target dir (underscore → hyphen),
+  outdated VN launch instructions referencing a vendored SDK path that
+  doesn't exist in-repo.
+
+### Open before Friday
+
+- **Hephaestus aiohttp `TimeoutError` on M14 parallel routing.** Smoke
+  on 2026-05-06 sent `"hi dokimasia, are you there?"` to hephaestus;
+  HTTP 200 SSE opened but body never streamed. Container logs show
+  `_execute_completion failed (attempt 2), retrying in 4.4s:
+  TimeoutError`. Network from inside the container reaches
+  `api.anthropic.com` cleanly via `urllib`; the hang is at the LiteLLM
+  + aiohttp transport layer specifically. Retry logic IS firing — so
+  the system is resilient, just slow. **Not a presentation blocker
+  since AJ isn't live-demoing**, but a real DX bug. File a GitHub
+  issue with reproduction + log capture; investigate after Friday.
+- **`docs/configuration.md` accuracy pass.** Has it drifted alongside
+  the agent count? Tier table in README references 6 specialists; the
+  4 spirits (aidos/aletheia/cupid/puck) aren't listed. Decide whether
+  spirits get tier rows.
+- **`docs/cli.md` slash-command list audit.** `/scratchpad` shipped in
+  [#176]; `/settings [0]` shipped in [#168]. Are they listed?
+- **`docs/agents/index.md`** — does it still describe the right roster?
+- **One more pass** of host-area narrative WHAT-comments that the
+  initial deslop subagent flagged but #184 skipped to scope-control
+  (Manages/Handles/Provides docstring rewrites). Lower priority than
+  the doc-accuracy items.
 
 ## M6 — ElevenLabs hybrid (pre-player-release blocker)
 

@@ -165,7 +165,7 @@ KOURAI_PROVIDER=local make cli
 ### 2. Start the Agents
 
 ```bash
-make up           # Build images and start all 11 agents + observability stack
+make up           # Build images and start all 10 agents + vn-bridge + observability stack
 make status       # Check health
 ```
 
