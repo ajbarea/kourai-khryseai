@@ -32,6 +32,56 @@ Concrete blocker list for the QR-code reviewer experience.
   One-line `COPY` in the runtime stage.
 - **ROADMAP Shipped section collapsed to one-liners** [#183]. 959 →
   811 lines. Per the section's own header convention.
+- **First-impression CLI playthrough fixes** [#184, commit 3671602].
+  Played through `make cli` as a first-time developer would. Found and
+  fixed five bugs visible to anyone cloning at the poster session:
+  - **Hephaestus contradicted himself on roster** — asking "who are
+    you all?" produced "You've got four of them" then listed FIVE
+    maidens, with all four spirits absent. Routing prompt only listed
+    the five pipeline specialists; spirits were mentioned only in CHAT
+    examples and Aidos/Aletheia not at all. Added explicit "THE FULL
+    ROSTER — Kourai Khryseai is TEN entities total" block (5 + 4 + 1).
+    He now correctly groups them as "Five Forge Specialists / Four
+    Companion Spirits" on the canonical question.
+  - **Routing JSON leaked into chat replies** — every CHAT artifact
+    closed with `{"mode": "chat", "target_agent": null}` because
+    `extract_parts_text` JSON-serialized DataParts and concatenated
+    them with text. That's correct for the inter-agent A2A path
+    (Hephaestus reads `commit_count` from Mneme this way) but wrong
+    for user-facing rendering. Added `include_data: bool = True`
+    parameter; CLI passes `False` on the display path. 3 new
+    regression tests in `test_a2a_events.py` cover both directions.
+  - **47KB of DEBUG flood on every boot** — bare `logging.debug(...)`
+    from RealtimeTTS plus huggingface_hub's httpcore/PIL stack emitted
+    via a parallel handler installed by an upstream `basicConfig`,
+    bypassing our silence filter. `setup_logging` now strips
+    pre-existing root handlers before installing ours and pins
+    `logging.basicConfig` to a no-op so late imports cannot reinstall.
+    Added `_RootDebugFilter` (drops sub-WARNING records under
+    `name="root"`) and extended `_CONSOLE_SILENCED_LIBS` with PIL,
+    huggingface_hub, filelock, asyncio, and `kourai_common.tts_realtime`.
+    File logs keep full DEBUG; only console is silenced.
+  - **TTS log lines landed inside the speech-preview quotes** — the
+    `"TTS: starting / playback complete"` records emitted between the
+    opening and closing quotes of the karaoke render, making it look
+    like Hephaestus was reading the log aloud. Same fix as above
+    (silence list).
+  - **torch FutureWarnings + UserWarning visible on every boot** —
+    RealtimeTTS lazy-loads torch which prints `weight_norm` deprecation,
+    `LSTMCell` argument shift, and `LSTM dropout=0.2 num_layers=1` to
+    stderr regardless of logging config (these go through Python's
+    `warnings` module). Filtered scoped to `module=torch\..*` inside
+    `tts_realtime.py` before the RealtimeTTS import. Genuine warnings
+    from our own code stay audible.
+  - **Bonus non-bug**: `/maidens` portrait fallback in tmux looked like
+    bare `▀▀▀▀` characters. Turns out `_render_image_ansi` uses 24-bit
+    ANSI half-blocks that look correct in any truecolor terminal —
+    tmux's `capture-pane` strips ANSI by default, so this was a
+    capture-tooling artifact, not a real bug.
+  Boot output went from 47KB of httpcore/PIL/AWS-signed-URL/torch noise
+  to 5 lines, all in our consistent format, all useful. First thing a
+  developer sees after `make cli` is now the banner + connect message.
+
 - **Pre-presentation slop sweep + doc-accuracy fixes + structural
   additions** [#184 — open, 10 commits].
   4 parallel deslop subagents → ~30 high-confidence edits: dropped
