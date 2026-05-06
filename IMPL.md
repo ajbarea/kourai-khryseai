@@ -6,24 +6,45 @@ to a one-liner under "Shipped" and this file resets to the next milestone.
 Git history is the archive — these docs are plans + scratchpad, not a
 historical record.
 
-Updated: 2026-05-06 · Active focus: **LLM cache breakpoint split
-shipped [#177]** — `_build_contextual_messages` now structures the
-system prompt as two `cache_control` text blocks (static + dynamic
-summary) instead of concatenating them. Static block always cache-
-hits within a session; summary block resets only on Mneme rewrite.
-Closes the CODEX_ARCHITECTURE_PLAN.md note that flagged this issue
-but had never been executed. Magnitude: ~3-7× reduction in cache-
-write tokens on long Forge Party sessions. **Scratchpad rebuild
-Phase 1 shipped [#176]** — `kourai_common.scratchpad` data layer +
-CLI `/scratchpad` slash command. Replaces the post-#175 classifier-
-drop path with a real consumer; agent reasoning is recallable per-
-agent instead of dropped. Aligns with 2026 best practice for LLM
-CoT visibility (distinct render, not spoken; sources in module
-docstring). Same session: **M6 sub-task 2 shipped [#174]** —
-`kourai_common.tts_cache` content-addressable disk cache validated
-against the spec'd shape (sha256-of-length-prefixed inputs, sharded
-`{key[:2]}/{key}.{ext}` layout, 500 MB cap with oldest-mtime-first
-eviction); enabled at vn_bridge construction where the static
+Updated: 2026-05-06 · Active focus: **Cache-tighten get_enriched_system_prompt
+follow-on shipping (post-#177)** — splits the previously-monolithic system
+content into two cache breakpoints at the source: Block 0 truly-static
+(`SYSTEM_PROMPT` + optional call-site `static_suffix`); Block 1 player-
+dynamic (identity + memories + alignment + romance + personality
+adaptation + memory moments + virtues). Replaces the string-returning
+`get_enriched_system_prompt` with `get_enriched_system_blocks` returning
+cache-marked text blocks. `_build_contextual_messages` updated to APPEND
+the summary block to upstream lists rather than collapsing them; legacy
+string path preserved as safety net. Migration covers all 9 callers
+(puck, cupid, aidos, aletheia, kallos, techne, mneme, dokimasia, metis)
+plus hephaestus's manual `_route` path via new public helper
+`cached_text_blocks(*chunks, static_ttl="1h")`. **TTL upgrade bundled**:
+web-search of Anthropic's May 2026 docs surfaced that the static block
+is exactly the documented use case for the 1h extended TTL — long chat
+conversations where users may not respond within 5min and agentic side-
+agents that may take longer than 5min. Forge Party sessions routinely
+exceed 5min idle; truly-static block re-use pays back the 2× write
+multiplier after just one hit beyond 5min. Block 0 default static_ttl="1h";
+Blocks 1-3 (player-dynamic, summary, first-user) stay at 5min default
+since they churn sub-hourly anyway. Stays within Anthropic's 4-breakpoint
+budget (BP1 static-1h / BP2 player-dynamic-5m / BP3 summary-5m / BP4
+first-user-5m). **LLM cache breakpoint split shipped [#177]** —
+`_build_contextual_messages` now structures the system prompt as two
+`cache_control` text blocks (static + dynamic summary) instead of
+concatenating them. Static block always cache-hits within a session;
+summary block resets only on Mneme rewrite. Closes the
+CODEX_ARCHITECTURE_PLAN.md note that flagged this issue but had never
+been executed. Magnitude: ~3-7× reduction in cache-write tokens on long
+Forge Party sessions. **Scratchpad rebuild Phase 1 shipped [#176]** —
+`kourai_common.scratchpad` data layer + CLI `/scratchpad` slash command.
+Replaces the post-#175 classifier-drop path with a real consumer; agent
+reasoning is recallable per-agent instead of dropped. Aligns with 2026
+best practice for LLM CoT visibility (distinct render, not spoken;
+sources in module docstring). Same session: **M6 sub-task 2 shipped
+[#174]** — `kourai_common.tts_cache` content-addressable disk cache
+validated against the spec'd shape (sha256-of-length-prefixed inputs,
+sharded `{key[:2]}/{key}.{ext}` layout, 500 MB cap with oldest-mtime-
+first eviction); enabled at vn_bridge construction where the static
 dialogue dicts give near-100% hit rate once warm. **GUI zombie call
 sites cleaned [#175]** — 8 sites in `hosts/gui/{render,queue_event_handler,pygame_event_handler}.py`
 referenced GUIComponentsIntegration attributes that #173 deleted;
@@ -305,22 +326,11 @@ opts into emitting these kinds.
 - **Specialist parity for fact recall.** Today only metis reads
   `build_fact_context` with project scope; techne / kallos / dokimasia /
   hephaestus inherit the gap. Defer until a non-metis PAUSE caller surfaces.
-- **Cache-tighten `get_enriched_system_prompt` follow-on (post-#177).**
-  The PR #177 fix split system content into two cache blocks (static +
-  semantic_summary), but the "static" block contains
-  `get_enriched_system_prompt`'s output, which itself concatenates the
-  truly-static `SYSTEM_PROMPT` with dynamic player context (identity +
-  memories + alignment + romance + personality adaptation + memory
-  moments + virtues). Every player-state shift currently invalidates
-  what should be the always-cacheable block. Fix: return a structured
-  list of (truly-static, dynamic-player-context) blocks; let callers
-  pass that list directly as system content; `_build_contextual_messages`
-  appends the semantic_summary block on top. 12+ call sites in
-  `agents/{puck,hephaestus,dokimasia,kallos,aletheia,aidos,techne,mneme,metis}/agent.py`
-  to update. Stays within Anthropic's 4-breakpoint-per-request limit
-  (BP1 SYSTEM_PROMPT, BP2 player context, BP3 summary, BP4 first user
-  in agentic loop). File as one focused PR when next session has room
-  for it; partial migration would be anticipatory infra.
+- **Cache-tighten `get_enriched_system_prompt` follow-on shipping** —
+  see the active-focus block above. Active-focus also bundles the 1h
+  TTL upgrade for the static block (web-search-confirmed Anthropic
+  May-2026 best practice for long interactive sessions); collapses to
+  one-liner under "Shipped" once the PR merges.
 - **Sisters audit weekly cron** (`trig_013uP9ryCLYscBKS7X6PB5og`,
   Mondays 12:00 UTC) opens drift PRs and a rollup issue automatically.
 - **Issue #126 auto-rescan** (`.github/workflows/issue-126-rescan.yml`)

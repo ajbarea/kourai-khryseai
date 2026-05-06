@@ -688,30 +688,104 @@ class TestExportImport:
         assert "New imported" in contents
 
 
-# ── Enriched System Prompt Tests ────────────────────────────────────────
+# ── Enriched System Blocks Tests ────────────────────────────────────────
 
 
-class TestEnrichedSystemPrompt:
-    def test_returns_base_when_no_profile(self, monkeypatch):
+class TestEnrichedSystemBlocks:
+    """Verify get_enriched_system_blocks returns cache-marked text blocks
+    split into (truly-static, player-dynamic) so the static block always
+    cache-hits while the dynamic block resets only on player state shifts.
+
+    research(2026-05): post-#177 follow-on. Pre-fix shape concatenated
+    SYSTEM_PROMPT with dynamic player context as a single string, so every
+    player-state shift invalidated the static portion's cache. Source:
+    platform.claude.com/docs/en/build-with-claude/prompt-caching.
+    """
+
+    def test_returns_single_static_block_when_no_profile(self, monkeypatch):
         import kourai_common.player as player_mod
-        from kourai_common.player import get_enriched_system_prompt
+        from kourai_common.player import get_enriched_system_blocks
 
         player_mod._profile_cache = None  # ty: ignore[unresolved-attribute]
         player_mod._profile_cache_ts = 0.0  # ty: ignore[unresolved-attribute]
         monkeypatch.setattr(PlayerProfile, "load", staticmethod(lambda: None))
 
-        result = get_enriched_system_prompt("base prompt", "metis")
-        assert result == "base prompt"
+        # Static block opts into 1h TTL — see cached_text_blocks docstring.
+        result = get_enriched_system_blocks("base prompt", "metis")
+        assert result == [
+            {
+                "type": "text",
+                "text": "base prompt",
+                "cache_control": {"type": "ephemeral", "ttl": "1h"},
+            }
+        ]
 
-    def test_appends_player_context_when_profile_exists(self, profile, monkeypatch):
+    def test_splits_static_and_dynamic_blocks_when_profile_exists(self, profile, monkeypatch):
         import kourai_common.player as player_mod
-        from kourai_common.player import get_enriched_system_prompt
+        from kourai_common.player import get_enriched_system_blocks
 
         player_mod._profile_cache = None  # ty: ignore[unresolved-attribute]
         player_mod._profile_cache_ts = 0.0  # ty: ignore[unresolved-attribute]
         monkeypatch.setattr(PlayerProfile, "load", staticmethod(lambda: profile))
 
-        result = get_enriched_system_prompt("base prompt", "metis")
-        assert "base prompt" in result
-        assert "PLAYER IDENTITY" in result
-        assert "AJ" in result
+        result = get_enriched_system_blocks("base prompt", "metis")
+        assert len(result) == 2
+        # Block 0 is the truly-static prompt — bytewise just the base, 1h TTL.
+        assert result[0]["text"] == "base prompt"
+        assert result[0]["cache_control"] == {"type": "ephemeral", "ttl": "1h"}
+        # Block 1 is the player-dynamic context — has identity/alignment data,
+        # 5min default TTL because player state churns sub-hourly anyway.
+        assert "PLAYER IDENTITY" in result[1]["text"]
+        assert "AJ" in result[1]["text"]
+        assert result[1]["cache_control"] == {"type": "ephemeral"}
+        # Critically: the base prompt is NOT also embedded in block 1.
+        assert "base prompt" not in result[1]["text"]
+
+    def test_static_suffix_baked_into_static_block(self, profile, monkeypatch):
+        """Call sites with mode-specific extras (dokimasia's "Fix failing
+        tests..." or metis's "DISCUSSION MODE...") pass them via static_suffix
+        so they end up in Block 0 — they're truly-static for that call site
+        and shouldn't invalidate the dynamic block when player state shifts."""
+        import kourai_common.player as player_mod
+        from kourai_common.player import get_enriched_system_blocks
+
+        player_mod._profile_cache = None  # ty: ignore[unresolved-attribute]
+        player_mod._profile_cache_ts = 0.0  # ty: ignore[unresolved-attribute]
+        monkeypatch.setattr(PlayerProfile, "load", staticmethod(lambda: profile))
+
+        result = get_enriched_system_blocks(
+            "base prompt", "metis", static_suffix="DISCUSSION MODE: brief"
+        )
+        assert len(result) == 2
+        # Both base + suffix end up in the static block.
+        assert "base prompt" in result[0]["text"]
+        assert "DISCUSSION MODE: brief" in result[0]["text"]
+        # NOT in the dynamic block — it must stay free of static text.
+        assert "DISCUSSION MODE" not in result[1]["text"]
+
+    def test_static_block_byte_identical_across_player_state_shifts(self, profile, monkeypatch):
+        """The whole point: the static block must remain bytewise identical
+        even when player state mutates (new memory added, affinity changed),
+        so the prefix-cache machinery cache-hits the static block on every
+        call regardless of dynamic-block churn."""
+        import kourai_common.player as player_mod
+        from kourai_common.player import add_player_memory, get_enriched_system_blocks
+
+        player_mod._profile_cache = None  # ty: ignore[unresolved-attribute]
+        player_mod._profile_cache_ts = 0.0  # ty: ignore[unresolved-attribute]
+        monkeypatch.setattr(PlayerProfile, "load", staticmethod(lambda: profile))
+
+        first = get_enriched_system_blocks("base prompt", "metis")
+
+        # Mutate player state; force profile-cache reload.
+        add_player_memory(profile.player_id, "new memory entry", "achievement", agent_name="metis")
+        player_mod._profile_cache = None  # ty: ignore[unresolved-attribute]
+        player_mod._profile_cache_ts = 0.0  # ty: ignore[unresolved-attribute]
+
+        second = get_enriched_system_blocks("base prompt", "metis")
+
+        # Block 0 (static) — bytewise identical.
+        assert first[0]["text"] == second[0]["text"]
+        # Block 1 (dynamic) — must reflect the new memory; therefore differs.
+        assert first[1]["text"] != second[1]["text"]
+        assert "new memory entry" in second[1]["text"]

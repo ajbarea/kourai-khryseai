@@ -100,9 +100,13 @@ class TestDeterminePipeline:
 
             await determine_pipeline("commit prep")
 
-            # System prompt should contain the player context
-            system_msg = mock.call_args[0][1][0]["content"]
-            assert "PLAYER IDENTITY" in system_msg
+            # System prompt should contain the player context. Hephaestus
+            # routes through cached_text_blocks(static, dynamic), so flatten
+            # via the canonical _coerce_chunk_content helper.
+            from kourai_common.llm import _coerce_chunk_content
+
+            system_text = _coerce_chunk_content(mock.call_args[0][1][0]["content"])
+            assert "PLAYER IDENTITY" in system_text
 
 
 class TestPipelineDataclasses:

@@ -19,7 +19,7 @@ from typing import Any
 
 from agents.hephaestus.remote_connections import AgentInputRequired, RemoteAgentConnection
 from kourai_common.config import MAX_ITERATIONS, get_agent_url
-from kourai_common.llm import chat
+from kourai_common.llm import cached_text_blocks, chat
 from kourai_common.player import PlayerProfile, build_player_context
 from kourai_common.tracing import create_span
 from scripts.git_changes import collect_git_changes
@@ -271,14 +271,18 @@ async def determine_pipeline(
     user_request = expand_mentions(user_request)
 
     with create_span("hephaestus.route", {"request_length": str(len(user_request))}):
-        # Inject player identity into routing prompt for personalized responses
+        # Inject player identity into routing prompt for personalized responses.
+        # Split into a truly-static block (ROUTING_PROMPT + permissions-mode
+        # suffix) and a player-dynamic block (player_ctx + own affinity tier)
+        # so the static block always cache-hits across player-state shifts.
+        # See research note in kourai_common.player_context.get_enriched_system_blocks.
         profile = PlayerProfile.load()
-        system_prompt = ROUTING_PROMPT
+        static_part = ROUTING_PROMPT
         if yolo:
             # /yolo bypass — instruct the LLM to skip CONFIRM_ORDER and
             # emit the agent list directly. The system prompt below
             # otherwise demands CONFIRM_ORDER for every dev task.
-            system_prompt += (
+            static_part += (
                 "\n\nYOLO MODE: The player has /yolo on. Skip CONFIRM_ORDER "
                 "for this turn — emit response option #1 (the comma-separated "
                 "agent list) directly for development tasks. CHAT: and ASK_USER: "
@@ -290,7 +294,7 @@ async def determine_pipeline(
             # still confirm anything that includes Techne / Kallos /
             # Dokimasia (those agents are the ones with mutating tools per
             # forge_tools.MUTATING_TOOL_NAMES).
-            system_prompt += (
+            static_part += (
                 "\n\nAUTO_APPROVE_READS: The player has /permissions "
                 "auto_approve_reads on. Skip CONFIRM_ORDER ONLY when the "
                 "planned pipeline contains none of {techne, kallos, "
@@ -300,22 +304,29 @@ async def determine_pipeline(
                 "CONFIRM_ORDER as usual; this flag does NOT bypass the "
                 "gate for write paths."
             )
+
+        dynamic_parts: list[str] = []
         if profile and profile.display_name:
             player_ctx = build_player_context(profile, "hephaestus", top_k_memories=4)
             if player_ctx:
-                system_prompt += f"\n\n{player_ctx}"
+                dynamic_parts.append(player_ctx)
 
         # Inject Hephaestus's own relationship tier so he flavors CHAT responses.
         heph_score = affinities.get("hephaestus")
         if heph_score is not None:
-            system_prompt += (
-                f"\n\nYour current relationship with the player: "
+            dynamic_parts.append(
+                f"Your current relationship with the player: "
                 f"{_tier_label(heph_score)} (affinity {heph_score:.2f}). "
                 f"Adjust your tone accordingly."
             )
 
+        dynamic_part = "\n\n".join(dynamic_parts)
+
         messages = [
-            {"role": "system", "content": system_prompt},
+            {
+                "role": "system",
+                "content": cached_text_blocks(static_part, dynamic_part),
+            },
             {"role": "user", "content": user_request},
         ]
         # 800 tokens covers all four router outputs (agent list / ASK_USER /

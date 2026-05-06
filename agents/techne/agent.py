@@ -18,7 +18,7 @@ from kourai_common.file_ops import PathViolation, validate_file_path
 from kourai_common.llm import chat_with_tools
 from kourai_common.mcp_bridge import forge_tool_bridge
 from kourai_common.mcp_client import kourai_project_root_var
-from kourai_common.player import get_enriched_system_prompt
+from kourai_common.player import get_enriched_system_blocks
 from kourai_common.prompts import CURRENT_DATE, build_system_prompt
 from kourai_common.subprocess import StatusCallback, run_command
 
@@ -276,7 +276,7 @@ async def apply_code_changes(
         user_content = [{"type": "text", "text": user_text}, *image_parts]
 
     messages: list[dict[str, Any]] = [
-        {"role": "system", "content": get_enriched_system_prompt(SYSTEM_PROMPT, "techne")},
+        {"role": "system", "content": get_enriched_system_blocks(SYSTEM_PROMPT, "techne")},
         {"role": "user", "content": user_content},
     ]
 

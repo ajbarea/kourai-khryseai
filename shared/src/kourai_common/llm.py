@@ -43,6 +43,44 @@ WORKING_MEMORY_LIMIT = 5
 _EPHEMERAL_CACHE: dict[str, str] = {"type": "ephemeral"}
 
 
+def cached_text_blocks(*chunks: str, static_ttl: str = "1h") -> list[dict[str, Any]]:
+    """Wrap text chunks as cache-marked text blocks (cache_control on each).
+
+    Drops empty chunks; returns one block per non-empty chunk in order. The
+    FIRST non-empty chunk gets ``cache_control={"type": "ephemeral", "ttl": static_ttl}``
+    (default ``"1h"``); subsequent chunks get the 5-minute default
+    (``{"type": "ephemeral"}``). Pass static-first then dynamic so the
+    truly-static block lives long enough to amortize the higher 1h write cost.
+
+    Pass ``static_ttl="5m"`` to disable the 1h upgrade for the first block.
+
+    research(2026-05): Anthropic prompt caching offers two TTLs — 5-minute
+    default (1.25× write cost, 0.1× read) and 1-hour extended (2× write cost,
+    0.1× read). Static system prompts in interactive agent applications
+    benefit from 1h TTL because Forge Party sessions routinely include idle
+    stretches longer than 5 minutes (player think-time, VN scene playback,
+    between-task chat); the truly-static block re-use pays back the 2×
+    write multiplier after just one cache hit beyond 5min. Anthropic's docs
+    explicitly recommend 1h TTL for "long chat conversations where users
+    may not respond within 5 minutes" and "agentic side-agents that may
+    take longer than 5 minutes" — both shoes fit kourai. Dynamic / summary
+    breakpoints stay at 5m default since they churn sub-hourly anyway.
+    Source: https://platform.claude.com/docs/en/build-with-claude/prompt-caching.
+    """
+    blocks: list[dict[str, Any]] = []
+    first = True
+    for chunk in chunks:
+        if not chunk:
+            continue
+        if first and static_ttl != "5m":
+            cache: dict[str, Any] = {"type": "ephemeral", "ttl": static_ttl}
+        else:
+            cache = _EPHEMERAL_CACHE
+        blocks.append({"type": "text", "text": chunk, "cache_control": cache})
+        first = False
+    return blocks
+
+
 class LLMError(Exception):
     """Base exception for LLM call failures."""
 
@@ -287,23 +325,32 @@ async def _build_contextual_messages(
     # research(2026-05): Anthropic prompt caching cuts cost by up to 90 %
     # on repeat turns when the cached prefix is stable. The pre-2026-05-06
     # shape concatenated the dynamic semantic_summary onto the static
-    # system content as a single string, so every Mneme summarization
-    # invalidated the entire system-prompt cache and forced a fresh
-    # write of the static portion (the bulk). Restructuring as a list
-    # of two text blocks with separate cache_control markers keeps the
-    # static block always-cacheable; only the summary block resets when
-    # Mneme rewrites the summary. Sources: Anthropic prompt-caching docs
-    # (multiple cache_control breakpoints supported up to four per
-    # request, in increasing prefix order); CODEX_ARCHITECTURE_PLAN.md
-    # internal note (kourai-khryseai .claude/) flagged this exact issue.
+    # system content as a single string; #177 split the system content
+    # into two blocks so the summary lives at its own breakpoint. This
+    # branch now also handles upstream callers that pre-supply structured
+    # cache blocks (``get_enriched_system_blocks`` returns
+    # ``[truly-static, player-dynamic]`` already cache-marked) — the
+    # summary appends as a third block rather than collapsing the upstream
+    # split. Anthropic's per-request budget is four cache_control
+    # breakpoints, so [static / player-dynamic / summary / first-user] uses
+    # the full budget when chat_with_tools also marks the first user.
+    # Source: https://platform.claude.com/docs/en/build-with-claude/prompt-caching.
     if state["semantic_summary"] and full_messages and full_messages[0]["role"] == "system":
         original_system = full_messages[0]["content"]
-        # Static block first (always cache-hits within a session); summary
-        # block second (resets on summarization). Both carry cache_control
-        # so the prefix-cache machinery can read either breakpoint.
-        full_messages[0] = {
-            **full_messages[0],
-            "content": [
+        summary_block = {
+            "type": "text",
+            "text": (f"=== SEMANTIC MEMORY (PREVIOUS CONTEXT) ===\n{state['semantic_summary']}"),
+            "cache_control": _EPHEMERAL_CACHE,
+        }
+        if isinstance(original_system, list):
+            # Caller pre-supplied structured cache blocks — append summary
+            # rather than collapsing their static/dynamic split.
+            new_content = [*original_system, summary_block]
+        else:
+            # Legacy string path — wrap the original as a single static
+            # block, then append summary. Two breakpoints; summary still
+            # gets its own cache-control marker so it resets independently.
+            new_content = [
                 {
                     "type": "text",
                     "text": original_system
@@ -311,15 +358,9 @@ async def _build_contextual_messages(
                     else str(original_system),
                     "cache_control": _EPHEMERAL_CACHE,
                 },
-                {
-                    "type": "text",
-                    "text": (
-                        f"=== SEMANTIC MEMORY (PREVIOUS CONTEXT) ===\n{state['semantic_summary']}"
-                    ),
-                    "cache_control": _EPHEMERAL_CACHE,
-                },
-            ],
-        }
+                summary_block,
+            ]
+        full_messages[0] = {**full_messages[0], "content": new_content}
 
     # 3. Inject Working Memory (Only Unsummarized Recent Messages)
     recent_history = get_unsummarized_messages(context_id, agent_name)

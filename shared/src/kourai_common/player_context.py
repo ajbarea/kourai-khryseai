@@ -9,8 +9,9 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+from kourai_common.llm import cached_text_blocks
 from kourai_common.player_constants import (
     AFFINITY_TIER_INSTRUCTIONS,
     AFFINITY_TIER_NAMES,
@@ -30,19 +31,52 @@ _profile_cache_ts: float = 0.0
 _PROFILE_CACHE_TTL = 30.0  # Reload profile every 30 seconds max
 
 
-def get_enriched_system_prompt(base_prompt: str, agent_name: str) -> str:
-    """Return base system prompt enriched with player context.
+def get_enriched_system_blocks(
+    base_prompt: str,
+    agent_name: str,
+    *,
+    static_suffix: str = "",
+) -> list[dict[str, Any]]:
+    """Return system content as cache-marked text blocks split static/dynamic.
 
-    This is the primary integration point for agent code. Call this at
-    message-construction time instead of using SYSTEM_PROMPT directly.
+    Block 0 (truly static): ``base_prompt`` plus optional ``static_suffix``.
+    Cache-hits across the full session — only changes when the agent ships a
+    new SYSTEM_PROMPT or the call site appends a different suffix.
+
+    Block 1 (player-dynamic, optional): identity + memories + alignment +
+    romance + personality adaptation + memory moments + virtues, joined.
+    Resets when player state shifts. Omitted when no enrichment applies (no
+    profile / no display_name).
+
+    Both blocks carry ``cache_control={"type": "ephemeral"}`` so the
+    prefix-cache machinery can read either breakpoint independently.
+
+    The ``static_suffix`` kwarg is for call sites that pin extra truly-static
+    text to a particular invocation — dokimasia's "Fix failing tests..."
+    suffix, metis's "DISCUSSION MODE..." suffix. The suffix concatenates into
+    Block 0 because it's static for that call site; bundling it into Block 0
+    keeps Block 1 free of static text (so Block 1 cache-hits even for
+    non-suffix invocations of the same agent that follow).
+
     Caches the player profile for 30s to avoid repeated disk reads.
 
-    Includes: player identity, memories, alignment, romance, personality
-    adaptation, and optional memory moments.
+    research(2026-05): post-#177 follow-on. Pre-fix shape concatenated
+    truly-static SYSTEM_PROMPT with dynamic player context as a single
+    string, so every player-state shift invalidated the cache for the
+    static portion (1-3 K tokens of maiden personality + tool descriptions).
+    Anthropic supports up to four cache_control breakpoints per request in
+    increasing prefix order; using two for system content (static + player-
+    dynamic) plus one for the summary plus one for the first user message
+    fits the budget exactly. Source:
+    https://platform.claude.com/docs/en/build-with-claude/prompt-caching.
     """
     global _profile_cache, _profile_cache_ts
 
     from kourai_common.player_profile import PlayerProfile
+
+    static_text = base_prompt
+    if static_suffix:
+        static_text = f"{base_prompt}\n\n{static_suffix}"
 
     now = time.time()
     if _profile_cache is None or (now - _profile_cache_ts) > _PROFILE_CACHE_TTL:
@@ -50,15 +84,15 @@ def get_enriched_system_prompt(base_prompt: str, agent_name: str) -> str:
         _profile_cache_ts = now
 
     if not _profile_cache or not _profile_cache.display_name:
-        return base_prompt
+        return cached_text_blocks(static_text)
 
     ctx = build_player_context(_profile_cache, agent_name, top_k_memories=6)
     if not ctx:
-        return base_prompt
+        return cached_text_blocks(static_text)
 
-    parts = [base_prompt, ctx]
+    parts = [ctx]
 
-    # Personality adaptation (tier + alignment shifts)
+    # Personality adaptation (tier + alignment shifts) — player-dynamic.
     try:
         from kourai_common.personality_adaptation import get_personality_adaptation
 
@@ -70,7 +104,7 @@ def get_enriched_system_prompt(base_prompt: str, agent_name: str) -> str:
     except Exception:
         log.debug("Failed to get personality adaptation (non-critical)", exc_info=True)
 
-    # Memory moments (probabilistic nostalgia callbacks)
+    # Memory moments (probabilistic nostalgia callbacks) — player-dynamic.
     try:
         from kourai_common.memory_moments import generate_moment_context
 
@@ -80,7 +114,8 @@ def get_enriched_system_prompt(base_prompt: str, agent_name: str) -> str:
     except Exception:
         log.debug("Failed to generate memory moment (non-critical)", exc_info=True)
 
-    # Forge virtue context — psychological state for interjection awareness
+    # Forge virtue context — psychological state for interjection awareness;
+    # player-dynamic (mutates with virtue events).
     try:
         from kourai_common.virtues import get_virtue_context
 
@@ -90,7 +125,8 @@ def get_enriched_system_prompt(base_prompt: str, agent_name: str) -> str:
     except Exception:
         log.debug("Failed to get virtue context (non-critical)", exc_info=True)
 
-    return "\n\n".join(parts)
+    dynamic_text = "\n\n".join(parts)
+    return cached_text_blocks(static_text, dynamic_text)
 
 
 def build_player_context(

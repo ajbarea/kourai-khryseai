@@ -18,7 +18,7 @@ from kourai_common.forge_tools import (
 from kourai_common.llm import chat_with_tools
 from kourai_common.mcp_bridge import forge_tool_bridge
 from kourai_common.mcp_client import kourai_project_root_var
-from kourai_common.player import get_enriched_system_prompt
+from kourai_common.player import get_enriched_system_blocks
 from kourai_common.prompts import CURRENT_DATE, build_system_prompt
 from kourai_common.subprocess import StatusCallback, run_command
 
@@ -205,7 +205,7 @@ async def apply_lint_fixes(
     messages = [
         {
             "role": "system",
-            "content": get_enriched_system_prompt(SYSTEM_PROMPT, "kallos"),
+            "content": get_enriched_system_blocks(SYSTEM_PROMPT, "kallos"),
         },
         {
             "role": "user",

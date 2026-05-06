@@ -21,7 +21,7 @@ from kourai_common.forge_tools import (
 from kourai_common.llm import chat, chat_stream, chat_with_tools
 from kourai_common.mcp_bridge import forge_tool_bridge
 from kourai_common.mcp_client import kourai_project_root_var
-from kourai_common.player import get_enriched_system_prompt
+from kourai_common.player import get_enriched_system_blocks
 from kourai_common.prompts import CURRENT_DATE, build_system_prompt
 from kourai_common.subprocess import StatusCallback, run_command
 
@@ -152,15 +152,18 @@ async def apply_test_fixes(
     messages = [
         {
             "role": "system",
-            "content": (
-                get_enriched_system_prompt(SYSTEM_PROMPT, "dokimasia")
-                + "\n\nFix failing tests or the underlying code by calling the "
-                "file-op tools (`read_file`, `write_file`, `edit_file`). Paths "
-                "must be PROJECT-RELATIVE and point at specific files — "
-                "`read_file` does NOT list directories. The failing files are "
-                "already provided below; read them only if you need to confirm "
-                "exact text before `edit_file`. Plan briefly in one short "
-                "paragraph before calling any tool."
+            "content": get_enriched_system_blocks(
+                SYSTEM_PROMPT,
+                "dokimasia",
+                static_suffix=(
+                    "Fix failing tests or the underlying code by calling the "
+                    "file-op tools (`read_file`, `write_file`, `edit_file`). Paths "
+                    "must be PROJECT-RELATIVE and point at specific files — "
+                    "`read_file` does NOT list directories. The failing files are "
+                    "already provided below; read them only if you need to confirm "
+                    "exact text before `edit_file`. Plan briefly in one short "
+                    "paragraph before calling any tool."
+                ),
             ),
         },
         {
@@ -311,7 +314,7 @@ async def generate_tests(
         user_content = [{"type": "text", "text": user_text}, *image_parts]
 
     messages: list[dict[str, Any]] = [
-        {"role": "system", "content": get_enriched_system_prompt(SYSTEM_PROMPT, "dokimasia")},
+        {"role": "system", "content": get_enriched_system_blocks(SYSTEM_PROMPT, "dokimasia")},
         {"role": "user", "content": user_content},
     ]
     log.info("Generating tests for %s", module_name)
@@ -340,7 +343,7 @@ async def generate_tests_stream(
         user_content = [{"type": "text", "text": user_text}, *image_parts]
 
     messages: list[dict[str, Any]] = [
-        {"role": "system", "content": get_enriched_system_prompt(SYSTEM_PROMPT, "dokimasia")},
+        {"role": "system", "content": get_enriched_system_blocks(SYSTEM_PROMPT, "dokimasia")},
         {"role": "user", "content": user_content},
     ]
     log.info("Streaming test generation for %s", module_name)

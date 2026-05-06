@@ -88,8 +88,13 @@ class TestDiscussTradeoffs:
         with patch("agents.metis.agent.chat", side_effect=capture_chat):
             await discuss_tradeoffs("add divide")
 
+        # Metis's discuss_tradeoffs passes static_suffix="DISCUSSION MODE..."
+        # through get_enriched_system_blocks, which lands in Block 0 of the
+        # cache-marked block list. Flatten via the canonical helper.
+        from kourai_common.llm import _coerce_chunk_content
+
         system_msg = next(m for m in captured["messages"] if m["role"] == "system")
-        assert "DISCUSSION MODE" in system_msg["content"]
+        assert "DISCUSSION MODE" in _coerce_chunk_content(system_msg["content"])
 
     @pytest.mark.asyncio
     async def test_max_tokens_is_modest(self):

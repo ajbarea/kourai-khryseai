@@ -11,7 +11,7 @@ import logging
 
 from kourai_common.facts import build_fact_context
 from kourai_common.llm import chat
-from kourai_common.player import get_affinity_tier, get_all_affinities, get_enriched_system_prompt
+from kourai_common.player import get_affinity_tier, get_all_affinities, get_enriched_system_blocks
 from kourai_common.prompts import CURRENT_DATE, build_system_prompt
 
 log = logging.getLogger(__name__)
@@ -125,7 +125,7 @@ async def translate_emotion(
     full_prompt = "\n\n".join(context_lines)
 
     messages = [
-        {"role": "system", "content": get_enriched_system_prompt(SYSTEM_PROMPT, "cupid")},
+        {"role": "system", "content": get_enriched_system_blocks(SYSTEM_PROMPT, "cupid")},
         {"role": "user", "content": full_prompt},
     ]
     return await chat("cupid", messages, temperature=0.7, max_tokens=400, context_id=context_id)

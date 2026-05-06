@@ -107,6 +107,19 @@ class TestDeterminePipelineForwardsConfirmOrder:
         assert "metis" in result
 
 
+def _system_text(system_msg: dict) -> str:
+    """Flatten system content (str or cache-marked block list) for substring search.
+
+    Hephaestus's routing path now passes ``cached_text_blocks(static, dynamic)``
+    as ``content`` so the static block cache-hits across player-state shifts.
+    Reuses ``_coerce_chunk_content`` (the existing helper that already
+    normalizes provider-specific payloads to plain text) rather than rolling
+    a parallel flattener."""
+    from kourai_common.llm import _coerce_chunk_content
+
+    return _coerce_chunk_content(system_msg["content"])
+
+
 class TestYoloBypass:
     """``metadata.yolo`` bypasses the gate via system-prompt augmentation."""
 
@@ -124,8 +137,9 @@ class TestYoloBypass:
             await determine_pipeline("add a function", metadata={"yolo": "on"})
 
         system_msg = next(m for m in captured["messages"] if m["role"] == "system")
-        assert "YOLO MODE" in system_msg["content"]
-        assert "Skip CONFIRM_ORDER" in system_msg["content"]
+        sys_text = _system_text(system_msg)
+        assert "YOLO MODE" in sys_text
+        assert "Skip CONFIRM_ORDER" in sys_text
 
     @pytest.mark.asyncio
     async def test_no_yolo_keeps_system_prompt_clean(self):
@@ -141,7 +155,7 @@ class TestYoloBypass:
             await determine_pipeline("add a function")
 
         system_msg = next(m for m in captured["messages"] if m["role"] == "system")
-        assert "YOLO MODE" not in system_msg["content"]
+        assert "YOLO MODE" not in _system_text(system_msg)
 
 
 class TestAutoApproveReadsBypass:
@@ -164,10 +178,11 @@ class TestAutoApproveReadsBypass:
             await determine_pipeline("plan a feature", metadata={"auto_approve_reads": "on"})
 
         system_msg = next(m for m in captured["messages"] if m["role"] == "system")
-        assert "AUTO_APPROVE_READS" in system_msg["content"]
-        assert "techne" in system_msg["content"].lower()
-        assert "kallos" in system_msg["content"].lower()
-        assert "dokimasia" in system_msg["content"].lower()
+        sys_text = _system_text(system_msg)
+        assert "AUTO_APPROVE_READS" in sys_text
+        assert "techne" in sys_text.lower()
+        assert "kallos" in sys_text.lower()
+        assert "dokimasia" in sys_text.lower()
 
     @pytest.mark.asyncio
     async def test_yolo_wins_when_both_set(self):
@@ -187,8 +202,9 @@ class TestAutoApproveReadsBypass:
             )
 
         system_msg = next(m for m in captured["messages"] if m["role"] == "system")
-        assert "YOLO MODE" in system_msg["content"]
-        assert "AUTO_APPROVE_READS" not in system_msg["content"]
+        sys_text = _system_text(system_msg)
+        assert "YOLO MODE" in sys_text
+        assert "AUTO_APPROVE_READS" not in sys_text
 
 
 class TestCLISettingsYoloField:

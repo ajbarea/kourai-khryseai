@@ -1051,6 +1051,86 @@ class TestCacheControlMarkers:
         assert _mark_last_tool_cacheable(tools) == tools
 
 
+class TestCachedTextBlocks:
+    """Pure-function coverage for cached_text_blocks — the public helper that
+    callers (player_context, hephaestus's manual routing path) use to wrap
+    static + dynamic chunks as cache-marked text blocks.
+
+    research(2026-05): Anthropic prompt caching supports up to 4
+    cache_control breakpoints per request, in increasing prefix order.
+    Splitting truly-static from player-dynamic chunks keeps the static
+    block always-cacheable while the dynamic block resets only on player
+    state shifts. Source:
+    platform.claude.com/docs/en/build-with-claude/prompt-caching.
+    """
+
+    def test_single_chunk_yields_one_block_with_1h_ttl(self):
+        from kourai_common.llm import cached_text_blocks
+
+        # Default static_ttl="1h" — the first (truly-static) block opts into
+        # the 1h TTL because Forge Party sessions routinely span >5min.
+        out = cached_text_blocks("static prompt only")
+        assert out == [
+            {
+                "type": "text",
+                "text": "static prompt only",
+                "cache_control": {"type": "ephemeral", "ttl": "1h"},
+            }
+        ]
+
+    def test_two_chunks_split_ttls_static_1h_dynamic_5m(self):
+        from kourai_common.llm import cached_text_blocks
+
+        out = cached_text_blocks("static", "dynamic")
+        assert len(out) == 2
+        assert out[0]["text"] == "static"
+        assert out[1]["text"] == "dynamic"
+        # Block 0 (static) — 1h TTL because it's truly static for the session.
+        assert out[0]["cache_control"] == {"type": "ephemeral", "ttl": "1h"}
+        # Block 1 (dynamic) — 5min default because it churns sub-hourly anyway.
+        assert out[1]["cache_control"] == {"type": "ephemeral"}
+
+    def test_empty_chunks_dropped(self):
+        from kourai_common.llm import cached_text_blocks
+
+        out = cached_text_blocks("static", "", "dynamic", "")
+        assert len(out) == 2
+        assert out[0]["text"] == "static"
+        assert out[1]["text"] == "dynamic"
+
+    def test_first_nonempty_chunk_gets_1h_ttl_when_leading_chunks_empty(self):
+        """If callers pass empty leading chunks (common when an optional
+        static suffix is unset), the FIRST NON-EMPTY chunk still gets the 1h
+        TTL — not the literal first array index."""
+        from kourai_common.llm import cached_text_blocks
+
+        out = cached_text_blocks("", "actually static", "dynamic")
+        assert len(out) == 2
+        assert out[0]["text"] == "actually static"
+        assert out[0]["cache_control"] == {"type": "ephemeral", "ttl": "1h"}
+        assert out[1]["cache_control"] == {"type": "ephemeral"}
+
+    def test_no_chunks_yields_empty_list(self):
+        from kourai_common.llm import cached_text_blocks
+
+        assert cached_text_blocks() == []
+
+    def test_all_empty_chunks_yields_empty_list(self):
+        from kourai_common.llm import cached_text_blocks
+
+        assert cached_text_blocks("", "", "") == []
+
+    def test_static_ttl_5m_override_disables_1h_upgrade(self):
+        """Pass static_ttl="5m" to opt out of the 1h default — both blocks
+        use the 5min default. For tests / call sites where the 5min behavior
+        is genuinely correct (e.g., short-lived auxiliary calls)."""
+        from kourai_common.llm import cached_text_blocks
+
+        out = cached_text_blocks("static", "dynamic", static_ttl="5m")
+        assert out[0]["cache_control"] == {"type": "ephemeral"}
+        assert out[1]["cache_control"] == {"type": "ephemeral"}
+
+
 class TestBuildContextualMessagesCacheStructure:
     """Verify _build_contextual_messages places semantic_summary in its own
     cache-control block so the static system prefix stays cacheable across
@@ -1191,6 +1271,71 @@ class TestBuildContextualMessagesCacheStructure:
         assert out_a[0]["content"][0]["text"] == out_b[0]["content"][0]["text"]
         # Summary block (index 1) must differ.
         assert out_a[0]["content"][1]["text"] != out_b[0]["content"][1]["text"]
+
+    @pytest.mark.asyncio
+    async def test_list_content_summary_appended_as_third_block(self):
+        """When the caller pre-supplies cache-marked blocks (truly-static +
+        player-dynamic), the summary block APPENDS to that list rather than
+        replacing it — yielding three breakpoints (static / dynamic / summary)
+        that all chain through the prefix-cache.
+
+        This is the post-#177 follow-on path: get_enriched_system_blocks
+        returns a list[dict]; _build_contextual_messages must preserve the
+        upstream split rather than collapsing it back into a string."""
+        from kourai_common.llm import _build_contextual_messages, cached_text_blocks
+
+        upstream_blocks = cached_text_blocks(
+            "TRULY STATIC SYSTEM PROMPT",
+            "PLAYER DYNAMIC CONTEXT (memories + alignment)",
+        )
+        with (
+            patch("kourai_common.llm._manage_memory", new=AsyncMock(return_value=0)),
+            patch(
+                "kourai_common.llm.get_agent_state",
+                return_value={"semantic_summary": "summary text"},
+            ),
+            patch("kourai_common.llm.get_unsummarized_messages", return_value=[]),
+            patch("kourai_common.llm.add_message"),
+        ):
+            out = await _build_contextual_messages(
+                "metis",
+                [{"role": "system", "content": upstream_blocks}],
+                "ctx-1",
+            )
+        sys_content = out[0]["content"]
+        assert isinstance(sys_content, list)
+        assert len(sys_content) == 3
+        # Original two blocks preserved bytewise.
+        assert sys_content[0]["text"] == "TRULY STATIC SYSTEM PROMPT"
+        assert sys_content[1]["text"] == "PLAYER DYNAMIC CONTEXT (memories + alignment)"
+        # Summary appended as the third block, with its own breakpoint.
+        assert "summary text" in sys_content[2]["text"]
+        assert sys_content[2]["cache_control"] == {"type": "ephemeral"}
+
+    @pytest.mark.asyncio
+    async def test_list_content_no_summary_left_alone(self):
+        """When the caller supplies cache-marked blocks AND there's no summary,
+        the system content stays exactly as the caller provided it. No mutation,
+        no re-wrapping — the upstream cache structure passes through cleanly."""
+        from kourai_common.llm import _build_contextual_messages, cached_text_blocks
+
+        upstream_blocks = cached_text_blocks("STATIC", "DYNAMIC")
+        with (
+            patch("kourai_common.llm._manage_memory", new=AsyncMock(return_value=0)),
+            patch(
+                "kourai_common.llm.get_agent_state",
+                return_value={"semantic_summary": ""},
+            ),
+            patch("kourai_common.llm.get_unsummarized_messages", return_value=[]),
+            patch("kourai_common.llm.add_message"),
+        ):
+            out = await _build_contextual_messages(
+                "metis",
+                [{"role": "system", "content": upstream_blocks}],
+                "ctx-1",
+            )
+        # Unchanged: caller's two blocks pass through.
+        assert out[0]["content"] == upstream_blocks
 
 
 class TestLogCacheUsage:

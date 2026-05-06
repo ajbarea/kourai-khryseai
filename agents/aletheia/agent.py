@@ -13,7 +13,7 @@ import logging
 import re
 
 from kourai_common.llm import chat
-from kourai_common.player import get_enriched_system_prompt
+from kourai_common.player import get_enriched_system_blocks
 from kourai_common.prompts import CURRENT_DATE, build_system_prompt
 
 log = logging.getLogger(__name__)
@@ -115,7 +115,7 @@ async def validate_research(
         prompt += f"\n\nNote: {existing_citations} existing 'Research:' citation(s) found — verify their format."
 
     messages = [
-        {"role": "system", "content": get_enriched_system_prompt(SYSTEM_PROMPT, "aletheia")},
+        {"role": "system", "content": get_enriched_system_blocks(SYSTEM_PROMPT, "aletheia")},
         {"role": "user", "content": prompt},
     ]
     return await chat("aletheia", messages, temperature=0.1, max_tokens=800, context_id=context_id)

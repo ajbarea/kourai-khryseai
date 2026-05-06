@@ -393,7 +393,7 @@ class TestPersonalityAdaptation:
 class TestEnrichedPromptIntegration:
     def test_enriched_prompt_includes_adaptation(self):
         import kourai_common.player_context as player_ctx
-        from kourai_common.player import get_enriched_system_prompt
+        from kourai_common.player import get_enriched_system_blocks
 
         p = PlayerProfile(display_name="AJ", sovereignty=70, devotion=0)
         p.save()
@@ -403,11 +403,15 @@ class TestEnrichedPromptIntegration:
         player_ctx._profile_cache = None
         player_ctx._profile_cache_ts = 0
 
-        result = get_enriched_system_prompt("Base prompt here.", "metis")
-        assert "Base prompt here." in result
-        assert "PLAYER IDENTITY" in result
-
-        assert "PERSONALITY ADAPTATION" in result
+        # Block 0 is the truly-static base; block 1 is the player-dynamic
+        # context (identity + alignment + adaptation). Personality adaptation
+        # belongs in block 1 — it's keyed off affinity tier + alignment archetype,
+        # both of which mutate with player action.
+        result = get_enriched_system_blocks("Base prompt here.", "metis")
+        assert len(result) == 2
+        assert result[0]["text"] == "Base prompt here."
+        assert "PLAYER IDENTITY" in result[1]["text"]
+        assert "PERSONALITY ADAPTATION" in result[1]["text"]
 
     def test_hooks_include_achievements(self, tmp_path, monkeypatch):
         from kourai_common.hooks import run_post_task_hooks
