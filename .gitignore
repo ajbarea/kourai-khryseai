@@ -81,3 +81,9 @@ tools/voice-lab/.next/
 tools/voice-lab/tsconfig.tsbuildinfo
 tools/voice-lab/.playwright-mcp/
 plans/
+
+# Local visual reference scrap — never committed (third-party imagery)
+inspiration/
+
+# Windows mark-of-the-web alternate data streams from cross-mounted files
+*:Zone.Identifier

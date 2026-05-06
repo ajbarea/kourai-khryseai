@@ -14,12 +14,8 @@ import pygame.freetype
 from hosts.gui.flash_effect import FlashEffect
 from hosts.gui.gui_components_integration import GUIComponentsIntegration
 from hosts.gui.high_contrast_gui_integration import HighContrastGUIIntegration
-from hosts.gui.pipeline_status_gui_integration import PipelineStatusGUIIntegration
-from hosts.gui.scratchpad_gui_integration import ScratchpadGUIIntegration
-from hosts.gui.status_bubbles_gui_integration import StatusBubblesGUIIntegration
 from hosts.gui.typewriter import TypewriterManager
 from hosts.gui.typewriter_flash_integration import TypewriterFlashIntegration
-from tests.unit.gui_test_helpers import _surf
 
 
 class TestTypewriterFlashIntegration:
@@ -117,12 +113,7 @@ class TestGUIComponentsIntegration:
             gci = GUIComponentsIntegration(gui)
         assert gci.get_settings_manager() is not None
         assert gci.get_font_scaler() is not None
-        assert gci.get_status_bubbles() is not None
-        assert gci.get_pipeline_status() is not None
-        assert gci.get_scratchpad() is not None
         assert gci.get_high_contrast() is not None
-        assert gci.get_agent_personalities() is not None
-        assert gci.get_agent_handoff() is not None
 
 
 class TestHighContrastGUIIntegration:
@@ -180,91 +171,3 @@ class TestHighContrastGUIIntegration:
         hci = self._make()
         result = hci.verify_wcag_compliance((255, 255, 255), (0, 0, 0))
         assert isinstance(result, bool)
-
-
-class TestPipelineStatusGUIIntegration:
-    def test_init(self):
-        gui = Mock()
-        pi = PipelineStatusGUIIntegration(gui)
-        assert pi.gui is gui
-
-    def test_update_current_agent(self):
-        pi = PipelineStatusGUIIntegration(Mock())
-        pi.update_current_agent("metis")
-        assert pi.get_current_agent() == "metis"
-
-    def test_add_remove_queue(self):
-        pi = PipelineStatusGUIIntegration(Mock())
-        pi.add_agent_to_queue("kallos")
-        assert "kallos" in pi.get_processing_queue()
-        pi.remove_agent_from_queue("kallos")
-        assert "kallos" not in pi.get_processing_queue()
-
-    def test_loading_state(self):
-        pi = PipelineStatusGUIIntegration(Mock())
-        pi.set_loading_state(True)
-        assert pi.is_loading() is True
-        pi.set_loading_state(False)
-        assert pi.is_loading() is False
-
-    def test_clear_pipeline(self):
-        pi = PipelineStatusGUIIntegration(Mock())
-        pi.add_agent_to_queue("a")
-        pi.clear_pipeline()
-        assert len(pi.get_processing_queue()) == 0
-
-    def test_get_indicator(self):
-        pi = PipelineStatusGUIIntegration(Mock())
-        assert pi.get_indicator() is not None
-
-
-class TestScratchpadGUIIntegration:
-    def test_init(self):
-        si = ScratchpadGUIIntegration(Mock())
-        assert si.scratchpad is not None
-
-    def test_add_plan(self):
-        si = ScratchpadGUIIntegration(Mock())
-        si.add_plan("Step 1", "metis")
-        assert "metis" in si.scratchpad._content_by_agent
-
-    def test_set_active_agent(self):
-        si = ScratchpadGUIIntegration(Mock())
-        si.set_active_agent("kallos")
-        assert si.scratchpad._active_agent == "kallos"
-
-    def test_toggle(self):
-        si = ScratchpadGUIIntegration(Mock())
-        si.toggle()
-        assert si.scratchpad.is_open is True
-
-    def test_handle_event(self):
-        si = ScratchpadGUIIntegration(Mock())
-        event = pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=(0, 0))
-        result = si.handle_event(event)
-        assert result is False
-
-    def test_draw(self):
-        si = ScratchpadGUIIntegration(Mock())
-        s = _surf()
-        rect = pygame.Rect(0, 0, 300, 400)
-        si.draw(s, rect)
-
-
-class TestStatusBubblesGUIIntegration:
-    def test_init(self):
-        sbi = StatusBubblesGUIIntegration(Mock())
-        assert sbi.status_bubbles is not None
-
-    def test_add_status(self):
-        sbi = StatusBubblesGUIIntegration(Mock())
-        sbi.add_status_message("test")
-
-    def test_get_bubbles(self):
-        sbi = StatusBubblesGUIIntegration(Mock())
-        assert sbi.get_status_bubbles() is not None
-
-    def test_clear(self):
-        sbi = StatusBubblesGUIIntegration(Mock())
-        sbi.add_status_message("test")
-        sbi.clear_all_status()

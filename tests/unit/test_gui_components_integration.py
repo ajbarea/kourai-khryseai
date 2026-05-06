@@ -20,11 +20,7 @@ class TestGUIComponentsIntegration:
             assert integration.gui is mock_gui
             assert integration.settings is not None
             assert integration.font_scaler is not None
-            assert integration.status_bubbles is not None
-            assert integration.pipeline_status is not None
             assert integration.high_contrast is not None
-            assert integration.agent_personalities is not None
-            assert integration.agent_handoff is not None
 
     def test_get_settings_manager(self):
         """Test getting settings manager."""
@@ -46,26 +42,6 @@ class TestGUIComponentsIntegration:
             scaler = integration.get_font_scaler()
             assert scaler is integration.font_scaler
 
-    def test_get_status_bubbles(self):
-        """Test getting status bubbles."""
-        mock_gui = Mock()
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = Path(tmpdir) / "settings.json"
-            integration = GUIComponentsIntegration(mock_gui, config_path)
-
-            bubbles = integration.get_status_bubbles()
-            assert bubbles is integration.status_bubbles
-
-    def test_get_pipeline_status(self):
-        """Test getting pipeline status."""
-        mock_gui = Mock()
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = Path(tmpdir) / "settings.json"
-            integration = GUIComponentsIntegration(mock_gui, config_path)
-
-            pipeline = integration.get_pipeline_status()
-            assert pipeline is integration.pipeline_status
-
     def test_get_high_contrast(self):
         """Test getting high contrast integration."""
         mock_gui = Mock()
@@ -75,26 +51,6 @@ class TestGUIComponentsIntegration:
 
             hc = integration.get_high_contrast()
             assert hc is integration.high_contrast
-
-    def test_get_agent_personalities(self):
-        """Test getting agent personalities."""
-        mock_gui = Mock()
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = Path(tmpdir) / "settings.json"
-            integration = GUIComponentsIntegration(mock_gui, config_path)
-
-            personalities = integration.get_agent_personalities()
-            assert personalities is integration.agent_personalities
-
-    def test_get_agent_handoff(self):
-        """Test getting agent handoff integration."""
-        mock_gui = Mock()
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = Path(tmpdir) / "settings.json"
-            integration = GUIComponentsIntegration(mock_gui, config_path)
-
-            handoff = integration.get_agent_handoff()
-            assert handoff is integration.agent_handoff
 
     def test_save_all_settings(self):
         """Test saving all settings."""
