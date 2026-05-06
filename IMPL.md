@@ -1,30 +1,25 @@
 # Kourai Khryseai — Implementation scratchpad
 
-The active TODO list for whatever we're working on right now. When a
-milestone lands, its detail block in [ROADMAP.md](./ROADMAP.md) collapses
-to a one-liner under "Shipped" and this file resets to the next milestone.
-Git history is the archive — these docs are plans + scratchpad, not a
-historical record.
+The active TODO list for whatever's in flight **right now** — current PR,
+open design question blocking me, immediate next pickup. Queued specs,
+cross-cutting invariants, and "next up" ordering live in
+[ROADMAP.md](./ROADMAP.md). Git history is the archive.
 
-Updated: 2026-05-06 · NE AI Agents Day 2026 poster prep is **shipped
-through #184** (slop sweep + first-impression CLI playthrough fixes +
-AGENTS.md + CITATION.cff + MCC pillars + poster-page CTAs). QR-code
-reviewer experience verified end-to-end: clean boot, accurate roster,
-no JSON leaks, working `make cli` path. Friday-only watch is the live
-poster session itself.
+If this file is more than ~50 lines, something queued or referential has
+crept in — extract it back to ROADMAP.
 
-Active focus returns to **M6 ElevenLabs hybrid** (sub-task 2 audio
-cache layer shipped [#174]; sub-tasks 1/3/4/5 still gate on M20 +
-VN smoke).
+Updated: 2026-05-06
 
-Pre-release perfection stance unchanged: no workarounds, web-search
-current best practice **at the planning step**, architectural fix
-over expedient patch.
+## In flight
 
-## Post-presentation follow-ups
+Nothing actively building. NE Agents Day prep shipped through #184; the
+QR-code reviewer experience is verified end-to-end. Friday's poster
+session is a passive watch.
 
-Items that surfaced during NE Agents Day prep but don't need to land
-before Friday — investigate after the poster session.
+## Next pickups
+
+After Friday, working through these in order — small, self-contained,
+don't need AJ at the keyboard:
 
 - **Hephaestus aiohttp `TimeoutError` on M14 parallel routing.** Smoke
   on 2026-05-06 sent `"hi dokimasia, are you there?"` to hephaestus;
@@ -32,216 +27,20 @@ before Friday — investigate after the poster session.
   `_execute_completion failed (attempt 2), retrying in 4.4s:
   TimeoutError`. Network from inside the container reaches
   `api.anthropic.com` cleanly via `urllib`; hang is at the LiteLLM +
-  aiohttp transport layer specifically. Retry logic IS firing — system
-  is resilient, just slow. File a GitHub issue with reproduction + log
-  capture; investigate after Friday.
-- **Karaoke Tier 2 fallback prints empty `""` quote pair when Kokoro
-  on CPU doesn't fire `on_word` callbacks.** Cosmetic — TTS audio
-  still plays correctly and the spoken text is in the file log. Fix
-  is to fall through to a static text print in the karaoke close path
-  when no words were revealed.
+  aiohttp transport layer. Retry logic IS firing — system is resilient,
+  just slow. File a GitHub issue with reproduction + log capture.
+- **Karaoke Tier 2 fallback prints empty `""` quote pair when Kokoro on
+  CPU doesn't fire `on_word` callbacks.** Cosmetic. Fix is to fall
+  through to a static text print in the karaoke close path when no words
+  were revealed.
 - **`docs/configuration.md` accuracy + spirits tier-table decision.**
   README simplified tier table omits aidos/aletheia/cupid/puck rows;
-  the docs page should either fully list them or explicitly link to
+  docs page should either fully list them or explicitly link to
   `shared/src/kourai_common/config.py` as canonical.
-- **Host-area docstring deslop pass** that #184 deferred — Manages/
-  Handles/Provides narrative WHAT-comments in `hosts/cli/` and
-  `hosts/gui/`. Lower priority than the post-presentation M6 work.
+- **Host-area docstring deslop pass** that #184 deferred —
+  Manages/Handles/Provides narrative WHAT-comments in `hosts/cli/` and
+  `hosts/gui/`.
 
-## M6 — ElevenLabs hybrid (pre-player-release blocker)
-
-Promoted from "future-future" 2026-05-03; spec'd 2026-05-05 against
-ElevenLabs's actual May 2026 docs. Character voice IS the product
-(Hephaestus gruff vs Kallos lilting); Kokoro swaps voicepacks but can't
-deliver per-character emotional control. ElevenLabs can.
-[VOICE_CASTING_PLAN.md](../tools/voice-lab/VOICE_CASTING_PLAN.md)
-already casts voice IDs + per-maiden settings.
-
-### Engine + model strategy
-
-| Model | Use | Latency | Price | Markup support |
-|---|---|---|---|---|
-| `eleven_flash_v2_5` | routine dialogue, handoffs | ~75ms | $0.06 / 1k chars | `<break>` works but ElevenLabs warns against overuse — use natural punctuation |
-| `eleven_v3` | victory lines, key handoffs, onboarding | ~1-2s | $0.12 / 1k chars | `[bracket]` audio tags for emotional control; **no** SSML break tags |
-
-### Required add-ons before player release
-
-#### 1. Per-engine markup adapter
-
-Producers emit plain text with optional inline `[bracket]` audio
-direction hints. The adapter at the engine boundary translates per
-target engine:
-
-| Engine | Behavior |
-|---|---|
-| `eleven_v3` | Keep `[bracket]` tags. Tag effect decays after ~4-5 words; producers should write short tagged segments. Layered tags supported (`[nervously][whispers]`). |
-| `eleven_flash_v2_5` / `eleven_multilingual_v2` | Strip brackets — v3 audio tags don't apply. Emotional tone comes from `voice_settings.style` + low `stability` + per-maiden voice training. Skip `<break>` per ElevenLabs's instability warning. |
-| `kokoro` (current) | Strip brackets. No SSML, no audio tags; punctuation carries everything. |
-
-Tag vocabulary (lift from ElevenLabs's documented set, scoped to
-maidens — skip the cinematic ones that don't fit pipeline dialogue):
-
-- Voice cues: `[whispers]`, `[sighs]`, `[exhales]`, `[laughs]`,
-  `[sarcastic]`, `[curious]`, `[excited]`, `[crying]`
-- Layered (per ElevenLabs docs): `[nervously][whispers]`,
-  `[softly][sighs]`, etc.
-- Skip: `[applause]`, `[clapping]`, `[gasps]`, `[sings]`, accent
-  tags — too rare or character-mismatched.
-
-The existing `kourai_common.ssml.strip_ssml` defensive layer stays in
-place. Order at the engine boundary: strip SSML (defensive) → apply
-engine markup adapter → synthesize.
-
-`research(2026-05)`: ElevenLabs `prompting/eleven-v3` audio-tag list,
-help-center "How do audio tags work with Eleven v3" 4-5-word decay note,
-help-center "Do pauses and SSML phoneme tags work" model support matrix.
-
-#### 2. Audio caching layer — SHIPPED [#174]
-
-`kourai_common.tts_cache.cached_synthesize`. Engine-agnostic via
-fetch-injection; same module wraps Kokoro now and ElevenLabs at sub-task
-3 swap. Cache key:
-`sha256(length-prefixed(text, voice_id, model_id, sorted-keys-json(voice_settings)))`.
-Layout: `${XDG_CACHE_HOME:-~/.cache}/kourai/tts/{key[:2]}/{key}.{ext}`;
-oldest-mtime-first eviction at 500 MB cap. Opt-in via
-`RealtimeTTSEngine(cache_dir=...)`; enabled at vn_bridge construction
-where static dialogue dicts repeat across players. CLI / GUI integration
-deferred — current `speak()` streams synth into PyAudio playback rather
-than returning bytes; routing through cache is non-trivial. Re-enter
-when ElevenLabs swap forces `speak()` to refactor against bytes.
-
-#### 3. Per-persona prosody design pass
-
-With adapter + cache shipped and ElevenLabs reference audio in hand
-(via `tools/voice-lab` Next.js scratchpad), decide per-maiden defaults:
-
-- Kallos: `[whispers]` for teasing asides, lower stability for expressiveness.
-- Dokimasia: `[sarcastic]` defaults during validation failures.
-- Aidos / Aletheia: highest stability + lowest style for clinical / authoritative validation tone (already in VOICE_CASTING_PLAN.md).
-- Hephaestus: gruff via `style` slider + voice training (no `[gruff]` tag exists).
-
-Deferred under the SSML plan; now design-tractable against real
-reference audio post-adapter-ship.
-
-### Sub-task order + gating
-
-1. **Per-engine markup adapter** — `kourai_common.tts_markup.apply_engine_markup`. Ships when caller exists (i.e., bundled with sub-task 4).
-2. **Audio cache layer — SHIPPED [#174]** (see #2 above).
-3. **ElevenLabs SDK integration** — `pyproject.toml` adds `elevenlabs` dep; new `ElevenLabsEngine` class implementing the same `RealtimeTTSEngine` public surface. Engine selected via `KOURAI_TTS_ENGINE=elevenlabs|kokoro` env (default `kokoro` until cutover). `client.text_to_speech.convert(voice_id, text, model_id, voice_settings=VoiceSettings(...), output_format)` returns bytes.
-4. **Voice-lab → production wiring** — flip default to `elevenlabs`, smoke through CLI / GUI / VN.
-5. **Per-persona prosody pass** — tune voice_settings + audio tag defaults per maiden against reference audio.
-
-**Production swap gated on M20 + VN smoke landing first** — character
-voice quality is most visible against a polished dialogue UX; doing M6
-before audio-led reveal lands would burn ElevenLabs spend chasing UX
-bugs we already know about.
-
-### Cost projections (2026-05 ElevenLabs API pricing)
-
-- Pre-release dev (~200 lines/day × 50 chars): ~$22/month.
-- 100 active players (~200 lines/session × 30 sessions): ~$2,160/month uncached → ~$430-1,080/month after cache layer (50-80% hit rate on static dialogue, near-100% on v3 lines after warm).
-- 1000 active players: ~$21,600/month → ~$4,300-10,800/month with cache.
-
-## Notes / open invariants
-
-- **MCP elicitation deferred-by-design.** Real-caller-driven only.
-  Architectural notes from closed
-  [PR #74](https://github.com/ajbarea/kourai-khryseai/pull/74) capture
-  the round-trip design when the first forge MCP tool wants `ctx.elicit()`.
-- **MCP spec version pinned to 2025-11-25** — confirmed still current as
-  of 2026-05-06 (no new revision since November 2025; v2.1 SEPs in
-  flight, not yet adopted). Spec drift watcher cron
-  (`scripts/watch_protocols.py`, runs Sundays 13:00 UTC) flags any
-  subsequent revision.
-- **`run_post_task_hooks` orchestration unwired.** Layer is fully tested
-  but no production call sites; `synthesise_fact_from_pause` lives
-  directly in `streaming.py` as the pragmatic answer. Promotion is
-  sibling work flagged for M5/M6.
-- **Specialist parity for fact recall.** Today only metis reads
-  `build_fact_context` with project scope; techne / kallos / dokimasia /
-  hephaestus inherit the gap. Defer until a non-metis PAUSE caller
-  surfaces.
-- **Server-side conversation compaction (Anthropic Opus 4.6+).**
-  Anthropic's 2026-05 cookbook recommends server-side compaction over
-  manual `_manage_memory`-style summarization for Opus 4.6+ — handles
-  context-window management automatically without SDK-level config via
-  `client.beta.messages.tool_runner` with `compaction_control`.
-  Migration is a multi-PR refactor: 1) verify LiteLLM passes the beta
-  header (uncertain), 2) dual-provider design (Anthropic uses
-  server-side, Gemini/Ollama keep manual), 3) existing `_manage_memory`
-  becomes the fallback. The cheap-tier pin (#180) captures ~80% of the
-  cost win without that refactor risk; defer until the remaining 20% is
-  worth it.
-- **Sisters audit weekly cron** (`trig_013uP9ryCLYscBKS7X6PB5og`, Mondays
-  12:00 UTC) opens drift PRs and a rollup issue automatically.
-- **Issue #126 auto-rescan** (`.github/workflows/issue-126-rescan.yml`)
-  fires Saturdays 14:17 UTC from 2026-05-16 until npm bundles
-  `@xmldom/xmldom>=0.8.13`. Upstream landed 0.8.13 in 2026; the rescan
-  will detect once npm cuts a release with the bumped pin.
-- **DRY-sweep follow-ups deferred from [#170]:**
-  - **pyloudnorm migration of `AudioNormalizer`** in
-    `kourai_common.audio_dsp`. Today's hand-rolled LUFS approximation
-    works; ITU-R BS.1770-4 via pyloudnorm is technically correct but
-    requires re-tuning the per-personality profiles in `AGENT_PROFILES`.
-    File when an audio-quality callback surfaces.
-  - **VN demo-script bridge.** `kourai_common.demo_script` is consumed
-    by CLI and GUI; VN's `script_poster_demo.rpy` keeps a header comment
-    cross-reference rather than a real import (Ren'Py can't import Python
-    at script-time without bridge gymnastics). Build a `.rpy` codegen
-    pass when the demo script needs another change.
-  - **Pydantic v2 migration of `CLISettings` / `SettingsManager`.** The
-    new `AudioSettings` is a `@dataclass` to match the surrounding style;
-    full migration would touch settings persistence, slash-command
-    panels, and tests. File when a settings-validation pain point
-    surfaces.
-- **M18 Phase 3 Part B** — distinct render paths for `KIND_CODE` /
-  `KIND_SPEC`. Both kinds are reserved tokens with no producer; building
-  host-side render paths is anticipatory infra. Re-enter once a
-  specialist (likely techne for code, metis for spec) opts into emitting
-  these kinds.
-
-## Up next — priority order
-
-Pre-release perfection stance: no workarounds, web-search May 2026 best
-practice **at the planning step**, architectural fix over expedient patch.
-Pick by impact + caller reality, not file-of-origin.
-
-**Live-smoke gated** (need AJ at the keyboard):
-- **Live VN smoke end-to-end** — exercises the vn_bridge `/tts` →
-  `RealtimeTTSEngine.synthesize_to_wav` path + metadata-based dialogue
-  routing. Includes M20 sub-task 2/4 cps verification (Ren'Py-side
-  cps math from the `X-TTS-Duration-Seconds` header) and the VN
-  synthesis indicator that's gated on the Ren'Py wrapper.
-- **M6 sub-tasks 1, 3, 4, 5** — markup adapter / ElevenLabs SDK /
-  production swap / per-persona prosody pass; gated on M20 + VN smoke
-  landing first.
-- **Puck Slice 3 + 4** — flight scene rewrite, first-message routing.
-- **VN dialogue-presentation polish** (illuminated-manuscript framing) —
-  parchment + plaque corner flourishes, epithet subtitle.
-
-**Self-contained workable** (ship clean without AJ in-loop):
-- **Puck Slice 2 helper** — `_invoke_agent_live(agent, prompt, fallback,
-  timeout)` A2A timeout-and-fallback wrapper. Skip the
-  `/replay-tutorial` command pending Slice 3 (replays a still-stub
-  flight scene = anticipatory).
-- **Cross-host pipeline-status** — `kourai_common.pipeline_status`
-  data layer (PipelineState frozen + PipelineTracker with handoff hooks)
-  + vn_bridge wiring (replaces the local `current_agent` variable). GUI
-  integration (refactor of GUIState's agent fields) deferred to Phase 2.
-- **Cross-host status-feed** — `kourai_common.status_feed` (RingBuffer[T]
-  + StatusEvent typed record). One writer, three subscribers (CLI
-  `/debug` slash, future GUI bottom overlay, file-write). Replaces
-  debug_log.py + the deleted status_bubbles parallel state stores.
-- **Cross-host gossip-render** — `kourai_common.gossip_render`
-  (RenderedRound). gossip_core / gossip_models already canonical
-  from #170; what's missing is the host-agnostic structured-render
-  translation. Renderers collapse to ~30-line ANSI / pygame / Ren'Py
-  adapters.
-- **Cross-host codex** (in-game encyclopedia) — biggest scope; fixes
-  the broken VN codex screens; Mass Effect-shape data + unlock triggers.
-  Best done as one large PR; live smoke needed for VN parchment-book
-  renderer.
-- **Per-agent motion language** — polish, lands last.
-
-Music playlist (#11) — content-driven; AJ adds tracks to
-`assets/audio/music/` over time. No code work.
+After those: **M6 ElevenLabs hybrid** is the next milestone (gated on
+M20 + VN smoke landing first; full spec in
+[ROADMAP.md → M6](./ROADMAP.md#m6--elevenlabs-hybrid-pre-player-release-blocker)).
