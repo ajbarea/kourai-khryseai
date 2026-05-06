@@ -1051,6 +1051,148 @@ class TestCacheControlMarkers:
         assert _mark_last_tool_cacheable(tools) == tools
 
 
+class TestBuildContextualMessagesCacheStructure:
+    """Verify _build_contextual_messages places semantic_summary in its own
+    cache-control block so the static system prefix stays cacheable across
+    Mneme summarizations.
+
+    research(2026-05): Anthropic prompt caching cuts cost by up to 90 % on
+    repeat turns. Pre-2026-05-06 shape concatenated the dynamic summary onto
+    the static system content as a string — every summarization invalidated
+    the entire prefix. The fix splits the system content into two
+    cache_control text blocks; only the summary block resets when the
+    summary changes.
+    """
+
+    @pytest.mark.asyncio
+    async def test_summary_present_yields_two_cache_blocks(self):
+        from kourai_common.llm import _build_contextual_messages
+
+        with (
+            patch("kourai_common.llm._manage_memory", new=AsyncMock(return_value=0)),
+            patch(
+                "kourai_common.llm.get_agent_state",
+                return_value={"semantic_summary": "prior context"},
+            ),
+            patch("kourai_common.llm.get_unsummarized_messages", return_value=[]),
+            patch("kourai_common.llm.add_message"),
+        ):
+            out = await _build_contextual_messages(
+                "metis",
+                [
+                    {"role": "system", "content": "static maiden personality"},
+                    {"role": "user", "content": "hi"},
+                ],
+                "ctx-1",
+            )
+        # System content is now a list of two cache-marked text blocks.
+        sys_content = out[0]["content"]
+        assert isinstance(sys_content, list)
+        assert len(sys_content) == 2
+        # Block 0 = static prefix, block 1 = dynamic summary, both cached.
+        assert sys_content[0]["text"] == "static maiden personality"
+        assert sys_content[0]["cache_control"] == {"type": "ephemeral"}
+        assert "prior context" in sys_content[1]["text"]
+        assert sys_content[1]["cache_control"] == {"type": "ephemeral"}
+
+    @pytest.mark.asyncio
+    async def test_no_summary_leaves_system_content_string(self):
+        """Without a summary, the system stays a plain string so the existing
+        single-block _mark_system_cacheable path still adds one breakpoint
+        downstream — no behavior change for new sessions."""
+        from kourai_common.llm import _build_contextual_messages
+
+        with (
+            patch("kourai_common.llm._manage_memory", new=AsyncMock(return_value=0)),
+            patch(
+                "kourai_common.llm.get_agent_state",
+                return_value={"semantic_summary": ""},
+            ),
+            patch("kourai_common.llm.get_unsummarized_messages", return_value=[]),
+            patch("kourai_common.llm.add_message"),
+        ):
+            out = await _build_contextual_messages(
+                "metis",
+                [
+                    {"role": "system", "content": "static maiden personality"},
+                    {"role": "user", "content": "hi"},
+                ],
+                "ctx-1",
+            )
+        # No summary → system stays a string. _mark_system_cacheable
+        # downstream wraps it into a single-block list.
+        assert out[0]["content"] == "static maiden personality"
+
+    @pytest.mark.asyncio
+    async def test_no_context_id_returns_messages_unchanged(self):
+        """No context_id (e.g., one-off ad-hoc call) bypasses memory entirely;
+        no summary injection, no cache structure change."""
+        from kourai_common.llm import _build_contextual_messages
+
+        msgs = [
+            {"role": "system", "content": "sys"},
+            {"role": "user", "content": "ad-hoc"},
+        ]
+        out = await _build_contextual_messages("metis", msgs, None)
+        # Same content references; nothing got wrapped.
+        assert out[0]["content"] == "sys"
+        assert out[1]["content"] == "ad-hoc"
+
+    @pytest.mark.asyncio
+    async def test_summary_block_text_is_self_describing(self):
+        """The summary block's text carries the SEMANTIC MEMORY header so a
+        debugging human reading a request payload can spot what the block is."""
+        from kourai_common.llm import _build_contextual_messages
+
+        with (
+            patch("kourai_common.llm._manage_memory", new=AsyncMock(return_value=0)),
+            patch(
+                "kourai_common.llm.get_agent_state",
+                return_value={"semantic_summary": "prior context"},
+            ),
+            patch("kourai_common.llm.get_unsummarized_messages", return_value=[]),
+            patch("kourai_common.llm.add_message"),
+        ):
+            out = await _build_contextual_messages(
+                "metis",
+                [{"role": "system", "content": "sys"}],
+                "ctx-1",
+            )
+        block_text = out[0]["content"][1]["text"]
+        assert "SEMANTIC MEMORY" in block_text
+        assert "PREVIOUS CONTEXT" in block_text
+
+    @pytest.mark.asyncio
+    async def test_static_block_unchanged_when_summary_changes(self):
+        """The whole point: vary the summary, the static block stays bytewise
+        identical so the prefix-cache machinery hits the static block on
+        every call regardless of summary churn."""
+        from kourai_common.llm import _build_contextual_messages
+
+        async def _build_with_summary(summary: str):
+            with (
+                patch("kourai_common.llm._manage_memory", new=AsyncMock(return_value=0)),
+                patch(
+                    "kourai_common.llm.get_agent_state",
+                    return_value={"semantic_summary": summary},
+                ),
+                patch("kourai_common.llm.get_unsummarized_messages", return_value=[]),
+                patch("kourai_common.llm.add_message"),
+            ):
+                return await _build_contextual_messages(
+                    "metis",
+                    [{"role": "system", "content": "STATIC PERSONALITY"}],
+                    "ctx-1",
+                )
+
+        out_a = await _build_with_summary("summary version A")
+        out_b = await _build_with_summary("summary version B")
+        # Static block (index 0) must be byte-identical across summaries.
+        assert out_a[0]["content"][0]["text"] == out_b[0]["content"][0]["text"]
+        # Summary block (index 1) must differ.
+        assert out_a[0]["content"][1]["text"] != out_b[0]["content"][1]["text"]
+
+
 class TestLogCacheUsage:
     """_log_cache_usage emits a debug line only when real cache numbers exist."""
 
