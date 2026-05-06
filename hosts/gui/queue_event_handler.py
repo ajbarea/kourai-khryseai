@@ -99,9 +99,7 @@ class QueueEventHandler:
 
     def _handle_connected(self, event: dict) -> None:
         self.state.connected = True
-        self.gui_integration.status_bubbles.add_status_message(
-            f"[system] Connected to {event.get('name', 'Hephaestus')}"
-        )
+        logger.info("Connected to %s", event.get("name", "Hephaestus"))
         greeting = "The forge is hot. What are we building?"
         self.history.add(DialogueEntry("hephaestus", greeting))
         self.history.scroll_to_bottom()
@@ -160,35 +158,41 @@ class QueueEventHandler:
         )
         self.state.switch_agent(new_agent)
         self.tts_manager.set_current_agent(new_agent)
-        self.gui_integration.get_scratchpad().set_active_agent(new_agent)
 
     def _route_status_text(self, agent: str, text: str) -> None:
-        """Classify and route a status message to the right subsystem."""
-        if is_system_status(text):
-            self.gui_integration.status_bubbles.add_status_message(f"[{agent}] {text}")
-        elif is_scratchpad_content(text):
-            self.gui_integration.get_scratchpad().add_plan(text, agent)
+        """Classify and route a status message to the right subsystem.
+
+        System-status (`* Connected`, `* Completed`) and scratchpad-shaped
+        (TODO / CoT bullets) messages used to feed dedicated GUI widgets
+        that #173 pruned. Drop them silently here until the cross-host
+        ``status_feed`` / ``scratchpad`` rebuilds land — same effective
+        UX as pre-#173 (those widgets weren't actually rendered, just
+        instantiated) and avoids the AttributeError that would otherwise
+        fire on every classified message.
+        """
+        if is_system_status(text) or is_scratchpad_content(text):
+            logger.debug("dropped non-dialogue status from %s: %r", agent, text[:60])
+            return
+        speakable = extract_speakable(text)
+        if self._will_speak(speakable):
+            # M20 sub-task 2 Tier 1 (audio-led): typewriter pace = TTS word events.
+            self._add_with_word_paced_typewriter(DialogueEntry(agent, text))
+            play_emote_sfx(text, agent, self.audio_manager)
+            speak_async(
+                speakable,
+                agent,
+                self.tts_manager,
+                on_word=self._on_tts_word,
+                on_audio_start=self._on_tts_audio_start,
+            )
         else:
-            speakable = extract_speakable(text)
-            if self._will_speak(speakable):
-                # M20 sub-task 2 Tier 1 (audio-led): typewriter pace = TTS word events.
-                self._add_with_word_paced_typewriter(DialogueEntry(agent, text))
-                play_emote_sfx(text, agent, self.audio_manager)
-                speak_async(
-                    speakable,
-                    agent,
-                    self.tts_manager,
-                    on_word=self._on_tts_word,
-                    on_audio_start=self._on_tts_audio_start,
-                )
-            else:
-                # Time-based typewriter. M20 sub-task 4: in "instant"
-                # mode TTS still fires (audio catches up to text);
-                # legacy behavior for players who prefer text-first.
-                self._add_with_typewriter(DialogueEntry(agent, text))
-                play_emote_sfx(text, agent, self.audio_manager)
-                if self._tts_unsynced_enabled(speakable):
-                    speak_async(speakable, agent, self.tts_manager)
+            # Time-based typewriter. M20 sub-task 4: in "instant"
+            # mode TTS still fires (audio catches up to text);
+            # legacy behavior for players who prefer text-first.
+            self._add_with_typewriter(DialogueEntry(agent, text))
+            play_emote_sfx(text, agent, self.audio_manager)
+            if self._tts_unsynced_enabled(speakable):
+                speak_async(speakable, agent, self.tts_manager)
 
     def _handle_result(self, event: dict) -> None:
         text = event["text"]
@@ -247,9 +251,7 @@ class QueueEventHandler:
             play_emote_sfx(victory_text, self.state.last_agent, self.audio_manager)
             speak_async(victory_text, self.state.last_agent, self.tts_manager)
 
-        self.gui_integration.status_bubbles.add_status_message(
-            f"[system] * Completed in {elapsed:.1f}s"
-        )
+        logger.info("Pipeline completed in %.1fs", elapsed)
         self.history.scroll_to_bottom()
 
     def _handle_error(self, event: dict) -> None:

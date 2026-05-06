@@ -115,9 +115,6 @@ class RenderPipeline:
             if self.gui_integration.settings.get("show_debug_logs", False):
                 self.debug_log.draw(screen, dialogue_rect)
 
-            # Scratchpad
-            self.gui_integration.get_scratchpad().draw(screen, dialogue_rect)
-
             # Overlays (drawn last — on top of everything)
             self.settings_overlay.draw(screen)
             self.alignment_panel.draw(screen)
