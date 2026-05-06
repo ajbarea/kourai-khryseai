@@ -765,6 +765,26 @@ file-of-origin.
 One-line per item, newest first. Detail moves to git history when work
 lands — these docs are plans + scratchpad, not a historical archive.
 
+- 2026-05-06 — **Summarization cheap-tier pin** [#180]. `_manage_memory`'s
+  summarization sub-call was resolving to `get_model(agent_name)` — same
+  tier as the agent, which on smart-tier-Metis is Opus 4.7 ($5/M input).
+  Anthropic's context-compaction cookbook documents the cheap-tier
+  pattern with `"model": "claude-haiku-4-5"` for the compaction sub-call
+  (5× cheaper, sufficient extraction quality, fastest tier so the next
+  agent call doesn't wait). Self-acknowledged TODO already in code
+  ("could theoretically use a cheaper/faster one") — this PR acts on
+  it. One-line resolution change inside `_manage_memory`'s try block
+  pinning to `tier="cheap"`; mirrors M14's `metis.discuss_tradeoffs`
+  cheap-tier pin pattern. Test
+  `test_summarization_pinned_to_cheap_tier` sets KOURAI_MODEL_TIER=smart
+  so the env would otherwise route Metis to Opus, asserts Haiku still
+  wins. Cost magnitude: ~$0.06/hour saved on Opus-tier dev sessions
+  (~5× per-summary reduction × ~3 summaries/agent/hour × 5 agents).
+  Latency win on top — Haiku is ~2-4× faster than Opus. Server-side
+  compaction (Opus 4.6+ via `client.beta.messages.tool_runner`) filed
+  as follow-on Open Invariant; #180 captures ~80% of the cost win
+  without that bigger refactor. `research(2026-05)`: source
+  platform.claude.com/cookbook/tool-use-automatic-context-compaction.
 - 2026-05-06 — **Cache telemetry split by 5m vs 1h TTL (post-#178 follow-on)** [#179].
   PR #178's static-block ttl="1h" upgrade meant Anthropic now bills part
   of every request at 2× input (the 1h rate) vs 1.25× (the 5m default).

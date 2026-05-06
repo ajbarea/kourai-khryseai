@@ -6,10 +6,25 @@ to a one-liner under "Shipped" and this file resets to the next milestone.
 Git history is the archive — these docs are plans + scratchpad, not a
 historical record.
 
-Updated: 2026-05-06 · Active focus: **Cache telemetry per-TTL split
-shipped [#179]** — `/usage` was applying the 5m write rate (1.25× input)
-to ALL cache-write tokens, under-quoting the 1h-static portion of #178
-by ~60%. AgentUsage now splits into `cache_write_5m_tokens` +
+Updated: 2026-05-06 · Active focus: **Summarization cheap-tier pin
+shipped [#180]** — `_manage_memory`'s summarization sub-call was using
+`get_model(agent_name)` (same tier as the agent), so Opus-powered
+agents paid Opus rates for "summarize this conversation" — extraction
+work that Haiku handles fine. Anthropic's own context-compaction
+cookbook documents the cheap-tier-for-compaction pattern explicitly
+(`model: "claude-haiku-4-5"` for compaction sub-call). Mirrors M14's
+`metis.discuss_tradeoffs` cheap-tier pin pattern — same intent: quick
+auxiliary call shouldn't run on the agent's primary tier. Cost
+magnitude: 5× input reduction per summary; ~$0.06/hour saved on
+Opus-tier dev sessions plus a latency win (Haiku is the fastest tier).
+Server-side compaction (Anthropic Opus 4.6+ feature via
+`client.beta.messages.tool_runner.compaction_control`) filed as
+follow-on Open Invariant — needs LiteLLM passthrough verification +
+dual-provider design; #180 captures ~80% of the cost win without that
+refactor risk. **Cache telemetry per-TTL split shipped [#179]** —
+`/usage` was applying the 5m write rate (1.25× input) to ALL
+cache-write tokens, under-quoting the 1h-static portion of #178 by
+~60%. AgentUsage now splits into `cache_write_5m_tokens` +
 `cache_write_1h_tokens`; `record_usage` extracts Anthropic's
 `usage.cache_creation.ephemeral_5m_input_tokens` /
 `ephemeral_1h_input_tokens` sub-fields when present, falls back to
