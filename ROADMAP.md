@@ -760,6 +760,18 @@ file-of-origin.
 One-line per item, newest first. Detail moves to git history when work
 lands — these docs are plans + scratchpad, not a historical archive.
 
+- 2026-05-06 — **Drop GUI zombie call sites surviving #173** [#175].
+  Eight host-side call sites in `hosts/gui/{render,queue_event_handler,pygame_event_handler}.py`
+  referenced `GUIComponentsIntegration.get_scratchpad` /
+  `.status_bubbles` attributes that #173 deleted. ty surfaced these as
+  `unresolved-attribute` warnings (rc=0 — `make lint` passed) but
+  `render.py:119`'s per-frame `get_scratchpad().draw()` would have
+  crashed every GUI frame. Cleanup drops the zombie sites; `_route_status_text`
+  collapses to "drop non-dialogue, route dialogue to typewriter" (same
+  effective UX as pre-#173 since the deleted widgets weren't actually
+  rendering). Tab key unbound; cross-host `scratchpad` rebuild will
+  rebind when its renderer lands. ty: 22 → 14 diagnostics; 3075/3075
+  unit pass.
 - 2026-05-06 — **TTS audio cache layer (M6 sub-task 2)** [#174].
   `kourai_common.tts_cache` content-addressable disk cache wraps the
   engine bytes-returning synth call. Cache key is `sha256` of
