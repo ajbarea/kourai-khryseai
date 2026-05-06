@@ -765,6 +765,26 @@ file-of-origin.
 One-line per item, newest first. Detail moves to git history when work
 lands — these docs are plans + scratchpad, not a historical archive.
 
+- 2026-05-06 — **Cache telemetry split by 5m vs 1h TTL (post-#178 follow-on)** [#179].
+  PR #178's static-block ttl="1h" upgrade meant Anthropic now bills part
+  of every request at 2× input (the 1h rate) vs 1.25× (the 5m default).
+  `/usage` was applying the 5m rate to all cache writes — under-quoting
+  the 1h-static portion by ~60%. Anthropic's response shape exposes the
+  per-TTL breakdown via `usage.cache_creation.ephemeral_5m_input_tokens`
+  and `ephemeral_1h_input_tokens`. `AgentUsage` splits into
+  `cache_write_5m_tokens` + `cache_write_1h_tokens` (legacy
+  `cache_write_tokens` preserved as a `@property` summing both for
+  backward compat). `record_usage` extracts the breakdown when present;
+  falls back to total → 5m bucket when not (under-quotes rather than
+  over-bills). `ModelPricing` gains `cache_write_1h_per_m`; Anthropic
+  invariant is 2× input across all four tiers; Gemini stays at 0 since
+  per-hour storage doesn't fit per-write shape. `compute_cost` combines
+  both rates. `_log_cache_usage` emits `write_5m=N write_1h=M` per
+  request when breakdown is present, falls back to legacy `write=N`
+  otherwise. 9 new tests; 3138/3138 unit pass; ty rc=0. `research(2026-05)`:
+  source platform.claude.com prompt-caching docs (response format
+  section explicitly documents the cache_creation sub-object on
+  mixed-TTL requests).
 - 2026-05-06 — **Cache-tighten get_enriched_system_blocks (post-#177 follow-on)** [#178].
   PR #177 split the system message into two cache breakpoints, but the
   "static" block still concatenated SYSTEM_PROMPT with dynamic player

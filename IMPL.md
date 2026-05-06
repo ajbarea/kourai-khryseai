@@ -6,12 +6,23 @@ to a one-liner under "Shipped" and this file resets to the next milestone.
 Git history is the archive — these docs are plans + scratchpad, not a
 historical record.
 
-Updated: 2026-05-06 · Active focus: **Cache-tighten follow-on shipped
-[#178]** — splits the previously-monolithic system content into two
-cache breakpoints at the source: Block 0 truly-static (`SYSTEM_PROMPT` +
-optional call-site `static_suffix`, **1h TTL**); Block 1 player-dynamic
-(identity + memories + alignment + romance + personality adaptation +
-memory moments + virtues, 5m default). Replaced string-returning
+Updated: 2026-05-06 · Active focus: **Cache telemetry per-TTL split
+shipped [#179]** — `/usage` was applying the 5m write rate (1.25× input)
+to ALL cache-write tokens, under-quoting the 1h-static portion of #178
+by ~60%. AgentUsage now splits into `cache_write_5m_tokens` +
+`cache_write_1h_tokens`; `record_usage` extracts Anthropic's
+`usage.cache_creation.ephemeral_5m_input_tokens` /
+`ephemeral_1h_input_tokens` sub-fields when present, falls back to
+total→5m bucket when not (under-quote rather than over-bill).
+ModelPricing gains `cache_write_1h_per_m` (2× input on Anthropic, 0 on
+Gemini); `compute_cost` combines both rates. `_log_cache_usage` emits
+`write_5m=N write_1h=M` per request when breakdown present.
+**Cache-tighten follow-on shipped [#178]** — splits the previously-
+monolithic system content into two cache breakpoints at the source:
+Block 0 truly-static (`SYSTEM_PROMPT` + optional call-site
+`static_suffix`, **1h TTL**); Block 1 player-dynamic (identity +
+memories + alignment + romance + personality adaptation + memory
+moments + virtues, 5m default). Replaced string-returning
 `get_enriched_system_prompt` with `get_enriched_system_blocks` returning
 cache-marked text blocks; new public helper `cached_text_blocks(*chunks,
 static_ttl="1h")` in `kourai_common.llm` for hephaestus's manual `_route`
