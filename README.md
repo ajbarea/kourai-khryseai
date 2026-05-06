@@ -388,6 +388,29 @@ Full docs are available at [Kourai Khryseai](https://ajbarea.github.io/kourai-kh
 
 ---
 
+## Citation
+
+If you use Kourai Khryseai or its findings in academic work, please
+cite the NE AI Agents Day 2026 poster + extended abstract:
+
+```bibtex
+@inproceedings{barea2026kourai,
+  author    = {Arnaldo Barea},
+  title     = {Kourai Khryseai: Transparent Human-on-the-Loop Multi-Agent Software Development},
+  booktitle = {North-East AI Agents Day 2026},
+  address   = {New York, NY, USA},
+  year      = {2026},
+  month     = {5},
+  url       = {https://ajbarea.github.io/kourai-khryseai/research/ne-agents-day-2026/},
+}
+```
+
+GitHub renders a copy-paste citation widget from
+[`CITATION.cff`](CITATION.cff) on the right sidebar of the repo
+homepage.
+
+---
+
 ## License
 
 [Apache 2.0](LICENSE)
