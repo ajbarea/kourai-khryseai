@@ -149,7 +149,7 @@ If Kallos finds issues Techne can fix, they iterate up to 3 rounds automatically
 
 ```bash
 git clone https://github.com/ajbarea/kourai-khryseai.git
-cd kourai_khryseai
+cd kourai-khryseai
 
 make setup        # Install dependencies (equivalent: uv sync --all-packages)
 cp .env.example .env
@@ -165,7 +165,7 @@ KOURAI_PROVIDER=local make cli
 ### 2. Start the Agents
 
 ```bash
-make up           # Builds Docker images, starts all 6 agents + Jaeger + Prometheus
+make up           # Build images and start all 11 agents + observability stack
 make status       # Check health
 ```
 
