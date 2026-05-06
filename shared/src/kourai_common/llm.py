@@ -282,15 +282,44 @@ async def _build_contextual_messages(
     # 1. Fetch State (Semantic Memory)
     state = get_agent_state(context_id, agent_name)
 
-    # 2. Inject Semantic Summary into System Prompt
+    # 2. Inject Semantic Summary as a SEPARATE cache breakpoint.
+    #
+    # research(2026-05): Anthropic prompt caching cuts cost by up to 90 %
+    # on repeat turns when the cached prefix is stable. The pre-2026-05-06
+    # shape concatenated the dynamic semantic_summary onto the static
+    # system content as a single string, so every Mneme summarization
+    # invalidated the entire system-prompt cache and forced a fresh
+    # write of the static portion (the bulk). Restructuring as a list
+    # of two text blocks with separate cache_control markers keeps the
+    # static block always-cacheable; only the summary block resets when
+    # Mneme rewrites the summary. Sources: Anthropic prompt-caching docs
+    # (multiple cache_control breakpoints supported up to four per
+    # request, in increasing prefix order); CODEX_ARCHITECTURE_PLAN.md
+    # internal note (kourai-khryseai .claude/) flagged this exact issue.
     if state["semantic_summary"] and full_messages and full_messages[0]["role"] == "system":
         original_system = full_messages[0]["content"]
-        injected_system = (
-            f"{original_system}\n\n"
-            "=== SEMANTIC MEMORY (PREVIOUS CONTEXT) ===\n"
-            f"{state['semantic_summary']}"
-        )
-        full_messages[0]["content"] = injected_system
+        # Static block first (always cache-hits within a session); summary
+        # block second (resets on summarization). Both carry cache_control
+        # so the prefix-cache machinery can read either breakpoint.
+        full_messages[0] = {
+            **full_messages[0],
+            "content": [
+                {
+                    "type": "text",
+                    "text": original_system
+                    if isinstance(original_system, str)
+                    else str(original_system),
+                    "cache_control": _EPHEMERAL_CACHE,
+                },
+                {
+                    "type": "text",
+                    "text": (
+                        f"=== SEMANTIC MEMORY (PREVIOUS CONTEXT) ===\n{state['semantic_summary']}"
+                    ),
+                    "cache_control": _EPHEMERAL_CACHE,
+                },
+            ],
+        }
 
     # 3. Inject Working Memory (Only Unsummarized Recent Messages)
     recent_history = get_unsummarized_messages(context_id, agent_name)
