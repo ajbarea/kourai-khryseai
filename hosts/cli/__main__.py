@@ -30,6 +30,7 @@ from hosts.cli.commands import (
     _copy_to_clipboard,
     _handle_preferences_command,
     _handle_project_command,
+    _handle_scratchpad_command,
     _show_help,
     _show_settings,
 )
@@ -789,6 +790,10 @@ async def main(
 
                 if prompt_text == "/metrics":
                     _show_metrics_dashboard()
+                    continue
+
+                if prompt_text == "/scratchpad" or prompt_text.startswith("/scratchpad "):
+                    _handle_scratchpad_command(prompt_text)
                     continue
 
                 if prompt_text.startswith("/maidens"):
