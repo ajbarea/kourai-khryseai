@@ -9,13 +9,17 @@ The Kourai Khryseai Visual Novel is a Ren'Py experience where the Golden Maidens
 ## Starting the VN
 
 ```bash
-# From the Ren'Py SDK directory
-cd hosts/vn/renpy-8.5.2-sdk
-./renpy.sh ../kourai_vn    # Linux/Mac
-renpy.exe ..\kourai_vn     # Windows
+make vn
 ```
 
-The VN launches, connects to the `vn-bridge` service at `:10010`, and drops you into the forge. The bridge must be running via `docker compose up`.
+This resolves the Ren'Py SDK from `KOURAI_RENPY_EXE` (env override),
+a local SDK copy under `hosts/vn/renpy-8.5.2-sdk/`, or
+`C:\Tools\renpy-8.5.2-sdk\renpy.exe` via `/mnt/c/...` in WSL. The SDK
+itself is **optional and gitignored** — see [`hosts/vn/README.md`](https://github.com/ajbarea/kourai-khryseai/blob/main/hosts/vn/README.md)
+for the install-once Windows pattern.
+
+The VN launches, connects to the `vn-bridge` service at `:10010`, and
+drops you into the forge. The bridge must be running via `make up`.
 
 ---
 
