@@ -65,6 +65,11 @@ SLASH_COMMANDS: tuple[SlashCommand, ...] = (
     SlashCommand("prefs", "Alias for /preferences"),
     SlashCommand("metrics", "Show alignment, affinity, and virtue metrics"),
     SlashCommand("maidens", "Meet the Golden Maidens", arg_hint="[name]"),
+    SlashCommand(
+        "scratchpad",
+        "Recent agent reasoning (CoT / TODO buffered from the stream)",
+        arg_hint="[<agent>|clear [<agent>]]",
+    ),
     SlashCommand("status", "Agent info: name, URL, model, context ID"),
     SlashCommand(
         "project new",

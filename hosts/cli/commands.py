@@ -651,9 +651,92 @@ __all__ = [
     "_copy_to_clipboard",
     "_handle_preferences_command",
     "_handle_project_command",
+    "_handle_scratchpad_command",
     "_show_help",
     "_show_settings",
 ]
+
+
+# ---------------------------------------------------------------------------
+# /scratchpad — recall agent reasoning (CoT / TODO buffered from the stream)
+# ---------------------------------------------------------------------------
+def _format_scratchpad_age(seconds_ago: float) -> str:
+    """Human-readable relative timestamp, terse for inline display."""
+    if seconds_ago < 60:
+        return "just now"
+    if seconds_ago < 3600:
+        return f"{int(seconds_ago // 60)}m ago"
+    if seconds_ago < 86400:
+        return f"{int(seconds_ago // 3600)}h ago"
+    return f"{int(seconds_ago // 86400)}d ago"
+
+
+def _handle_scratchpad_command(prompt_text: str) -> None:
+    """Recall agent reasoning buffered from the streaming pipeline.
+
+    Forms:
+      ``/scratchpad`` — list all agents that have buffered entries.
+      ``/scratchpad <agent>`` — show that agent's recent entries, oldest-
+        first (so the player reads top-down through the reasoning).
+      ``/scratchpad clear`` — clear all buffers.
+      ``/scratchpad clear <agent>`` — clear one agent's buffer.
+
+    `research(2026-05)`: 2026 best practice for LLM CoT visibility is
+    distinct rendering (not piped through dialogue / TTS) — sources
+    catalogued in :mod:`kourai_common.scratchpad`.
+    """
+    import time
+
+    from kourai_common.scratchpad import get_scratchpad
+
+    scratchpad = get_scratchpad()
+    parts = prompt_text.split()
+    args = parts[1:]  # drop "/scratchpad"
+
+    # /scratchpad clear [<agent>]
+    if args and args[0] == "clear":
+        target = args[1].lower() if len(args) > 1 else None
+        scratchpad.clear(target)
+        target_label = target or "all agents"
+        _echo(f"  {_DIM}Cleared scratchpad for {target_label}.{_RESET}")
+        return
+
+    # /scratchpad <agent>
+    if args:
+        agent = args[0].lower()
+        entries = scratchpad.entries(agent)
+        if not entries:
+            _echo(f"  {_DIM}No buffered reasoning from {agent} this session.{_RESET}")
+            return
+        _echo(f"\n{_GOLD_BOLD}━━━ Scratchpad — {agent} ━━━{_RESET}\n")
+        now = time.time()
+        for entry in entries:
+            age = _format_scratchpad_age(now - entry.timestamp)
+            _echo(f"  {_DIM}[{age}]{_RESET}")
+            for line in entry.text.splitlines():
+                _echo(f"    {line}" if line.strip() else "")
+            _echo("")
+        return
+
+    # /scratchpad — list summary across agents
+    agents_with_entries = scratchpad.agents()
+    if not agents_with_entries:
+        _echo(
+            f"  {_DIM}Scratchpad is empty. Agents with multi-line reasoning "
+            f"(plans, TODOs, checklists) get buffered here automatically.{_RESET}"
+        )
+        return
+    _echo(f"\n{_GOLD_BOLD}━━━ Scratchpad ━━━{_RESET}\n")
+    now = time.time()
+    for agent in agents_with_entries:
+        ents = scratchpad.entries(agent)
+        latest = max(ents, key=lambda e: e.timestamp)
+        age = _format_scratchpad_age(now - latest.timestamp)
+        _echo(
+            f"  {_GOLD}{agent}{_RESET}  "
+            f"{_DIM}{len(ents)} entr{'y' if len(ents) == 1 else 'ies'}, latest {age}{_RESET}"
+        )
+    _echo(f"\n  {_DIM}Use /scratchpad <agent> to read recent reasoning.{_RESET}\n")
 
 
 # ---------------------------------------------------------------------------

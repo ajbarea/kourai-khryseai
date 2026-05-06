@@ -44,6 +44,7 @@ from hosts.cli.styling import _DIM, _GOLD, _GOLD_BRIGHT, _RED, _RESET
 from kourai_common.a2a_events import extract_artifact_data
 from kourai_common.federation.host_helpers import build_pipeline_turn_entry
 from kourai_common.hooks_interaction import synthesise_fact_from_pause
+from kourai_common.message_classifier import is_scratchpad_content
 from kourai_common.messaging import (
     KIND_DIALOGUE,
     file_part_from_b64,
@@ -54,6 +55,7 @@ from kourai_common.messaging import (
 )
 from kourai_common.pause_state import pop_preference_kind
 from kourai_common.projects import derive_project_id
+from kourai_common.scratchpad import get_scratchpad
 
 if TYPE_CHECKING:
     from a2a.client.client import Client
@@ -236,6 +238,13 @@ async def send_and_stream(
                     formatted, agent = _maidenify_status(text)
                     # Strict M18 routing: only KIND_DIALOGUE goes to TTS.
                     kind = get_content_kind(event.status.message)
+                    # Cross-host scratchpad rebuild: agent reasoning
+                    # (multi-line bullet / TODO / checkbox text) gets
+                    # buffered so /scratchpad can recall it later.
+                    # Side-effect only — display routing below stays
+                    # unchanged so players still see reasoning inline.
+                    if agent and kind != KIND_DIALOGUE and is_scratchpad_content(text):
+                        get_scratchpad().add(agent, text)
                     # Captions off + TTS on → audio-only (drop visual);
                     # without TTS, visual must land or dialogue is lost.
                     suppress_visual = (

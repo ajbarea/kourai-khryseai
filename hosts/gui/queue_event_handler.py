@@ -170,8 +170,17 @@ class QueueEventHandler:
         instantiated) and avoids the AttributeError that would otherwise
         fire on every classified message.
         """
-        if is_system_status(text) or is_scratchpad_content(text):
-            logger.debug("dropped non-dialogue status from %s: %r", agent, text[:60])
+        if is_scratchpad_content(text):
+            # Cross-host scratchpad rebuild: route reasoning into the
+            # shared kourai_common.scratchpad buffer. CLI's /scratchpad
+            # slash command already reads from the same buffer; a GUI
+            # overlay renderer can land later without further plumbing.
+            from kourai_common.scratchpad import get_scratchpad
+
+            get_scratchpad().add(agent, text)
+            return
+        if is_system_status(text):
+            logger.debug("system status from %s: %r", agent, text[:60])
             return
         speakable = extract_speakable(text)
         if self._will_speak(speakable):
