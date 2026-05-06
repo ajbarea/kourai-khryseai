@@ -168,9 +168,7 @@ class PygameEventDispatcher:
             return True
         if self.alignment_panel.handle_event(event):
             return True
-        if self.gossip_panel.handle_event(event):
-            return True
-        return self.gui_integration.get_scratchpad().handle_event(event)
+        return self.gossip_panel.handle_event(event)
 
     # -- keyboard ------------------------------------------------------------
 
@@ -214,8 +212,6 @@ class PygameEventDispatcher:
 
         if event.key == pygame.K_ESCAPE:
             self.settings_overlay.toggle()
-        elif event.key == pygame.K_TAB:
-            self.gui_integration.get_scratchpad().toggle()
         elif event.key == pygame.K_F2:
             self.alignment_panel.toggle()
         elif event.key == pygame.K_F3:
