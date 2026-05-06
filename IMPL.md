@@ -32,7 +32,8 @@ Concrete blocker list for the QR-code reviewer experience.
   One-line `COPY` in the runtime stage.
 - **ROADMAP Shipped section collapsed to one-liners** [#183]. 959 →
   811 lines. Per the section's own header convention.
-- **Pre-presentation slop sweep + doc-accuracy fixes** [#184 — open].
+- **Pre-presentation slop sweep + doc-accuracy fixes + structural
+  additions** [#184 — open, 10 commits].
   4 parallel deslop subagents → ~30 high-confidence edits: dropped
   `{CURRENT_DATE} Best Practices` template prefix from 9 agent prompts,
   stripped floating `April 2026` / `as of 2026-05` markers from
@@ -51,6 +52,29 @@ Concrete blocker list for the QR-code reviewer experience.
     that the README simplified table still omits.
   - `docs/cli.md`: missing `/scratchpad` (#176) and `/preferences`
     (alias `/prefs`, M17 Phase 2). Added.
+  - `docs/architecture/index.md`: **added MCC pillars section.** The
+    poster abstract names "Monitor / Communicate / Control" as the
+    core conceptual frame; pre-fix those terms appeared only on the
+    poster page itself. Now anchored to verified code locations
+    (`_OtelTraceFilter`, `is_audio_output_available`, `with_retry`
+    jitter, `MAX_ITERATIONS` Kallos⇅Techne loop) so a reviewer
+    following the abstract into architecture finds the mapping.
+  - `docs/agents/specialists.md` + `docs/agents/index.md`: 10 broken
+    GitHub URLs using `kourai_khryseai` (underscore) → fixed to
+    `kourai-khryseai` (hyphen). All specialist/spirit "view source"
+    links would have 404'd.
+  - `docs/vn.md`: same outdated `cd hosts/vn/renpy-8.5.2-sdk` path
+    as the getting-started fix (the SDK is optional + gitignored);
+    replaced with `make vn`.
+  - **New root `AGENTS.md`** (484 words; 6 H2 sections; covers
+    Build/Testing/Lint/Conventions/Architecture/NFRs). Per arxiv
+    2511.12884v1 ("Agent READMEs: An Empirical Study of Context
+    Files for Agentic Coding"), agentic coding tools (Claude Code,
+    Cursor, Codex, Aider) read root-level `AGENTS.md` by default.
+    The empirical median is 485 words, 6-7 H2 sections, with
+    Security and Performance the common 14.5%-included gaps —
+    targeted exactly. Coexists with `.github/copilot-instructions.md`
+    (the deeper Copilot-specific file already in place).
 - **Verified GitHub repo + docs site state.** GitHub description +
   topics + homepage URL are correctly set. Docs site at
   `https://ajbarea.github.io/kourai-khryseai/` builds and serves; nav,
