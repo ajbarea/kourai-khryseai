@@ -109,6 +109,12 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked \
 RUN adduser -D -u 1000 -h /app kourai
 
 COPY --link --from=builder /app/.venv /app/.venv
+# kourai_common.paths.find_project_root() walks up from shared/src/kourai_common/
+# looking for the workspace pyproject.toml ([tool.uv.workspace]). It's the
+# single source of truth for assets_dir / logs_dir / templates_dir, called at
+# module import, so the runtime image must include the workspace pyproject —
+# not just the builder stage that uses it for `uv sync`.
+COPY --chown=1000:1000 --link pyproject.toml /app/pyproject.toml
 COPY --chown=1000:1000 --link agents/ agents/
 COPY --chown=1000:1000 --link hosts/ hosts/
 COPY --chown=1000:1000 --link shared/ shared/
