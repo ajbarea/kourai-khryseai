@@ -662,6 +662,96 @@ architectural moves; valuable but not the first lift.
 - **VN Codex broken (`hosts/vn/kourai_vn/game/codex_data.rpy`,
   `screens_codex.rpy`).** Symptom and reproduction TBD; needs a
   debugging session next time the VN host (`make vn`) is exercised.
+  See "Cross-host shared rebuilds" below — the codex extraction
+  supersedes a fix-in-place; rebuilding the encyclopedia under
+  `kourai_common.codex` lets the broken VN screens get rewritten
+  fresh against the canonical data, with CLI + GUI surfaces gained
+  for free.
+
+### Surfaced 2026-05-06 from cross-host dead-infra audit
+
+After #170/#171/#172 shipped the ten-item cross-host DRY sweep, a
+follow-up audit surfaced a stratum of staged-but-unwired GUI features
+(Scratchpad, PipelineStatusIndicator, StatusBubbles, AgentPersonality
+indicators, plus the CLI's `gossip_cli`). Their integration shims had
+been instantiated in `gui_components_integration.py` but never called
+from any rendering or logic path; tests exercised the APIs against
+`Mock()`, giving false coverage signal (the *Mockery* anti-pattern in
+modern test-design literature). The legacy modules were deleted in
+preference to wiring them, on the explicit understanding that any
+rebuild lands as a shared-across-hosts feature rather than a
+GUI-defines-then-waits pattern.
+
+The rebuild items below are **deliberately host-agnostic** at the data
+layer (frozen dataclasses + pure logic in `kourai_common.*`); each
+host owns thin renderer adapters. Pick by player-journey impact, not
+file-of-origin.
+
+- **Cross-host scratchpad — per-agent CoT / TODO display.** Today
+  `kourai_common.message_classifier.is_scratchpad_content` already
+  routes scratchpad-shaped messages, but no host renders them. New
+  shared module: `kourai_common.scratchpad` exporting
+  `ScratchpadEntry(kind, text)` (kind ∈ todo / cot_step / bullet /
+  plain) and `Scratchpad(agent_name)` with `.append(text) /
+  .entries() / .clear() / .summary()` — extends the existing
+  classifier with structured parsing. Renderers: CLI `/scratchpad`
+  slash dump (or passive scrollback), GUI overlay panel, VN side
+  parchment slip styled to match the dialogue framing.
+- **Cross-host pipeline-status — active agent + queue + loading
+  flag.** Real metis-parallel work exists (M0); each host re-derives
+  "who's active" from event streams independently today. New shared
+  module: `kourai_common.pipeline_status` exporting `PipelineState`
+  (frozen) + `PipelineTracker` with hooks into the central A2A event
+  stream (`working` → set_active, handoff → dequeue+set_active,
+  `complete` → clear). Renderers: CLI status-line above prompt
+  (`🔥 hephaestus → 📐 metis (analyzing)`), GUI active-agent badge
+  + queue indicator, VN HUD overlay highlighting the active maiden.
+- **Cross-host status feed — debug events ring buffer.** Today
+  `debug_log.py` writes events to disk and the deleted
+  `status_bubbles.py` buffered the same shape in memory — two
+  parallel state stores. New shared module: `kourai_common.status_feed`
+  exporting a generic `RingBuffer[T]` and a `StatusEvent(level,
+  agent, text, timestamp)` typed record. One writer, three
+  subscribers (CLI `/debug` slash, GUI bottom overlay, VN optional
+  codex page); file-write becomes just another subscriber.
+- **Cross-host gossip render layer.** `gossip_core` and
+  `gossip_models` already canonical from #170; what's missing is a
+  structured-render translation. New shared module:
+  `kourai_common.gossip_render` exporting `RenderedRound(speakers,
+  lines, options)` and host-agnostic format helpers. Renderers
+  collapse to ~30-line ANSI / pygame / Ren'Py adapters that consume
+  `RenderedRound`.
+- **Cross-host codex — encyclopedia entries with auto-unlock
+  triggers.** Today the VN owns ~550 lines of `codex_data.rpy` plus
+  401 lines of `screens_codex.rpy`, and the VN screen path is broken
+  (above). Mass-Effect-shaped data: 6 categories (Characters,
+  Technology, Lore, Virtues, Tutorials, Systems), entries with `id /
+  title / subtitle / content / unlock_trigger`, triggers like
+  `start | agent_met:<name> | affinity:<name>:<threshold> |
+  tutorial:<id>`. New shared modules: `kourai_common.codex` exporting
+  `CodexEntry`, `CODEX_CATEGORIES`, `CODEX_ENTRIES`, plus an
+  `is_unlocked(entry, player_state)` pure-function trigger evaluator.
+  Renderers: CLI `/codex` slash + ANSI table, GUI overlay panel, VN
+  parchment-book screen (replaces the broken Ren'Py screens with a
+  fresh implementation reading the canonical data).
+- **Per-agent motion language.** Each maiden gets a distinctive
+  visual idle behaviour (the deleted `agent_personality_indicators`
+  reached for this with pygame-only `pulse / glow / shimmer / none`
+  primitives but never wired). Polish layer, lands last. New canonical
+  field on `AGENT_METADATA` — `motion: Literal["pulse", "glow",
+  "shimmer", "drift", "static"]` — with each host translating: GUI
+  pygame primitives, VN Ren'Py ATL transforms, CLI no-op (or subtle
+  ANSI shimmer for very-active agents). Filed for after the static
+  visual tightening below.
+- **VN dialogue-presentation polish (illuminated-manuscript
+  framing).** Static improvements landing the VN's existing parchment
+  + plaque concept closer to its visual reference: ornate corner
+  flourishes on the dialogue frame, decorative motif at the
+  plaque-to-dialogue join, epithet subtitle rendered under the
+  speaker name in the plaque (data already exists at
+  `AGENT_METADATA[*]["epithet"]`; render-side wiring is the gap).
+  Live-smoke required (AJ at the keyboard) for each visual change to
+  confirm against the parchment background.
 
 ---
 
@@ -670,6 +760,24 @@ architectural moves; valuable but not the first lift.
 One-line per item, newest first. Detail moves to git history when work
 lands — these docs are plans + scratchpad, not a historical archive.
 
+- 2026-05-06 — **Prune dead host-side anticipatory infrastructure**.
+  Deletes the staged-but-unwired stratum of GUI features (Scratchpad,
+  PipelineStatusIndicator, StatusBubbles, AgentPersonality
+  indicators/handoff) plus the CLI's `gossip_cli` surface. 9 source
+  files + 6 dedicated test files removed; ~105 false-coverage tests
+  pruned (the *Mockery* anti-pattern: APIs exercised against `Mock()`
+  with no real consumer); `gui_components_integration.py` collapsed to
+  the three live members (settings, font_scaler, high_contrast). The
+  ideas these files reached for aren't gone — they're filed under
+  "Cross-host shared rebuilds" in the Future / unprioritized backlog
+  with shared-across-hosts plans (scratchpad, pipeline-status,
+  status-feed, gossip-render, codex, per-character motion,
+  illuminated-manuscript dialogue polish), each landing as
+  `kourai_common.*` data + thin host renderers rather than
+  GUI-defines-then-waits. `agent_personality_indicators.py`'s parallel
+  agent-color palette also drifted from #171's canonical
+  `AGENT_METADATA["rgb"]`; the canonical now stands alone. 3031/3031
+  unit pass; `make lint` clean.
 - 2026-05-06 — **Centralize VN companion-spirits palette to
   `script_data.rpy` constants** [#172]. Resolves the "VN companion-spirits
   brightening" follow-up filed alongside #171. Walked back the originally
