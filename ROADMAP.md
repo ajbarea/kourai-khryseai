@@ -765,6 +765,30 @@ file-of-origin.
 One-line per item, newest first. Detail moves to git history when work
 lands — these docs are plans + scratchpad, not a historical archive.
 
+- 2026-05-06 — **Cache-tighten get_enriched_system_blocks (post-#177 follow-on)** [#178].
+  PR #177 split the system message into two cache breakpoints, but the
+  "static" block still concatenated SYSTEM_PROMPT with dynamic player
+  context (identity + memories + alignment + romance + adaptation +
+  moments + virtues), invalidating the truly-static portion (~1-3K
+  tokens of maiden personality + tool descriptions, the bulk) on every
+  player-state shift. Replace `get_enriched_system_prompt` (str) with
+  `get_enriched_system_blocks` (list[dict]) returning two cache-marked
+  blocks split at the static/dynamic boundary; new public helper
+  `cached_text_blocks(*chunks, static_ttl="1h")` for hephaestus's manual
+  routing path. **1h TTL upgrade bundled** for Block 0 — web-search of
+  Anthropic's May 2026 docs surfaced the static system prompt is exactly
+  the documented use case for the 1h extended TTL ("long chat
+  conversations where users may not respond within 5 minutes" + "agentic
+  side-agents that may take longer than 5 minutes"). 1h costs 2× write
+  vs 1.25× for 5m default; both 0.1× read; truly-static block re-use
+  pays back the multiplier after one hit beyond 5min. Forge Party
+  sessions routinely exceed 5min idle. Within Anthropic's 4-breakpoint
+  budget (BP1 static-1h / BP2 player-dynamic-5m / BP3 summary-5m / BP4
+  first-user-5m). Migration: 9 callers via blocks API + hephaestus via
+  cached_text_blocks + 5 test files. ~5× reduction in static-block write
+  tokens on top of the ~3-7× from #177. 18 new unit tests including
+  byte-identity invariant; 3130/3130 unit pass; ty rc=0. Source:
+  platform.claude.com prompt-caching docs.
 - 2026-05-06 — **Split system-prompt cache breakpoints** [#177].
   `_build_contextual_messages` was concatenating the dynamic
   `semantic_summary` onto the static system content as a string,
