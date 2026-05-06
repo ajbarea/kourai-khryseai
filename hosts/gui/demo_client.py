@@ -5,6 +5,10 @@ into the real GUI input bar.  You type a prompt, the demo plays the
 canned Hephaestus → Metis pause sequence so you can screenshot the
 "Metis is waiting for input" moment.
 
+The beat list comes from ``kourai_common.demo_script`` so CLI and GUI
+agree on the canonical scene; this module owns the recv-queue event
+shape only.
+
 Activated via ``--demo`` on ``make gui-demo`` / ``python -m hosts.gui --demo``.
 No network, no LLM, no A2A.
 
@@ -21,13 +25,19 @@ import threading
 import time
 from typing import TYPE_CHECKING
 
+from kourai_common.demo_script import (
+    CSV_DEMO_TURNS,
+    DemoTurn,
+    matches_csv_trigger,
+)
+
 if TYPE_CHECKING:
     import queue as _queue
 
 logger = logging.getLogger(__name__)
 
 
-# --- Canned response script ------------------------------------------------
+# --- Canonical script → recv-queue event sequence -------------------------
 # Emoji prefixes route through GUI's detect_agent (hosts/gui/maidens.py)
 # and trigger portrait flips + name-card updates automatically.
 #
@@ -38,52 +48,91 @@ logger = logging.getLogger(__name__)
 #     setting input_bar.waiting_for_agent to the speaking agent — which
 #     is exactly what makes the "Metis is waiting for input" framing
 #     work for the poster screenshot.
-
+#
 # The Hephaestus → Metis handoff is generated automatically by
 # queue_event_handler._maybe_handoff() when it sees the agent switch from
-# hephaestus → metis in the stream, so we don't emit a manual "Metis!
-# Draw up the plans..." line here (that would render it twice).  The
-# built-in HANDOFF_LINES dict in hosts/gui/maidens.py has better variants.
-_CSV_SEQUENCE: list[tuple[float, dict]] = [
-    (
-        1.0,
-        {
-            "type": "status",
-            "text": "\U0001f4d0 analyzing events module...",
-        },
-    ),
-    (
-        0.9,
-        {
-            "type": "status",
-            "text": "\U0001f4d0 found 3 models with datetime fields; nested "
-            "relationships in Attendance and Session.",
-        },
-    ),
-    (
-        0.9,
-        {
-            "type": "status",
-            "text": '\U0001f4d0 "One decision before I draft the spec."',
-        },
-    ),
-    (
-        1.0,
-        {
-            "type": "status",
-            "text": '\U0001f4d0 INPUT_REQUIRED: "Should CSV export stream chunked I/O '
-            "for large files? events.json has ~420k rows in production — "
-            "loading all at once would spike memory. Streaming stays "
-            'constant-memory but adds ~3ms/row of overhead."',
-        },
-    ),
-]
+# hephaestus → metis in the stream, so we skip Hephaestus's speech turn
+# from CSV_DEMO_TURNS — the built-in HANDOFF_LINES has better variants.
+
+_SPEAKER_EMOJI: dict[str, str] = {
+    "hephaestus": "\U0001f525",  # 🔥
+    "metis": "\U0001f4d0",  # 📐
+}
+
+
+def _format_event(turn: DemoTurn, *, pending_rationale: list[str]) -> dict | None:
+    """Translate one canonical turn into a recv-queue status event.
+
+    Returns ``None`` for turns that should be folded into a later event
+    (rationale lines following an action / input_required get bundled).
+    """
+    if turn.kind == "rationale":
+        pending_rationale.append(turn.text)
+        return None
+    emoji = _SPEAKER_EMOJI.get(turn.speaker, "")
+    if turn.kind == "speech":
+        return {"type": "status", "text": f'{emoji} "{turn.text}"'}
+    if turn.kind == "action":
+        # Flush queued rationale into the previous emit's tail; for the
+        # opening "analyzing events module..." action there's nothing
+        # pending yet, so this is a clean status line.
+        text = turn.text
+        if pending_rationale:
+            text = f"{text} {'; '.join(pending_rationale)}"
+            pending_rationale.clear()
+        return {"type": "status", "text": f"{emoji} {text}"}
+    if turn.kind == "input_required":
+        text = turn.text
+        if pending_rationale:
+            text = f"{text} {' '.join(pending_rationale)}"
+            pending_rationale.clear()
+        return {"type": "status", "text": f'{emoji} INPUT_REQUIRED: "{text}"'}
+    return None
+
+
+def _build_csv_sequence() -> list[tuple[float, dict]]:
+    """Materialize CSV_DEMO_TURNS into the recv-queue event list.
+
+    Hephaestus's opening speech is dropped because the GUI's
+    queue_event_handler._maybe_handoff synthesizes a richer handoff line
+    when it sees the agent switch.
+
+    Rationale beats following a non-rationale beat get bundled into that
+    beat's text — the GUI's dialogue panel renders one status per emit
+    and we don't want sub-points becoming disconnected entries.
+    """
+    out: list[tuple[float, dict]] = []
+    pending: list[str] = []
+    for turn in CSV_DEMO_TURNS:
+        if turn.speaker == "hephaestus" and turn.kind == "speech":
+            continue
+        event = _format_event(turn, pending_rationale=pending)
+        if event is not None:
+            out.append((turn.pacing_ms / 1000.0, event))
+        elif out and pending:
+            # Rationale that landed AFTER an emitted event — fold into
+            # that event's text and re-emit. Preserves the "include the
+            # rationale prose" intent without adding a separate row.
+            last_delay, last_event = out[-1]
+            updated_text = f"{last_event['text']} {'; '.join(pending)}"
+            out[-1] = (last_delay, {**last_event, "text": updated_text})
+            pending.clear()
+    # Trailing rationale (no further event to merge into) gets its own
+    # final status line.
+    if pending:
+        emoji = _SPEAKER_EMOJI.get("metis", "")
+        out.append(
+            (0.4, {"type": "status", "text": f"{emoji} {' '.join(pending)}"}),
+        )
+    return out
+
+
+_CSV_SEQUENCE: list[tuple[float, dict]] = _build_csv_sequence()
 
 
 def _matches_csv_prompt(text: str) -> bool:
     """Loose match — any phrasing around CSV export triggers the canned scene."""
-    low = text.lower()
-    return "csv" in low and ("export" in low or "stream" in low or "events" in low)
+    return matches_csv_trigger(text)
 
 
 class DemoGuiClient:

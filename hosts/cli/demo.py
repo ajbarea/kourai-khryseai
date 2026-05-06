@@ -2,7 +2,9 @@
 
 Plays a canned Hephaestus → Metis pipeline exchange that pauses at a
 Metis clarifying question. Uses the exact same rendering primitives as
-the real CLI, so the output is byte-identical to a real session.
+the real CLI, so the output is byte-identical to a real session. The
+beat list comes from ``kourai_common.demo_script`` so CLI and GUI agree
+on the canonical scene; this module owns ANSI rendering only.
 
 No network, no LLM — pure scripted output. Activated via `--demo` on
 `make cli` or `python -m hosts.cli --demo`.
@@ -25,18 +27,29 @@ from prompt_toolkit.patch_stdout import patch_stdout
 
 from hosts.cli.rendering import _banner, _echo
 from hosts.cli.styling import (
-    _BOLD,
     _DIM,
     _GOLD,
     _GOLD_BOLD,
     _ITALIC,
     _RESET,
 )
+from kourai_common.demo_script import (
+    CSV_DEMO_CHOICES,
+    CSV_DEMO_TRIGGER,
+    CSV_DEMO_TURNS,
+    DemoTurn,
+)
 
 # Soft magenta for ask/clarification lines — matches the poster palette.
 _MAGENTA = "\033[38;2;242;106;140m"
 _CYAN = "\033[38;2;125;224;224m"
 _GREEN = "\033[38;2;125;216;132m"
+
+# Speaker → (emoji, display name) for the inline status header.
+_SPEAKERS: dict[str, tuple[str, str]] = {
+    "hephaestus": ("🔥", "Hephaestus"),
+    "metis": ("📐", "Metis"),
+}
 
 
 # Default timing — gentle so screenshots can be taken mid-stream if wanted.
@@ -57,13 +70,79 @@ async def _pause(seconds: float) -> None:
         await asyncio.sleep(d)
 
 
-async def run_demo(prompt_text: str | None = None) -> None:
-    """Play the canned Hephaestus→Metis pause scene and wait for user input.
+async def _pause_turn(turn: DemoTurn) -> None:
+    """Wait the turn's pacing_ms (scaled), then yield."""
+    await _pause(turn.pacing_ms / 1000.0)
 
-    The prompt will sit at the interactive `❯` cursor after the pipeline
+
+def _render_turn(turn: DemoTurn, *, after_input_required: bool) -> None:
+    """ANSI-render one canonical DemoTurn through ``_echo``.
+
+    The ``after_input_required`` flag tracks rationale-line indentation:
+    rationale beats following the question render as deeper-indented dim
+    continuation lines beneath the question; rationale beats earlier in
+    the stream render as the ``└─`` action sub-points beneath their
+    parent action.
+    """
+    if turn.speaker not in _SPEAKERS:
+        # Unknown speaker — skip. Defensive only; the canonical script
+        # uses speakers from _SPEAKERS exclusively.
+        return
+    emoji, name = _SPEAKERS[turn.speaker]
+    if turn.kind == "speech":
+        _echo(f'{emoji} {_GOLD_BOLD}{name}{_RESET}: {_ITALIC}"{turn.text}"{_RESET}')
+    elif turn.kind == "action":
+        _echo("")
+        _echo(f"{emoji} {_GOLD_BOLD}{name}{_RESET}: {turn.text}")
+    elif turn.kind == "rationale" and not after_input_required:
+        _echo(f"   {_DIM}└─ {turn.text}{_RESET}")
+    elif turn.kind == "rationale":
+        _echo(f"     {_DIM}{turn.text}{_RESET}")
+    elif turn.kind == "input_required":
+        _echo("")
+        _echo(f'   {_MAGENTA}→ {_ITALIC}"{turn.text}"{_RESET}')
+
+
+def _render_choice_menu() -> None:
+    """Render the CSV-demo choice menu inline beneath the question."""
+    by_key: dict[str, str] = {c.key: c.label for c in CSV_DEMO_CHOICES}
+    yes_label = by_key.get("y", "yes")
+    no_label = by_key.get("n", "no")
+    explain_label = by_key.get("?", "explain")
+    _echo("")
+    _echo(f"     [{_GREEN}y{_RESET}] {yes_label}     [{_GREEN}n{_RESET}] {no_label}")
+    _echo(f"     [{_CYAN}?{_RESET}] {explain_label}      [{_MAGENTA}^C{_RESET}] cancel")
+    _echo("")
+
+
+def _resolve_choice_key(answer: str) -> str | None:
+    """Map a user reply to one of the canonical choice keys, else None."""
+    cleaned = answer.strip().lower()
+    if not cleaned:
+        return None
+    for choice in CSV_DEMO_CHOICES:
+        if cleaned == choice.key or cleaned in choice.aliases:
+            return choice.key
+    return None
+
+
+async def _render_response(key: str) -> None:
+    """Render the response_turns for a chosen key."""
+    choice = next((c for c in CSV_DEMO_CHOICES if c.key == key), None)
+    if choice is None:
+        return
+    for turn in choice.response_turns:
+        await _pause_turn(turn)
+        _render_turn(turn, after_input_required=False)
+
+
+async def run_demo(prompt_text: str | None = None) -> None:
+    """Play the canned Hephaestus → Metis pause scene and wait for user input.
+
+    The prompt sits at the interactive `❯` cursor after the pipeline
     pauses, ready for a screenshot. Press Ctrl-C or answer y/n to exit.
     """
-    demo_prompt = prompt_text or "implement CSV export with tests for the events module"
+    demo_prompt = prompt_text or CSV_DEMO_TRIGGER
 
     # --- Banner / welcome (mirrors the real CLI) ------------------------------
     _echo(_banner())
@@ -80,52 +159,17 @@ async def run_demo(prompt_text: str | None = None) -> None:
     _echo("")
     await _pause(0.5)
 
-    # --- Hephaestus routes to Metis -------------------------------------------
-    # Quoted + italic — Hephaestus is SPEAKING an in-character handoff line.
-    _echo(
-        f"🔥 {_GOLD_BOLD}Hephaestus{_RESET}: "
-        f'{_ITALIC}"Metis! Draw up the plans. And no improvising."{_RESET}'
-    )
-    await _pause(0.8)
-
-    # --- Metis streams analysis -----------------------------------------------
-    # Unquoted — these are ACTIONS/STATUS (what Metis is doing), not speech.
-    _echo("")
-    _echo(f"📐 {_GOLD_BOLD}Metis{_RESET}: analyzing events module...")
-    await _pause(0.45)
-    _echo(f"   {_DIM}└─ found 3 models with datetime fields{_RESET}")
-    await _pause(0.45)
-    _echo(
-        f"   {_DIM}└─ nested relationships in {_RESET}{_BOLD}Attendance{_RESET}"
-        f"{_DIM} and {_RESET}{_BOLD}Session{_RESET}"
-    )
-    await _pause(0.65)
-
-    # --- Metis pauses with clarifying question --------------------------------
-    # Quoted + italic — Metis is SPEAKING to the player (transitional remark).
-    _echo("")
-    _echo(f'📐 {_GOLD_BOLD}Metis{_RESET}: {_ITALIC}"One decision before I draft the spec."{_RESET}')
-    await _pause(0.3)
-    _echo("")
-    # The question itself is also speech — quoted + italic.  Magenta colour
-    # still marks it as a clarifying/INPUT_REQUIRED line; the arrow is the
-    # procedural cue.  The explanatory rationale below stays unquoted (it's
-    # narrative context, not what Metis says out loud).
-    _echo(
-        f'   {_MAGENTA}→ {_ITALIC}"Should CSV export stream chunked I/O for large files?"{_RESET}'
-    )
-    _echo(f"     {_DIM}events.json has ~420k rows in prod. Loading all at once{_RESET}")
-    _echo(f"     {_DIM}would spike memory. Streaming stays constant-memory.{_RESET}")
+    # --- Walk the canonical turn list ----------------------------------------
+    seen_input_required = False
+    for turn in CSV_DEMO_TURNS:
+        await _pause_turn(turn)
+        _render_turn(turn, after_input_required=seen_input_required)
+        if turn.kind == "input_required":
+            seen_input_required = True
     await _pause(0.4)
-    _echo("")
-    _echo(
-        f"     [{_GREEN}y{_RESET}] yes, stream chunked     [{_GREEN}n{_RESET}] no, load in memory"
-    )
-    _echo(f"     [{_CYAN}?{_RESET}] explain trade-offs      [{_MAGENTA}^C{_RESET}] cancel")
-    _echo("")
+    _render_choice_menu()
 
     # --- Interactive prompt: waits for user. Exit cleanly on Ctrl-C / Ctrl-D. -
-    # Use prompt_toolkit so the blinking cursor + styling match the real CLI.
     session: PromptSession[str] = PromptSession()
     prompt_str = ANSI(f"{_CYAN}❯{_RESET} ")
     try:
@@ -136,31 +180,17 @@ async def run_demo(prompt_text: str | None = None) -> None:
         _echo(f"{_GOLD}Forge cooled. Farewell. ✨{_RESET}")
         return
 
-    answer_clean = answer.strip().lower()
     _echo("")
-
-    # Responses use the speech-vs-action rule: "Noted." is a spoken reply
-    # (quoted + italic); the "drafting..." line that follows is status (plain).
-    if answer_clean in {"y", "yes", "stream", "chunked"}:
-        _echo(f'📐 {_GOLD_BOLD}Metis{_RESET}: {_ITALIC}"Noted."{_RESET}')
-        _echo(f"📐 {_GOLD_BOLD}Metis{_RESET}: drafting spec with streaming I/O...")
-        _echo(f"{_DIM}(demo stops here — this is where the real pipeline would resume.){_RESET}")
-    elif answer_clean in {"n", "no", "memory"}:
-        _echo(f'📐 {_GOLD_BOLD}Metis{_RESET}: {_ITALIC}"Noted."{_RESET}')
-        _echo(f"📐 {_GOLD_BOLD}Metis{_RESET}: drafting spec with in-memory load...")
-        _echo(f"{_DIM}(demo stops here — this is where the real pipeline would resume.){_RESET}")
-    elif answer_clean in {"?", "help", "explain"}:
-        _echo(
-            f"📐 {_GOLD_BOLD}Metis{_RESET}: "
-            f'{_ITALIC}"Streaming keeps memory flat but adds a small per-row cost. '
-            f"Loading all at once is faster for files under ~100MB but scales "
-            f"linearly with RAM — for events.json at 420k rows, streaming is "
-            f'the right call."{_RESET}'
-        )
-        _echo(f"{_DIM}(demo exits after the explanation.){_RESET}")
-    else:
+    key = _resolve_choice_key(answer)
+    if key is None:
         _echo(f"{_DIM}(demo exits — any real answer would resume the pipeline.){_RESET}")
-
+        _echo("")
+        return
+    await _render_response(key)
+    if key in {"y", "n"}:
+        _echo(f"{_DIM}(demo stops here — this is where the real pipeline would resume.){_RESET}")
+    elif key == "?":
+        _echo(f"{_DIM}(demo exits after the explanation.){_RESET}")
     _echo("")
 
 

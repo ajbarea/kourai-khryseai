@@ -323,18 +323,20 @@ Foundations first because most items need the new `paths.py`:
    stay local but use the same `OnboardingChoice` schema. Bundles
    item #10 (intra-CLI ANSI re-import). 6 new tests; 3087/3087 pass.
 
-4. **Item #1 — demo script as data**. Create
-   `shared/src/kourai_common/demo_script.py` with `DemoTurn(speaker,
-   kind, text, choices, pacing_ms)` records and the canonical
-   Hephaestus → Metis pause sequence. Choices use the same
-   `OnboardingChoice`-shape (`id`, `label`, `description`) for
-   consistency. CLI's `hosts/cli/demo.py:61-160` and GUI's
-   `hosts/gui/demo_client.py` iterate the records; each host's
-   render layer stays host-specific. VN's `script_poster_demo.rpy`
-   gets a header comment pointing to the shared canonical script
-   (Ren'Py can't import Python at script-time without a bridge round-trip;
-   a future task could mechanically generate the `.rpy` from the
-   shared data).
+4. **Item #1 — demo script as data** ✅ shipped at TBD-after-commit.
+   `kourai_common.demo_script` owns `DemoTurn(speaker, kind, text,
+   pacing_ms)` and `DemoChoice(key, label, aliases, response_turns)`
+   plus `CSV_DEMO_TRIGGER`, `CSV_DEMO_TURNS` (the 7-beat Hephaestus
+   → Metis pause scene), `CSV_DEMO_CHOICES` (y/n/?), and
+   `matches_csv_trigger(text)`. CLI's `hosts/cli/demo.py` walks the
+   shared turns and renders ANSI; GUI's `hosts/gui/demo_client.py`
+   walks the same turns and pushes recv-queue events (rationale beats
+   bundle into the parent action's text since the GUI dialogue panel
+   renders one status per emit). VN's `script_poster_demo.rpy`
+   keeps its hand-coded form with a fresh header comment cross-
+   referencing the canonical source — Ren'Py can't import Python at
+   script-time without bridge gymnastics. 11 new tests; 3098/3098
+   unit pass.
 
 5. **Item #4 — emote SFX engine**. Move `extract_emotes()` and
    `resolve_sfx()` from `hosts/gui/emote_sfx.py` to
