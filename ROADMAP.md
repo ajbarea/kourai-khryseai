@@ -765,6 +765,23 @@ file-of-origin.
 One-line per item, newest first. Detail moves to git history when work
 lands — these docs are plans + scratchpad, not a historical archive.
 
+- 2026-05-06 — **Split system-prompt cache breakpoints** [#177].
+  `_build_contextual_messages` was concatenating the dynamic
+  `semantic_summary` onto the static system content as a string,
+  invalidating the prompt cache on every Mneme summarization. Restructure
+  as a list of two `cache_control` text blocks: static block always
+  cache-hits within a session; summary block resets only on summary
+  rewrite. Anthropic accepts up to 4 breakpoints per request; chat_with_tools
+  gets BP1 + BP2 here plus BP3 from `_mark_first_user_cacheable`,
+  inside the limit. `research(2026-05)`: Anthropic prompt caching cuts
+  cost by up to 90% on repeat turns; source platform.claude.com
+  prompt-caching docs + May 2026 release notes. Magnitude:
+  ~3-7× reduction in cache-write tokens on long Forge Party sessions
+  where Mneme summarizes every 5+ messages. 5 new unit tests including
+  the byte-identity assertion `test_static_block_unchanged_when_summary_changes`
+  that pins the actual cache-hit invariant. Closes the
+  CODEX_ARCHITECTURE_PLAN.md note that flagged this issue but had
+  never been executed.
 - 2026-05-06 — **Cross-host scratchpad rebuild Phase 1** [#176].
   First slice of the rebuild filed alongside #173: `kourai_common.scratchpad`
   data layer (`ScratchpadEntry` frozen dataclass + per-agent

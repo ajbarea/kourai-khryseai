@@ -6,12 +6,19 @@ to a one-liner under "Shipped" and this file resets to the next milestone.
 Git history is the archive — these docs are plans + scratchpad, not a
 historical record.
 
-Updated: 2026-05-06 · Active focus: **Scratchpad rebuild Phase 1
-shipped [#176]** — `kourai_common.scratchpad` data layer + CLI
-`/scratchpad` slash command. Replaces the post-#175 classifier-drop
-path with a real consumer; agent reasoning is recallable per-agent
-instead of dropped. Aligns with 2026 best practice for LLM CoT
-visibility (distinct render, not spoken; sources in module
+Updated: 2026-05-06 · Active focus: **LLM cache breakpoint split
+shipped [#177]** — `_build_contextual_messages` now structures the
+system prompt as two `cache_control` text blocks (static + dynamic
+summary) instead of concatenating them. Static block always cache-
+hits within a session; summary block resets only on Mneme rewrite.
+Closes the CODEX_ARCHITECTURE_PLAN.md note that flagged this issue
+but had never been executed. Magnitude: ~3-7× reduction in cache-
+write tokens on long Forge Party sessions. **Scratchpad rebuild
+Phase 1 shipped [#176]** — `kourai_common.scratchpad` data layer +
+CLI `/scratchpad` slash command. Replaces the post-#175 classifier-
+drop path with a real consumer; agent reasoning is recallable per-
+agent instead of dropped. Aligns with 2026 best practice for LLM
+CoT visibility (distinct render, not spoken; sources in module
 docstring). Same session: **M6 sub-task 2 shipped [#174]** —
 `kourai_common.tts_cache` content-addressable disk cache validated
 against the spec'd shape (sha256-of-length-prefixed inputs, sharded
