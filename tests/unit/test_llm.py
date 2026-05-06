@@ -1373,6 +1373,53 @@ class TestLogCacheUsage:
             _log_cache_usage("techne", MagicMock())
         assert not any("cache techne" in r.message for r in caplog.records)
 
+    def test_logs_per_ttl_breakdown_when_present(self, caplog):
+        """When the response carries usage.cache_creation with the
+        ephemeral_5m / ephemeral_1h sub-fields (Anthropic mixed-TTL post-#178),
+        the log line splits into write_5m / write_1h instead of a single
+        write= total — operator can spot mismatched proportions in the cache
+        write distribution from a glance."""
+        import logging
+        from types import SimpleNamespace
+
+        from kourai_common.llm import _log_cache_usage
+
+        usage = SimpleNamespace(
+            prompt_tokens_details=SimpleNamespace(cached_tokens=1800),
+            cache_creation_input_tokens=556,
+            cache_creation=SimpleNamespace(
+                ephemeral_5m_input_tokens=456,
+                ephemeral_1h_input_tokens=100,
+            ),
+        )
+        response = SimpleNamespace(usage=usage)
+        with caplog.at_level(logging.DEBUG, logger="kourai_common.llm"):
+            _log_cache_usage("metis", response)
+        assert any(
+            "cache metis read=1800 write_5m=456 write_1h=100" in r.message for r in caplog.records
+        )
+
+    def test_falls_back_to_legacy_total_when_no_breakdown(self, caplog):
+        """Without the cache_creation sub-object (older provider responses,
+        streaming edge cases, non-Anthropic providers), the log line stays
+        on the legacy single-bucket form — backward-compatible."""
+        import logging
+        from types import SimpleNamespace
+
+        from kourai_common.llm import _log_cache_usage
+
+        usage = SimpleNamespace(
+            prompt_tokens_details=SimpleNamespace(cached_tokens=900),
+            cache_creation_input_tokens=200,
+        )
+        response = SimpleNamespace(usage=usage)
+        with caplog.at_level(logging.DEBUG, logger="kourai_common.llm"):
+            _log_cache_usage("kallos", response)
+        # Legacy single-bucket form retained when no breakdown supplied.
+        assert any("cache kallos read=900 write=200" in r.message for r in caplog.records)
+        # Per-TTL form NOT emitted (would be misleading without the actual split).
+        assert not any("write_5m" in r.message for r in caplog.records)
+
 
 class TestChatWithToolsCachesPrefix:
     """Integration: chat_with_tools must hand cache-marked prefix to LiteLLM."""
