@@ -24,3 +24,43 @@
 Multi-agent coding systems are increasingly capable, but their coordination decisions are often opaque to the supervisor. Kourai Khryseai treats multi-agent software development as an interpretability problem and organizes the system around three pillars — **Monitor**, **Communicate**, and **Control**. A Hephaestus orchestrator routes requests to specialist agents for planning, coding, testing, style review, and commit synthesis. Every step is observable through OpenTelemetry GenAI spans and a streamed Forge transcript (Monitor); agents pause to request clarification when requirements are ambiguous (Communicate); and a bounded Kallos⇅Techne repair loop plus graceful degradation make recovery deliberate rather than an edge case (Control). The backend combines independent A2A-connected services, MCP-based tool use, shared local SQLite state, and end-to-end tracing through OpenTelemetry, Jaeger, and Prometheus. The same orchestration layer powers a CLI, desktop GUI, and visual-novel-style interface, enabling studies of interface and embodiment without changing backend logic. Claim-driven tests anchor each MCC property to a mechanism in code: transparency is treated as a systems property, not just a UX choice.
 
 **Keywords:** AI agents, multi-agent systems, software engineering, human-on-the-loop, interpretability, observability
+
+## Try it
+
+The full system is on GitHub at
+[`ajbarea/kourai-khryseai`](https://github.com/ajbarea/kourai-khryseai).
+Clone, set an `ANTHROPIC_API_KEY` in `.env`, and:
+
+```bash
+make setup        # uv workspace install
+make up           # build + start all 10 agents + vn-bridge + observability
+make cli          # interactive REPL
+```
+
+The three pillars (Monitor / Communicate / Control) map to verified
+code locations documented in
+[Architecture → The Three Pillars](../../architecture/index.md#the-three-pillars-monitor-communicate-control).
+For agentic-coding tools (Claude Code, Cursor, Codex, Aider), the root
+[`AGENTS.md`](https://github.com/ajbarea/kourai-khryseai/blob/main/AGENTS.md)
+is the canonical entry point; `make help` enumerates every developer
+target.
+
+## Cite this work
+
+```bibtex
+@inproceedings{barea2026kourai,
+  author    = {Arnaldo Barea},
+  title     = {Kourai Khryseai: Transparent Human-on-the-Loop Multi-Agent Software Development},
+  booktitle = {North-East AI Agents Day 2026},
+  address   = {New York, NY, USA},
+  year      = {2026},
+  month     = {5},
+  url       = {https://ajbarea.github.io/kourai-khryseai/research/ne-agents-day-2026/},
+}
+```
+
+The repo's
+[`CITATION.cff`](https://github.com/ajbarea/kourai-khryseai/blob/main/CITATION.cff)
+is the machine-readable source — GitHub renders a one-click "Cite this
+repository" widget on the repo sidebar that exports BibTeX, APA,
+EndNote, and Zenodo formats.
