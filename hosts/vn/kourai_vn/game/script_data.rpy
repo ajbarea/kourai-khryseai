@@ -84,14 +84,18 @@ init python:
     for name, meta in AGENT_METADATA.items():
         AGENT_ACCENT_BY_NAME[name.capitalize()] = meta["hex_color"]
 
-    # Some agents' canonical accent colors (Metis indigo #4C6EF5, Dokimasia
-    # gray #6C757D, Mneme brown-red #B73E1D) are too dark to read cleanly
-    # against the #14100AEE plaque fill and the parchment dialogue background.
-    # _bright_hex shifts HSL-lightness up to a legibility floor so the same
-    # color identity still reads, just with enough contrast to be scannable.
-    # Keep the original accent for HUD bars + plaque hairlines (solid shapes
-    # where the darker value works); use the brightened variant wherever the
-    # accent is rendered as *text*.
+    # The current AGENT_METADATA palette (warm-gold theme for the 6
+    # maidens + Okabe-Ito for puck/cupid) is bright enough to read on
+    # the parchment dialogue background without adjustment. _bright_hex
+    # remains available for any future canonical that lands too dark
+    # against the #14100AEE plaque fill. Apply selectively where the
+    # accent is rendered as *text*; HUD bars + plaque hairlines (solid
+    # shapes) handle darker values fine.
+    #
+    # Note: #4C6EF5 / #6C757D / #B73E1D appear in screens_relationships.rpy
+    # as Sophia / Arete / Mneia *virtue* accent colors — different domain
+    # from maiden colors, despite the historical confusion that lived in
+    # this comment until 2026-05-06.
     import colorsys as _colorsys
 
     def _bright_hex(hex_color, min_l=0.70):
