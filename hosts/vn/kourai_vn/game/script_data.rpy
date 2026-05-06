@@ -117,6 +117,31 @@ init python:
     }
 
     # ──────────────────────────────────────────────────────────────────────
+    # VN companion-spirits palette — surface-decorative tints for the
+    # relationship-overlay panels and the per-spirit popovers in
+    # screens_companion_spirits.rpy. These are NOT "Puck's color" or
+    # "Cupid's color" in the canonical sense — they're "the panel tint
+    # used when the panel is for Puck/Cupid". Deliberately desaturated
+    # vs the canonical Okabe-Ito values from AGENT_METADATA so the
+    # companion-spirit cards read as soft and welcoming on the parchment
+    # background, instead of vibrating against it the way fully-saturated
+    # CVD-safe values would (HSL: canonical puck S=1.0 → #009E73; this
+    # surface uses S≈0.33 → #7FBC8C). _bright_hex doesn't reproduce these
+    # values because it preserves saturation; it produces #65FFD5 / #FFA965
+    # for the canonicals, both far brighter and more vivid than what fits
+    # the companion-spirits aesthetic.
+    #
+    # If a future PR canonicalizes companion accents under a structured
+    # per-surface override field on AGENT_METADATA, point that field at
+    # these constants — they're the source of truth today.
+    # ──────────────────────────────────────────────────────────────────────
+    VN_PUCK_ACCENT = "#7FBC8C"  # soft mint — Puck companion-spirit panel
+    VN_CUPID_ACCENT = "#E8728C"  # soft rose — Cupid companion-spirit panel
+    VN_CUPID_ACCENT_BG = "#E8728C33"        # 20% alpha — body fill
+    VN_CUPID_ACCENT_BG_STRONG = "#E8728C44"  # 27% alpha — emphasized fill
+    VN_CUPID_ACCENT_HOVER = "#E8728C66"      # 40% alpha — hover state
+
+    # ──────────────────────────────────────────────────────────────────────
     # Inline agent-name colorization in dialogue — when Hephaestus says
     # "Metis — draw up the plans," *Metis* renders in her indigo accent
     # color while the rest stays default parchment. Reinforces the sense

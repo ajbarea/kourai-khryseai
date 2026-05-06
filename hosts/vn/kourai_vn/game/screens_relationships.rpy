@@ -260,8 +260,8 @@ screen pre_confession_window(agent_id):
     python:
         _agent_name = agent_id.capitalize()
         _agent_color = AGENT_COLORS.get(agent_id, "#F0E8D0")
-        _puck_color = "#7FBC8C"
-        _cupid_color = "#E8728C"
+        _puck_color = VN_PUCK_ACCENT
+        _cupid_color = VN_CUPID_ACCENT
 
     add Solid("#00000088")
 
@@ -391,8 +391,8 @@ screen confession_scene(agent_id):
     python:
         _agent_name = agent_id.capitalize()
         _agent_color = AGENT_COLORS.get(agent_id, "#F0E8D0")
-        _puck_color = "#7FBC8C"
-        _cupid_color = "#E8728C"
+        _puck_color = VN_PUCK_ACCENT
+        _cupid_color = VN_CUPID_ACCENT
         _confession_lines = {
             "hephaestus": "I don't do this. Fall for anyone. But you've proven you see me as more than the orchestrator. That's dangerous.",
             "techne":     "Don't make me spell it out. You mean something to me. More than code. That terrifies me.",
@@ -536,7 +536,7 @@ screen confession_outcome(agent_id, accepted):
     python:
         _agent_name = agent_id.capitalize()
         _agent_color = AGENT_COLORS.get(agent_id, "#F0E8D0")
-        _puck_color = "#7FBC8C"
+        _puck_color = VN_PUCK_ACCENT
         _accepted_reactions = {
             "hephaestus": "...I'll hold you to that. The forge keeps its promises. And so do I.",
             "techne":     "You compiled my heart. *quiet laugh* Don't make me regret saying that.",

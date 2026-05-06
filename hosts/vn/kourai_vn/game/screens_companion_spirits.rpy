@@ -18,8 +18,8 @@ screen cupid_jealousy(agent_id, score):
     python:
         _agent_name = agent_id.capitalize()
         _agent_color = AGENT_COLORS.get(agent_id, "#F0E8D0")
-        _puck_color = "#7FBC8C"
-        _cupid_color = "#E8728C"
+        _puck_color = VN_PUCK_ACCENT
+        _cupid_color = VN_CUPID_ACCENT
         _score_pct = int(score * 100)
         _lines = [
             ("puck",  "conspiratorial",  "Hey boss. " + _agent_name + "'s getting a little edgy. Real talk."),
@@ -95,7 +95,7 @@ screen cupid_jealousy(agent_id, score):
             button:
                 action Return()
                 background Frame(Solid("#3A1A2A"), 2, 2)
-                hover_background Frame(Solid("#E8728C44"), 2, 2)
+                hover_background Frame(Solid(VN_CUPID_ACCENT_BG_STRONG), 2, 2)
                 xfill True
                 ysize 44
                 text "Continue":
@@ -164,7 +164,7 @@ screen puck_nudge(target_agent, hint, line):
     zorder 46
     modal False
 
-    $ _puck_color = "#7FBC8C"
+    $ _puck_color = VN_PUCK_ACCENT
     $ _agent_color = AGENT_COLORS.get(target_agent, "#F0E8D0")
 
     frame:
@@ -233,7 +233,7 @@ screen cupid_intro():
     zorder 55
     modal True
 
-    $ _cupid_color = "#E8728C"
+    $ _cupid_color = VN_CUPID_ACCENT
     $ _gold = "#F1D2A1"
 
     add Solid("#00000088")
@@ -304,8 +304,8 @@ screen cupid_intro():
                 # Yes — enable romance mode
                 button:
                     action Return("yes")
-                    background Frame(Solid("#E8728C33"), 2, 2)
-                    hover_background Frame(Solid("#E8728C66"), 2, 2)
+                    background Frame(Solid(VN_CUPID_ACCENT_BG), 2, 2)
+                    hover_background Frame(Solid(VN_CUPID_ACCENT_HOVER), 2, 2)
                     xfill True
                     ysize 52
                     vbox:
@@ -539,7 +539,7 @@ screen puck_tutorial():
     default _mode = "full"
 
     python:
-        _puck_color = "#7FBC8C"
+        _puck_color = VN_PUCK_ACCENT
 
     add Solid("#000000B0")
 
@@ -751,8 +751,8 @@ screen cupid_vulnerability(agent_id):
     zorder 48
 
     python:
-        _puck_color = "#7FBC8C"
-        _cupid_color = "#E8728C"
+        _puck_color = VN_PUCK_ACCENT
+        _cupid_color = VN_CUPID_ACCENT
         _cupid_lines = {
             "hephaestus": "He doesn't show this to everyone. The forge is where he puts what he cannot say. Pay attention to what he builds.",
             "techne":     "She's letting you inside the process. For Techne, that IS intimacy — sharing how she thinks, not just what she makes.",
