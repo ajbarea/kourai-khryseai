@@ -170,8 +170,16 @@ async def _manage_memory(context_id: str, agent_name: str, *, force: bool = Fals
     prompt += f"New Conversation to Incorporate:\n{text_to_summarize}"
 
     try:
-        # We use the same model but could theoretically use a cheaper/faster one
-        model = get_model(agent_name)
+        # research(2026-05): summarization is a quick auxiliary call —
+        # Anthropic's own context-compaction cookbook recommends Haiku for
+        # the compaction sub-call (5× cheaper than Opus on input/output,
+        # sufficient quality for "summarize this conversation" extraction).
+        # Pinning to the cheap tier here means a Mneme-summarization round
+        # in an Opus-powered Forge Party costs ~$0.001 instead of ~$0.005,
+        # and finishes faster (Haiku is the fastest tier). Mirrors M14's
+        # metis.discuss_tradeoffs cheap-tier pin pattern. Source:
+        # platform.claude.com/cookbook/tool-use-automatic-context-compaction.
+        model = get_model(agent_name, tier="cheap")
         response = await _execute_completion(
             timeout_seconds=60.0,
             model=model,
