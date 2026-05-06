@@ -297,8 +297,10 @@ KOURAI_MODEL_TIER=standard    # cheap | standard | smart
 | Tier | Hephaestus | Metis | Techne | Dokimasia | Kallos | Mneme |
 |------|-----------|-------|--------|-----------|--------|-------|
 | **cheap** | Haiku | Haiku | Haiku | Haiku | Haiku | Haiku |
-| **standard** | Sonnet | Opus | Sonnet | Sonnet | Haiku | Haiku |
-| **smart** | Opus | Opus | Opus | Sonnet | Sonnet | Sonnet |
+| **standard** | Sonnet | Sonnet | Sonnet | Haiku | Haiku | Haiku |
+| **smart** | Sonnet | Opus | Sonnet | Sonnet | Sonnet | Sonnet |
+
+Companion spirits (Puck, Cupid, Aidos, Aletheia) and tier overrides are detailed in [Configuration → LLM Models](docs/configuration.md#llm-models).
 
 ### TTS Backends
 
