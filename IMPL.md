@@ -6,29 +6,25 @@ to a one-liner under "Shipped" and this file resets to the next milestone.
 Git history is the archive — these docs are plans + scratchpad, not a
 historical record.
 
-Updated: 2026-05-06 · Active focus: **Cache-tighten get_enriched_system_prompt
-follow-on shipping (post-#177)** — splits the previously-monolithic system
-content into two cache breakpoints at the source: Block 0 truly-static
-(`SYSTEM_PROMPT` + optional call-site `static_suffix`); Block 1 player-
-dynamic (identity + memories + alignment + romance + personality
-adaptation + memory moments + virtues). Replaces the string-returning
+Updated: 2026-05-06 · Active focus: **Cache-tighten follow-on shipped
+[#178]** — splits the previously-monolithic system content into two
+cache breakpoints at the source: Block 0 truly-static (`SYSTEM_PROMPT` +
+optional call-site `static_suffix`, **1h TTL**); Block 1 player-dynamic
+(identity + memories + alignment + romance + personality adaptation +
+memory moments + virtues, 5m default). Replaced string-returning
 `get_enriched_system_prompt` with `get_enriched_system_blocks` returning
-cache-marked text blocks. `_build_contextual_messages` updated to APPEND
-the summary block to upstream lists rather than collapsing them; legacy
-string path preserved as safety net. Migration covers all 9 callers
-(puck, cupid, aidos, aletheia, kallos, techne, mneme, dokimasia, metis)
-plus hephaestus's manual `_route` path via new public helper
-`cached_text_blocks(*chunks, static_ttl="1h")`. **TTL upgrade bundled**:
-web-search of Anthropic's May 2026 docs surfaced that the static block
-is exactly the documented use case for the 1h extended TTL — long chat
-conversations where users may not respond within 5min and agentic side-
-agents that may take longer than 5min. Forge Party sessions routinely
-exceed 5min idle; truly-static block re-use pays back the 2× write
-multiplier after just one hit beyond 5min. Block 0 default static_ttl="1h";
-Blocks 1-3 (player-dynamic, summary, first-user) stay at 5min default
-since they churn sub-hourly anyway. Stays within Anthropic's 4-breakpoint
-budget (BP1 static-1h / BP2 player-dynamic-5m / BP3 summary-5m / BP4
-first-user-5m). **LLM cache breakpoint split shipped [#177]** —
+cache-marked text blocks; new public helper `cached_text_blocks(*chunks,
+static_ttl="1h")` in `kourai_common.llm` for hephaestus's manual `_route`
+path. Migration: 9 agent callers + hephaestus + 5 test files.
+`_build_contextual_messages` appends summary block to upstream lists
+rather than collapsing them; legacy string path preserved as safety net.
+1h-TTL default is web-search-confirmed May 2026 Anthropic best practice
+for long interactive sessions (Forge Party sessions routinely exceed 5min
+idle; truly-static block re-use pays back the 2× write multiplier after
+one hit beyond 5min). Stays within Anthropic's 4-breakpoint budget (BP1
+static-1h / BP2 player-dynamic-5m / BP3 summary-5m / BP4 first-user-5m).
+~5× reduction in static-block write tokens on top of the ~3-7× from #177.
+**LLM cache breakpoint split shipped [#177]** —
 `_build_contextual_messages` now structures the system prompt as two
 `cache_control` text blocks (static + dynamic summary) instead of
 concatenating them. Static block always cache-hits within a session;
