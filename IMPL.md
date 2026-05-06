@@ -33,14 +33,31 @@ Concrete blocker list for the QR-code reviewer experience.
 - **ROADMAP Shipped section collapsed to one-liners** [#183]. 959 →
   811 lines. Per the section's own header convention.
 - **Pre-presentation slop sweep + doc-accuracy fixes** [#184 — open].
-  4 parallel deslop subagents. ~30 high-confidence edits: dropped
+  4 parallel deslop subagents → ~30 high-confidence edits: dropped
   `{CURRENT_DATE} Best Practices` template prefix from 9 agent prompts,
   stripped floating `April 2026` / `as of 2026-05` markers from
   shared/ + scripts/ + docker-compose / Dockerfile / Makefile /
-  pyproject. Plus README + getting-started accuracy: wrong agent count
-  ("6 agents" → 11), wrong clone target dir (underscore → hyphen),
-  outdated VN launch instructions referencing a vendored SDK path that
-  doesn't exist in-repo.
+  pyproject. Plus four follow-on commits of fact-checking against the
+  canonical code:
+  - README + getting-started: wrong agent count ("6 agents" → 10),
+    wrong clone target dir (underscore → hyphen), outdated VN launch
+    instructions referencing a vendored SDK path that doesn't exist
+    in-repo (replaced with `make vn` resolver pointer).
+  - README LLM tier table: drift from `shared/src/kourai_common/config.py`.
+    `standard` row had Metis as Opus (actual Sonnet) and Dokimasia as
+    Sonnet (actual Haiku); `smart` row had Hephaestus + Techne as Opus
+    (actual Sonnet for both). Fixed against the canonical mapping;
+    pointer added to `docs/configuration.md` for the four spirits' rows
+    that the README simplified table still omits.
+  - `docs/cli.md`: missing `/scratchpad` (#176) and `/preferences`
+    (alias `/prefs`, M17 Phase 2). Added.
+- **Verified GitHub repo + docs site state.** GitHub description +
+  topics + homepage URL are correctly set. Docs site at
+  `https://ajbarea.github.io/kourai-khryseai/` builds and serves; nav,
+  hero, agent grid all current; "Ten AI agents" framing matches
+  README/getting-started post-fix. Top nav: Home, Overview, Getting
+  Started, Agents, Architecture, Interfaces, Configuration, Pricing,
+  Research.
 
 ### Open before Friday
 
