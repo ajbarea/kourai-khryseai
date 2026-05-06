@@ -835,3 +835,104 @@ class TestRealtimeTTSEngineSynthesizeToWav:
 
         engine = RealtimeTTSEngine()
         assert await engine.synthesize_to_wav("hi", agent_name="hephaestus") == b""
+
+
+# ===================================================================
+# synthesize_to_wav() — TTS audio cache wiring (M6 sub-task 2)
+# ===================================================================
+
+
+class TestRealtimeTTSEngineCacheWiring:
+    @pytest.mark.asyncio
+    async def test_default_construction_does_not_cache(self, mock_realtimetts, tmp_path):
+        """Without cache_dir, behavior is identical to pre-cache: every
+        call hits Kokoro. Default keeps existing tests / production paths
+        unchanged."""
+        _, mock_kokoro, _, mock_stream = mock_realtimetts
+        mock_kokoro.get_stream_info.return_value = (8, 1, 24000)
+        _wire_chunked_play(mock_stream, [b"\x00\x01" * 12])
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        engine = RealtimeTTSEngine()  # cache_dir defaults to None
+        await engine.synthesize_to_wav("hi", agent_name="metis")
+        await engine.synthesize_to_wav("hi", agent_name="metis")
+        # Both calls drove Kokoro through play() — no cache short-circuit.
+        assert mock_stream.play.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_cache_dir_routes_second_call_through_cache(self, mock_realtimetts, tmp_path):
+        """With cache_dir set, the second identical call returns cached
+        bytes without re-driving Kokoro."""
+        _, mock_kokoro, _, mock_stream = mock_realtimetts
+        mock_kokoro.get_stream_info.return_value = (8, 1, 24000)
+        _wire_chunked_play(mock_stream, [b"\x00\x01" * 12])
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        engine = RealtimeTTSEngine(cache_dir=tmp_path)
+        first = await engine.synthesize_to_wav("hi", agent_name="metis")
+        second = await engine.synthesize_to_wav("hi", agent_name="metis")
+        assert first == second
+        # Only one synth invocation; the second call hit the cache.
+        assert mock_stream.play.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_cache_keys_include_speed_override(self, mock_realtimetts, tmp_path):
+        """speed=1.0 vs speed=1.5 must produce distinct cache entries —
+        otherwise a player toggle would silently re-use the wrong audio."""
+        _, mock_kokoro, _, mock_stream = mock_realtimetts
+        mock_kokoro.get_stream_info.return_value = (8, 1, 24000)
+        _wire_chunked_play(mock_stream, [b"\x00\x01" * 12])
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        engine = RealtimeTTSEngine(cache_dir=tmp_path)
+        await engine.synthesize_to_wav("hi", agent_name="metis", speed=1.0)
+        await engine.synthesize_to_wav("hi", agent_name="metis", speed=1.5)
+        # Each speed got its own miss-fetch; both drove Kokoro.
+        assert mock_stream.play.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_cache_keys_include_voice_override(self, mock_realtimetts, tmp_path):
+        """Different voice_key → different cache entry."""
+        _, mock_kokoro, _, mock_stream = mock_realtimetts
+        mock_kokoro.get_stream_info.return_value = (8, 1, 24000)
+        _wire_chunked_play(mock_stream, [b"\x00\x01" * 12])
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        engine = RealtimeTTSEngine(cache_dir=tmp_path)
+        await engine.synthesize_to_wav("hi", agent_name="metis", voice_key="af_bella")
+        await engine.synthesize_to_wav("hi", agent_name="metis", voice_key="af_sarah")
+        assert mock_stream.play.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_empty_synth_result_not_cached(self, mock_realtimetts, tmp_path):
+        """If Kokoro returns no chunks (e.g., cold-start glitch), don't
+        litter the cache with an empty WAV that would block real synth
+        on the next call."""
+        _, mock_kokoro, _, mock_stream = mock_realtimetts
+        mock_kokoro.get_stream_info.return_value = (8, 1, 24000)
+        # play() returns nothing — synthesize_to_wav returns b""
+        mock_stream.play.side_effect = lambda *_a, **_k: None
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        engine = RealtimeTTSEngine(cache_dir=tmp_path)
+        first = await engine.synthesize_to_wav("hi", agent_name="metis")
+        assert first == b""
+        # Cache dir should not have leaked an empty entry.
+        wav_files = list(tmp_path.rglob("*.wav"))
+        assert wav_files == []
+
+    @pytest.mark.asyncio
+    async def test_cache_writes_under_sharded_layout(self, mock_realtimetts, tmp_path):
+        """The cache must use the spec'd `{key[:2]}/{key}.wav` layout so
+        large caches don't blow up a single inode."""
+        _, mock_kokoro, _, mock_stream = mock_realtimetts
+        mock_kokoro.get_stream_info.return_value = (8, 1, 24000)
+        _wire_chunked_play(mock_stream, [b"\x00\x01" * 12])
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        engine = RealtimeTTSEngine(cache_dir=tmp_path)
+        await engine.synthesize_to_wav("hi", agent_name="metis")
+        # Exactly one file, two-char shard prefix dir.
+        wav_files = list(tmp_path.rglob("*.wav"))
+        assert len(wav_files) == 1
+        assert wav_files[0].parent.name == wav_files[0].stem[:2]
