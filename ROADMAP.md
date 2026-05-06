@@ -670,6 +670,34 @@ architectural moves; valuable but not the first lift.
 One-line per item, newest first. Detail moves to git history when work
 lands — these docs are plans + scratchpad, not a historical archive.
 
+- 2026-05-06 — **Re-canonicalize `hex_color` + `rgb` on
+  `AGENT_METADATA`** [#171]. Follow-up from the cross-host DRY sweep
+  IMPL "Notes / open invariants". PR #12 (April 24) added VN
+  `script_data.rpy:49-56` reads of `AGENT_METADATA[name]["hex_color"]`
+  for all 8 agents at startup; #118 (May 2) removed those keys under
+  "no consumers in production or tests" rationale, missing VN as a
+  consumer — the dict access has been a latent `KeyError` ever since,
+  not surfaced because the VN host hasn't been live-smoked recently.
+  Restores the keys with a single canonical source: GUI's existing
+  warm-gold theme palette for the 6 maidens (matches GUI's current
+  rendered behavior, no visible change for GUI players); CLI
+  `styling.py`'s Okabe-Ito CVD-safe values `#009E73` (puck) and
+  `#D55E00` (cupid) for the secondary roster (matches the project's
+  stated palette preference for agents without a thematic gold
+  variant). GUI's `_AGENT_COLORS` derived from shared `rgb` field
+  rather than duplicated. Stale comment at `script_data.rpy:87`
+  claiming Metis/Dokimasia/Mneme canonicals are
+  `#4C6EF5 / #6C757D / #B73E1D` corrected — those hex values appear
+  in `screens_relationships.rpy:103,111,119` as Sophia / Arete /
+  Mneia *virtue* accent colors, a different domain. VN's hardcoded
+  `_puck_color = "#7FBC8C"` and `_cupid_color = "#E8728C"` literals
+  (15+ sites in `screens_relationships.rpy` and
+  `screens_companion_spirits.rpy`, including alpha-suffixed
+  hover-background variants) deliberately untouched — `#7FBC8C` is
+  ≈`_bright_hex(AGENT_COLORS["puck"])` but `#E8728C` is a different
+  hue than canonical cupid `#D55E00` (rose vs vermillion-orange);
+  replacing the literals needs live VN smoke. 26 new tests; 3129/3129
+  unit pass.
 - 2026-05-05 — **Cross-host DRY sweep — 10 extractions to `kourai_common/`** [#170].
   Audit of `hosts/cli/` / `hosts/gui/` / `hosts/vn/` against
   `shared/src/kourai_common/` surfaced 10 candidates after the
