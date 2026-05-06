@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 from kourai_common.facts import build_fact_context
 from kourai_common.llm import chat, chat_stream
-from kourai_common.player import get_enriched_system_prompt
+from kourai_common.player import get_enriched_system_blocks
 from kourai_common.prompts import CURRENT_DATE, build_system_prompt
 from kourai_common.subprocess import StatusCallback, run_command
 
@@ -172,18 +172,21 @@ async def discuss_tradeoffs(
     smart-tier rates for it would be ongoing waste. The override goes
     through ``kourai_common.llm.chat(..., tier="cheap")``.
     """
-    system_prompt = (
-        get_enriched_system_prompt(SYSTEM_PROMPT, "metis")
-        + "\n\nDISCUSSION MODE: This is a quick parallel brainstorm during "
-        "Hephaestus's order classification — NOT a full spec. Give 1-2 "
-        "SHORT paragraphs of architectural concerns, edge cases, or "
-        "tradeoffs the player should weigh before confirming. Stay tight; "
-        "the read-back is coming. Speak in your usual voice (quoted lines "
-        "for direct address per M10). Do NOT emit FACT tags here — those "
-        "belong in the actual spec call later."
+    system_blocks = get_enriched_system_blocks(
+        SYSTEM_PROMPT,
+        "metis",
+        static_suffix=(
+            "DISCUSSION MODE: This is a quick parallel brainstorm during "
+            "Hephaestus's order classification — NOT a full spec. Give 1-2 "
+            "SHORT paragraphs of architectural concerns, edge cases, or "
+            "tradeoffs the player should weigh before confirming. Stay tight; "
+            "the read-back is coming. Speak in your usual voice (quoted lines "
+            "for direct address per M10). Do NOT emit FACT tags here — those "
+            "belong in the actual spec call later."
+        ),
     )
     messages: list[dict[str, Any]] = [
-        {"role": "system", "content": system_prompt},
+        {"role": "system", "content": system_blocks},
         {"role": "user", "content": user_request},
     ]
     log.info("Metis discuss_tradeoffs for: %.100s", user_request)
@@ -275,7 +278,7 @@ async def create_spec(
         user_content = [{"type": "text", "text": user_text}, *image_parts]
 
     messages: list[dict[str, Any]] = [
-        {"role": "system", "content": get_enriched_system_prompt(SYSTEM_PROMPT, "metis")},
+        {"role": "system", "content": get_enriched_system_blocks(SYSTEM_PROMPT, "metis")},
         {"role": "user", "content": user_content},
     ]
     log.info("Creating spec for: %.100s", idea)
@@ -319,7 +322,7 @@ async def create_spec_stream(
         user_content = [{"type": "text", "text": user_text}, *image_parts]
 
     messages: list[dict[str, Any]] = [
-        {"role": "system", "content": get_enriched_system_prompt(SYSTEM_PROMPT, "metis")},
+        {"role": "system", "content": get_enriched_system_blocks(SYSTEM_PROMPT, "metis")},
         {"role": "user", "content": user_content},
     ]
     log.info("Streaming spec for: %.100s", idea)

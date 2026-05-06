@@ -7,7 +7,7 @@ The original god module has been split into:
 - player_affinity: Affinity tracking + romance progression
 - player_alignment: Alignment-gated dialogue instructions
 - player_romance: Romance dialogue system + jealousy context
-- player_context: Prompt builder hub (get_enriched_system_prompt, build_player_context)
+- player_context: Prompt builder hub (get_enriched_system_blocks, build_player_context)
 - player_io: Data import/export
 
 All public names are re-exported here so existing `from kourai_common.player import X`
