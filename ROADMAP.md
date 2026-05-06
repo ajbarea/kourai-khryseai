@@ -5,7 +5,7 @@ A public, living plan for where the forge is heading. Items here are either
 *currently working on* lives in [IMPL.md](./IMPL.md) — when it lands, the
 matching milestone here collapses to a single line under "Shipped".
 
-Last reviewed: 2026-05-05. Active focus: **M6 ElevenLabs hybrid as pre-player-release blocker** (promoted 2026-05-03 after walking back the M18 Phase 2 SSML investment — ElevenLabs v3's actual May 2026 docs don't support SSML break tags, so the producer-side SSML markup was wrong for the M6 target; see Shipped log entry for #152). Parallel sweep underway: **cross-host DRY extraction sweep** (10 items, branch `chore/cross-host-dry-sweep`, May 2026 — see [IMPL.md](./IMPL.md) "Cross-host DRY sweep"). See [IMPL.md](./IMPL.md) for the active work, the open invariants, and the priority-ordered "Up next" list. Pre-release perfection stance unchanged: May 2026 best practice no matter the cost, **web-search the SPECIFIC target's primary docs at the planning step** (not just at implementation), architectural fix over expedient patch. Sister-repo audit weekly cron runs Mondays 12:00 UTC.
+Last reviewed: 2026-05-05. Active focus: **M6 ElevenLabs hybrid as pre-player-release blocker** (promoted 2026-05-03 after walking back the M18 Phase 2 SSML investment — ElevenLabs v3's actual May 2026 docs don't support SSML break tags, so the producer-side SSML markup was wrong for the M6 target; see Shipped log entry for #152). See [IMPL.md](./IMPL.md) for the active work, the open invariants, and the priority-ordered "Up next" list. Pre-release perfection stance unchanged: May 2026 best practice no matter the cost, **web-search the SPECIFIC target's primary docs at the planning step** (not just at implementation), architectural fix over expedient patch. Sister-repo audit weekly cron runs Mondays 12:00 UTC.
 
 ---
 
@@ -669,6 +669,42 @@ architectural moves; valuable but not the first lift.
 
 One-line per item, newest first. Detail moves to git history when work
 lands — these docs are plans + scratchpad, not a historical archive.
+
+- 2026-05-05 — **Cross-host DRY sweep — 10 extractions to `kourai_common/`** [#170].
+  Audit of `hosts/cli/` / `hosts/gui/` / `hosts/vn/` against
+  `shared/src/kourai_common/` surfaced 10 candidates after the
+  maidens-dedup precedent in [#161]; this sweep ships them all on one
+  themed branch. New shared modules: `paths.py` (canonical
+  `PROJECT_ROOT` walking up to the `[tool.uv.workspace]` pyproject +
+  `assets_dir / cache_dir / logs_dir / templates_dir / docs_assets_dir
+  / avatars_dir(style) / audio_dir(kind)` accessors — replaces 11
+  scattered `parents[N]` traversals), `settings_audio.py` (canonical
+  audio defaults — fixes a 13× GUI-vs-CLI music_volume divergence
+  that left first-launch GUI players at silent music while CLI shipped
+  0.65), `onboarding_data.py` (canonicalized 5-role set used by GUI
+  + VN; CLI gained "hero", legacy "master"/"casual" IDs still flow
+  through Puck handoff), `demo_script.py` (CSV-export pause scene as
+  `DemoTurn` records consumed by both CLI and GUI demo paths; VN's
+  `.rpy` keeps its hand-coded form with a header cross-reference),
+  `emote_sfx.py` (extract_emotes + keyword → SFX category resolver),
+  `audio_dsp.py` (numpy AudioNormalizer / FadeEffect / Visualizer /
+  PersonalityAudioProfile + per-agent profiles — pyloudnorm migration
+  filed as follow-up), `dialogue_pacing.py` (PacingMode + DialoguePacer
+  — pure timing), `message_classifier.py` (is_system_status +
+  is_scratchpad_content regex pair). Extended `agents.py` with
+  `EMOJI_PREFIX` + `detect_agent`. Plus a CLI styling re-import
+  cleanup in `onboarding.py` (item #10) folded into item #3's commit.
+  Shared deps gained `numpy>=1.26` and `emoji>=2.15.0`; both already
+  in the GUI host's deps. Behavior changes: exactly one — GUI
+  first-launch music_volume default 0.05 → 0.65; players who saved
+  the silent default keep it (no auto-migration). 49 new unit tests +
+  1 patch-target update; 3103/3103 unit pass.
+  `research(2026-05)`: `importlib.resources.files()` is the modern best
+  practice for installed-package data, but kourai's assets aren't
+  packaged with the wheel — pathlib walk-up keyed off
+  `[tool.uv.workspace]` is the right fit. Sources: pythontutorials.net
+  on project root, csteinmetz1/pyloudnorm (filed for follow-up),
+  Pydantic Settings docs (filed for follow-up).
 
 - 2026-05-05 — **Puck tutorial slice 1: mode cascade + `/settings [0]` entry** [#168].
   First slice of the Puck-led first-run tutorial implementation per
