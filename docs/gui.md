@@ -118,8 +118,10 @@ skip, motion-sensitivity toggle for accessibility).
 
 ## Text-to-Speech 🎙️
 
-Each agent speaks through a per-agent neural voice (Edge-TTS by default,
-[Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) local fallback).
+Each agent speaks through a per-agent neural voice. The runtime engine
+is [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) via
+RealtimeTTS — local, Apache-2.0, ~350 MB RAM on CPU. Edge-TTS is the
+documented cloud fallback for environments where Kokoro can't load.
 Audio plays at 44.1 kHz stereo with peak + loudness normalization, runs
 under ~100 ms latency, and the master volume / per-agent voice override
 live in [Configuration → Text-to-Speech](configuration.md#text-to-speech-configuration).

@@ -5,12 +5,15 @@ A public, living plan for where the forge is heading. Items here are either
 *currently working on* lives in [IMPL.md](./IMPL.md) — when it lands, the
 matching milestone here collapses to a single line under "Shipped".
 
-Last reviewed: 2026-05-06. Active focus: **M6 ElevenLabs hybrid** as
-pre-player-release blocker. M6 sub-task 2 (audio cache layer) shipped
-under Kokoro [#174] and rides along into the swap; sub-tasks 1/3/4/5
-gate on M20 + VN smoke landing first. See [IMPL.md](./IMPL.md) for the
-active work, open invariants, and priority-ordered "Up next" list.
-Pre-release perfection stance unchanged: May 2026 best practice no
+Last reviewed: 2026-05-06. Active focus through Friday: **NE AI Agents
+Day 2026 poster prep** — QR-code-driven repo browsing is the realistic
+review surface, so the next 48 hours go to clean README / getting-
+started / cli.md, slop-free comments and docstrings, and a fresh-
+clone path that actually works. Post-Friday returns to **M6 ElevenLabs
+hybrid** (sub-task 2 audio cache layer shipped [#174]; sub-tasks
+1/3/4/5 still gate on M20 + VN smoke). See [IMPL.md](./IMPL.md) for
+the live blocker list, open invariants, and priority-ordered "Up next".
+Pre-release perfection stance unchanged: current best practice no
 matter the cost, **web-search the SPECIFIC target's primary docs at the
 planning step**, architectural fix over expedient patch. Sister-repo
 audit weekly cron runs Mondays 12:00 UTC.
