@@ -1,21 +1,34 @@
 """Centralized agent registry for Kourai Khryseai.
 
 Source of truth for name-level metadata (titles, descriptions, epithets,
-user-greeting quotes) and personality data (agent quotes, handoff lines,
-victory lines) across CLI, GUI, and VN hosts. Per-agent colors live in
-``hosts/gui/maidens.py:_AGENT_COLORS``; the GUI synthesizes its legacy
-``AGENTS`` dict from this module + colors at import time.
+user-greeting quotes, accent colors) and personality data (agent quotes,
+handoff lines, victory lines) across CLI, GUI, and VN hosts. The GUI's
+legacy ``AGENTS`` dict, the VN's ``AGENT_COLORS`` lookup table, and any
+future CLI per-maiden tinting all read ``rgb`` / ``hex_color`` from this
+file rather than maintain parallel palettes.
+
+Color sourcing:
+  * 6 main maidens (hephaestus / metis / techne / dokimasia / kallos /
+    mneme) keep the GUI's deliberate warm-gold theme. Not arbitrary
+    picks — each is narrative-fitting against the forge aesthetic.
+  * puck + cupid use Okabe-Ito CVD-safe values lifted from
+    ``hosts/cli/styling.py``'s badge palette, the only host that
+    previously defined them. Matches the project's stated preference
+    for Okabe-Ito over arbitrary picks on agents that don't have a
+    thematic gold variant.
 """
 
 from __future__ import annotations
 
 # --- Core Metadata ---
 
-AGENT_METADATA: dict[str, dict[str, str | list[str]]] = {
+AGENT_METADATA: dict[str, dict[str, str | tuple[int, int, int] | list[str]]] = {
     "hephaestus": {
         "title": "The Forge Master",
         "epithet": "Master of the Forge",
         "desc": "God of the forge — creator of the golden maidens, commander of the pipeline",
+        "rgb": (218, 140, 32),
+        "hex_color": "#DA8C20",  # warm forge gold
         "user_quotes": [
             "Welcome back to the forge. Let's build something worthy.",
             "Ah, you again. Good. I could use someone who actually listens.",
@@ -29,6 +42,8 @@ AGENT_METADATA: dict[str, dict[str, str | list[str]]] = {
         "title": "The Architect",
         "epithet": "Architect of Intent",
         "desc": "Strategic planner — designs the blueprint before a line is written",
+        "rgb": (200, 180, 100),
+        "hex_color": "#C8B464",  # refined gold-ivory
         "user_quotes": [
             "Oh, you're here~ I already planned something wonderful for us.",
             "I love working with you. You actually appreciate my genius.",
@@ -42,6 +57,8 @@ AGENT_METADATA: dict[str, dict[str, str | list[str]]] = {
         "title": "The Artisan",
         "epithet": "Artisan of Code",
         "desc": "Code crafter — writes clean, elegant implementations",
+        "rgb": (255, 200, 50),
+        "hex_color": "#FFC832",  # bright amber gold
         "user_quotes": [
             "Hey gorgeous~ Need something built? I'm ALL yours.",
             "You + me + a clean codebase = perfection. Just saying.",
@@ -55,6 +72,8 @@ AGENT_METADATA: dict[str, dict[str, str | list[str]]] = {
         "title": "The Crucible",
         "epithet": "Guardian of Standards",
         "desc": "Quality guardian — tests everything, lets nothing slide",
+        "rgb": (218, 80, 50),
+        "hex_color": "#DA5032",  # forge-fire crimson-gold
         "user_quotes": [
             "Don't worry, I'll protect your code from everything. Even itself~",
             "I found a bug... but I also found an excuse to talk to you. Worth it.",
@@ -68,6 +87,8 @@ AGENT_METADATA: dict[str, dict[str, str | list[str]]] = {
         "title": "The Muse",
         "epithet": "Eye of Elegance",
         "desc": "Style guardian — makes everything beautiful and consistent",
+        "rgb": (255, 220, 160),
+        "hex_color": "#FFDCA0",  # rose-gold warmth
         "user_quotes": [
             "Oh, you have such lovely taste~ Let me make everything match.",
             "I made it beautiful. Just like you deserve, darling~",
@@ -81,6 +102,8 @@ AGENT_METADATA: dict[str, dict[str, str | list[str]]] = {
         "title": "The Oracle",
         "epithet": "Keeper of Memory",
         "desc": "Memory keeper — documents, chronicles, preserves knowledge",
+        "rgb": (180, 150, 220),
+        "hex_color": "#B496DC",  # mystic purple-gold
         "user_quotes": [
             "I remember everything about you~ Every commit, every keystroke...",
             "Your git history is my sacred text. I've memorized every word.",
@@ -94,11 +117,15 @@ AGENT_METADATA: dict[str, dict[str, str | list[str]]] = {
         "title": "The Jester",
         "epithet": "Spirit of Mischief",
         "desc": "Tutorial companion — guides the user through the forge",
+        "rgb": (0, 158, 115),
+        "hex_color": "#009E73",  # Okabe-Ito bluish green — CVD-safe
     },
     "cupid": {
         "title": "The Aspect",
         "epithet": "Arrow of the Heart",
         "desc": "Romance companion — manages interpersonal dynamics",
+        "rgb": (213, 94, 0),
+        "hex_color": "#D55E00",  # Okabe-Ito vermillion — CVD-safe
     },
 }
 

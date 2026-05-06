@@ -56,16 +56,14 @@ def get_avatar_path(name: str) -> Path | None:
     return None
 
 
-# Per-agent palette. Keys serve as the GUI roster: only agents listed
-# here appear in AGENTS. Puck and Cupid are deferred until M6 voice-lab
-# work crystallises their portraits and palettes.
+# GUI roster: the 6 main maidens. Puck and Cupid are still excluded from
+# AGENTS (their portraits / panels aren't wired yet), but their colors
+# now live alongside the rest in kourai_common.agents.AGENT_METADATA so
+# the VN's hex_color lookup pattern works for all 8 agents on startup.
+_GUI_ROSTER = ("hephaestus", "metis", "techne", "dokimasia", "kallos", "mneme")
 _AGENT_COLORS: dict[str, tuple[int, int, int]] = {
-    "hephaestus": (218, 140, 32),  # warm forge gold
-    "metis": (200, 180, 100),  # refined gold-ivory
-    "techne": (255, 200, 50),  # bright amber gold
-    "dokimasia": (218, 80, 50),  # forge-fire crimson-gold
-    "kallos": (255, 220, 160),  # rose-gold warmth
-    "mneme": (180, 150, 220),  # mystic purple-gold
+    name: AGENT_METADATA[name]["rgb"]  # type: ignore[misc]
+    for name in _GUI_ROSTER
 }
 
 
