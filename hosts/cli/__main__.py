@@ -639,6 +639,7 @@ async def main(
         _greet_face = _MAIDEN_FACES[_greet_name]
         _karaoke_started = [False]
         _last_was_word = [False]
+        _words_revealed = [0]
 
         def _open_greeting_karaoke() -> None:
             if _karaoke_started[0]:
@@ -653,6 +654,7 @@ async def main(
             sep = karaoke_word_separator(w, _last_was_word[0])
             _echo(sep + w, nl=False)
             _last_was_word[0] = True
+            _words_revealed[0] += 1
 
         try:
             await tts.speak(
@@ -663,6 +665,15 @@ async def main(
             )
         finally:
             if _karaoke_started[0]:
+                # Karaoke opened (`Kallos (◕ᴗ◕✿) "`) but on_word may not
+                # have fired even once — Kokoro on CPU and the muted
+                # audio path both routinely yield zero per-word events
+                # while still firing on_audio_start. Without this fall-
+                # through the player saw empty quote pairs (`""`) where
+                # the greeting should have been; print the actual text
+                # before the closing quote so the line reads correctly.
+                if _words_revealed[0] == 0:
+                    _echo(_greet_quote, nl=False)
                 _echo(karaoke_dialogue_close(), nl=False)
             else:
                 _echo(_greet_line)
