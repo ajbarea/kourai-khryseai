@@ -328,6 +328,43 @@ see [feedback_websearch_before_arch_decision](../../.claude/projects/-home-ajbar
 architectural fix over expedient patch. Pick by impact + caller
 reality, not file-of-origin.
 
+**Live-smoke gated** (need AJ at the keyboard):
+- M20 sub-task 2 + 4 VN cps verification (item 1 below)
+- Live VN smoke end-to-end (item 2)
+- M6 sub-tasks 1, 3, 4, 5 — markup adapter / ElevenLabs SDK / production
+  swap / per-persona prosody pass; gated on M20 + VN smoke landing
+- Puck Slice 3 + 4 — flight scene rewrite, first-message routing
+- VN dialogue-presentation polish (illuminated-manuscript framing) —
+  parchment + plaque corner flourishes, epithet subtitle
+
+**Self-contained workable** (ship clean without AJ in-loop):
+- Puck Slice 2 helper-only — `_invoke_agent_live(agent, prompt,
+  fallback, timeout)` A2A timeout-and-fallback wrapper. Skip the
+  `/replay-tutorial` command pending Slice 3 (replays a still-stub
+  flight scene = anticipatory).
+- Cross-host pipeline-status — `kourai_common.pipeline_status` data
+  layer (PipelineState frozen + PipelineTracker with handoff hooks)
+  + vn_bridge wiring (replaces the local `current_agent` variable).
+  GUI integration (refactor of GUIState's agent fields) deferred to
+  Phase 2 — risky to bundle with the data layer.
+- Cross-host status-feed — `kourai_common.status_feed` (RingBuffer[T]
+  + StatusEvent typed record). One writer, three subscribers (CLI
+  `/debug` slash, future GUI bottom overlay, file-write). Replaces
+  debug_log.py + the deleted status_bubbles parallel state stores.
+- Cross-host gossip-render — `kourai_common.gossip_render`
+  (RenderedRound). gossip_core / gossip_models already canonical
+  from #170; what's missing is the host-agnostic structured-render
+  translation. Renderers collapse to ~30-line ANSI / pygame /
+  Ren'Py adapters.
+- Cross-host codex (in-game encyclopedia) — biggest scope; fixes
+  the broken VN codex screens; Mass Effect-shape data + unlock
+  triggers. Best done as one large PR; live smoke needed for VN
+  parchment-book renderer.
+- Per-agent motion language — polish, lands last.
+
+**Original priority order** (M20 / Puck / M6 chain) below for
+context. Items shipped 2026-05-06 marked with their PR.
+
 1. **M20 sub-task 2 + 4 — audio-led text reveal + opt-out toggle.**
    Sub-task 2 shipped on all three surfaces: **CLI Tier 2 [#153]**,
    **CLI Tier 1 karaoke [#154]**, **GUI Tier 1 word-paced typewriter
