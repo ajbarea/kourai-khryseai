@@ -48,6 +48,7 @@ from kourai_common.messaging import (
     user_message,
 )
 from kourai_common.ssml import strip_ssml
+from kourai_common.tts_cache import default_cache_dir
 from kourai_common.tts_realtime import RealtimeTTSEngine
 
 if TYPE_CHECKING:
@@ -123,7 +124,14 @@ async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
     # play() doesn't skip audio device opening, only construction-time
     # muted does (stream_player.AudioConfiguration.muted gate). vn_bridge
     # never calls speak(), so headless = correct.
-    app.state.tts_engine = RealtimeTTSEngine(muted=True)
+    #
+    # M6 sub-task 2: enable the TTS audio cache. Static dialogue dicts
+    # (HANDOFF_LINES, VICTORY_LINES, AGENT_QUOTES, greetings) repeat
+    # constantly across players — once warm, near-100% hit rate. Cache
+    # lives at ${XDG_CACHE_HOME:-~/.cache}/kourai/tts and survives across
+    # checkouts / make clean. Validating shape under Kokoro now; rides
+    # along into the ElevenLabs swap (M6 sub-task 4).
+    app.state.tts_engine = RealtimeTTSEngine(muted=True, cache_dir=default_cache_dir())
     app.state.context_id = uuid4().hex
     yield
     app.state.tts_engine.cleanup()

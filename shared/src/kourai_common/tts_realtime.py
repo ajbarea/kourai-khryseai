@@ -45,6 +45,7 @@ from kourai_common.tts_backend import (
     TTSVoiceConfig,
     get_voice_for_agent,
 )
+from kourai_common.tts_cache import cached_synthesize
 
 # Module-load side effect: kill libasound's stderr cascade before
 # `_TextToAudioStream(...)` enumerates ALSA in `__init__` below.
@@ -52,6 +53,7 @@ silence_alsa_lib_errors()
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +115,7 @@ class RealtimeTTSEngine:
         enable_effects: bool = True,
         muted: bool | None = None,
         on_word: Callable[[object], None] | None = None,
+        cache_dir: Path | None = None,
     ):
         # research(2026-05): muted=None means auto-detect via PortAudio's
         # paNoDevice signal — degrades to silent text-only on Docker
@@ -158,6 +161,10 @@ class RealtimeTTSEngine:
         self.enable_effects = enable_effects
         self.is_playing = False
         self._on_complete: Callable[[], None] | None = None
+        # Opt-in TTS cache for synthesize_to_wav. None = uncached (default
+        # so existing tests stay green); vn_bridge passes
+        # tts_cache.default_cache_dir() at construction. M6 sub-task 2.
+        self._cache_dir = cache_dir
 
         self._stream.set_volume(self._effective_volume())
 
@@ -437,6 +444,11 @@ class RealtimeTTSEngine:
         underlying StreamPlayer skips ``open_stream()`` entirely. The
         runtime ``muted=True`` here only stops audio frame writes; it
         does not prevent the device-open probe inside RealtimeTTS.
+
+        When the engine was constructed with ``cache_dir=...`` (M6
+        sub-task 2), identical (text, voice_id, speed) requests return
+        cached WAV bytes from disk without re-invoking Kokoro. Empty
+        synth results are not cached.
         """
         if not text.strip():
             return b""
@@ -455,6 +467,40 @@ class RealtimeTTSEngine:
             voice_cfg = get_voice_for_agent(agent_name)
         effective_speed = speed if speed is not None else voice_cfg.speed
 
+        if self._cache_dir is None:
+            return await self._uncached_synthesize_to_wav(
+                text, voice_cfg, effective_speed, agent_name
+            )
+
+        # voice_settings keyed on the surface that actually shapes Kokoro
+        # output. lang_code is part of voice resolution upstream but
+        # locked per voice_id, so it would be redundant in the hash.
+        return await cached_synthesize(
+            text=text,
+            voice_id=voice_cfg.voice_id,
+            model_id="kokoro",
+            voice_settings={
+                "speed": effective_speed,
+                "pitch": voice_cfg.pitch,
+            },
+            fetch=lambda: self._uncached_synthesize_to_wav(
+                text, voice_cfg, effective_speed, agent_name
+            ),
+            cache_dir=self._cache_dir,
+            extension="wav",
+        )
+
+    async def _uncached_synthesize_to_wav(
+        self,
+        text: str,
+        voice_cfg: TTSVoiceConfig,
+        effective_speed: float,
+        agent_name: str | None,
+    ) -> bytes:
+        """The pre-cache body of synthesize_to_wav — drives KokoroEngine
+        directly. Split out so :func:`cached_synthesize` can wrap it as
+        the cache-miss fetch.
+        """
         chunks: list[bytes] = []
         t_start = time.monotonic()
 
