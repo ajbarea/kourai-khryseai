@@ -75,6 +75,19 @@ Concrete blocker list for the QR-code reviewer experience.
     Security and Performance the common 14.5%-included gaps —
     targeted exactly. Coexists with `.github/copilot-instructions.md`
     (the deeper Copilot-specific file already in place).
+  - **New root `CITATION.cff`** (schema 1.2.0, validated via
+    `cffconvert`). GitHub auto-renders a "Cite this repository"
+    widget in the right sidebar exporting BibTeX / APA / EndNote /
+    Zenodo with one click. Embedded `preferred-citation` shapes the
+    May 8, 2026 NE AI Agents Day venue with paper-shaped fields
+    (collection-title, conference.name, date-published). README
+    gains a parallel `Citation` section with copy-paste BibTeX.
+  - **Poster page CTAs** — `docs/research/ne-agents-day-2026/index.md`
+    gains a "Try it" block (`make setup` / `make up` / `make cli`
+    + deep link into Architecture → Three Pillars + pointer to
+    AGENTS.md) and a "Cite this work" block mirroring the README.
+    Closes the loop from abstract → architecture mapping → runnable
+    code path for any reviewer landing on the poster URL via QR.
 - **Verified GitHub repo + docs site state.** GitHub description +
   topics + homepage URL are correctly set. Docs site at
   `https://ajbarea.github.io/kourai-khryseai/` builds and serves; nav,
