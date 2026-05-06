@@ -12,6 +12,68 @@ Kourai Khryseai is built around **transparency** and **interactivity**:
 
 ---
 
+## 🏛️ The Three Pillars: Monitor / Communicate / Control
+
+Kourai Khryseai treats multi-agent software development as an
+interpretability problem. Every coordination decision routes through
+one of three pillars; each pillar maps to a concrete mechanism in code,
+not a UX-only affordance.
+
+### 🔭 Monitor — every step is observable
+
+- **OpenTelemetry GenAI spans** wrap every LLM call across all 10
+  agents (`shared/src/kourai_common/llm.py`).
+- **Streamed Forge Transcript** broadcasts the full prior reasoning to
+  every specialist before it speaks (see
+  [Hephaestus ↔ Specialists](#hephaestus-specialists-the-forge-transcript)
+  below).
+- **Trace-ID injection** — `_OtelTraceFilter` in
+  `shared/src/kourai_common/log.py:89` threads the active trace ID into
+  every log record so a Jaeger span is grep-findable in Dozzle without
+  any code change between observation and search.
+
+### 💬 Communicate — agents pause when ambiguous
+
+- **HOTL pause tokens** — Metis emits `PAUSE: <preference_kind>` when
+  it would otherwise inline a one-time-per-project assumption (test
+  coverage target, Python version, style rules). Resolved via slash
+  command and persisted as a fact (M17 Phase 1).
+- **CONFIRM_ORDER read-back** — Hephaestus emits a tiered read-back
+  (`clear` / `smart` / `clarify`) before lighting the forge on any
+  development task (M13).
+- **A2A `INPUT_REQUIRED`** — see
+  [Input Required: Clarification Loop](#input-required-clarification-loop)
+  below for the mid-pipeline question / resume flow.
+
+### 🛠️ Control — recovery is deliberate, not an edge case
+
+- **Bounded Kallos⇅Techne repair loop** — when Kallos finds lint or
+  style issues Techne can fix, Hephaestus iterates Techne→Kallos up to
+  `KOURAI_MAX_ITERATIONS` rounds (default 5; see
+  `shared/src/kourai_common/config.py:136` and
+  `agents/hephaestus/agent.py:593`). Beyond the bound, the remainder
+  is reported, not silently retried.
+- **Graceful TTS auto-mute** — `is_audio_output_available()` in
+  `shared/src/kourai_common/audio_env.py` probes PortAudio after cheap
+  early-exits (env, headless Linux, WSL2-without-WSLg) so a missing
+  audio device degrades to silent dialogue rather than crashing the
+  agent (M6 / [#146](https://github.com/ajbarea/kourai-khryseai/pull/146)).
+- **Retry with jitter** — `with_retry` in
+  `shared/src/kourai_common/retry.py` wraps A2A and LLM calls in
+  exponential backoff with ±20% jitter so concurrent agents hitting
+  a 429 don't retry in lockstep ([#181](https://github.com/ajbarea/kourai-khryseai/pull/181)).
+
+The poster abstract names these the **MCC pillars** and frames
+transparency as a systems property. The unit suite under `tests/unit/`
+exercises each — `test_pause_tag.py`, `test_pipeline.py`,
+`test_metis_parallel.py`, `test_hooks_interaction.py`,
+`test_executors.py` cover the load-bearing communicate / control
+mechanisms; observability is exercised end-to-end via
+`tests/integration/test_reasoning_quality.py` and the live trace path
+through Jaeger.
+
+---
+
 ## 🗺️ System Diagram
 
 ```mermaid
