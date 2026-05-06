@@ -773,187 +773,39 @@ file-of-origin.
 One-line per item, newest first. Detail moves to git history when work
 lands — these docs are plans + scratchpad, not a historical archive.
 
+- 2026-05-06 — **Docker runtime workspace pyproject** [#182]. Runtime stage missed the workspace `pyproject.toml`; `kourai_common.paths.find_project_root()` raised at import, crash-looping every Python agent.
 - 2026-05-06 — **Retry exponential-backoff jitter (±20%)** [#181].
-  `with_retry` was deterministic; concurrent agents hitting a 429
-  retried in lockstep and re-collided. Apply `random.uniform(0.8, 1.2)`
-  multiplier to the computed delay; API-provided "Please retry in Xs"
-  path stays deterministic.
-- 2026-05-06 — **Summarization cheap-tier pin** [#180]. `_manage_memory`
-  was resolving the summarization sub-call to the agent's tier (Opus on
-  smart). Pin to `tier="cheap"` per Anthropic's context-compaction
-  cookbook (Haiku is 5× cheaper and sufficient for "summarize this").
-  Mirrors M14's `metis.discuss_tradeoffs` pattern.
+- 2026-05-06 — **Summarization cheap-tier pin** [#180].
 - 2026-05-06 — **Cache telemetry split by 5m vs 1h TTL** [#179].
-  Post-#178 follow-on. `AgentUsage` splits into `cache_write_5m_tokens`
-  + `cache_write_1h_tokens` from `usage.cache_creation` sub-object;
-  `ModelPricing` gains `cache_write_1h_per_m` (2× input on Anthropic);
-  `compute_cost` combines both rates. Closes the ~60% cost under-quote
-  that #178 introduced.
-- 2026-05-06 — **Cache-tighten get_enriched_system_blocks** [#178].
-  Replaces string-returning `get_enriched_system_prompt` with
-  `get_enriched_system_blocks` returning cache-marked
-  `[truly-static, player-dynamic]` text blocks; new public helper
-  `cached_text_blocks(*chunks, static_ttl="1h")` for hephaestus's
-  manual routing path. Static block defaults to 1h TTL — Anthropic's
-  May-2026 docs explicitly recommend it for long interactive sessions.
-  Within the 4-breakpoint budget (static-1h / player-dynamic-5m /
-  summary-5m / first-user-5m). ~5× reduction in static-block write
-  tokens on top of #177's ~3-7×.
+- 2026-05-06 — **Cache-tighten `get_enriched_system_blocks`** [#178]. Static block defaults to 1h TTL within the 4-breakpoint budget.
 - 2026-05-06 — **Split system-prompt cache breakpoints** [#177].
-  `_build_contextual_messages` was concatenating the dynamic
-  `semantic_summary` onto the static system content, invalidating the
-  prompt cache on every Mneme summarization. Restructure as a list of
-  two `cache_control` text blocks (static + summary). ~3-7× reduction
-  in cache-write tokens on long Forge Party sessions.
-- 2026-05-06 — **Cross-host scratchpad rebuild Phase 1** [#176].
-  `kourai_common.scratchpad` data layer + CLI `/scratchpad` slash;
-  replaces the orphan classifier consumer left by #175. CLI streaming
-  + GUI's post-#175 drop branch route to the same buffer. 2026 LLM
-  CoT-visibility best practice is render-distinct (not spoken).
+- 2026-05-06 — **Cross-host scratchpad rebuild Phase 1** [#176]. `kourai_common.scratchpad` + CLI `/scratchpad`; GUI/VN renderers gated on live smoke.
 - 2026-05-06 — **Drop GUI zombie call sites surviving #173** [#175].
-  Eight call sites referenced `GUIComponentsIntegration.get_scratchpad`
-  / `.status_bubbles` attributes that #173 deleted; `render.py`'s
-  per-frame `get_scratchpad().draw()` would have crashed every GUI
-  frame. Tab key unbound; cross-host scratchpad rebuild rebinds when
-  its renderer lands. ty: 22 → 14 diagnostics.
-- 2026-05-06 — **TTS audio cache layer (M6 sub-task 2)** [#174].
-  `kourai_common.tts_cache` content-addressable disk cache. Cache key
-  is `sha256` of length-prefixed
-  `(text, voice_id, model_id, sorted-keys-json(voice_settings))`;
-  layout `${XDG_CACHE_HOME}/kourai/tts/{key[:2]}/{key}.{ext}`;
-  oldest-mtime-first eviction at 500 MB cap. Engine-agnostic via
-  fetch-injection — rides into the ElevenLabs SDK swap at M6 sub-task 3.
-  Enabled at vn_bridge where static dialogue dicts yield near-100% hit
-  rate once warm.
-- 2026-05-06 — **Prune dead host-side anticipatory infrastructure**
-  [#173]. Deleted the staged-but-unwired GUI stratum (Scratchpad,
-  PipelineStatusIndicator, StatusBubbles, AgentPersonality
-  indicators/handoff) plus CLI's `gossip_cli` surface; ~9 source files
-  + 6 test files removed; ~105 false-coverage tests pruned (Mockery
-  anti-pattern). Replacements filed under "Cross-host shared rebuilds"
-  in the backlog as `kourai_common.*` data + thin host renderers.
+- 2026-05-06 — **TTS audio cache layer (M6 sub-task 2)** [#174]. `kourai_common.tts_cache` content-addressable disk cache, engine-agnostic via fetch-injection.
+- 2026-05-06 — **Prune dead host-side anticipatory infrastructure** [#173]. Replacements filed as `kourai_common.*` cross-host rebuilds in the backlog.
 - 2026-05-06 — **Centralize VN companion-spirits palette** [#172].
-  5 named constants in `script_data.rpy` + 15 literal sites swapped to
-  references. Walked back `_bright_hex(AGENT_COLORS[name])` after
-  computing the actual outputs (RGB-distance 102 / 71 from VN's current
-  literals) — VN's palette is a separate desaturated companion-spirits
-  palette, not drift from canonical.
-- 2026-05-06 — **Re-canonicalize `hex_color` + `rgb` on `AGENT_METADATA`**
-  [#171]. Restores the keys #118 removed; missing VN as a consumer was
-  a latent KeyError. Single canonical source: GUI's warm-gold theme for
-  the 6 maidens; CLI styling's Okabe-Ito CVD-safe values for
-  puck/cupid. GUI's `_AGENT_COLORS` derived from shared `rgb` instead
-  of duplicated.
-- 2026-05-05 — **Cross-host DRY sweep — 10 extractions to
-  `kourai_common/`** [#170]. New shared modules: `paths`,
-  `settings_audio`, `onboarding_data`, `demo_script`, `emote_sfx`,
-  `audio_dsp`, `dialogue_pacing`, `message_classifier`. Extended
-  `agents.py` with `EMOJI_PREFIX` + `detect_agent`. Behavior change:
-  GUI first-launch music_volume default 0.05 → 0.65 (fixes a 13× silent-
-  music divergence vs CLI). pyloudnorm + Pydantic v2 + VN demo-script
-  bridge filed as follow-ups in IMPL.
-- 2026-05-05 — **Puck tutorial slice 1: mode cascade + `/settings [0]`
-  entry** [#168]. `apply_mode_cascade(mode)` flips all 7 cascade
-  settings idempotently; `/settings [0]` panel entry reads + flips +
-  prints diegetic line. `romance_enabled` stays False in both paths
-  (separate two-step opt-in). Slices 2-4 queued.
-- 2026-05-05 — **GUI synthesis indicator via
-  `TypewriterManager.set_pending_audio`** [#166]. Companion to #165's
-  CLI indicator; renders a single-ellipsis placeholder while
-  `displayed_chars == 0` during the ~3s Kokoro CPU wait window. Cleared
-  by `on_audio_start` / `advance_word` / `flush_remaining` / `reset`.
-  VN equivalent pending live-smoke.
-- 2026-05-05 — **CLI synthesis indicator during ~3s Kokoro wait window**
-  [#165]. Pre-renders `Name face …` (dim ellipsis) before `tts.speak`;
-  cleared via CR + erase-line ANSI when karaoke header opens or Tier 2
-  box renders.
-- 2026-05-05 — **Cleared 3 pre-existing zensical build warnings**
-  [#164]. Mechanical drift sweep: escaped `\[0\]` / `\[status\]`
-  link-reference patterns; retargeted stale
-  `gui.md#text-to-speech-system-` anchor.
+- 2026-05-06 — **Re-canonicalize `hex_color` + `rgb` on `AGENT_METADATA`** [#171].
+- 2026-05-05 — **Cross-host DRY sweep — 10 extractions to `kourai_common/`** [#170]. Behaviour change: GUI first-launch `music_volume` 0.05 → 0.65 (fixes a 13× silent-music divergence vs CLI).
+- 2026-05-05 — **Puck tutorial slice 1: mode cascade + `/settings [0]` entry** [#168].
+- 2026-05-05 — **GUI synthesis indicator via `TypewriterManager.set_pending_audio`** [#166].
+- 2026-05-05 — **CLI synthesis indicator during ~3s Kokoro wait window** [#165].
+- 2026-05-05 — **Cleared 3 pre-existing zensical build warnings** [#164].
 - 2026-05-05 — **Puck tutorial spec polish + zensical nav add** [#162].
-  `docs/architecture/puck-first-run-tutorial.md` added to nav; status
-  block matches ROADMAP convention. May 2026 best-practice cross-check
-  confirmed the spec's progressive-disclosure + in-fiction-integration
-  approach.
-- 2026-05-05 — **GUI `maidens.py` dedup against shared/agents.py**
-  [#161]. Promoted GUI's richer content (extra emote-prefixed quotes,
-  missing return-handoff routes) into shared; GUI now imports + builds
-  legacy `AGENTS` dict from a local color map. 327 → 101 lines.
+- 2026-05-05 — **GUI `maidens.py` dedup against shared/agents.py** [#161].
 - 2026-05-05 — **Research-grounded M6 ElevenLabs hybrid spec** [#160].
-  Spec'd against ElevenLabs's actual May 2026 docs. Open question
-  answered: no server-side audio cache by request hash; client-side
-  cache per Supabase cookbook pattern. Per-engine markup adapter
-  design; audio cache spec; sub-task ordering + M20+VN-smoke gating.
-  ROADMAP cleanup: M6 section unmuddled; "Future / unprioritized
-  backlog" H2 added.
-- 2026-05-03 — **Walked back M18 Phase 2 SSML markup investment**
-  [#152]. Reverted dialogue-content SSML from #149/#150 after
-  web-searching ElevenLabs's actual docs: Eleven v3 doesn't support
-  SSML break tags (uses `[bracket]` audio tags); Flash V2.5 supports
-  `<break>` but ElevenLabs warns against overuse.
-  `kourai_common.ssml.strip_ssml` + defusedxml dep stay as defensive
-  infrastructure. **Lesson logged in memory**: web-search SPECIFIC
-  target's primary docs at the planning step. M6 promoted to
-  pre-player-release blocker.
-- 2026-05-03 — **M18 Phase 2 SSML rollout — handoff/victory dicts +
-  display chokepoint** [#150]. Reverted in #152.
-- 2026-05-03 — **M18 Phase 2 hephaestus producer-side pilot** [#149].
-  Reverted in #152.
-- 2026-05-03 — **Uvicorn-takeover sweep across 10 specialists** [#148].
-  `kourai_common.log.run_uvicorn` helper centralizes `log_config=None`;
-  10 specialists swap their `uvicorn.run` for the helper. Fixes
-  silently-dropped `log.info(...)` (uvicorn's default dictConfig was
-  wiping `setup_logging`'s root handlers).
-- 2026-05-03 — **M18 Phase 2 — engine-side SSML strip layer** [#147].
-  `kourai_common.ssml.strip_ssml` via `defusedxml` (XXE / billion-laughs
-  hardened); feeds plain text to Kokoro. Producer-side wrap reverted in
-  #152; strip layer stays as defensive infrastructure.
+- 2026-05-03 — **Walked back M18 Phase 2 SSML markup investment** [#152]. Eleven v3 uses `[bracket]` audio tags, not SSML break tags. **Lesson logged in memory**: web-search SPECIFIC target's primary docs at the planning step. M6 promoted to pre-player-release blocker.
+- 2026-05-03 — M18 Phase 2 — handoff/victory dicts + display chokepoint [#150]. *(Reverted in #152.)*
+- 2026-05-03 — M18 Phase 2 hephaestus producer-side pilot [#149]. *(Reverted in #152.)*
+- 2026-05-03 — **Uvicorn-takeover sweep across 10 specialists** [#148]. `kourai_common.log.run_uvicorn` centralizes `log_config=None`; fixes silently-dropped `log.info(...)`.
+- 2026-05-03 — **M18 Phase 2 — engine-side SSML strip layer** [#147]. `kourai_common.ssml.strip_ssml` via `defusedxml`; stays as defensive infrastructure post-#152.
 - 2026-05-03 — **Cross-platform graceful TTS fallback** [#146].
-  `audio_env.is_audio_output_available()` probes PortAudio after
-  cheap-NO gates (`KOURAI_TTS=off`, WSL2-without-WSLg, headless Linux);
-  `RealtimeTTSEngine.__init__` defaults `muted=None` (auto-detect) with
-  per-platform fix recipe on auto-mute.
-- 2026-05-03 — **vn_bridge headless TTS unblock + observability**
-  [#145]. Three connected fixes: `RealtimeTTSEngine(muted=True)` at
-  construction skips the audio-device probe; `log_config=None` on
-  `uvicorn.run` stops uvicorn's dictConfig wipe; `force=True` on
-  `basicConfig` so transitive imports can't no-op the handler install.
+- 2026-05-03 — **vn_bridge headless TTS unblock + observability** [#145].
 - 2026-05-02 — **Smoke-driven polish wave** [#140] [#141] [#142] [#143].
-  Surfaced by driving `make cli` from the host: TTS playback +
-  synthesize_to_wav timing logs (#140); Kokoro pre-warm INFO summary
-  (#141); `get_host_agent_url` for direct host invocation (#142);
-  Hephaestus router `max_tokens=200→800` (#143).
-- 2026-05-02 — **`/aj-deslop` sweep on this session's three feature
-  PRs** [#138]. -102 LoC of multi-paragraph docstrings + rationale
-  comment blocks trimmed across 8 modules; behavior unchanged.
+- 2026-05-02 — **`/aj-deslop` sweep on session feature PRs** [#138].
 - 2026-05-02 — **M20 sub-task 1 — Kokoro voice tensor pre-warm** [#136].
-  `_prewarm_agent_voices` materializes all 10 agent voice tensors at
-  `RealtimeTTSEngine.__init__`; eliminates 1-3s per-voice download/parse
-  cost on first per-agent utterance.
-- 2026-05-02 — **M18 Phase 3 Part A — strict kind routing** [#134].
-  Tagged remaining unmigrated forwarders; dropped `kind is None`
-  fallback + `DIALOGUE_KEYWORDS` prose-keyword path. Untagged messages
-  now route as not-dialogue everywhere. Phase 3 Part B deferred.
-- 2026-05-02 — **WSL audio cascade silenced** [#133]. libasound noop
-  handler at TTS module load + fd-redirect context around
-  `_TextToAudioStream(...)` suppress ~55 stderr lines/startup under
-  WSL2/headless. `KOURAI_AUDIO_DEBUG=1` opt-out.
-- 2026-05-02 — **Wolfi base-image migration** [#125] [#127] [#130]
-  (closes #98). All 13 Docker images on Wolfi (0H baseline vs 1H
-  Debian-glibc on CVE-2026-5435); durable GH Actions rescan workflow
-  tracks issue #126 (xmldom upstream block); introduced
-  `# research(YYYY-MM):` inline-rationale convention.
+- 2026-05-02 — **M18 Phase 3 Part A — strict kind routing** [#134]. Phase 3 Part B deferred.
+- 2026-05-02 — **WSL audio cascade silenced** [#133].
+- 2026-05-02 — **Wolfi base-image migration** [#125] [#127] [#130] (closes #98). All 13 Docker images on Wolfi; introduced `# research(YYYY-MM):` inline-rationale convention.
 - 2026-05-02 — **`/aj-deslop` IMPL TODO closed** [#124] [#128] [#129].
-  Three sweeps; -118 LoC of "why we picked this" prose. Pre-release
-  stance: keep only what helps a reader execute.
-- 2026-05-02 — **UX/DX + CI batch** [#118] [#119] [#120] [#121] [#122]
-  [#123] [#131]. `AGENT_METADATA` dead-fields drop, Okabe-Ito CVD-safe
-  agent badges (closes #10), captions toggle for audio-only mode
-  (closes #19), apt cache for portaudio19-dev, GHA layer cache for MCP
-  Docker builds, NO_COLOR honored across `styling.py`, ty narrowings.
-- 2026-05-01 — **M18 Phase 1 verified GREEN end-to-end** via
-  `make smoke-m18`; full hephaestus → metis → techne → dokimasia →
-  kallos → mneme cascade in 57.4s, defensive virtues fail-soft fired
-  as designed. Same-day post-smoke DX cleanup: [#114] [#115] [#116]
-  [#117].
+- 2026-05-02 — **UX/DX + CI batch** [#118] [#119] [#120] [#121] [#122] [#123] [#131]. Includes Okabe-Ito CVD-safe agent badges (closes #10), captions toggle for audio-only mode (closes #19).
+- 2026-05-01 — **M18 Phase 1 verified GREEN end-to-end** via `make smoke-m18`; same-day post-smoke DX cleanup [#114] [#115] [#116] [#117].
