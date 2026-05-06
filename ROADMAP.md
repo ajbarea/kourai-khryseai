@@ -5,7 +5,7 @@ A public, living plan for where the forge is heading. Items here are either
 *currently working on* lives in [IMPL.md](./IMPL.md) — when it lands, the
 matching milestone here collapses to a single line under "Shipped".
 
-Last reviewed: 2026-05-06. Active focus: **M6 ElevenLabs hybrid as pre-player-release blocker** (promoted 2026-05-03 after walking back the M18 Phase 2 SSML investment — ElevenLabs v3's actual May 2026 docs don't support SSML break tags, so the producer-side SSML markup was wrong for the M6 target; see Shipped log entry for #152). M6 sub-task 2 (audio cache layer) shipped under Kokoro 2026-05-06 [#174] — engine-agnostic via fetch-injection, rides along into the ElevenLabs swap. See [IMPL.md](./IMPL.md) for the active work, the open invariants, and the priority-ordered "Up next" list. Pre-release perfection stance unchanged: May 2026 best practice no matter the cost, **web-search the SPECIFIC target's primary docs at the planning step** (not just at implementation), architectural fix over expedient patch. Sister-repo audit weekly cron runs Mondays 12:00 UTC.
+Last reviewed: 2026-05-06. Active focus: **M6 ElevenLabs hybrid as pre-player-release blocker** (promoted 2026-05-03 after walking back the M18 Phase 2 SSML investment — ElevenLabs v3's actual May 2026 docs don't support SSML break tags, so the producer-side SSML markup was wrong for the M6 target; see Shipped log entry for #152). M6 sub-task 2 (audio cache layer) shipped under Kokoro 2026-05-06 [#174] — engine-agnostic via fetch-injection, rides along into the ElevenLabs swap. Cross-host scratchpad rebuild Phase 1 shipped 2026-05-06 [#176] — first of the seven cross-host rebuilds queued post-#173, replaces the orphan classifier-drop path with a real per-agent recall surface (CLI `/scratchpad`); 2026 LLM CoT-visibility best practice is render-distinct (sources in module docstring). See [IMPL.md](./IMPL.md) for the active work, the open invariants, and the priority-ordered "Up next" list. Pre-release perfection stance unchanged: May 2026 best practice no matter the cost, **web-search the SPECIFIC target's primary docs at the planning step** (not just at implementation), architectural fix over expedient patch. Sister-repo audit weekly cron runs Mondays 12:00 UTC.
 
 ---
 
@@ -687,16 +687,21 @@ layer (frozen dataclasses + pure logic in `kourai_common.*`); each
 host owns thin renderer adapters. Pick by player-journey impact, not
 file-of-origin.
 
-- **Cross-host scratchpad — per-agent CoT / TODO display.** Today
-  `kourai_common.message_classifier.is_scratchpad_content` already
-  routes scratchpad-shaped messages, but no host renders them. New
-  shared module: `kourai_common.scratchpad` exporting
-  `ScratchpadEntry(kind, text)` (kind ∈ todo / cot_step / bullet /
-  plain) and `Scratchpad(agent_name)` with `.append(text) /
-  .entries() / .clear() / .summary()` — extends the existing
-  classifier with structured parsing. Renderers: CLI `/scratchpad`
-  slash dump (or passive scrollback), GUI overlay panel, VN side
-  parchment slip styled to match the dialogue framing.
+- ~~**Cross-host scratchpad — per-agent CoT / TODO display.**~~
+  **Phase 1 shipped 2026-05-06 [#176]:** `kourai_common.scratchpad`
+  data layer (`ScratchpadEntry` + per-agent ring-buffered
+  `Scratchpad` + lazy module singleton) + CLI `/scratchpad` slash
+  command. CLI streaming buffers classifier-shaped non-dialogue
+  messages as a side-effect (display routing unchanged). GUI's
+  post-#175 logger.debug-and-drop path now buffers to the same
+  module. ScratchpadEntry stores raw text rather than the originally-
+  spec'd kind union — kind classification is a renderer concern,
+  not a buffer property. **Phase 2 follow-on:** GUI overlay
+  renderer + VN side parchment renderer (each gated on live smoke);
+  vn_bridge classifier-side wiring (today vn_bridge routes through
+  KIND_DIALOGUE metadata, so non-dialogue scratchpad content from
+  VN-side specialists isn't a current pattern); cross-session
+  persistence (file when a player asks).
 - **Cross-host pipeline-status — active agent + queue + loading
   flag.** Real metis-parallel work exists (M0); each host re-derives
   "who's active" from event streams independently today. New shared
@@ -760,6 +765,19 @@ file-of-origin.
 One-line per item, newest first. Detail moves to git history when work
 lands — these docs are plans + scratchpad, not a historical archive.
 
+- 2026-05-06 — **Cross-host scratchpad rebuild Phase 1** [#176].
+  First slice of the rebuild filed alongside #173: `kourai_common.scratchpad`
+  data layer (`ScratchpadEntry` frozen dataclass + per-agent
+  ring-buffered `Scratchpad` with `add` / `entries` / `agents` /
+  `clear`; module-level `get_scratchpad()` lazy singleton) + CLI
+  `/scratchpad [<agent>|clear [<agent>]]` slash command. CLI
+  streaming buffers classifier-shaped non-dialogue messages as a
+  display-unchanged side-effect; GUI's post-#175 logger.debug-and-drop
+  branch routes to the same buffer. Replaces the orphan classifier
+  consumer left by #175 with real recall. 39 new unit tests; 3114/3114
+  pass. `research(2026-05)`: 2026 best practice for LLM scratchpad /
+  CoT is "render distinct from dialogue, prefer structured visibility,
+  don't TTS" (ICLR 2026 paper arxiv 2510.27246; Masood 2026-04).
 - 2026-05-06 — **Drop GUI zombie call sites surviving #173** [#175].
   Eight host-side call sites in `hosts/gui/{render,queue_event_handler,pygame_event_handler}.py`
   referenced `GUIComponentsIntegration.get_scratchpad` /

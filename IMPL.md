@@ -6,23 +6,31 @@ to a one-liner under "Shipped" and this file resets to the next milestone.
 Git history is the archive — these docs are plans + scratchpad, not a
 historical record.
 
-Updated: 2026-05-06 · Active focus: **M6 sub-task 2 shipped [#174]
-under Kokoro** — `kourai_common.tts_cache` content-addressable disk
-cache validated against the spec'd shape (sha256-of-length-prefixed
-inputs, sharded `{key[:2]}/{key}.{ext}` layout, 500 MB cap with
-oldest-mtime-first eviction); enabled at vn_bridge construction
-where the static dialogue dicts give near-100% hit rate once warm.
-Sub-task ordering rolls forward: per-engine markup adapter (sub-task
-1) bundles with the production swap (sub-task 4); ElevenLabs SDK
-integration (sub-task 3) still gated on M20 + VN smoke landing
-first. Pre-player-release blocker still M6 overall. SSML markup
-investment reverted [#152]; defensive strip helpers stay. Cross-host
-DRY sweep merged in [#170] — 10 extractions to `kourai_common/`,
-fixed a 13× GUI music-volume divergence bug. Dead host-side
+Updated: 2026-05-06 · Active focus: **Scratchpad rebuild Phase 1
+shipped [#176]** — `kourai_common.scratchpad` data layer + CLI
+`/scratchpad` slash command. Replaces the post-#175 classifier-drop
+path with a real consumer; agent reasoning is recallable per-agent
+instead of dropped. Aligns with 2026 best practice for LLM CoT
+visibility (distinct render, not spoken; sources in module
+docstring). Same session: **M6 sub-task 2 shipped [#174]** —
+`kourai_common.tts_cache` content-addressable disk cache validated
+against the spec'd shape (sha256-of-length-prefixed inputs, sharded
+`{key[:2]}/{key}.{ext}` layout, 500 MB cap with oldest-mtime-first
+eviction); enabled at vn_bridge construction where the static
+dialogue dicts give near-100% hit rate once warm. **GUI zombie call
+sites cleaned [#175]** — 8 sites in `hosts/gui/{render,queue_event_handler,pygame_event_handler}.py`
+referenced GUIComponentsIntegration attributes that #173 deleted;
+ty: 22→14 diagnostics. M6 sub-task ordering: markup adapter
+(sub-task 1) bundles with production swap (sub-task 4); ElevenLabs
+SDK integration (sub-task 3) gated on M20 + VN smoke. Pre-player-
+release blocker still M6 overall. SSML markup investment reverted
+[#152]; defensive strip helpers stay. Cross-host DRY sweep merged
+in [#170] — 10 extractions to `kourai_common/`. Dead host-side
 anticipatory infra pruned in [#173] — 9 source / 6 test files /
-~2.6k LOC; 7 cross-host rebuild items filed in ROADMAP backlog.
-main is clean; issue #126 (upstream-blocked `@xmldom/xmldom@0.8.12`
-HIGH bundled inside npm 11.13.0) is auto-managed by
+~2.6k LOC; 7 cross-host rebuild items filed in ROADMAP backlog (one
+shipped 2026-05-06, six remaining). main is clean; issue #126
+(upstream-blocked `@xmldom/xmldom@0.8.12` HIGH bundled inside npm
+11.13.0) is auto-managed by
 `.github/workflows/issue-126-rescan.yml` — Saturdays 14:17 UTC from
 2026-05-16, auto-closes once upstream lands `>=0.8.13`.
 
