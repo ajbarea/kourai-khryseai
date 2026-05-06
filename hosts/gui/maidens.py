@@ -12,15 +12,21 @@ callers continue to import ``AGENTS``, ``HANDOFF_LINES``,
 from __future__ import annotations
 
 import logging
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from kourai_common.agents import (
     AGENT_METADATA,
     AGENT_QUOTES,
+    EMOJI_PREFIX as EMOJI_TO_AGENT,
     HANDOFF_FALLBACKS as HANDOFF_GENERIC,
     HANDOFF_LINES,
     VICTORY_LINES,
+    detect_agent,
 )
+from kourai_common.paths import avatars_dir
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 __all__ = [
     "AGENTS",
@@ -35,7 +41,7 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 # Avatar images live in the root assets/avatars/anime directory
-_AVATAR_DIR = Path(__file__).resolve().parents[2] / "assets" / "avatars" / "anime"
+_AVATAR_DIR = avatars_dir()  # default style: anime
 
 
 def get_avatar_path(name: str) -> Path | None:
@@ -81,25 +87,5 @@ def _build_agents() -> dict[str, dict]:
 # Legacy import shape: AGENTS["hephaestus"]["quotes"], etc.
 AGENTS: dict[str, dict] = _build_agents()
 
-# Emoji prefix → agent name (mirrors what Hephaestus sends in status messages)
-EMOJI_TO_AGENT: dict[str, str] = {
-    "\U0001f525": "hephaestus",  # 🔥
-    "\U0001f4d0": "metis",  # 📐
-    "⚙️": "techne",  # ⚙️
-    "⚙": "techne",  # ⚙
-    "\U0001f9ea": "dokimasia",  # 🧪
-    "✨": "kallos",  # ✨
-    "\U0001f4dc": "mneme",  # 📜
-}
-
-
-def detect_agent(text: str) -> tuple[str | None, str]:
-    """Detect which agent is speaking from an emoji-prefixed status string.
-
-    Returns (agent_name | None, cleaned_text).
-    """
-    stripped = text.lstrip()
-    for emoji, name in EMOJI_TO_AGENT.items():
-        if stripped.startswith(emoji):
-            return name, stripped.replace(emoji, "", 1).strip()
-    return None, text
+# EMOJI_TO_AGENT and detect_agent above re-export from kourai_common.agents
+# (shared with CLI's _EMOJI_TO_MAIDEN derivation in hosts/cli/maidens.py).

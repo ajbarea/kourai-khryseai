@@ -23,6 +23,11 @@ from hosts.gui.constants import (
     FONT_NAME,
     theme,
 )
+from kourai_common.onboarding_data import (
+    EXPERIENCE_OPTIONS,
+    PRONOUN_OPTIONS,
+    ROLE_OPTIONS,
+)
 
 # Onboarding steps
 STEP_PUCK_INTRO = 0
@@ -34,23 +39,6 @@ STEP_TITLE = 5
 STEP_PRONOUNS = 6
 STEP_WELCOME = 7
 STEP_DONE = 8
-
-# Role options (role_id, display_label, description)
-ROLE_OPTIONS = [
-    ("divine", "As a God among mortals", "Divine honorifics, reverent tone"),
-    ("mortal", "As a fellow artisan", "Casual, warm, collaborative"),
-    ("hero", "As a proven champion", "Comradely respect, earned trust"),
-    ("devoted", "As their beloved master", "Devoted, formal, adoring"),
-    ("name_only", "Just by name", "Natural, no special treatment"),
-]
-
-# Pronoun options
-PRONOUN_OPTIONS = ["he/him", "she/her", "they/them", ""]
-
-EXPERIENCE_OPTIONS = [
-    ("focused", "Focused — minimal game mechanics, terminal-first coding flow"),
-    ("gamified", "Gamified — full forge systems, relationship progression, and lore"),
-]
 
 
 def _puck_handoff_line(role: str) -> str:
@@ -205,7 +193,7 @@ class OnboardingOverlay:
         if self.step == STEP_MODE:
             for i, rect in enumerate(self._button_rects):
                 if rect.collidepoint(pos):
-                    self.experience_mode = EXPERIENCE_OPTIONS[i][0]
+                    self.experience_mode = EXPERIENCE_OPTIONS[i].id
                     self.step = STEP_METRICS
                     self._button_rects.clear()
                     return True
@@ -221,9 +209,9 @@ class OnboardingOverlay:
         if self.step == STEP_TITLE:
             for i, rect in enumerate(self._button_rects):
                 if rect.collidepoint(pos):
-                    role, _label, _desc = ROLE_OPTIONS[i]
-                    self.selected_role = role
-                    self.selected_title = _label
+                    choice = ROLE_OPTIONS[i]
+                    self.selected_role = choice.id
+                    self.selected_title = choice.label
                     self.step = STEP_PRONOUNS
                     self._button_rects.clear()
                     return True
@@ -231,7 +219,7 @@ class OnboardingOverlay:
         if self.step == STEP_PRONOUNS:
             for i, rect in enumerate(self._button_rects):
                 if rect.collidepoint(pos):
-                    self.selected_pronouns = PRONOUN_OPTIONS[i]
+                    self.selected_pronouns = PRONOUN_OPTIONS[i].id
                     self.step = STEP_WELCOME
                     self._button_rects.clear()
                     return True
@@ -347,7 +335,8 @@ class OnboardingOverlay:
         y += 36
 
         self._button_rects.clear()
-        for i, (_mode, label) in enumerate(EXPERIENCE_OPTIONS):
+        for i, choice in enumerate(EXPERIENCE_OPTIONS):
+            label = choice.description
             btn_y = y + i * (BUTTON_H + BUTTON_PAD)
             rect = pygame.Rect(
                 self.panel_rect.x + 30, self.panel_rect.y + btn_y, PANEL_W - 60, BUTTON_H
@@ -469,7 +458,9 @@ class OnboardingOverlay:
         y += 50
 
         self._button_rects.clear()
-        for i, (_role, label, desc) in enumerate(ROLE_OPTIONS):
+        for i, choice in enumerate(ROLE_OPTIONS):
+            label = choice.label
+            desc = choice.description
             btn_y = y + i * (BUTTON_H + BUTTON_PAD)
             rect = pygame.Rect(
                 self.panel_rect.x + 30,
@@ -508,9 +499,11 @@ class OnboardingOverlay:
         )
         y += 50
 
-        labels = ["he/him", "she/her", "they/them", "Skip"]
+        # Pronoun rows render the OnboardingChoice.label so the empty-id
+        # "skip" entry shows "Skip" rather than a blank row.
         self._button_rects.clear()
-        for i, label in enumerate(labels):
+        for i, choice in enumerate(PRONOUN_OPTIONS):
+            label = choice.label.title() if choice.id == "" else choice.label
             btn_y = y + i * (BUTTON_H + BUTTON_PAD)
             rect = pygame.Rect(
                 self.panel_rect.x + 30,

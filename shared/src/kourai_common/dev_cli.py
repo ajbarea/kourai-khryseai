@@ -29,8 +29,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from kourai_common.dev_log import LOG, SESSION_ENV, run_step
+from kourai_common.paths import PROJECT_ROOT
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 load_dotenv(PROJECT_ROOT / ".env")
 
 DEFAULT_ENV = {

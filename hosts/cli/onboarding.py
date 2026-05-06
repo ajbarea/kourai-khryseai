@@ -2,6 +2,10 @@
 
 Guides the player through name entry, pronunciation tuning, title/role
 selection, and pronoun preferences. Saves to PlayerProfile JSON.
+
+Role / pronoun / experience choices come from
+``kourai_common.onboarding_data`` so CLI / GUI / VN agree on the
+canonical option set; CLI-only metrics options stay defined locally.
 """
 
 from __future__ import annotations
@@ -9,47 +13,28 @@ from __future__ import annotations
 import logging
 
 from hosts.cli.settings import CLISettings
+from hosts.cli.styling import _BOLD, _CYAN, _DIM, _GOLD, _GOLD_BRIGHT, _ITALIC, _RESET
+from kourai_common.onboarding_data import (
+    EXPERIENCE_OPTIONS,
+    PRONOUN_OPTIONS,
+    ROLE_OPTIONS,
+    OnboardingChoice,
+)
 from kourai_common.player import PlayerProfile, set_active_profile
 
 logger = logging.getLogger(__name__)
 
-# Reuse CLI color palette (keep in sync with hosts/cli/styling.py)
-_GOLD = "\033[38;2;201;148;74m"
-_GOLD_BRIGHT = "\033[38;2;241;210;161m"
-_CYAN = "\033[1;36m"
-_DIM = "\033[2m"
-_BOLD = "\033[1m"
-_ITALIC = "\033[3m"
-_RESET = "\033[0m"
-
-# Title/role presets
-ROLE_OPTIONS = [
-    ("divine", "A God among mortals — the maidens serve with awe"),
-    ("mortal", "A fellow artisan — the maidens treat you as an equal"),
-    ("master", "Their beloved master — devoted, formal address"),
-    ("casual", "Just by name — natural, relaxed conversation"),
+# CLI-only — neither host duplicates these, so the canonical surface stays
+# here. Same OnboardingChoice schema as the shared lists for a uniform
+# render path.
+METRICS_OPTIONS_FOCUSED: list[OnboardingChoice] = [
+    OnboardingChoice(id="off", label="No", description="No (recommended for Focused mode)"),
+    OnboardingChoice(id="on", label="Yes", description="Yes, enable affinity + virtue tracking"),
 ]
 
-PRONOUN_OPTIONS = [
-    ("he/him", "he/him"),
-    ("she/her", "she/her"),
-    ("they/them", "they/them"),
-    ("", "skip / prefer not to say"),
-]
-
-EXPERIENCE_OPTIONS = [
-    ("focused", "Focused — minimal game mechanics, terminal-first coding flow"),
-    ("gamified", "Gamified — full forge systems, relationship progression, and lore"),
-]
-
-METRICS_OPTIONS_FOCUSED = [
-    ("off", "No (recommended for Focused mode)"),
-    ("on", "Yes, enable affinity + virtue tracking"),
-]
-
-METRICS_OPTIONS_GAMIFIED = [
-    ("on", "Yes (recommended for Gamified mode)"),
-    ("off", "No, keep this session private"),
+METRICS_OPTIONS_GAMIFIED: list[OnboardingChoice] = [
+    OnboardingChoice(id="on", label="Yes", description="Yes (recommended for Gamified mode)"),
+    OnboardingChoice(id="off", label="No", description="No, keep this session private"),
 ]
 
 
@@ -65,31 +50,38 @@ def _input(prompt_text: str) -> str:
         return ""
 
 
-def _pick(options: list[tuple[str, str]], prompt_text: str) -> str:
-    """Present numbered options and return the selected value."""
+def _pick(options: list[OnboardingChoice], prompt_text: str) -> str:
+    """Present numbered choices and return the selected ``id``."""
     _echo(prompt_text)
-    for i, (_, label) in enumerate(options, 1):
-        _echo(f"  {_GOLD}{i}{_RESET}) {label}")
+    for i, choice in enumerate(options, 1):
+        _echo(f"  {_GOLD}{i}{_RESET}) {choice.description}")
     _echo("")
 
     while True:
-        choice = _input(f"  {_GOLD}>{_RESET} ")
-        if not choice:
-            return options[0][0]  # Default to first option
+        picked = _input(f"  {_GOLD}>{_RESET} ")
+        if not picked:
+            return options[0].id  # Default to first option
         try:
-            idx = int(choice) - 1
+            idx = int(picked) - 1
             if 0 <= idx < len(options):
-                return options[idx][0]
+                return options[idx].id
         except ValueError:
             pass
         _echo(f"  {_DIM}Pick a number 1–{len(options)}{_RESET}")
 
 
 def _puck_handoff_line(role: str) -> str:
-    """Role-sensitive Puck handoff line before meeting Hephaestus."""
-    if role in {"divine", "master"}:
+    """Role-sensitive Puck handoff line before meeting Hephaestus.
+
+    Keeps legacy CLI role IDs (``master`` / ``casual``) in the match set
+    so existing player profiles routed through the CLI before the May
+    2026 onboarding canonicalization still get a tonally-correct line.
+    Maps to the canonical 5-role set: divine / hero / devoted (formal)
+    vs mortal / name_only / casual / master (warm).
+    """
+    if role in {"divine", "hero", "master", "devoted"}:
         return "All right, highness — try not to smirk when the old king sizes you up."
-    if role in {"mortal", "casual"}:
+    if role in {"mortal", "casual", "name_only"}:
         return "Stay close. Hephaestus is intense, but he respects honest craft."
     return "Easy now — first impressions matter with the Forge King."
 

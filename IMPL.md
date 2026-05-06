@@ -10,7 +10,9 @@ Updated: 2026-05-05 · Active focus: **M6 ElevenLabs hybrid as
 pre-player-release blocker** (spec'd 2026-05-05 against ElevenLabs
 May 2026 docs — see M6 section below; implementation queued behind
 M20 + VN smoke). SSML markup investment reverted [#152]; defensive
-strip helpers stay. main is clean; issue #126 (upstream-blocked
+strip helpers stay. **Cross-host DRY sweep complete on branch
+`chore/cross-host-dry-sweep`** (5 commits, all 10 items shipped,
+3103 unit pass) — PR pending. main is clean; issue #126 (upstream-blocked
 `@xmldom/xmldom@0.8.12` HIGH bundled inside npm 11.13.0) is
 auto-managed by `.github/workflows/issue-126-rescan.yml` —
 Saturdays 14:17 UTC from 2026-05-16, auto-closes once upstream
@@ -248,6 +250,155 @@ deferred. Both kinds are reserved tokens with no producer; building host-
 side render paths before any specialist emits them is anticipatory infra.
 Re-enter Part B once a specialist (likely techne for code, metis for spec)
 opts into emitting these kinds.
+
+## Cross-host DRY sweep — May 2026 (active)
+
+Audit of `hosts/cli/`, `hosts/gui/`, `hosts/vn/` against `shared/src/kourai_common/`
+surfaced 10 extraction candidates after the maidens-dedup precedent in
+[#161]. Already shared (good baseline): `agents.py` (metadata + colors +
+quotes + handoff/victory lines), `audio.AudioManager`, `tts_realtime`,
+`player.PlayerProfile`, `gossip_core`/`gossip_models`, `companion`,
+`virtues`. Working on branch `chore/cross-host-dry-sweep`; one commit
+per item; final PR at the end.
+
+`research(2026-05)`: project-root traversals across the repo use a mix of
+`.parents[2]`/`.parents[3]`/`.parents[4]` — fragile under any directory
+restructure. The 2026 best practice is `importlib.resources.files()` for
+installed-package data, but the kourai assets aren't packaged — they live
+in the repo's top-level `assets/` next to `pyproject.toml`. So pathlib
+walk-up looking for `pyproject.toml` (the pattern already in use at
+`hosts/vn/.../bridge.py:30`) is the right fit; that's what the new
+`kourai_common/paths.py` will canonicalize. Pydantic v2 is the modern
+settings stack and is already in `kourai-common` deps, but the existing
+`CLISettings` is a `@dataclass` and migrating wholesale is out of scope
+for a DRY sweep — new `AudioSettings` matches the surrounding dataclass
+style; pydantic migration is a separate decision. Sources:
+[Python project root + `importlib.resources.files()` 2026 patterns](
+https://www.pythontutorials.net/blog/python-get-path-of-root-project-structure/),
+[Pydantic Settings Management](
+https://docs.pydantic.dev/latest/concepts/pydantic_settings/),
+[pyloudnorm (deferred — see item 5)](
+https://github.com/csteinmetz1/pyloudnorm).
+
+### Extraction items (priority order)
+
+Foundations first because most items need the new `paths.py`:
+
+1. **Item #8 + #9 — paths + emoji map** ✅ shipped at c97a11d.
+   `kourai_common.paths` now owns `PROJECT_ROOT` (pyproject walk-up
+   keyed off `[tool.uv.workspace]`), `assets_dir()`, `cache_dir()`,
+   `logs_dir()`, `templates_dir()`, `docs_assets_dir()`,
+   `avatars_dir(style="anime"|"vn")`,
+   `audio_dir(kind="music"|"sfx"|"ambient"|"tts")`. 11 callsites
+   migrated to import the helpers; 1 lingering host file (VN's
+   `bridge.py`) deliberately keeps its own walk-up because it runs
+   under Ren'Py-bundled Python without sys.path access to
+   `kourai_common`. `EMOJI_PREFIX` + `detect_agent` live in
+   `kourai_common.agents`; CLI's `_EMOJI_TO_MAIDEN` is now a derived
+   dict comprehension over the shared map; GUI re-exports
+   `EMOJI_TO_AGENT` and `detect_agent` from shared for back-compat.
+   Tests: `tests/unit/test_paths.py` (15 cases) and
+   `tests/unit/test_emoji_prefix.py` (6 cases). 3075/3075 unit pass.
+
+2. **Item #2 — AudioSettings** ✅ shipped at 674e6d3.
+   `kourai_common.settings_audio` owns the frozen `AudioSettings`
+   dataclass (3 toggles + 4 volumes) plus the `MUSIC_VOLUME_DEFAULT`
+   etc. constants and a `DEFAULT_AUDIO_SETTINGS` snapshot dict.
+   `hosts/cli/settings.py:CLISettings` reads its volume defaults from
+   the shared constants via `field(default=...)`; `hosts/gui/settings.py`
+   spreads `**DEFAULT_AUDIO_SETTINGS` into its `DEFAULT_SETTINGS` dict;
+   `hosts/gui/settings_overlay.py:222` slider-fallback values now
+   reference the same constants. **Bug fix**: GUI's first-launch
+   `music_volume` was 0.05 against CLI's 0.65 — same player switching
+   hosts heard a 13× audio jump. Now: 0.65 on both. Players who saved
+   the silent default in their GUI config still see it (we don't
+   migrate persisted JSON), but new launches and `Reset to Defaults`
+   land on the canonical value. 6 new tests; 3081/3081 unit pass.
+
+3. **Item #3 — onboarding option lists** ✅ shipped at 138fdfb.
+   `kourai_common.onboarding_data` owns `OnboardingChoice(id, label,
+   description)` plus 5-role `ROLE_OPTIONS` (canonicalized on the
+   GUI/VN set; CLI gained "hero" and dropped "master"/"casual"
+   labels — the IDs still flow through Puck handoff for back-compat),
+   `PRONOUN_OPTIONS` (4), `EXPERIENCE_OPTIONS` (2). Both hosts'
+   onboarding flows iterate the shared lists; CLI's metrics options
+   stay local but use the same `OnboardingChoice` schema. Bundles
+   item #10 (intra-CLI ANSI re-import). 6 new tests; 3087/3087 pass.
+
+4. **Item #1 — demo script as data** ✅ shipped at cd85892.
+   `kourai_common.demo_script` owns `DemoTurn(speaker, kind, text,
+   pacing_ms)` and `DemoChoice(key, label, aliases, response_turns)`
+   plus `CSV_DEMO_TRIGGER`, `CSV_DEMO_TURNS` (the 7-beat Hephaestus
+   → Metis pause scene), `CSV_DEMO_CHOICES` (y/n/?), and
+   `matches_csv_trigger(text)`. CLI's `hosts/cli/demo.py` walks the
+   shared turns and renders ANSI; GUI's `hosts/gui/demo_client.py`
+   walks the same turns and pushes recv-queue events (rationale beats
+   bundle into the parent action's text since the GUI dialogue panel
+   renders one status per emit). VN's `script_poster_demo.rpy`
+   keeps its hand-coded form with a fresh header comment cross-
+   referencing the canonical source — Ren'Py can't import Python at
+   script-time without bridge gymnastics. 11 new tests; 3098/3098
+   unit pass.
+
+5. **Items #4 / #5 / #6 / #7 — pure-logic GUI extractions** ✅ shipped
+   in one rollup commit (a5d1d78). Four mechanical moves of
+   pure-logic modules from `hosts/gui/` to `shared/src/kourai_common/`,
+   each leaving the GUI module as a thin re-export shim so existing
+   GUI imports + tests keep working unchanged:
+   - `kourai_common/emote_sfx.py` — `extract_emotes`, `resolve_sfx`,
+     `_KEYWORD_MAP`, `_EMOTE_RE`. Host-specific `play_emote_sfx`
+     stays in GUI (pygame AudioManager dependency).
+   - `kourai_common/audio_dsp.py` — `AudioMetrics`, `AudioNormalizer`,
+     `AudioFadeEffect`, `AudioVisualizer`, `PersonalityAudioProfile`,
+     `AGENT_PROFILES`. Behavior preserved exactly; pyloudnorm
+     migration filed as follow-up below.
+   - `kourai_common/dialogue_pacing.py` — `PacingMode` enum,
+     `PacingConfig` dataclass, `DialoguePacer`. Pure timing.
+   - `kourai_common/message_classifier.py` — `is_system_status` and
+     `is_scratchpad_content` (pure regex with `emoji.replace_emoji`
+     pre-strip).
+
+   Shared deps gained `numpy>=1.26` and `emoji>=2.15.0`.
+   `tests/unit/test_gui_pure_logic.py` patch targets repointed from
+   `hosts.gui.dialogue_pacing.asyncio.sleep` to
+   `kourai_common.dialogue_pacing.asyncio.sleep` — the actual lookup
+   site for the awaited call. `tests/unit/test_shared_emote_sfx.py`
+   added (5 cases) covering the moved logic against canonical asset
+   paths. 3103/3103 unit pass.
+
+9. **Item #10 — CLI styling re-import** ✅ shipped with item #3 (same
+   file touched, same commit).
+
+### Acceptance criteria (whole sweep)
+
+- `make lint` and `make test-unit` green on the branch before each commit.
+- Each commit is `refactor(scope): ...` per recent precedent (#161). No
+  feature-add framing (this is pure DRY).
+- IMPL.md is updated after each item — strike the row through, add a
+  one-line "shipped at <commit-sha>" pointer.
+- ROADMAP.md "Shipped" log gets a single rollup entry at sweep end with
+  the final commit hash, NOT one per item.
+- No anticipatory infra: every extraction must have a current caller in
+  at least one host. Items that look extractable but only one host needs
+  them stay where they are.
+- Zero behavior changes EXCEPT item #2's volume defaults (player-facing
+  bug fix; called out explicitly in the commit message).
+
+### Follow-ups deliberately deferred
+
+- pyloudnorm migration of `AudioNormalizer`. Real LUFS measurement is
+  technically correct but requires re-tuning the per-personality
+  audio profiles against new readings. File when an audio-quality
+  callback surfaces.
+- VN demo-script bridge. The shared `demo_script.py` is consumed by
+  CLI and GUI in this sweep; VN's `.rpy` gets a comment cross-reference
+  rather than a real import. Build a `.rpy` codegen pass when the demo
+  script needs another change.
+- Pydantic v2 migration of `CLISettings` / `SettingsManager`. The new
+  `AudioSettings` is a dataclass to match the surrounding style; a
+  full migration would touch settings persistence, slash-command
+  panels, and tests. File when a settings-validation pain point
+  surfaces.
 
 ## Notes / open invariants
 

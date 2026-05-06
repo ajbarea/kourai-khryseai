@@ -11,6 +11,12 @@
 ## Uses the real multi-slot portrait system from screens_dialogue.rpy so the
 ## scene you capture for the poster is faithful to live VN behaviour — not a
 ## screenshot-only fiction.
+##
+## Canonical script source: shared/src/kourai_common/demo_script.py
+## (CSV_DEMO_TURNS / CSV_DEMO_CHOICES). CLI demo.py + GUI demo_client.py
+## iterate that list directly; this .rpy hand-codes the same beats because
+## Ren'Py can't cleanly import Python at script-time. If the canonical
+## script changes, mirror the edit here too — there's no auto-sync.
 
 ## The painted forge-atelier background source PNG is 1672×941; scale it
 ## to the canonical 1920×1080 stage so it fills the scene without the

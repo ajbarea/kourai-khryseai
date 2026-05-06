@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
+from kourai_common.paths import templates_dir as _templates_dir
 from kourai_common.player_constants import PLAYER_DIR, _now_iso
 
 if TYPE_CHECKING:
@@ -28,7 +29,7 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 PROJECTS_DIR = PLAYER_DIR / "projects"
-TEMPLATES_DIR = Path(__file__).resolve().parents[3] / "templates"
+TEMPLATES_DIR = _templates_dir()
 
 KNOWN_TEMPLATES = ("empty", "python", "node", "backend", "frontend")
 _SLUG_RE = re.compile(r"[^a-z0-9]+")

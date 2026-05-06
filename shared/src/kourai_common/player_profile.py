@@ -37,7 +37,7 @@ class PlayerProfile:
     display_name: str = ""
     tts_name: str = ""  # Phonetic respelling for TTS pronunciation
     title: str = ""  # e.g., "The Architect"
-    role: str = "mortal"  # "divine" | "mortal" | "custom"
+    role: str = "mortal"  # canonical IDs in kourai_common.onboarding_data.ROLE_OPTIONS
     pronouns: str = ""  # "he/him", "she/her", "they/them", ""
 
     # Alignment gauges (0–100 each, independent like ME2 Paragon/Renegade)

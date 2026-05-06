@@ -227,7 +227,7 @@ class TestDialoguePacerAsync:
 
         pacer = DialoguePacer(PacingConfig(enable_thinking_pause=True, thinking_pause_duration=0.5))
         mock_sleep = AsyncMock()
-        with patch("hosts.gui.dialogue_pacing.asyncio.sleep", mock_sleep):
+        with patch("kourai_common.dialogue_pacing.asyncio.sleep", mock_sleep):
             await pacer.wait_before_response()
             mock_sleep.assert_awaited_once_with(0.5)
 
@@ -237,7 +237,7 @@ class TestDialoguePacerAsync:
 
         pacer = DialoguePacer(PacingConfig(enable_thinking_pause=False))
         mock_sleep = AsyncMock()
-        with patch("hosts.gui.dialogue_pacing.asyncio.sleep", mock_sleep):
+        with patch("kourai_common.dialogue_pacing.asyncio.sleep", mock_sleep):
             await pacer.wait_before_response()
             mock_sleep.assert_not_awaited()
 
@@ -247,7 +247,7 @@ class TestDialoguePacerAsync:
 
         pacer = DialoguePacer(PacingConfig(mode=PacingMode.FAST))
         mock_sleep = AsyncMock()
-        with patch("hosts.gui.dialogue_pacing.asyncio.sleep", mock_sleep):
+        with patch("kourai_common.dialogue_pacing.asyncio.sleep", mock_sleep):
             await pacer.wait_between_responses()
             mock_sleep.assert_awaited_once_with(0.5)
 
@@ -257,7 +257,7 @@ class TestDialoguePacerAsync:
 
         pacer = DialoguePacer(PacingConfig(mode=PacingMode.INSTANT))
         mock_sleep = AsyncMock()
-        with patch("hosts.gui.dialogue_pacing.asyncio.sleep", mock_sleep):
+        with patch("kourai_common.dialogue_pacing.asyncio.sleep", mock_sleep):
             await pacer.wait_between_responses()
             mock_sleep.assert_not_awaited()
 
@@ -267,7 +267,7 @@ class TestDialoguePacerAsync:
 
         pacer = DialoguePacer(PacingConfig(min_chars_per_second=50.0))
         mock_sleep = AsyncMock()
-        with patch("hosts.gui.dialogue_pacing.asyncio.sleep", mock_sleep):
+        with patch("kourai_common.dialogue_pacing.asyncio.sleep", mock_sleep):
             await pacer.wait_for_display("Hello")
             mock_sleep.assert_awaited_once_with(pytest.approx(0.1))
 
@@ -278,7 +278,7 @@ class TestDialoguePacerAsync:
 
         pacer = DialoguePacer()
         mock_sleep = AsyncMock()
-        with patch("hosts.gui.dialogue_pacing.asyncio.sleep", mock_sleep):
+        with patch("kourai_common.dialogue_pacing.asyncio.sleep", mock_sleep):
             await pacer.wait_for_display("")
             mock_sleep.assert_not_awaited()
 
