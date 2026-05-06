@@ -5,7 +5,15 @@ A public, living plan for where the forge is heading. Items here are either
 *currently working on* lives in [IMPL.md](./IMPL.md) — when it lands, the
 matching milestone here collapses to a single line under "Shipped".
 
-Last reviewed: 2026-05-06. Active focus: **M6 ElevenLabs hybrid as pre-player-release blocker** (promoted 2026-05-03 after walking back the M18 Phase 2 SSML investment — ElevenLabs v3's actual May 2026 docs don't support SSML break tags, so the producer-side SSML markup was wrong for the M6 target; see Shipped log entry for #152). M6 sub-task 2 (audio cache layer) shipped under Kokoro 2026-05-06 [#174] — engine-agnostic via fetch-injection, rides along into the ElevenLabs swap. Cross-host scratchpad rebuild Phase 1 shipped 2026-05-06 [#176] — first of the seven cross-host rebuilds queued post-#173, replaces the orphan classifier-drop path with a real per-agent recall surface (CLI `/scratchpad`); 2026 LLM CoT-visibility best practice is render-distinct (sources in module docstring). LLM-cache follow-on in flight 2026-05-06 — `get_enriched_system_blocks` splits truly-static SYSTEM_PROMPT (1h-TTL cache breakpoint) from player-dynamic context (5min-default), so player-state shifts no longer invalidate the static block; bundled with hephaestus's manual routing path via the new `cached_text_blocks` helper. See [IMPL.md](./IMPL.md) for the active work, the open invariants, and the priority-ordered "Up next" list. Pre-release perfection stance unchanged: May 2026 best practice no matter the cost, **web-search the SPECIFIC target's primary docs at the planning step** (not just at implementation), architectural fix over expedient patch. Sister-repo audit weekly cron runs Mondays 12:00 UTC.
+Last reviewed: 2026-05-06. Active focus: **M6 ElevenLabs hybrid** as
+pre-player-release blocker. M6 sub-task 2 (audio cache layer) shipped
+under Kokoro [#174] and rides along into the swap; sub-tasks 1/3/4/5
+gate on M20 + VN smoke landing first. See [IMPL.md](./IMPL.md) for the
+active work, open invariants, and priority-ordered "Up next" list.
+Pre-release perfection stance unchanged: May 2026 best practice no
+matter the cost, **web-search the SPECIFIC target's primary docs at the
+planning step**, architectural fix over expedient patch. Sister-repo
+audit weekly cron runs Mondays 12:00 UTC.
 
 ---
 
@@ -766,540 +774,186 @@ One-line per item, newest first. Detail moves to git history when work
 lands — these docs are plans + scratchpad, not a historical archive.
 
 - 2026-05-06 — **Retry exponential-backoff jitter (±20%)** [#181].
-  `with_retry` was deterministic on the computed-exponential path —
-  every concurrent caller that hit a 429 at the same wall-clock instant
-  would retry at the same wall-clock instant, re-overwhelming the
-  upstream's recovering rate-limit window. Real risk at kourai's
-  operating point: Forge Party pipelines run 4-5 specialist agents
-  concurrently, all calling the same Anthropic / Gemini endpoint via
-  LiteLLM; without jitter the concurrent retries collide on every
-  rate-limit event and turn it into a sustained outage. 2026 best
-  practice from Anthropic + AWS retry-pattern docs: exponential backoff
-  WITH ±20% jitter via `random.uniform(0.8, 1.2)` multiplier on the
-  computed delay. The API-provided "Please retry in Xs" path stays
-  deterministic (server instruction) with the existing 0.5s buffer —
-  jittering a server-supplied delay would either re-overwhelm or waste
-  wall-time. 3 new tests cover the jitter shape (mocked uniform produces
-  exact delays), the band invariant (always 0.8-1.2 not wider), and the
-  API-provided-path bypass (uniform must NOT be called when the server
-  supplies a delay). 3142/3142 unit pass; ty rc=0; ruff clean (with
-  `# noqa: S311` on the `random.uniform` call since bandit's "not
-  crypto" warning is irrelevant for jitter). `research(2026-05)`:
-  sources tokencalculator.com Claude rate-limits 2026, fast.io AI Agent
-  Retry Patterns 2026.
-- 2026-05-06 — **Summarization cheap-tier pin** [#180]. `_manage_memory`'s
-  summarization sub-call was resolving to `get_model(agent_name)` — same
-  tier as the agent, which on smart-tier-Metis is Opus 4.7 ($5/M input).
-  Anthropic's context-compaction cookbook documents the cheap-tier
-  pattern with `"model": "claude-haiku-4-5"` for the compaction sub-call
-  (5× cheaper, sufficient extraction quality, fastest tier so the next
-  agent call doesn't wait). Self-acknowledged TODO already in code
-  ("could theoretically use a cheaper/faster one") — this PR acts on
-  it. One-line resolution change inside `_manage_memory`'s try block
-  pinning to `tier="cheap"`; mirrors M14's `metis.discuss_tradeoffs`
-  cheap-tier pin pattern. Test
-  `test_summarization_pinned_to_cheap_tier` sets KOURAI_MODEL_TIER=smart
-  so the env would otherwise route Metis to Opus, asserts Haiku still
-  wins. Cost magnitude: ~$0.06/hour saved on Opus-tier dev sessions
-  (~5× per-summary reduction × ~3 summaries/agent/hour × 5 agents).
-  Latency win on top — Haiku is ~2-4× faster than Opus. Server-side
-  compaction (Opus 4.6+ via `client.beta.messages.tool_runner`) filed
-  as follow-on Open Invariant; #180 captures ~80% of the cost win
-  without that bigger refactor. `research(2026-05)`: source
-  platform.claude.com/cookbook/tool-use-automatic-context-compaction.
-- 2026-05-06 — **Cache telemetry split by 5m vs 1h TTL (post-#178 follow-on)** [#179].
-  PR #178's static-block ttl="1h" upgrade meant Anthropic now bills part
-  of every request at 2× input (the 1h rate) vs 1.25× (the 5m default).
-  `/usage` was applying the 5m rate to all cache writes — under-quoting
-  the 1h-static portion by ~60%. Anthropic's response shape exposes the
-  per-TTL breakdown via `usage.cache_creation.ephemeral_5m_input_tokens`
-  and `ephemeral_1h_input_tokens`. `AgentUsage` splits into
-  `cache_write_5m_tokens` + `cache_write_1h_tokens` (legacy
-  `cache_write_tokens` preserved as a `@property` summing both for
-  backward compat). `record_usage` extracts the breakdown when present;
-  falls back to total → 5m bucket when not (under-quotes rather than
-  over-bills). `ModelPricing` gains `cache_write_1h_per_m`; Anthropic
-  invariant is 2× input across all four tiers; Gemini stays at 0 since
-  per-hour storage doesn't fit per-write shape. `compute_cost` combines
-  both rates. `_log_cache_usage` emits `write_5m=N write_1h=M` per
-  request when breakdown is present, falls back to legacy `write=N`
-  otherwise. 9 new tests; 3138/3138 unit pass; ty rc=0. `research(2026-05)`:
-  source platform.claude.com prompt-caching docs (response format
-  section explicitly documents the cache_creation sub-object on
-  mixed-TTL requests).
-- 2026-05-06 — **Cache-tighten get_enriched_system_blocks (post-#177 follow-on)** [#178].
-  PR #177 split the system message into two cache breakpoints, but the
-  "static" block still concatenated SYSTEM_PROMPT with dynamic player
-  context (identity + memories + alignment + romance + adaptation +
-  moments + virtues), invalidating the truly-static portion (~1-3K
-  tokens of maiden personality + tool descriptions, the bulk) on every
-  player-state shift. Replace `get_enriched_system_prompt` (str) with
-  `get_enriched_system_blocks` (list[dict]) returning two cache-marked
-  blocks split at the static/dynamic boundary; new public helper
-  `cached_text_blocks(*chunks, static_ttl="1h")` for hephaestus's manual
-  routing path. **1h TTL upgrade bundled** for Block 0 — web-search of
-  Anthropic's May 2026 docs surfaced the static system prompt is exactly
-  the documented use case for the 1h extended TTL ("long chat
-  conversations where users may not respond within 5 minutes" + "agentic
-  side-agents that may take longer than 5 minutes"). 1h costs 2× write
-  vs 1.25× for 5m default; both 0.1× read; truly-static block re-use
-  pays back the multiplier after one hit beyond 5min. Forge Party
-  sessions routinely exceed 5min idle. Within Anthropic's 4-breakpoint
-  budget (BP1 static-1h / BP2 player-dynamic-5m / BP3 summary-5m / BP4
-  first-user-5m). Migration: 9 callers via blocks API + hephaestus via
-  cached_text_blocks + 5 test files. ~5× reduction in static-block write
-  tokens on top of the ~3-7× from #177. 18 new unit tests including
-  byte-identity invariant; 3130/3130 unit pass; ty rc=0. Source:
-  platform.claude.com prompt-caching docs.
+  `with_retry` was deterministic; concurrent agents hitting a 429
+  retried in lockstep and re-collided. Apply `random.uniform(0.8, 1.2)`
+  multiplier to the computed delay; API-provided "Please retry in Xs"
+  path stays deterministic.
+- 2026-05-06 — **Summarization cheap-tier pin** [#180]. `_manage_memory`
+  was resolving the summarization sub-call to the agent's tier (Opus on
+  smart). Pin to `tier="cheap"` per Anthropic's context-compaction
+  cookbook (Haiku is 5× cheaper and sufficient for "summarize this").
+  Mirrors M14's `metis.discuss_tradeoffs` pattern.
+- 2026-05-06 — **Cache telemetry split by 5m vs 1h TTL** [#179].
+  Post-#178 follow-on. `AgentUsage` splits into `cache_write_5m_tokens`
+  + `cache_write_1h_tokens` from `usage.cache_creation` sub-object;
+  `ModelPricing` gains `cache_write_1h_per_m` (2× input on Anthropic);
+  `compute_cost` combines both rates. Closes the ~60% cost under-quote
+  that #178 introduced.
+- 2026-05-06 — **Cache-tighten get_enriched_system_blocks** [#178].
+  Replaces string-returning `get_enriched_system_prompt` with
+  `get_enriched_system_blocks` returning cache-marked
+  `[truly-static, player-dynamic]` text blocks; new public helper
+  `cached_text_blocks(*chunks, static_ttl="1h")` for hephaestus's
+  manual routing path. Static block defaults to 1h TTL — Anthropic's
+  May-2026 docs explicitly recommend it for long interactive sessions.
+  Within the 4-breakpoint budget (static-1h / player-dynamic-5m /
+  summary-5m / first-user-5m). ~5× reduction in static-block write
+  tokens on top of #177's ~3-7×.
 - 2026-05-06 — **Split system-prompt cache breakpoints** [#177].
   `_build_contextual_messages` was concatenating the dynamic
-  `semantic_summary` onto the static system content as a string,
-  invalidating the prompt cache on every Mneme summarization. Restructure
-  as a list of two `cache_control` text blocks: static block always
-  cache-hits within a session; summary block resets only on summary
-  rewrite. Anthropic accepts up to 4 breakpoints per request; chat_with_tools
-  gets BP1 + BP2 here plus BP3 from `_mark_first_user_cacheable`,
-  inside the limit. `research(2026-05)`: Anthropic prompt caching cuts
-  cost by up to 90% on repeat turns; source platform.claude.com
-  prompt-caching docs + May 2026 release notes. Magnitude:
-  ~3-7× reduction in cache-write tokens on long Forge Party sessions
-  where Mneme summarizes every 5+ messages. 5 new unit tests including
-  the byte-identity assertion `test_static_block_unchanged_when_summary_changes`
-  that pins the actual cache-hit invariant. Closes the
-  CODEX_ARCHITECTURE_PLAN.md note that flagged this issue but had
-  never been executed.
+  `semantic_summary` onto the static system content, invalidating the
+  prompt cache on every Mneme summarization. Restructure as a list of
+  two `cache_control` text blocks (static + summary). ~3-7× reduction
+  in cache-write tokens on long Forge Party sessions.
 - 2026-05-06 — **Cross-host scratchpad rebuild Phase 1** [#176].
-  First slice of the rebuild filed alongside #173: `kourai_common.scratchpad`
-  data layer (`ScratchpadEntry` frozen dataclass + per-agent
-  ring-buffered `Scratchpad` with `add` / `entries` / `agents` /
-  `clear`; module-level `get_scratchpad()` lazy singleton) + CLI
-  `/scratchpad [<agent>|clear [<agent>]]` slash command. CLI
-  streaming buffers classifier-shaped non-dialogue messages as a
-  display-unchanged side-effect; GUI's post-#175 logger.debug-and-drop
-  branch routes to the same buffer. Replaces the orphan classifier
-  consumer left by #175 with real recall. 39 new unit tests; 3114/3114
-  pass. `research(2026-05)`: 2026 best practice for LLM scratchpad /
-  CoT is "render distinct from dialogue, prefer structured visibility,
-  don't TTS" (ICLR 2026 paper arxiv 2510.27246; Masood 2026-04).
+  `kourai_common.scratchpad` data layer + CLI `/scratchpad` slash;
+  replaces the orphan classifier consumer left by #175. CLI streaming
+  + GUI's post-#175 drop branch route to the same buffer. 2026 LLM
+  CoT-visibility best practice is render-distinct (not spoken).
 - 2026-05-06 — **Drop GUI zombie call sites surviving #173** [#175].
-  Eight host-side call sites in `hosts/gui/{render,queue_event_handler,pygame_event_handler}.py`
-  referenced `GUIComponentsIntegration.get_scratchpad` /
-  `.status_bubbles` attributes that #173 deleted. ty surfaced these as
-  `unresolved-attribute` warnings (rc=0 — `make lint` passed) but
-  `render.py:119`'s per-frame `get_scratchpad().draw()` would have
-  crashed every GUI frame. Cleanup drops the zombie sites; `_route_status_text`
-  collapses to "drop non-dialogue, route dialogue to typewriter" (same
-  effective UX as pre-#173 since the deleted widgets weren't actually
-  rendering). Tab key unbound; cross-host `scratchpad` rebuild will
-  rebind when its renderer lands. ty: 22 → 14 diagnostics; 3075/3075
-  unit pass.
+  Eight call sites referenced `GUIComponentsIntegration.get_scratchpad`
+  / `.status_bubbles` attributes that #173 deleted; `render.py`'s
+  per-frame `get_scratchpad().draw()` would have crashed every GUI
+  frame. Tab key unbound; cross-host scratchpad rebuild rebinds when
+  its renderer lands. ty: 22 → 14 diagnostics.
 - 2026-05-06 — **TTS audio cache layer (M6 sub-task 2)** [#174].
-  `kourai_common.tts_cache` content-addressable disk cache wraps the
-  engine bytes-returning synth call. Cache key is `sha256` of
-  length-prefixed `(text, voice_id, model_id, sorted-keys-json(voice_settings))`
-  — length-prefixing chosen over a NUL separator after a regression
-  test demanded collision resistance against the unverifiable "no NUL
-  in inputs" invariant. Layout: `${XDG_CACHE_HOME:-~/.cache}/kourai/tts/{key[:2]}/{key}.{ext}`;
-  oldest-mtime-first eviction at 500 MB cap on miss-write via
-  `asyncio.to_thread`. Opt-in via `RealtimeTTSEngine(cache_dir=...)`
-  (default `None` keeps existing CLI / GUI / test paths uncached);
-  enabled at vn_bridge construction where static dialogue dicts
-  (`HANDOFF_LINES`, `VICTORY_LINES`, `AGENT_QUOTES`, greetings) yield
-  near-100% hit rate once warm. Engine-agnostic via fetch-injection,
-  so the same module rides along into the ElevenLabs SDK swap at M6
-  sub-task 3 without engine coupling. 44 new unit tests; 3075/3075
-  pass. `research(2026-05)`: rolled custom rather than diskcache —
-  spec wants greppable hex filenames + 2-char shard prefix; diskcache
-  is rowid-keyed values inside SQLite, ~3 MB dep we don't need.
-  ElevenLabs has no server-side cache by request hash (verified via
-  cookbook + API reference 2026-05); client-side cache is canonical.
-- 2026-05-06 — **Prune dead host-side anticipatory infrastructure**.
-  Deletes the staged-but-unwired stratum of GUI features (Scratchpad,
+  `kourai_common.tts_cache` content-addressable disk cache. Cache key
+  is `sha256` of length-prefixed
+  `(text, voice_id, model_id, sorted-keys-json(voice_settings))`;
+  layout `${XDG_CACHE_HOME}/kourai/tts/{key[:2]}/{key}.{ext}`;
+  oldest-mtime-first eviction at 500 MB cap. Engine-agnostic via
+  fetch-injection — rides into the ElevenLabs SDK swap at M6 sub-task 3.
+  Enabled at vn_bridge where static dialogue dicts yield near-100% hit
+  rate once warm.
+- 2026-05-06 — **Prune dead host-side anticipatory infrastructure**
+  [#173]. Deleted the staged-but-unwired GUI stratum (Scratchpad,
   PipelineStatusIndicator, StatusBubbles, AgentPersonality
-  indicators/handoff) plus the CLI's `gossip_cli` surface. 9 source
-  files + 6 dedicated test files removed; ~105 false-coverage tests
-  pruned (the *Mockery* anti-pattern: APIs exercised against `Mock()`
-  with no real consumer); `gui_components_integration.py` collapsed to
-  the three live members (settings, font_scaler, high_contrast). The
-  ideas these files reached for aren't gone — they're filed under
-  "Cross-host shared rebuilds" in the Future / unprioritized backlog
-  with shared-across-hosts plans (scratchpad, pipeline-status,
-  status-feed, gossip-render, codex, per-character motion,
-  illuminated-manuscript dialogue polish), each landing as
-  `kourai_common.*` data + thin host renderers rather than
-  GUI-defines-then-waits. `agent_personality_indicators.py`'s parallel
-  agent-color palette also drifted from #171's canonical
-  `AGENT_METADATA["rgb"]`; the canonical now stands alone. 3031/3031
-  unit pass; `make lint` clean.
-- 2026-05-06 — **Centralize VN companion-spirits palette to
-  `script_data.rpy` constants** [#172]. Resolves the "VN companion-spirits
-  brightening" follow-up filed alongside #171. Walked back the originally
-  scoped `_bright_hex(AGENT_COLORS[name])` substitution after computing
-  the actual brightening output: `_bright_hex(#009E73)` is `#65FFD5`
-  (vibrant neon mint, RGB-distance 102 from VN's `#7FBC8C`) and
-  `_bright_hex(#D55E00)` is `#FFA965` (peach-orange, distance 71 from
-  VN's `#E8728C`). The VN literals aren't drift from canonical — they're
-  a separate desaturated companion-spirits palette ("panel tint when the
-  panel is for puck/cupid", semantically distinct from "puck/cupid's
-  representing color"). Centralizes within VN scope without forcing
-  derivation: 5 named constants in `script_data.rpy`'s `init python:`
-  block (`VN_PUCK_ACCENT`, `VN_CUPID_ACCENT`, plus the three
-  alpha-suffixed Cupid variants for body fill / emphasized fill / hover
-  states), 15 literal sites across `screens_relationships.rpy` and
-  `screens_companion_spirits.rpy` swapped to constant references.
-  Regression guard at `tests/unit/test_vn_companion_accent.py` (7 cases)
-  asserts the hex literals don't reappear in any VN `.rpy` outside
-  `script_data.rpy` and locks the constant→value bindings. Latent visual
-  risk: zero — every rendered site reads the same hex as before, routed
-  through a name. 3136/3136 unit pass.
-- 2026-05-06 — **Re-canonicalize `hex_color` + `rgb` on
-  `AGENT_METADATA`** [#171]. Follow-up from the cross-host DRY sweep
-  IMPL "Notes / open invariants". PR #12 (April 24) added VN
-  `script_data.rpy:49-56` reads of `AGENT_METADATA[name]["hex_color"]`
-  for all 8 agents at startup; #118 (May 2) removed those keys under
-  "no consumers in production or tests" rationale, missing VN as a
-  consumer — the dict access has been a latent `KeyError` ever since,
-  not surfaced because the VN host hasn't been live-smoked recently.
-  Restores the keys with a single canonical source: GUI's existing
-  warm-gold theme palette for the 6 maidens (matches GUI's current
-  rendered behavior, no visible change for GUI players); CLI
-  `styling.py`'s Okabe-Ito CVD-safe values `#009E73` (puck) and
-  `#D55E00` (cupid) for the secondary roster (matches the project's
-  stated palette preference for agents without a thematic gold
-  variant). GUI's `_AGENT_COLORS` derived from shared `rgb` field
-  rather than duplicated. Stale comment at `script_data.rpy:87`
-  claiming Metis/Dokimasia/Mneme canonicals are
-  `#4C6EF5 / #6C757D / #B73E1D` corrected — those hex values appear
-  in `screens_relationships.rpy:103,111,119` as Sophia / Arete /
-  Mneia *virtue* accent colors, a different domain. VN's hardcoded
-  `_puck_color = "#7FBC8C"` and `_cupid_color = "#E8728C"` literals
-  (15+ sites in `screens_relationships.rpy` and
-  `screens_companion_spirits.rpy`, including alpha-suffixed
-  hover-background variants) deliberately untouched — `#7FBC8C` is
-  ≈`_bright_hex(AGENT_COLORS["puck"])` but `#E8728C` is a different
-  hue than canonical cupid `#D55E00` (rose vs vermillion-orange);
-  replacing the literals needs live VN smoke. 26 new tests; 3129/3129
-  unit pass.
-- 2026-05-05 — **Cross-host DRY sweep — 10 extractions to `kourai_common/`** [#170].
-  Audit of `hosts/cli/` / `hosts/gui/` / `hosts/vn/` against
-  `shared/src/kourai_common/` surfaced 10 candidates after the
-  maidens-dedup precedent in [#161]; this sweep ships them all on one
-  themed branch. New shared modules: `paths.py` (canonical
-  `PROJECT_ROOT` walking up to the `[tool.uv.workspace]` pyproject +
-  `assets_dir / cache_dir / logs_dir / templates_dir / docs_assets_dir
-  / avatars_dir(style) / audio_dir(kind)` accessors — replaces 11
-  scattered `parents[N]` traversals), `settings_audio.py` (canonical
-  audio defaults — fixes a 13× GUI-vs-CLI music_volume divergence
-  that left first-launch GUI players at silent music while CLI shipped
-  0.65), `onboarding_data.py` (canonicalized 5-role set used by GUI
-  + VN; CLI gained "hero", legacy "master"/"casual" IDs still flow
-  through Puck handoff), `demo_script.py` (CSV-export pause scene as
-  `DemoTurn` records consumed by both CLI and GUI demo paths; VN's
-  `.rpy` keeps its hand-coded form with a header cross-reference),
-  `emote_sfx.py` (extract_emotes + keyword → SFX category resolver),
-  `audio_dsp.py` (numpy AudioNormalizer / FadeEffect / Visualizer /
-  PersonalityAudioProfile + per-agent profiles — pyloudnorm migration
-  filed as follow-up), `dialogue_pacing.py` (PacingMode + DialoguePacer
-  — pure timing), `message_classifier.py` (is_system_status +
-  is_scratchpad_content regex pair). Extended `agents.py` with
-  `EMOJI_PREFIX` + `detect_agent`. Plus a CLI styling re-import
-  cleanup in `onboarding.py` (item #10) folded into item #3's commit.
-  Shared deps gained `numpy>=1.26` and `emoji>=2.15.0`; both already
-  in the GUI host's deps. Behavior changes: exactly one — GUI
-  first-launch music_volume default 0.05 → 0.65; players who saved
-  the silent default keep it (no auto-migration). 49 new unit tests +
-  1 patch-target update; 3103/3103 unit pass.
-  `research(2026-05)`: `importlib.resources.files()` is the modern best
-  practice for installed-package data, but kourai's assets aren't
-  packaged with the wheel — pathlib walk-up keyed off
-  `[tool.uv.workspace]` is the right fit. Sources: pythontutorials.net
-  on project root, csteinmetz1/pyloudnorm (filed for follow-up),
-  Pydantic Settings docs (filed for follow-up).
-
-- 2026-05-05 — **Puck tutorial slice 1: mode cascade + `/settings [0]` entry** [#168].
-  First slice of the Puck-led first-run tutorial implementation per
-  `docs/architecture/puck-first-run-tutorial.md`. The cascade helper
-  is the foundational unit — used by both the (future) onboarding
-  mode-gate scene AND the new `/settings` panel toggle. Shipping the
-  cascade + panel pair first because it's end-to-end player-visible
-  without depending on the (substantive) flight-scene rewrite
-  (slices 2-4 queued in IMPL). New module `hosts/cli/mode_cascade.py`
-  exports `apply_mode_cascade(mode)` (idempotent, opinionated, writes
-  all 7 cascade settings across PlayerProfile.preferences +
-  CLISettings) and `current_mode()` (reads from profile, defaults
-  gamified). `_print_settings_panel` gains `[0] Session Mode: <current>`
-  at the top; `_apply_settings_choice("0")` reads → flips → prints
-  the spec's diegetic line ("Puck slips back through the door,
-  grinning." for focused→gamified; "The forge falls quiet." for
-  gamified→focused). `romance_enabled` stays False in BOTH paths
-  per spec — full romance is a separate two-step opt-in, not
-  piggy-backed on the mode preset. 15 tests (11 cascade unit + 4
-  panel integration), 3053 unit tests pass total. `research(2026-05)`:
-  idempotent CLI config writes follow the "overwrite, don't append"
-  + "conditional checks gate non-idempotent work" pattern; cascade
-  module satisfies both. Sources: HackMD CLI best practices,
-  HackerNoon idempotent code guide.
-- 2026-05-05 — **GUI synthesis indicator via `TypewriterManager.set_pending_audio`** [#166].
-  Companion to #165's CLI indicator. The GUI's audio-led word-paced
-  typewriter sat at `displayed_chars=0` for ~3s on Kokoro CPU between
-  dialogue arrival and the first `on_word` fire — dialogue panel showed
-  agent name + portrait above an empty body during synthesis, looked
-  frozen. `TypewriterManager` gains a pending-audio mode: `set_pending_audio()`
-  arms a single-ellipsis placeholder rendered by both `get_displayed_text()`
-  and `update(dt)` while `displayed_chars == 0`; cleared by
-  `clear_pending_audio()` (called from the engine's `on_audio_start`
-  trampoline), `advance_word` (first word arrives), `flush_remaining`,
-  or `reset`. `QueueEventHandler._on_tts_audio_start` flipped from
-  no-op to clear the placeholder; `_add_with_word_paced_typewriter`
-  arms it after `start_word_paced` (order matters — `set_pending_audio`
-  no-ops outside word-paced mode). Motion-sensitivity respected
-  (full text revealed at start, no placeholder swap). Tests: 12 new
-  (9 typewriter unit + 3 queue-handler integration). VN equivalent
-  still pending; needs live-smoke validation alongside the existing
-  cps-driven typewriter race work.
-- 2026-05-05 — **CLI synthesis indicator during ~3s Kokoro wait window** [#165].
-  Audio-led karaoke path left stdout blank for ~3s on Kokoro CPU
-  between dialogue arrival and `on_audio_start` firing — player had no
-  visible feedback that the agent was about to speak. Pre-renders
-  `Name face …` (dim ellipsis) before `await tts.speak(...)`; `_open_karaoke`
-  wipes it via CR + erase-line ANSI before opening the karaoke header,
-  and the Tier 2 fallback finally-block does the same wipe before
-  echoing the box. New helpers `synthesis_indicator` /
-  `synthesis_indicator_clear` in `hosts/cli/rendering.py`. Indicator
-  path gates on the same `will_display and will_speak and audio_led`
-  predicate as the karaoke render — captions-off audio-only and
-  instant mode both skip it (no synthesis-wait gap to fill). Tests:
-  9 new (4 helper unit + 5 streaming integration). `research(2026-05)`
-  cited: callback-on-stream-begin + cleared-on-first-audio is the
-  convergent pattern across Hermes-agent display reporting and
-  RealtimeTTS reference; matches the `on_audio_start` trampoline
-  already plumbed through the engine in #156.
-- 2026-05-05 — **Cleared 3 pre-existing zensical build warnings** [#164].
-  Mechanical drift sweep covering issues surfaced during last session's
-  #162 Puck-tutorial nav-add work but consciously left for a separate
-  PR. `puck-first-run-tutorial.md:174` escaped `**\[0\]**` settings-
-  menu callout (was parsed as link reference). `configuration.md:305`
-  retargeted stale `gui.md#text-to-speech-system-` anchor to current
-  slug `#text-to-speech` (heading shortened in earlier docs cleanup).
-  `vn.md:89` escaped `\[status\]` placeholder in screen-display table
-  cell (also a link-reference parse). `uv run zensical build --clean`
-  now reports "No issues found" (was "3 issues found").
+  indicators/handoff) plus CLI's `gossip_cli` surface; ~9 source files
+  + 6 test files removed; ~105 false-coverage tests pruned (Mockery
+  anti-pattern). Replacements filed under "Cross-host shared rebuilds"
+  in the backlog as `kourai_common.*` data + thin host renderers.
+- 2026-05-06 — **Centralize VN companion-spirits palette** [#172].
+  5 named constants in `script_data.rpy` + 15 literal sites swapped to
+  references. Walked back `_bright_hex(AGENT_COLORS[name])` after
+  computing the actual outputs (RGB-distance 102 / 71 from VN's current
+  literals) — VN's palette is a separate desaturated companion-spirits
+  palette, not drift from canonical.
+- 2026-05-06 — **Re-canonicalize `hex_color` + `rgb` on `AGENT_METADATA`**
+  [#171]. Restores the keys #118 removed; missing VN as a consumer was
+  a latent KeyError. Single canonical source: GUI's warm-gold theme for
+  the 6 maidens; CLI styling's Okabe-Ito CVD-safe values for
+  puck/cupid. GUI's `_AGENT_COLORS` derived from shared `rgb` instead
+  of duplicated.
+- 2026-05-05 — **Cross-host DRY sweep — 10 extractions to
+  `kourai_common/`** [#170]. New shared modules: `paths`,
+  `settings_audio`, `onboarding_data`, `demo_script`, `emote_sfx`,
+  `audio_dsp`, `dialogue_pacing`, `message_classifier`. Extended
+  `agents.py` with `EMOJI_PREFIX` + `detect_agent`. Behavior change:
+  GUI first-launch music_volume default 0.05 → 0.65 (fixes a 13× silent-
+  music divergence vs CLI). pyloudnorm + Pydantic v2 + VN demo-script
+  bridge filed as follow-ups in IMPL.
+- 2026-05-05 — **Puck tutorial slice 1: mode cascade + `/settings [0]`
+  entry** [#168]. `apply_mode_cascade(mode)` flips all 7 cascade
+  settings idempotently; `/settings [0]` panel entry reads + flips +
+  prints diegetic line. `romance_enabled` stays False in both paths
+  (separate two-step opt-in). Slices 2-4 queued.
+- 2026-05-05 — **GUI synthesis indicator via
+  `TypewriterManager.set_pending_audio`** [#166]. Companion to #165's
+  CLI indicator; renders a single-ellipsis placeholder while
+  `displayed_chars == 0` during the ~3s Kokoro CPU wait window. Cleared
+  by `on_audio_start` / `advance_word` / `flush_remaining` / `reset`.
+  VN equivalent pending live-smoke.
+- 2026-05-05 — **CLI synthesis indicator during ~3s Kokoro wait window**
+  [#165]. Pre-renders `Name face …` (dim ellipsis) before `tts.speak`;
+  cleared via CR + erase-line ANSI when karaoke header opens or Tier 2
+  box renders.
+- 2026-05-05 — **Cleared 3 pre-existing zensical build warnings**
+  [#164]. Mechanical drift sweep: escaped `\[0\]` / `\[status\]`
+  link-reference patterns; retargeted stale
+  `gui.md#text-to-speech-system-` anchor.
 - 2026-05-05 — **Puck tutorial spec polish + zensical nav add** [#162].
-  The `docs/architecture/puck-first-run-tutorial.md` spec was orphaned
-  from zensical nav and had stale "not committed" header framing. Status
-  rewritten to match the ROADMAP blockquote convention; cross-referenced
-  2026-05-05 against current May 2026 best practice for AI/CLI
-  onboarding (progressive disclosure + in-fiction integration — what
-  the spec already prescribes; no architectural revision needed).
-  Out-of-scope item 4's GUI maidens-dedup bullet marked closed by #161.
-  Spec now visible under Architecture in the public docs site, labelled
-  `(spec)` to signal forward-looking design.
-- 2026-05-05 — **GUI `maidens.py` dedup against shared/agents.py** [#161].
-  GUI's `hosts/gui/maidens.py` was a 327-line near-duplicate of
-  `shared/src/kourai_common/agents.py` with GUI-only enrichments.
-  Promoted GUI's richer content (extra emote-prefixed quotes; missing
-  return-handoff routes for `dokimasia/kallos/mneme → hephaestus`;
-  extras in `techne → dokimasia` / `dokimasia → kallos` /
-  `kallos → mneme`) into shared as canonical. GUI now imports shared
-  and synthesises the legacy `AGENTS` dict from a local `_AGENT_COLORS`
-  map at module load. `EMOJI_TO_AGENT`, `detect_agent`, `get_avatar_path`
-  stay GUI-local. 327 → 101 lines (~70% smaller); CLI picks up the
-  richer shared quote pools as a knock-on. Lint + 3017 unit tests
-  clean; 200 existing GUI assertions on `AGENTS` / `HANDOFF_LINES` /
-  `VICTORY_LINES` / `detect_agent` / `get_avatar_path` pass unchanged.
-- 2026-05-05 — **Research-grounded M6 ElevenLabs hybrid spec + ROADMAP
-  cleanup** [#160]. Spec'd the M6 ElevenLabs hybrid against
-  ElevenLabs's actual May 2026 docs, applying the planning-step
-  web-search discipline the M18 Phase 2 walkback (#152) showed we
-  missed. **Open question answered:** ElevenLabs has no server-side
-  audio cache by request hash; the History API indexes by
-  `history_item_id` only, so the cache is ours to build per the
-  Supabase cookbook pattern. Per-engine markup adapter design replaces
-  the walked-back SSML approach (keep `[bracket]` audio tags for
-  `eleven_v3` with the 4-5 word decay constraint; strip for Flash v2.5
-  / multilingual_v2 / Kokoro; skip `<break>` everywhere per
-  ElevenLabs's own instability warning). Audio cache spec:
-  `sha256(text + voice_id + model_id + settings)` keyed, XDG-compliant
-  disk store, 500 MB LRU, `cacheable=False` opt-out. Sub-task order:
-  adapter → cache → SDK swap → wiring → prosody. Production swap
-  gated on M20 + VN smoke. ROADMAP cleanup: M6 section was
-  Frankensteined with unrelated CLI host / UX bullets from before its
-  repurposing; new "Future / unprioritized backlog" H2 hosts those
-  without misfiling. The "ElevenLabs TTS + SFX migration" bullet
-  trimmed to SFX-only (TTS portion now M6).
-- 2026-05-03 — **Walked back M18 Phase 2 SSML markup investment** [#152].
-  Reverted dialogue-content SSML from #149 (HEPH_HANDOFFS) and #150
-  (HANDOFF_LINES, HANDOFF_FALLBACKS, VICTORY_LINES, plus the AGENT_QUOTES
-  + user_quotes that PR #151 had queued — that PR closed as
-  superseded). After AJ flagged the M6 ElevenLabs target, web-searched
-  ElevenLabs's actual May 2026 best-practices docs and found: Eleven v3
-  (the high-impact-line target per VOICE_CASTING_PLAN.md) does NOT
-  support SSML break tags; uses `[bracket]` audio tags + ellipses +
-  natural punctuation. Eleven Flash V2.5 supports `<break>` but
-  ElevenLabs warns against overuse. So `<speak>...<break time="200ms"/>...</speak>`
-  was the wrong markup for both Kokoro AND the planned M6 target. Plain
-  text with rich punctuation reads naturally on both. **What stayed:**
-  the `kourai_common.ssml.strip_ssml` helper + defusedxml dep + every
-  display-chokepoint and TTS-engine strip call as defensive
-  infrastructure for any future LLM-emitted markup. **Lesson:**
-  web-search the SPECIFIC target's primary docs at the planning step,
-  not just at implementation; logged in
-  `feedback_websearch_before_arch_decision` memory record. M6 ElevenLabs
-  hybrid promoted from "future-future" to pre-player-release blocker
-  in the same conversation. ROADMAP M6 + IMPL "Up next" updated.
+  `docs/architecture/puck-first-run-tutorial.md` added to nav; status
+  block matches ROADMAP convention. May 2026 best-practice cross-check
+  confirmed the spec's progressive-disclosure + in-fiction-integration
+  approach.
+- 2026-05-05 — **GUI `maidens.py` dedup against shared/agents.py**
+  [#161]. Promoted GUI's richer content (extra emote-prefixed quotes,
+  missing return-handoff routes) into shared; GUI now imports + builds
+  legacy `AGENTS` dict from a local color map. 327 → 101 lines.
+- 2026-05-05 — **Research-grounded M6 ElevenLabs hybrid spec** [#160].
+  Spec'd against ElevenLabs's actual May 2026 docs. Open question
+  answered: no server-side audio cache by request hash; client-side
+  cache per Supabase cookbook pattern. Per-engine markup adapter
+  design; audio cache spec; sub-task ordering + M20+VN-smoke gating.
+  ROADMAP cleanup: M6 section unmuddled; "Future / unprioritized
+  backlog" H2 added.
+- 2026-05-03 — **Walked back M18 Phase 2 SSML markup investment**
+  [#152]. Reverted dialogue-content SSML from #149/#150 after
+  web-searching ElevenLabs's actual docs: Eleven v3 doesn't support
+  SSML break tags (uses `[bracket]` audio tags); Flash V2.5 supports
+  `<break>` but ElevenLabs warns against overuse.
+  `kourai_common.ssml.strip_ssml` + defusedxml dep stay as defensive
+  infrastructure. **Lesson logged in memory**: web-search SPECIFIC
+  target's primary docs at the planning step. M6 promoted to
+  pre-player-release blocker.
 - 2026-05-03 — **M18 Phase 2 SSML rollout — handoff/victory dicts +
-  display chokepoint** [#150]. Sibling PR to #149's hephaestus pilot,
-  expanded one layer up. (a) `HANDOFF_LINES` (11 entries),
-  `HANDOFF_FALLBACKS` (6 entries), and `VICTORY_LINES` (6 entries)
-  in `shared/src/kourai_common/agents.py` are now SSML — every line
-  wrapped in `<speak>` with `<break time="200ms"/>` markers at
-  sentence boundaries. (b) `_comms_window` in `hosts/cli/rendering.py`
-  applies `strip_ssml` at the universal display chokepoint, so every
-  caller (handoff chatter, victory chatter, _maidenify_status, future
-  emitters) gets clean text without remembering to strip. Defense-in-
-  depth: `_maidenify_status`'s strip from #149 stays as a second
-  layer. New `tests/unit/test_agent_dialogue_ssml.py` parameterizes
-  over every line (203 cases) to assert the SSML invariants.
-  Programmatic conversion via xml.sax.saxutils.escape; verified
-  every stripped line is non-empty, well-formed, and free of leftover
-  `<` / `>` characters. AGENT_QUOTES + user_quotes greetings still
-  pending for a follow-up PR.
+  display chokepoint** [#150]. Reverted in #152.
 - 2026-05-03 — **M18 Phase 2 hephaestus producer-side pilot** [#149].
-  First specialist to emit SSML: `HEPH_HANDOFFS` strings now wrapped
-  in `<speak>` envelopes with `<break>` markers; `_maidenify_status`
-  (CLI) and the vn_bridge NDJSON yield apply `strip_ssml` at the
-  display boundary; TTS engine path stays raw for future M6
-  ElevenLabs prosody passthrough. Tests verify quote-wrap convention
-  survives the strip so existing italic styling fires. LLM-generated
-  dialogue and per-persona prosody deferred to follow-ups.
+  Reverted in #152.
 - 2026-05-03 — **Uvicorn-takeover sweep across 10 specialists** [#148].
-  Same root cause #145 fixed for vn_bridge: every specialist's
-  `log.info(...)` was being silently dropped because their
-  `uvicorn.run(app, host, port)` call let uvicorn's default
-  dictConfig wipe `setup_logging`'s root handlers. New
-  `kourai_common.log.run_uvicorn` helper centralizes the
-  `log_config=None` right-default; 10 specialist `__main__.py` files
-  swap `uvicorn.run` for the helper, vn_bridge follows suit for
-  consistency. Live verified: hephaestus's `🔥 Hephaestus starting
-  on 0.0.0.0:10000` now appears in `docker logs`.
+  `kourai_common.log.run_uvicorn` helper centralizes `log_config=None`;
+  10 specialists swap their `uvicorn.run` for the helper. Fixes
+  silently-dropped `log.info(...)` (uvicorn's default dictConfig was
+  wiping `setup_logging`'s root handlers).
 - 2026-05-03 — **M18 Phase 2 — engine-side SSML strip layer** [#147].
-  New `kourai_common.ssml.strip_ssml` parses producer-emitted SSML via
-  `defusedxml` (XXE / billion-laughs hardened) and feeds plain text to
-  Kokoro — `<break>` / `<p>` / `<s>` inject whitespace, content tags
-  (`<emphasis>`, `<prosody>`, `<say-as>`) preserve their text,
-  malformed input falls back to a regex strip so a producer bug never
-  kills TTS. Wired into both `speak()` and `synthesize_to_wav()` so
-  vn_bridge inherits the same SSML contract as CLI/GUI. Kokoro mainline
-  still has no native SSML (`hexgrad/kokoro#36` open as of 2026-05),
-  so the strip layer stays mandatory until M6 swaps engines. Producer-
-  side wrap (next sub-task) ships separately, starting with hephaestus.
+  `kourai_common.ssml.strip_ssml` via `defusedxml` (XXE / billion-laughs
+  hardened); feeds plain text to Kokoro. Producer-side wrap reverted in
+  #152; strip layer stays as defensive infrastructure.
 - 2026-05-03 — **Cross-platform graceful TTS fallback** [#146].
-  `audio_env.is_audio_output_available()` probes via PortAudio's
-  `Pa_GetDefaultOutputDevice` / `paNoDevice` sentinel after cheap-NO
-  gates (`KOURAI_TTS=off`, WSL2-without-WSLg, headless Linux);
-  `RealtimeTTSEngine.__init__` defaults `muted=None` (auto-detect) and
-  logs a one-line per-platform fix recipe when it auto-mutes.
-  `speak()` widens `except Exception` → `except (Exception, SystemExit)`
-  for the phantom-device edge case where RealtimeTTS's deep `exit(0)`
-  bypasses the init probe. Live verified on this WSL2 (no PortAudio
-  device): CLI auto-mutes with warning, reaches the prompt, runs muted
-  synthesis without crashing. Bonus: streaming-speak first-chunk lag
-  is now measurable — 2.91s for 65 chars on CPU.
-- 2026-05-03 — **vn_bridge headless TTS unblock + observability** [#145].
-  Three connected fixes for the synthesis surface, surfaced by smoke-
-  driving `/tts` directly: `RealtimeTTSEngine(muted=True)` at
-  construction (only construction-time muted skips the
-  `stream_player.open_stream` audio-device probe — runtime
-  `play(muted=True)` doesn't); `log_config=None` on `uvicorn.run` to
-  stop uvicorn's default `dictConfig` from wiping basicConfig;
-  `force=True` on `basicConfig` so transitive imports
-  (RealtimeTTS / pydub / torch) can't no-op the handler install.
-  Prior to this PR, `#136`/`#140`/`#141` timing logs were silently
-  invisible in vn_bridge since merge — observability was effectively
-  zero on the synthesis surface. Verified pre-warm + per-utterance
-  timing logs now appear; same uvicorn-takeover affects all 10
-  specialist agents (flagged for follow-up sweep).
+  `audio_env.is_audio_output_available()` probes PortAudio after
+  cheap-NO gates (`KOURAI_TTS=off`, WSL2-without-WSLg, headless Linux);
+  `RealtimeTTSEngine.__init__` defaults `muted=None` (auto-detect) with
+  per-platform fix recipe on auto-mute.
+- 2026-05-03 — **vn_bridge headless TTS unblock + observability**
+  [#145]. Three connected fixes: `RealtimeTTSEngine(muted=True)` at
+  construction skips the audio-device probe; `log_config=None` on
+  `uvicorn.run` stops uvicorn's dictConfig wipe; `force=True` on
+  `basicConfig` so transitive imports can't no-op the handler install.
 - 2026-05-02 — **Smoke-driven polish wave** [#140] [#141] [#142] [#143].
-  Four follow-on fixes surfaced by driving `make cli` /
-  `python -m hosts.cli --prompt` from the host instead of theorizing.
-  `[#140]` Adds elapsed-time + voice/agent fields to the existing
-  `TTS: playback complete` log + a parallel line for
-  `synthesize_to_wav` so per-utterance lag is empirically measurable.
-  `[#141]` Adds INFO summary log per Kokoro pre-warm phase
-  (`langs N/M elapsed=Xs`, `voices N/M elapsed=Xs`) so a clean
-  startup leaves visible evidence the prewarm fired (was only
-  logging failures via `logger.debug` before). `[#142]` Adds
-  `get_host_agent_url` so direct `python -m hosts.cli` /
-  `python -m hosts.gui` invocations reach agents through
-  `localhost:<port>/` instead of the unresolved Docker service name
-  (`make cli` was papering over this with a `--agent` override).
-  `[#143]` Bumps Hephaestus's router `max_tokens=200→800` —
-  conversational CHAT-mode responses (e.g. "what can you do?") were
-  truncating mid-sentence at the 200-token cap that was set when
-  the router only emitted short structured outputs.
+  Surfaced by driving `make cli` from the host: TTS playback +
+  synthesize_to_wav timing logs (#140); Kokoro pre-warm INFO summary
+  (#141); `get_host_agent_url` for direct host invocation (#142);
+  Hephaestus router `max_tokens=200→800` (#143).
 - 2026-05-02 — **`/aj-deslop` sweep on this session's three feature
   PRs** [#138]. -102 LoC of multi-paragraph docstrings + rationale
-  comment blocks trimmed from `audio_env.py`, `tts_realtime.py`,
-  `messaging.py`, `streaming.py`, `vn_bridge/__main__.py`,
-  `hephaestus/agent_executor.py`, and three test modules — the
-  history+rationale lives in PR descriptions and git, not in the
-  source. Functional behavior unchanged.
+  comment blocks trimmed across 8 modules; behavior unchanged.
 - 2026-05-02 — **M20 sub-task 1 — Kokoro voice tensor pre-warm** [#136].
-  Added `_prewarm_agent_voices` alongside `_prewarm_agent_languages`
-  at `RealtimeTTSEngine.__init__`; calls `KPipeline.load_single_voice`
-  for every entry in `AGENT_VOICE_MAP`, materializing all 10 voice
-  tensors into the per-pipeline voice cache. Eliminates the 1-3s
-  per-voice download/parse cost stacked on top of synthesis lag for
-  the first per-agent utterance. Live verification: 7.38s init time,
-  all 10 agent voices materialized. Sub-tasks 2 + 3 (audio-led text
-  reveal across CLI/GUI/VN) remain.
+  `_prewarm_agent_voices` materializes all 10 agent voice tensors at
+  `RealtimeTTSEngine.__init__`; eliminates 1-3s per-voice download/parse
+  cost on first per-agent utterance.
 - 2026-05-02 — **M18 Phase 3 Part A — strict kind routing** [#134].
-  Tagged the last two unmigrated forwarders (hephaestus pipeline
-  forwarder + `BaseAgentExecutor` empty-input prompt), dropped the
-  `kind is None` fallback in `streaming.py`, retired the
-  `DIALOGUE_KEYWORDS` prose-keyword path in `vn_bridge`. Untagged
-  messages route as not-dialogue everywhere — surfaces any future
-  producer that forgets to tag rather than masking the bug. Phase 3
-  Part B (`KIND_CODE`/`KIND_SPEC` distinct render paths) deferred
-  until a producer actually emits either kind.
-- 2026-05-02 — **WSL audio cascade silenced** [#133]. PortAudio's
-  ALSA enumeration (~50 stderr lines) plus libjack connect-error
-  chatter (5 lines) on every CLI/GUI/vn_bridge startup under WSL2 /
-  headless Linux now suppressed via libasound noop handler (ctypes
-  `snd_lib_error_set_handler`) at TTS module load + fd-redirect
-  context manager around `_TextToAudioStream(...)`. Both gated by
-  `KOURAI_AUDIO_DEBUG=1` opt-out. Closes the last fixable Round 6
-  player-smoke follow-up bullet (only M15 logging architecture
-  remains from that list).
-- 2026-05-02 — **Wolfi base-image migration** (closes #98) across all
-  thirteen Docker images (10 agents + vn_bridge + sandbox + 2 MCP
-  sidecars + the `templates/backend` reference Techne reads), 0H
-  baseline vs 1H Debian-glibc on CVE-2026-5435; durable GH Actions
-  rescan workflow tracks the upstream-blocked npm `@xmldom/xmldom`
-  CVE (issue #126, auto-closes once `>=0.8.13` ships); introduced
-  `# research(YYYY-MM):` inline-rationale convention for web-search-
-  derived design choices. PRs `[#125]` `[#127]` `[#130]`.
-- 2026-05-02 — **`/aj-deslop` IMPL TODO closed** via three sweeps:
-  `[#124]` recent justification prose (-73 LoC), `[#128]` streaming +
-  log filter blocks (-24 LoC), `[#129]` CI workflow comment blocks
-  (-21 LoC). Pre-release stance: keep only what helps a reader
-  execute, drop "why we picked this" prose.
-- 2026-05-02 — **UX/DX + CI batch** in seven PRs. `[#118]` dropped
-  dead `AGENT_METADATA` color fields (-19 LoC), `[#119]` Okabe-Ito
-  CVD-safe agent badges (closes #10), `[#120]` captions toggle for
-  audio-only dialogue mode (closes #19), `[#121]` apt cache for
-  `portaudio19-dev` (cuts 15+min Azure-mirror flakes), `[#122]` GHA
-  layer cache for MCP sidecar Docker builds, `[#123]` NO_COLOR
-  honored across the rest of `styling.py`, `[#131]` ty narrowings
-  surfaced by `/aj-ci-audit` (record.args tuple-narrowing + ContentKind
-  literal in captions test).
+  Tagged remaining unmigrated forwarders; dropped `kind is None`
+  fallback + `DIALOGUE_KEYWORDS` prose-keyword path. Untagged messages
+  now route as not-dialogue everywhere. Phase 3 Part B deferred.
+- 2026-05-02 — **WSL audio cascade silenced** [#133]. libasound noop
+  handler at TTS module load + fd-redirect context around
+  `_TextToAudioStream(...)` suppress ~55 stderr lines/startup under
+  WSL2/headless. `KOURAI_AUDIO_DEBUG=1` opt-out.
+- 2026-05-02 — **Wolfi base-image migration** [#125] [#127] [#130]
+  (closes #98). All 13 Docker images on Wolfi (0H baseline vs 1H
+  Debian-glibc on CVE-2026-5435); durable GH Actions rescan workflow
+  tracks issue #126 (xmldom upstream block); introduced
+  `# research(YYYY-MM):` inline-rationale convention.
+- 2026-05-02 — **`/aj-deslop` IMPL TODO closed** [#124] [#128] [#129].
+  Three sweeps; -118 LoC of "why we picked this" prose. Pre-release
+  stance: keep only what helps a reader execute.
+- 2026-05-02 — **UX/DX + CI batch** [#118] [#119] [#120] [#121] [#122]
+  [#123] [#131]. `AGENT_METADATA` dead-fields drop, Okabe-Ito CVD-safe
+  agent badges (closes #10), captions toggle for audio-only mode
+  (closes #19), apt cache for portaudio19-dev, GHA layer cache for MCP
+  Docker builds, NO_COLOR honored across `styling.py`, ty narrowings.
 - 2026-05-01 — **M18 Phase 1 verified GREEN end-to-end** via
-  `make smoke-m18`; full specialist cascade hephaestus → metis →
-  techne → dokimasia → kallos → mneme produced two commit groups in
-  57.4s, defensive virtues fail-soft fired exactly as designed. Same-
-  day post-smoke DX cleanup: `[#114]` honest rebuild-failure timer,
-  `[#115]` `--voice/--no-voice` + `KOURAI_TTS` env + virtues fail-soft
-  + smoke gate-ack regex narrowing, `[#116]` soft-fail banner on pre-
-  mneme abort, `[#117]` uvicorn.access filter (44 lines/min healthcheck
-  noise → 0).
-
+  `make smoke-m18`; full hephaestus → metis → techne → dokimasia →
+  kallos → mneme cascade in 57.4s, defensive virtues fail-soft fired
+  as designed. Same-day post-smoke DX cleanup: [#114] [#115] [#116]
+  [#117].
