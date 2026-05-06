@@ -288,8 +288,15 @@ def _mark_last_tool_cacheable(tools: list[dict[str, Any]]) -> list[dict[str, Any
 def _log_cache_usage(agent_name: str, response: Any) -> None:
     """Debug-log cache read/write tokens from a LiteLLM response.usage.
 
-    Silent when usage is missing or the cached/written counts are not real
-    ints (so MagicMock-based unit tests don't trip false log lines).
+    Splits cache writes by TTL (5m / 1h) when the response carries the
+    ``cache_creation`` sub-object — Anthropic populates that on requests
+    that mix breakpoints with different TTLs (introduced by #178's
+    static-block ttl="1h" upgrade). When the breakdown isn't present
+    (older provider responses, streaming edge cases, non-Anthropic
+    providers), fall back to a single ``write=`` line.
+
+    Silent when usage is missing or the cached/written counts are not
+    real ints (so MagicMock-based unit tests don't trip false log lines).
     """
     usage = getattr(response, "usage", None)
     if usage is None:
@@ -302,7 +309,30 @@ def _log_cache_usage(agent_name: str, response: Any) -> None:
             cached = val
     written_val = getattr(usage, "cache_creation_input_tokens", None)
     written = written_val if isinstance(written_val, int) else 0
-    if cached or written:
+
+    written_5m = 0
+    written_1h = 0
+    creation = getattr(usage, "cache_creation", None)
+    if creation is not None:
+        v5 = getattr(creation, "ephemeral_5m_input_tokens", None)
+        v1 = getattr(creation, "ephemeral_1h_input_tokens", None)
+        if isinstance(v5, int):
+            written_5m = v5
+        if isinstance(v1, int):
+            written_1h = v1
+
+    if not (cached or written or written_5m or written_1h):
+        return
+
+    if written_5m or written_1h:
+        log.debug(
+            "cache %s read=%d write_5m=%d write_1h=%d",
+            agent_name,
+            cached,
+            written_5m,
+            written_1h,
+        )
+    else:
         log.debug("cache %s read=%d write=%d", agent_name, cached, written)
 
 

@@ -54,15 +54,29 @@ def _fake_response(
     completion_tokens=0,
     cache_creation_input_tokens=0,
     cached_tokens=0,
+    ephemeral_5m_input_tokens=None,
+    ephemeral_1h_input_tokens=None,
 ):
-    """Build a minimal LiteLLM-shaped response for ``record_usage`` to read."""
+    """Build a minimal LiteLLM-shaped response for ``record_usage`` to read.
+
+    Pass ``ephemeral_5m_input_tokens`` / ``ephemeral_1h_input_tokens`` (or
+    both) to populate the per-TTL breakdown sub-object Anthropic emits on
+    mixed-TTL requests. When neither is provided, the response carries no
+    ``cache_creation`` attribute — matching pre-#178 single-TTL responses.
+    """
     details = SimpleNamespace(cached_tokens=cached_tokens)
-    usage = SimpleNamespace(
-        prompt_tokens=prompt_tokens,
-        completion_tokens=completion_tokens,
-        cache_creation_input_tokens=cache_creation_input_tokens,
-        prompt_tokens_details=details,
-    )
+    fields = {
+        "prompt_tokens": prompt_tokens,
+        "completion_tokens": completion_tokens,
+        "cache_creation_input_tokens": cache_creation_input_tokens,
+        "prompt_tokens_details": details,
+    }
+    if ephemeral_5m_input_tokens is not None or ephemeral_1h_input_tokens is not None:
+        fields["cache_creation"] = SimpleNamespace(
+            ephemeral_5m_input_tokens=ephemeral_5m_input_tokens or 0,
+            ephemeral_1h_input_tokens=ephemeral_1h_input_tokens or 0,
+        )
+    usage = SimpleNamespace(**fields)
     return SimpleNamespace(usage=usage)
 
 
@@ -90,7 +104,11 @@ class TestRecordUsage:
         assert bucket.input_tokens == 1500
         assert bucket.output_tokens == 400
         assert bucket.cache_read_tokens == 900
-        assert bucket.cache_write_tokens == 200
+        # No per-TTL breakdown supplied → entire write attributed to the
+        # safe-default 5m bucket (rather than over-billing at 1h rate).
+        assert bucket.cache_write_5m_tokens == 200
+        assert bucket.cache_write_1h_tokens == 0
+        assert bucket.cache_write_tokens == 200  # property: sum
         assert bucket.calls == 1
         assert bucket.model == "anthropic/claude-sonnet-4-6"
 
@@ -177,6 +195,66 @@ class TestRecordUsage:
         record_usage("techne", MagicMock(), model="anthropic/claude-sonnet-4-6")
         assert ("techne", "anthropic/claude-sonnet-4-6") not in get_session_usage().agents
 
+    def test_per_ttl_cache_write_breakdown_extracted_when_present(self):
+        """When the response carries usage.cache_creation with the 5m/1h
+        sub-fields (Anthropic mixed-TTL requests post-#178), record_usage
+        must split into the two buckets — not lump everything as 5m."""
+        from kourai_common.usage import get_session_usage
+
+        record_usage(
+            "metis",
+            _fake_response(
+                prompt_tokens=2048,
+                completion_tokens=503,
+                cached_tokens=1800,
+                cache_creation_input_tokens=556,  # legacy total = 5m + 1h
+                ephemeral_5m_input_tokens=456,
+                ephemeral_1h_input_tokens=100,
+            ),
+            model="anthropic/claude-opus-4-7",
+        )
+        bucket = get_session_usage().agents[("metis", "anthropic/claude-opus-4-7")]
+        assert bucket.cache_write_5m_tokens == 456
+        assert bucket.cache_write_1h_tokens == 100
+        assert bucket.cache_write_tokens == 556  # property invariant
+
+    def test_per_ttl_breakdown_accumulates_across_calls(self):
+        """Both the 5m and 1h buckets must accumulate independently across
+        repeated calls so /usage shows per-TTL totals over a session."""
+        from kourai_common.usage import get_session_usage
+
+        for _ in range(3):
+            record_usage(
+                "techne",
+                _fake_response(
+                    cache_creation_input_tokens=100,
+                    ephemeral_5m_input_tokens=80,
+                    ephemeral_1h_input_tokens=20,
+                ),
+                model="anthropic/claude-sonnet-4-6",
+            )
+        bucket = get_session_usage().agents[("techne", "anthropic/claude-sonnet-4-6")]
+        assert bucket.cache_write_5m_tokens == 240  # 80 × 3
+        assert bucket.cache_write_1h_tokens == 60  # 20 × 3
+        assert bucket.cache_write_tokens == 300
+
+    def test_legacy_total_only_attributes_to_5m_bucket(self):
+        """When the response has cache_creation_input_tokens but no
+        breakdown sub-object (older provider responses, streaming edge
+        cases, non-Anthropic providers), attribute the entire total to
+        the 5m bucket — under-quotes 1h writes by ~60% but never
+        over-bills, which is the safer default."""
+        from kourai_common.usage import get_session_usage
+
+        record_usage(
+            "kallos",
+            _fake_response(cache_creation_input_tokens=500),  # no per-TTL sub-object
+            model="anthropic/claude-haiku-4-5-20251001",
+        )
+        bucket = get_session_usage().agents[("kallos", "anthropic/claude-haiku-4-5-20251001")]
+        assert bucket.cache_write_5m_tokens == 500
+        assert bucket.cache_write_1h_tokens == 0
+
 
 # ---------------------------------------------------------------------------
 # pricing — table sanity + compute_cost math
@@ -203,6 +281,17 @@ class TestPricingTable:
         for model_id, rates in ANTHROPIC_PRICING.items():
             assert rates.cache_write_5min_per_m == pytest.approx(rates.input_per_m * 1.25), (
                 f"{model_id}: 5-min cache write is not 1.25x input"
+            )
+
+    def test_cache_write_1h_is_2x_input(self):
+        # Anthropic May 2026 docs: 1-hour cache write costs 2× base input.
+        # #178 upgraded the static system block to ttl="1h" so this rate
+        # is what kourai's truly-static 1-3K-token prefix is billed at on
+        # every cache rewrite (which now happens once per hour rather than
+        # once per 5 minutes — net cost win).
+        for model_id, rates in ANTHROPIC_PRICING.items():
+            assert rates.cache_write_1h_per_m == pytest.approx(rates.input_per_m * 2.0), (
+                f"{model_id}: 1-hour cache write is not 2x input"
             )
 
     def test_known_april_2026_rates(self):
@@ -257,12 +346,15 @@ class TestGeminiPricing:
             )
 
     def test_cache_write_left_at_zero_intentionally(self):
-        # Gemini's caching is per-hour storage, not per-write — the
-        # 4-rate ModelPricing shape doesn't fit cleanly. We document
-        # the under-count rather than guess a per-write rate.
+        # Gemini's caching is per-hour storage, not per-write — neither
+        # the 5m nor the 1h rate fits the shape, so both are 0. Documents
+        # the under-count rather than guessing a per-write rate.
         for model_id, rates in GEMINI_PRICING.items():
             assert rates.cache_write_5min_per_m == 0.0, (
                 f"{model_id}: cache_write_5min should be 0 (Gemini billing model)"
+            )
+            assert rates.cache_write_1h_per_m == 0.0, (
+                f"{model_id}: cache_write_1h should be 0 (Gemini billing model)"
             )
 
 
@@ -275,18 +367,42 @@ class TestComputeCost:
         cost = compute_cost("anthropic/claude-sonnet-4-6", usage)
         assert cost == pytest.approx(3.0)
 
-    def test_full_cost_combines_all_four_rates(self):
+    def test_full_cost_combines_all_five_rates(self):
         # 1M input → $3 + 1M output → $15 + 1M cache_read → $0.30
-        # + 1M cache_write_5min → $3.75 = $22.05
+        # + 1M cache_write_5m → $3.75 + 1M cache_write_1h → $6.0 = $28.05
         usage = AgentUsage(
             model="anthropic/claude-sonnet-4-6",
             input_tokens=1_000_000,
             output_tokens=1_000_000,
             cache_read_tokens=1_000_000,
-            cache_write_tokens=1_000_000,
+            cache_write_5m_tokens=1_000_000,
+            cache_write_1h_tokens=1_000_000,
         )
         cost = compute_cost("anthropic/claude-sonnet-4-6", usage)
-        assert cost == pytest.approx(3.0 + 15.0 + 0.30 + 3.75)
+        assert cost == pytest.approx(3.0 + 15.0 + 0.30 + 3.75 + 6.0)
+
+    def test_1h_cache_write_billed_at_2x_input(self):
+        # 1M cache_write_1h at Sonnet's $3 input → $6 (2× input).
+        # Pre-#178 the same M tokens would have been billed at the 5m
+        # rate ($3.75) — under-quote of 60% on the 1h-static portion.
+        usage = AgentUsage(
+            model="anthropic/claude-sonnet-4-6",
+            cache_write_1h_tokens=1_000_000,
+        )
+        cost = compute_cost("anthropic/claude-sonnet-4-6", usage)
+        assert cost == pytest.approx(6.0)
+
+    def test_5m_and_1h_priced_independently(self):
+        # 500K cache_write_5m on Opus → 0.5 × $6.25 = $3.125
+        # 500K cache_write_1h on Opus → 0.5 × $10 = $5.00
+        # = $8.125 combined
+        usage = AgentUsage(
+            model="anthropic/claude-opus-4-7",
+            cache_write_5m_tokens=500_000,
+            cache_write_1h_tokens=500_000,
+        )
+        cost = compute_cost("anthropic/claude-opus-4-7", usage)
+        assert cost == pytest.approx(3.125 + 5.0)
 
     def test_partial_million_pro_rates(self):
         # 250K input on Haiku → 0.25 * $1 = $0.25

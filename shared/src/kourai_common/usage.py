@@ -39,8 +39,20 @@ class AgentUsage:
     input_tokens: int = 0
     output_tokens: int = 0
     cache_read_tokens: int = 0
-    cache_write_tokens: int = 0
+    # Cache writes split by TTL — 5m writes are 1.25× input on Anthropic,
+    # 1h writes are 2×. Pre-#178 we conflated both into one bucket at the
+    # 5m rate, which under-quoted the 1h-static portion by ~60%. The
+    # split lands here so /usage and compute_cost can reflect the actual
+    # mixed-TTL pricing introduced by #178's static-block ttl="1h" upgrade.
+    cache_write_5m_tokens: int = 0
+    cache_write_1h_tokens: int = 0
     calls: int = 0
+
+    @property
+    def cache_write_tokens(self) -> int:
+        """Total cache-write tokens (5m + 1h). Convenience for callers
+        that don't need the per-TTL breakdown."""
+        return self.cache_write_5m_tokens + self.cache_write_1h_tokens
 
 
 @dataclass
@@ -97,14 +109,37 @@ def record_usage(agent_name: str, response: Any, model: str = "") -> None:
 
     input_tokens = _coerce_int(getattr(usage, "prompt_tokens", None))
     output_tokens = _coerce_int(getattr(usage, "completion_tokens", None))
-    cache_write_tokens = _coerce_int(getattr(usage, "cache_creation_input_tokens", None))
+    cache_write_total = _coerce_int(getattr(usage, "cache_creation_input_tokens", None))
 
     cache_read_tokens = 0
     details = getattr(usage, "prompt_tokens_details", None)
     if details is not None:
         cache_read_tokens = _coerce_int(getattr(details, "cached_tokens", None))
 
-    if (input_tokens, output_tokens, cache_read_tokens, cache_write_tokens) == (0, 0, 0, 0):
+    # Per-TTL cache-write breakdown lives on usage.cache_creation when the
+    # request mixes ephemeral_5m and ephemeral_1h breakpoints (introduced
+    # by #178's static-block ttl="1h" upgrade). The legacy total at
+    # cache_creation_input_tokens always equals 5m+1h. When the breakdown
+    # isn't present (older provider responses, streaming edge cases, non-
+    # Anthropic providers), fall back to attributing everything to the 5m
+    # bucket so we don't over-bill — the legacy 5m rate is the safer
+    # default than the higher 1h rate.
+    cache_write_5m = 0
+    cache_write_1h = 0
+    creation = getattr(usage, "cache_creation", None)
+    if creation is not None:
+        cache_write_5m = _coerce_int(getattr(creation, "ephemeral_5m_input_tokens", None))
+        cache_write_1h = _coerce_int(getattr(creation, "ephemeral_1h_input_tokens", None))
+    if cache_write_5m == 0 and cache_write_1h == 0:
+        cache_write_5m = cache_write_total
+
+    if (
+        input_tokens,
+        output_tokens,
+        cache_read_tokens,
+        cache_write_5m,
+        cache_write_1h,
+    ) == (0, 0, 0, 0, 0):
         return
 
     with _LOCK:
@@ -113,7 +148,8 @@ def record_usage(agent_name: str, response: Any, model: str = "") -> None:
         bucket.input_tokens += input_tokens
         bucket.output_tokens += output_tokens
         bucket.cache_read_tokens += cache_read_tokens
-        bucket.cache_write_tokens += cache_write_tokens
+        bucket.cache_write_5m_tokens += cache_write_5m
+        bucket.cache_write_1h_tokens += cache_write_1h
         bucket.calls += 1
 
 
