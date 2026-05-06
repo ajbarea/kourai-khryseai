@@ -6,8 +6,21 @@ to a one-liner under "Shipped" and this file resets to the next milestone.
 Git history is the archive — these docs are plans + scratchpad, not a
 historical record.
 
-Updated: 2026-05-06 · Active focus: **Summarization cheap-tier pin
-shipped [#180]** — `_manage_memory`'s summarization sub-call was using
+Updated: 2026-05-06 · Active focus: **Retry jitter shipped [#181]** —
+`with_retry`'s exponential-backoff path was deterministic, so 4-5
+specialist agents in a Forge Party pipeline that hit a 429 at the same
+instant would retry at the same instant and re-collide on the
+upstream's recovering rate-limit window. 2026 best practice (Anthropic
+rate-limit guidance + AWS retry-pattern docs): exponential backoff with
+±20% jitter to de-correlate concurrent retries. Applies only to the
+computed exponential path; API-provided "Please retry in Xs" stays
+deterministic (server instruction, not guess) with the existing 0.5s
+buffer. Module docstring carries the research note + sources;
+`# noqa: S311` on the `random.uniform` call (bandit "not crypto" warning
+is irrelevant for jitter). 3 new tests (jitter applied to exponential,
+jitter band stays at ±20%, API-provided path bypasses jitter).
+**Summarization cheap-tier pin shipped [#180]** —
+`_manage_memory`'s summarization sub-call was using
 `get_model(agent_name)` (same tier as the agent), so Opus-powered
 agents paid Opus rates for "summarize this conversation" — extraction
 work that Haiku handles fine. Anthropic's own context-compaction

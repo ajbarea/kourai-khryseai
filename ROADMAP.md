@@ -765,6 +765,28 @@ file-of-origin.
 One-line per item, newest first. Detail moves to git history when work
 lands — these docs are plans + scratchpad, not a historical archive.
 
+- 2026-05-06 — **Retry exponential-backoff jitter (±20%)** [#181].
+  `with_retry` was deterministic on the computed-exponential path —
+  every concurrent caller that hit a 429 at the same wall-clock instant
+  would retry at the same wall-clock instant, re-overwhelming the
+  upstream's recovering rate-limit window. Real risk at kourai's
+  operating point: Forge Party pipelines run 4-5 specialist agents
+  concurrently, all calling the same Anthropic / Gemini endpoint via
+  LiteLLM; without jitter the concurrent retries collide on every
+  rate-limit event and turn it into a sustained outage. 2026 best
+  practice from Anthropic + AWS retry-pattern docs: exponential backoff
+  WITH ±20% jitter via `random.uniform(0.8, 1.2)` multiplier on the
+  computed delay. The API-provided "Please retry in Xs" path stays
+  deterministic (server instruction) with the existing 0.5s buffer —
+  jittering a server-supplied delay would either re-overwhelm or waste
+  wall-time. 3 new tests cover the jitter shape (mocked uniform produces
+  exact delays), the band invariant (always 0.8-1.2 not wider), and the
+  API-provided-path bypass (uniform must NOT be called when the server
+  supplies a delay). 3142/3142 unit pass; ty rc=0; ruff clean (with
+  `# noqa: S311` on the `random.uniform` call since bandit's "not
+  crypto" warning is irrelevant for jitter). `research(2026-05)`:
+  sources tokencalculator.com Claude rate-limits 2026, fast.io AI Agent
+  Retry Patterns 2026.
 - 2026-05-06 — **Summarization cheap-tier pin** [#180]. `_manage_memory`'s
   summarization sub-call was resolving to `get_model(agent_name)` — same
   tier as the agent, which on smart-tier-Metis is Opus 4.7 ($5/M input).
