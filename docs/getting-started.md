@@ -26,8 +26,8 @@ All three are equally capable and connect to the same Docker-hosted agent backen
 ### 1. Clone and install
 
 ```bash title="Terminal"
-git clone https://github.com/ajbarea/kourai_khryseai.git
-cd kourai_khryseai
+git clone https://github.com/ajbarea/kourai-khryseai.git
+cd kourai-khryseai
 
 # Install all workspace packages
 make setup
@@ -83,7 +83,9 @@ Start everything:
 docker compose up
 ```
 
-All ten agents + Jaeger + Prometheus.
+All ten agents (six specialists, four companion spirits) plus the
+vn-bridge service and the observability stack (Jaeger, Prometheus,
+Dozzle, memory-mcp, context7-mcp).
 
 To start a single agent (plus its dependencies):
 
@@ -156,10 +158,11 @@ See the [GUI Reference](gui.md) for keyboard shortcuts, visual effects, and TTS 
 ### :octicons-book-24: Option 3: Ren'Py Visual Novel
 
 ```bash
-cd hosts/vn/renpy-8.5.2-sdk
-./renpy.sh ../kourai_vn    # Linux/Mac
-renpy.exe ..\kourai_vn     # Windows
+make vn          # resolves Ren'Py SDK from KOURAI_RENPY_EXE or local install
 ```
+
+See `hosts/vn/README.md` for the SDK-resolution order (env override → local
+SDK copy → Windows default path) and per-platform launcher notes.
 
 Opens a Ren'Py visual novel with:
 - **Warm forge aesthetic** — gold, cream, charcoal

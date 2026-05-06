@@ -361,9 +361,9 @@ async def _build_contextual_messages(
     # 2. Inject Semantic Summary as a SEPARATE cache breakpoint.
     #
     # research(2026-05): Anthropic prompt caching cuts cost by up to 90 %
-    # on repeat turns when the cached prefix is stable. The pre-2026-05-06
-    # shape concatenated the dynamic semantic_summary onto the static
-    # system content as a single string; #177 split the system content
+    # on repeat turns when the cached prefix is stable. The pre-#177 shape
+    # concatenated the dynamic semantic_summary onto the static system
+    # content as a single string; #177 split the system content
     # into two blocks so the summary lives at its own breakpoint. This
     # branch now also handles upstream callers that pre-supply structured
     # cache blocks (``get_enriched_system_blocks`` returns

@@ -149,7 +149,7 @@ If Kallos finds issues Techne can fix, they iterate up to 3 rounds automatically
 
 ```bash
 git clone https://github.com/ajbarea/kourai-khryseai.git
-cd kourai_khryseai
+cd kourai-khryseai
 
 make setup        # Install dependencies (equivalent: uv sync --all-packages)
 cp .env.example .env
@@ -165,7 +165,7 @@ KOURAI_PROVIDER=local make cli
 ### 2. Start the Agents
 
 ```bash
-make up           # Builds Docker images, starts all 6 agents + Jaeger + Prometheus
+make up           # Build images and start all 10 agents + vn-bridge + observability stack
 make status       # Check health
 ```
 
@@ -297,8 +297,10 @@ KOURAI_MODEL_TIER=standard    # cheap | standard | smart
 | Tier | Hephaestus | Metis | Techne | Dokimasia | Kallos | Mneme |
 |------|-----------|-------|--------|-----------|--------|-------|
 | **cheap** | Haiku | Haiku | Haiku | Haiku | Haiku | Haiku |
-| **standard** | Sonnet | Opus | Sonnet | Sonnet | Haiku | Haiku |
-| **smart** | Opus | Opus | Opus | Sonnet | Sonnet | Sonnet |
+| **standard** | Sonnet | Sonnet | Sonnet | Haiku | Haiku | Haiku |
+| **smart** | Sonnet | Opus | Sonnet | Sonnet | Sonnet | Sonnet |
+
+Companion spirits (Puck, Cupid, Aidos, Aletheia) and tier overrides are detailed in [Configuration → LLM Models](docs/configuration.md#llm-models).
 
 ### TTS Backends
 
@@ -383,6 +385,29 @@ Full docs are available at [Kourai Khryseai](https://ajbarea.github.io/kourai-kh
 
 [![codecov sunburst](https://codecov.io/gh/ajbarea/kourai-khryseai/graphs/sunburst.svg?token=bNiUvETLLU)](https://app.codecov.io/gh/ajbarea/kourai-khryseai)
 </div>
+
+---
+
+## Citation
+
+If you use Kourai Khryseai or its findings in academic work, please
+cite the NE AI Agents Day 2026 poster + extended abstract:
+
+```bibtex
+@inproceedings{barea2026kourai,
+  author    = {Arnaldo Barea},
+  title     = {Kourai Khryseai: Transparent Human-on-the-Loop Multi-Agent Software Development},
+  booktitle = {North-East AI Agents Day 2026},
+  address   = {New York, NY, USA},
+  year      = {2026},
+  month     = {5},
+  url       = {https://ajbarea.github.io/kourai-khryseai/research/ne-agents-day-2026/},
+}
+```
+
+GitHub renders a copy-paste citation widget from
+[`CITATION.cff`](CITATION.cff) on the right sidebar of the repo
+homepage.
 
 ---
 

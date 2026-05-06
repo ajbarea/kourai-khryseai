@@ -24,28 +24,47 @@ import asyncio
 import io
 import logging
 import time
+import warnings
 import wave
 from typing import TYPE_CHECKING
+
+# Silence three torch warnings emitted while RealtimeTTS lazy-loads torch
+# during the next import: two FutureWarnings (``weight_norm`` deprecation
+# and ``LSTMCell.__init__`` argument-order shift in 2.x), plus the
+# ``LSTM dropout=0.2 with num_layers=1`` UserWarning that Kokoro's
+# packaged model triggers. All three are upstream concerns and the
+# library still ships pinned to the older API. Filtering here (before
+# the RealtimeTTS import that triggers the torch chain) keeps interactive
+# CLI/GUI boot output legible — without it the user sees a noisy stderr
+# burst on every startup. Scoped to ``module=torch\..*`` so genuine
+# warnings from our own code are still audible.
+warnings.filterwarnings("ignore", category=FutureWarning, module=r"torch\..*")
+warnings.filterwarnings("ignore", category=UserWarning, module=r"torch\.nn\.modules\.rnn")
 
 # Module-level bindings (aliased with leading underscore) so tests can
 # monkeypatch them without instantiating PyAudio. RealtimeTTS is a hard
 # dep in hosts/gui/pyproject.toml; importing it pulls in pyaudio, which
 # requires portaudio19-dev on Linux (CI installs it via ed4d560).
-import pyaudio
-from RealtimeTTS import KokoroEngine as _KokoroEngine, TextToAudioStream as _TextToAudioStream
+# E402 is intentional — the warnings.filterwarnings call above must run
+# before the RealtimeTTS import that triggers torch's lazy load.
+import pyaudio  # noqa: E402
+from RealtimeTTS import (  # noqa: E402
+    KokoroEngine as _KokoroEngine,
+    TextToAudioStream as _TextToAudioStream,
+)
 
-from kourai_common.audio_env import (
+from kourai_common.audio_env import (  # noqa: E402
     is_audio_output_available,
     silence_alsa_lib_errors,
     silence_audio_init_noise,
 )
-from kourai_common.ssml import strip_ssml
-from kourai_common.tts_backend import (
+from kourai_common.ssml import strip_ssml  # noqa: E402
+from kourai_common.tts_backend import (  # noqa: E402
     AGENT_VOICE_MAP,
     TTSVoiceConfig,
     get_voice_for_agent,
 )
-from kourai_common.tts_cache import cached_synthesize
+from kourai_common.tts_cache import cached_synthesize  # noqa: E402
 
 # Module-load side effect: kill libasound's stderr cascade before
 # `_TextToAudioStream(...)` enumerates ALSA in `__init__` below.
@@ -271,9 +290,9 @@ class RealtimeTTSEngine:
         handler is mutated by :meth:`speak` and cleared in finally.
 
         ``word`` is a ``RealtimeTTS.engines.base_engine.TimingInfo`` instance
-        with at least a ``.word`` attribute (string). Per the May 2026
-        RealtimeTTS docs, fires AT PLAYBACK TIME for English voices of
-        ``KokoroEngine`` — the karaoke-reveal primitive for Tier 1.
+        with at least a ``.word`` attribute (string). Per the RealtimeTTS
+        docs, fires AT PLAYBACK TIME for English voices of ``KokoroEngine``
+        — the karaoke-reveal primitive for Tier 1.
         """
         for cb in (self._on_word_static, self._on_word_current):
             if cb is None:

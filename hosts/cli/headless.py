@@ -45,7 +45,6 @@ async def _headless(agent_url: str, prompt: str, timeout_seconds: int, verbose: 
     context_id: str = uuid4().hex
     t0 = time.monotonic()
 
-    # Build and send message
     message = user_message(prompt, context_id=context_id)
 
     final_text = ""

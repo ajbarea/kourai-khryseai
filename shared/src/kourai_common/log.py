@@ -14,15 +14,43 @@ from opentelemetry import trace
 
 from kourai_common.paths import logs_dir as _logs_dir
 
-# Libs whose INFO records are noise to an end-user — they still write to the
-# file log, just not the console. Covers httpx request logs and the a2a
-# resolver dumping its full agent-card JSON on every connect.
+# Libs whose INFO/DEBUG records are noise to an end-user — they still write
+# to the file log, just not the console. Covers httpx request logs, the a2a
+# resolver dumping its full agent-card JSON on every connect, PIL's PNG/JPEG
+# decode chatter (huge during /maidens portrait rendering and Kokoro's voice
+# warm-up), and the bare ``logging.debug(...)`` calls some upstream
+# RealtimeTTS engines emit under name="root".
 _CONSOLE_SILENCED_LIBS = (
     "httpx",
     "httpcore",
     "urllib3",
     "a2a.client.card_resolver",
+    "PIL",
+    "huggingface_hub",
+    "filelock",
+    "asyncio",
+    # The "TTS: starting/playback complete" status records emit *during*
+    # the CLI's karaoke speech-preview render (between the opening and
+    # closing quotes of `Hephaestus ... "..."`), so they visibly land
+    # inside the quoted dialogue and look like the agent is reading the
+    # log file aloud. Keep them in the file log only.
+    "kourai_common.tts_realtime",
 )
+
+
+class _RootDebugFilter(logging.Filter):
+    """Drop sub-INFO records logged via the bare root logger.
+
+    Some upstream packages (RealtimeTTS in particular) call
+    ``logging.debug(...)`` directly, which records ``name="root"``.
+    Those records bypass per-logger silencing because they have no
+    namespace prefix to match. We drop them at INFO and below so they
+    only land in the file log; warnings still surface.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return not (record.name == "root" and record.levelno < logging.WARNING)
+
 
 # 2xx access logs from these paths are pure healthcheck noise.
 _HEALTHCHECK_PATHS = ("/.well-known/agent-card.json",)
@@ -155,6 +183,16 @@ def setup_logging(name: str, *, level: str | None = None) -> logging.Logger:
     # (httpx, a2a.*, kourai_common.*, etc.) land in logs/<name>.log — not just
     # records emitted through the `name` logger.
     root = logging.getLogger()
+
+    # Strip any pre-existing root handlers (e.g. another package called
+    # ``logging.basicConfig(level=DEBUG)`` at import time, which RealtimeTTS
+    # and a few HF deps do — that handler uses the default
+    # ``LEVEL:NAME:MSG`` format with level=DEBUG and floods the console
+    # with httpcore/PIL/AWS-signed-URL chatter. We replace it with our own
+    # filtered handler below.
+    for h in list(root.handlers):
+        root.removeHandler(h)
+
     root.setLevel(logging.DEBUG)  # capture everything at root; handlers filter.
 
     trace_filter = _OtelTraceFilter()
@@ -171,6 +209,7 @@ def setup_logging(name: str, *, level: str | None = None) -> logging.Logger:
         # drop 3rd-party INFO chatter from the terminal (still logged to file).
         if console.level > logging.DEBUG:
             console.addFilter(_ConsoleSilenceFilter(_CONSOLE_SILENCED_LIBS))
+            console.addFilter(_RootDebugFilter())
         root.addHandler(console)
 
     if not any(isinstance(h, RotatingFileHandler) for h in root.handlers):
@@ -192,9 +231,27 @@ def setup_logging(name: str, *, level: str | None = None) -> logging.Logger:
     if not any(isinstance(f, _UvicornAccessPathFilter) for f in access_logger.filters):
         access_logger.addFilter(_UvicornAccessPathFilter(_HEALTHCHECK_PATHS))
 
+    # Freeze ``logging.basicConfig`` so packages imported AFTER us (RealtimeTTS,
+    # huggingface_hub) cannot replace our handler with a default-format,
+    # DEBUG-level one that floods the terminal with httpcore / AWS-signed-URL
+    # / "Time to split sentences" chatter. Verbose mode honors this too —
+    # ``-v`` already configured our handler at DEBUG before reaching here.
+    logging.basicConfig = _frozen_basic_config  # ty: ignore[invalid-assignment]
+
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
     return logger
+
+
+def _frozen_basic_config(*_args: object, **_kwargs: object) -> None:
+    """No-op replacement for ``logging.basicConfig`` after ``setup_logging``.
+
+    Some upstream packages call ``basicConfig`` at import time even when a
+    handler is already attached; combined with ``force=True`` they replace
+    our config and the console floods with their default-format DEBUG
+    output. Pinning this to a no-op preserves what ``setup_logging`` chose.
+    """
+    return None
 
 
 def run_uvicorn(

@@ -19,7 +19,7 @@ from kourai_common.llm import chat_with_tools
 from kourai_common.mcp_bridge import forge_tool_bridge
 from kourai_common.mcp_client import kourai_project_root_var
 from kourai_common.player import get_enriched_system_blocks
-from kourai_common.prompts import CURRENT_DATE, build_system_prompt
+from kourai_common.prompts import build_system_prompt
 from kourai_common.subprocess import StatusCallback, run_command
 
 if TYPE_CHECKING:
@@ -30,8 +30,8 @@ log = logging.getLogger(__name__)
 SYSTEM_PROMPT = build_system_prompt(
     agent_name="Kallos",
     role="style specialist",
-    personality=f"""
-You enforce AJ's code quality standards across all files using {CURRENT_DATE} Best Practices.
+    personality="""
+You enforce AJ's code quality standards across all files.
 
 PERSONALITY: You're elegant, detail-oriented, and take pride in aesthetic perfection.
 You sass Hephaestus about his messy forge but make everything beautiful for the user.

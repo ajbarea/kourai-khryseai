@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 from kourai_common.llm import chat, chat_stream
 from kourai_common.player import get_enriched_system_blocks
-from kourai_common.prompts import CURRENT_DATE, build_system_prompt
+from kourai_common.prompts import build_system_prompt
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterable
@@ -21,8 +21,8 @@ log = logging.getLogger(__name__)
 SYSTEM_PROMPT = build_system_prompt(
     agent_name="Mneme",
     role="commit message specialist",
-    personality=f"""
-You generate commit message groups following AJ's EXACT format. ({CURRENT_DATE} Best Practices)
+    personality="""
+You generate commit message groups following AJ's EXACT format.
 
 PERSONALITY: You're scholarly, meticulous, and remember everything (literally).
 You sass Hephaestus about his poor documentation but chronicle everything for the user.

@@ -4,7 +4,7 @@
 
 <img src="../assets/avatars/metis_neutral.png" class="specialist-avatar" alt="Metis — Architect of Intent">
 
-**Port `10001`** · Model varies by [tier](../configuration.md#llm-models) (Opus on `smart`) · [`agents/metis/`](https://github.com/ajbarea/kourai_khryseai/tree/main/agents/metis)
+**Port `10001`** · Model varies by [tier](../configuration.md#llm-models) (Opus on `smart`) · [`agents/metis/`](https://github.com/ajbarea/kourai-khryseai/tree/main/agents/metis)
 
 Transforms rough ideas into detailed implementation specs. On the `smart` tier, uses the most capable model (Opus) because planning quality determines everything downstream.
 
@@ -41,7 +41,7 @@ This context is injected into the LLM prompt so specs are grounded in the actual
 
 <img src="../assets/avatars/techne_neutral.png" class="specialist-avatar" alt="Techne — Artisan of Code">
 
-**Port `10002`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/techne/`](https://github.com/ajbarea/kourai_khryseai/tree/main/agents/techne)
+**Port `10002`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/techne/`](https://github.com/ajbarea/kourai-khryseai/tree/main/agents/techne)
 
 Implements code changes from specs or fix requests. Drives a provider-native tool-use loop — the LLM emits `tool_use` blocks calling the MCP **forge** server's `read_file` / `write_file` / `edit_file` / `delete_file` tools, the runtime executes them inside a `forge_tool_bridge()` async context, and per-tool results stream back to the player as `🛠 forge.<tool>` status events.
 
@@ -55,7 +55,7 @@ The tool loop is shared with Kallos and Dokimasia — see [Internals](../archite
 
 <img src="../assets/avatars/dokimasia_neutral.png" class="specialist-avatar" alt="Dokimasia — Guardian of Standards">
 
-**Port `10003`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/dokimasia/`](https://github.com/ajbarea/kourai_khryseai/tree/main/agents/dokimasia)
+**Port `10003`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/dokimasia/`](https://github.com/ajbarea/kourai-khryseai/tree/main/agents/dokimasia)
 
 Writes pytest test suites and runs them. Handles both test generation (LLM) and test execution (subprocess). Uses `run_fix_loop()` to iterate on failing tests up to 3 times before reporting.
 
@@ -86,7 +86,7 @@ Target: **80%+ code coverage**.
 
 <img src="../assets/avatars/kallos_neutral.png" class="specialist-avatar" alt="Kallos — Eye of Elegance">
 
-**Port `10004`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/kallos/`](https://github.com/ajbarea/kourai_khryseai/tree/main/agents/kallos)
+**Port `10004`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/kallos/`](https://github.com/ajbarea/kourai-khryseai/tree/main/agents/kallos)
 
 Runs linters, cleans up comments, and enforces the project's style guide. Uses `run_fix_loop()` for iterative fixing. Updates the `techne_v` virtue (+0.01 per clean pass).
 
@@ -134,7 +134,7 @@ flowchart LR
 
 <img src="../assets/avatars/mneme_neutral.png" class="specialist-avatar" alt="Mneme — Keeper of Memory">
 
-**Port `10005`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/mneme/`](https://github.com/ajbarea/kourai_khryseai/tree/main/agents/mneme)
+**Port `10005`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/mneme/`](https://github.com/ajbarea/kourai-khryseai/tree/main/agents/mneme)
 
 Generates grouped commit messages from git diff output. Pure LLM, no subprocess or file I/O.
 
@@ -170,7 +170,7 @@ Files: path/to/changed/file.py, path/to/other.py
 
 <img src="../assets/avatars/puck_neutral.png" class="specialist-avatar" alt="Puck — Voice of Reason">
 
-**Port `10006`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/puck/`](https://github.com/ajbarea/kourai_khryseai/tree/main/agents/puck)
+**Port `10006`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/puck/`](https://github.com/ajbarea/kourai-khryseai/tree/main/agents/puck)
 
 A mischievous daimon who guides the player experience. Not a development agent — Puck is a companion who provides tutorial guidance, nudges when idle, and facilitates relationship minigames. Always present.
 
@@ -196,7 +196,7 @@ A mischievous daimon who guides the player experience. Not a development agent �
 
 <img src="../assets/avatars/cupid_neutral.png" class="specialist-avatar" alt="Cupid — Aspect of Love">
 
-**Port `10007`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/cupid/`](https://github.com/ajbarea/kourai_khryseai/tree/main/agents/cupid)
+**Port `10007`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/cupid/`](https://github.com/ajbarea/kourai-khryseai/tree/main/agents/cupid)
 
 An eros spirit who coaches the player through romantic progression with the maiden agents. Appears conditionally when affinity reaches 0.6+ with any agent. Builds relationship context from affinity scores.
 
@@ -223,7 +223,7 @@ An eros spirit who coaches the player through romantic progression with the maid
 
 <img src="../assets/avatars/aidos_neutral.png" class="specialist-avatar" alt="Aidos — The Honest Mirror">
 
-**Port `10008`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/aidos/`](https://github.com/ajbarea/kourai_khryseai/tree/main/agents/aidos)
+**Port `10008`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/aidos/`](https://github.com/ajbarea/kourai-khryseai/tree/main/agents/aidos)
 
 Detects and eliminates vague, corporate, and passive language from agent output. Uses regex pre-screening before LLM analysis for fast path on clean text.
 
@@ -254,7 +254,7 @@ Detects and eliminates vague, corporate, and passive language from agent output.
 
 <img src="../assets/avatars/aletheia_neutral.png" class="specialist-avatar" alt="Aletheia — Seeker of Truth">
 
-**Port `10009`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/aletheia/`](https://github.com/ajbarea/kourai_khryseai/tree/main/agents/aletheia)
+**Port `10009`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/aletheia/`](https://github.com/ajbarea/kourai-khryseai/tree/main/agents/aletheia)
 
 Validates citations, claims, and factual assertions in agent output. Uses regex-based claim detection before LLM verification for efficient processing.
 

@@ -35,7 +35,7 @@ setup:                     ## Install all Python dependencies + optional HF Stor
 setup-artifacts:           ## Create HF Storage Bucket for agent artifacts
 	@$(UV_DEV) setup-artifacts
 
-upgrade:                   ## Update all dependencies to latest versions
+upgrade:                   ## Update all dependencies
 	@$(UV_DEV) upgrade
 
 yolo:                      ## Nuke and rebuild: clean -> down -> setup -> upgrade -> clean

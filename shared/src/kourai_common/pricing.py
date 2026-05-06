@@ -1,8 +1,8 @@
 """Per-million-token rates for the LLMs Kourai uses.
 
 Sources: Anthropic public pricing page (cross-referenced against
-finout.io and benchlm.ai 2026 summaries) and Google's Gemini pricing
-page (https://ai.google.dev/gemini-api/docs/pricing) as of April 2026.
+finout.io and benchlm.ai summaries) and Google's Gemini pricing
+page (https://ai.google.dev/gemini-api/docs/pricing).
 
 Anthropic rates are uniform: output = 5x input, cache_read = 0.1x input,
 5-minute cache_write = 1.25x input, **1-hour cache_write = 2x input**.

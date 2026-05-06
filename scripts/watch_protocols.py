@@ -11,7 +11,7 @@ issues.
 
 Why we built this
     Today's protocol-tracking is ad-hoc — AJ nudges Claude with "search
-    the web for April 2026 best practice" and Claude does a sweep. That
+    the web for current best practice" and Claude does a sweep. That
     works for explicit refreshes but misses intermediate drift (e.g. v1.0
     of A2A landed with the spec-blessed ``Message.metadata`` channel for
     multi-turn metadata, but our text-tag carrier in ``a2a_utils.py``

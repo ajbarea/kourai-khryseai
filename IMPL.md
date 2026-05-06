@@ -6,16 +6,169 @@ to a one-liner under "Shipped" and this file resets to the next milestone.
 Git history is the archive — these docs are plans + scratchpad, not a
 historical record.
 
-Updated: 2026-05-06 · Active focus: **M6 ElevenLabs hybrid** is the
-pre-player-release blocker. Sub-task 2 (audio cache layer) shipped under
-Kokoro [#174]; sub-tasks 1/3/4/5 (markup adapter / SDK integration /
-production swap / per-persona prosody) gate on M20 + VN smoke landing
-first — character voice quality is most visible against a polished
-dialogue UX. Same-turn polish that's not blocking M6: the
-self-contained-workable bucket below (Puck Slice 2 helper, cross-host
-pipeline-status / status-feed / gossip-render / codex). Pre-release
-perfection stance: no workarounds, web-search May 2026 best practice
-**at the planning step**, architectural fix over expedient patch.
+Updated: 2026-05-06 · Active focus pivoted to **NE AI Agents Day 2026
+poster prep** (May 8, Jane Street NYC; one of 55 posters, title
+"Kourai Khryseai: Transparent Human-on-the-Loop Multi-Agent Software
+Development"). The realistic review surface is QR-code-driven repo
+browsing, not a live demo — so the next 48 hours go to: clean
+README + getting-started, slop-free comments and docstrings, a
+fresh-clone path that actually works. Once Friday is past, focus
+returns to **M6 ElevenLabs hybrid** (sub-task 2 audio cache layer
+shipped [#174]; sub-tasks 1/3/4/5 still gate on M20 + VN smoke).
+
+Pre-release perfection stance unchanged: no workarounds, web-search
+current best practice **at the planning step**, architectural fix
+over expedient patch.
+
+## Pre-presentation hygiene (next 48h)
+
+Concrete blocker list for the QR-code reviewer experience.
+
+### Shipped today
+
+- **Docker runtime image fix** [#182]. `kourai_common.paths` walks for
+  the workspace pyproject; runtime stage didn't ship it. All 10 agents
+  plus vn-bridge crash-looped at import (11 Python services total).
+  One-line `COPY` in the runtime stage.
+- **ROADMAP Shipped section collapsed to one-liners** [#183]. 959 →
+  811 lines. Per the section's own header convention.
+- **First-impression CLI playthrough fixes** [#184, commit 3671602].
+  Played through `make cli` as a first-time developer would. Found and
+  fixed five bugs visible to anyone cloning at the poster session:
+  - **Hephaestus contradicted himself on roster** — asking "who are
+    you all?" produced "You've got four of them" then listed FIVE
+    maidens, with all four spirits absent. Routing prompt only listed
+    the five pipeline specialists; spirits were mentioned only in CHAT
+    examples and Aidos/Aletheia not at all. Added explicit "THE FULL
+    ROSTER — Kourai Khryseai is TEN entities total" block (5 + 4 + 1).
+    He now correctly groups them as "Five Forge Specialists / Four
+    Companion Spirits" on the canonical question.
+  - **Routing JSON leaked into chat replies** — every CHAT artifact
+    closed with `{"mode": "chat", "target_agent": null}` because
+    `extract_parts_text` JSON-serialized DataParts and concatenated
+    them with text. That's correct for the inter-agent A2A path
+    (Hephaestus reads `commit_count` from Mneme this way) but wrong
+    for user-facing rendering. Added `include_data: bool = True`
+    parameter; CLI passes `False` on the display path. 3 new
+    regression tests in `test_a2a_events.py` cover both directions.
+  - **47KB of DEBUG flood on every boot** — bare `logging.debug(...)`
+    from RealtimeTTS plus huggingface_hub's httpcore/PIL stack emitted
+    via a parallel handler installed by an upstream `basicConfig`,
+    bypassing our silence filter. `setup_logging` now strips
+    pre-existing root handlers before installing ours and pins
+    `logging.basicConfig` to a no-op so late imports cannot reinstall.
+    Added `_RootDebugFilter` (drops sub-WARNING records under
+    `name="root"`) and extended `_CONSOLE_SILENCED_LIBS` with PIL,
+    huggingface_hub, filelock, asyncio, and `kourai_common.tts_realtime`.
+    File logs keep full DEBUG; only console is silenced.
+  - **TTS log lines landed inside the speech-preview quotes** — the
+    `"TTS: starting / playback complete"` records emitted between the
+    opening and closing quotes of the karaoke render, making it look
+    like Hephaestus was reading the log aloud. Same fix as above
+    (silence list).
+  - **torch FutureWarnings + UserWarning visible on every boot** —
+    RealtimeTTS lazy-loads torch which prints `weight_norm` deprecation,
+    `LSTMCell` argument shift, and `LSTM dropout=0.2 num_layers=1` to
+    stderr regardless of logging config (these go through Python's
+    `warnings` module). Filtered scoped to `module=torch\..*` inside
+    `tts_realtime.py` before the RealtimeTTS import. Genuine warnings
+    from our own code stay audible.
+  - **Bonus non-bug**: `/maidens` portrait fallback in tmux looked like
+    bare `▀▀▀▀` characters. Turns out `_render_image_ansi` uses 24-bit
+    ANSI half-blocks that look correct in any truecolor terminal —
+    tmux's `capture-pane` strips ANSI by default, so this was a
+    capture-tooling artifact, not a real bug.
+  Boot output went from 47KB of httpcore/PIL/AWS-signed-URL/torch noise
+  to 5 lines, all in our consistent format, all useful. First thing a
+  developer sees after `make cli` is now the banner + connect message.
+
+- **Pre-presentation slop sweep + doc-accuracy fixes + structural
+  additions** [#184 — open, 10 commits].
+  4 parallel deslop subagents → ~30 high-confidence edits: dropped
+  `{CURRENT_DATE} Best Practices` template prefix from 9 agent prompts,
+  stripped floating `April 2026` / `as of 2026-05` markers from
+  shared/ + scripts/ + docker-compose / Dockerfile / Makefile /
+  pyproject. Plus four follow-on commits of fact-checking against the
+  canonical code:
+  - README + getting-started: wrong agent count ("6 agents" → 10),
+    wrong clone target dir (underscore → hyphen), outdated VN launch
+    instructions referencing a vendored SDK path that doesn't exist
+    in-repo (replaced with `make vn` resolver pointer).
+  - README LLM tier table: drift from `shared/src/kourai_common/config.py`.
+    `standard` row had Metis as Opus (actual Sonnet) and Dokimasia as
+    Sonnet (actual Haiku); `smart` row had Hephaestus + Techne as Opus
+    (actual Sonnet for both). Fixed against the canonical mapping;
+    pointer added to `docs/configuration.md` for the four spirits' rows
+    that the README simplified table still omits.
+  - `docs/cli.md`: missing `/scratchpad` (#176) and `/preferences`
+    (alias `/prefs`, M17 Phase 2). Added.
+  - `docs/architecture/index.md`: **added MCC pillars section.** The
+    poster abstract names "Monitor / Communicate / Control" as the
+    core conceptual frame; pre-fix those terms appeared only on the
+    poster page itself. Now anchored to verified code locations
+    (`_OtelTraceFilter`, `is_audio_output_available`, `with_retry`
+    jitter, `MAX_ITERATIONS` Kallos⇅Techne loop) so a reviewer
+    following the abstract into architecture finds the mapping.
+  - `docs/agents/specialists.md` + `docs/agents/index.md`: 10 broken
+    GitHub URLs using `kourai_khryseai` (underscore) → fixed to
+    `kourai-khryseai` (hyphen). All specialist/spirit "view source"
+    links would have 404'd.
+  - `docs/vn.md`: same outdated `cd hosts/vn/renpy-8.5.2-sdk` path
+    as the getting-started fix (the SDK is optional + gitignored);
+    replaced with `make vn`.
+  - **New root `AGENTS.md`** (484 words; 6 H2 sections; covers
+    Build/Testing/Lint/Conventions/Architecture/NFRs). Per arxiv
+    2511.12884v1 ("Agent READMEs: An Empirical Study of Context
+    Files for Agentic Coding"), agentic coding tools (Claude Code,
+    Cursor, Codex, Aider) read root-level `AGENTS.md` by default.
+    The empirical median is 485 words, 6-7 H2 sections, with
+    Security and Performance the common 14.5%-included gaps —
+    targeted exactly. Coexists with `.github/copilot-instructions.md`
+    (the deeper Copilot-specific file already in place).
+  - **New root `CITATION.cff`** (schema 1.2.0, validated via
+    `cffconvert`). GitHub auto-renders a "Cite this repository"
+    widget in the right sidebar exporting BibTeX / APA / EndNote /
+    Zenodo with one click. Embedded `preferred-citation` shapes the
+    May 8, 2026 NE AI Agents Day venue with paper-shaped fields
+    (collection-title, conference.name, date-published). README
+    gains a parallel `Citation` section with copy-paste BibTeX.
+  - **Poster page CTAs** — `docs/research/ne-agents-day-2026/index.md`
+    gains a "Try it" block (`make setup` / `make up` / `make cli`
+    + deep link into Architecture → Three Pillars + pointer to
+    AGENTS.md) and a "Cite this work" block mirroring the README.
+    Closes the loop from abstract → architecture mapping → runnable
+    code path for any reviewer landing on the poster URL via QR.
+- **Verified GitHub repo + docs site state.** GitHub description +
+  topics + homepage URL are correctly set. Docs site at
+  `https://ajbarea.github.io/kourai-khryseai/` builds and serves; nav,
+  hero, agent grid all current; "Ten AI agents" framing matches
+  README/getting-started post-fix. Top nav: Home, Overview, Getting
+  Started, Agents, Architecture, Interfaces, Configuration, Pricing,
+  Research.
+
+### Open before Friday
+
+- **Hephaestus aiohttp `TimeoutError` on M14 parallel routing.** Smoke
+  on 2026-05-06 sent `"hi dokimasia, are you there?"` to hephaestus;
+  HTTP 200 SSE opened but body never streamed. Container logs show
+  `_execute_completion failed (attempt 2), retrying in 4.4s:
+  TimeoutError`. Network from inside the container reaches
+  `api.anthropic.com` cleanly via `urllib`; the hang is at the LiteLLM
+  + aiohttp transport layer specifically. Retry logic IS firing — so
+  the system is resilient, just slow. **Not a presentation blocker
+  since AJ isn't live-demoing**, but a real DX bug. File a GitHub
+  issue with reproduction + log capture; investigate after Friday.
+- **`docs/configuration.md` accuracy pass.** Has it drifted alongside
+  the agent count? Tier table in README references 6 specialists; the
+  4 spirits (aidos/aletheia/cupid/puck) aren't listed. Decide whether
+  spirits get tier rows.
+- **`docs/cli.md` slash-command list audit.** `/scratchpad` shipped in
+  [#176]; `/settings [0]` shipped in [#168]. Are they listed?
+- **`docs/agents/index.md`** — does it still describe the right roster?
+- **One more pass** of host-area narrative WHAT-comments that the
+  initial deslop subagent flagged but #184 skipped to scope-control
+  (Manages/Handles/Provides docstring rewrites). Lower priority than
+  the doc-accuracy items.
 
 ## M6 — ElevenLabs hybrid (pre-player-release blocker)
 

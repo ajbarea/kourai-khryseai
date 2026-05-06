@@ -6,12 +6,8 @@ function constructs a complete prompt with layered architecture for any agent ro
 
 from __future__ import annotations
 
-import datetime
-
-CURRENT_DATE = datetime.date.today().strftime("%B %Y")
-
-PYTHON_STANDARDS = f"""
-Python Standards ({CURRENT_DATE} Best Practices):
+PYTHON_STANDARDS = """
+Python Standards:
 - Python 3.12+ features (match statements, contextlib.suppress, modern typing)
 - Modern type hints: X | None (not Optional[X]), lowercase generics (list, dict)
 - Dependency Management: ALWAYS use `uv` (no pip/venv), understand `uv.lock` and workspaces

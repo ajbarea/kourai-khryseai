@@ -1,8 +1,4 @@
-"""Font scaling manager for Kourai Khryseai GUI.
-
-Manages font scaling from 80% to 200% of default size. Provides methods to
-scale fonts and adjust scroll positions when scale changes.
-"""
+"""Font scaler — clamps scale 0.8x–2.0x and adjusts scroll on change."""
 
 from __future__ import annotations
 
@@ -10,11 +6,7 @@ import pygame.freetype
 
 
 class FontScaler:
-    """Manages font scaling from 80% to 200% of default size.
-
-    Provides methods to set the scale factor, scale fonts, and adjust scroll
-    positions when the scale changes. Clamps scale values to the valid range.
-    """
+    """Font scaling state, clamped to ``[min_scale, max_scale]``."""
 
     def __init__(self, min_scale: float = 0.8, max_scale: float = 2.0) -> None:
         """Initialize FontScaler with scale range.

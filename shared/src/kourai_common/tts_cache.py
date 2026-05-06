@@ -24,9 +24,9 @@ spec wants greppable hex filenames + 2-char shard prefix; diskcache
 stores opaque rowid-keyed values inside a SQLite file plus value
 files under random hex names. ~150 LOC of stdlib fits without the
 SQLite layer or its ~3 MB dep footprint. Source: diskcache tutorial
-2026-05 (storage layout) + ElevenLabs Supabase cookbook 2026-05
-(canonical client-side caching pattern — server-side caching by
-content hash is not provided by ElevenLabs).
+(storage layout) + ElevenLabs Supabase cookbook (client-side
+caching pattern — server-side caching by content hash is not
+provided by ElevenLabs).
 """
 
 from __future__ import annotations

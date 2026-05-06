@@ -316,7 +316,7 @@ async def query_context7(library: str, topic: str, tokens: int = 5000) -> str:
                         # removed entirely (the server now sizes responses
                         # internally). Sticking with the old names produced
                         # ``MCP error -32602: Tool get-library-docs not found``
-                        # in production sidecars (#14 from 2026-04-29 smoke).
+                        # in production sidecars (#14 from a smoke run).
                         docs_result = await session.call_tool(
                             "query-docs",
                             {

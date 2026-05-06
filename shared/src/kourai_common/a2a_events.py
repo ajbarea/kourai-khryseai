@@ -34,8 +34,16 @@ def _has_field(part: object, field: str) -> bool:
     return hasattr(part, field)
 
 
-def extract_parts_text(parts: object) -> str:
-    """Extract text/data payloads from A2A parts."""
+def extract_parts_text(parts: object, *, include_data: bool = True) -> str:
+    """Extract text/data payloads from A2A parts.
+
+    By default, data-parts are JSON-serialized and concatenated alongside
+    text — the inter-agent A2A path (e.g. Hephaestus reading Mneme's
+    ``commit_count`` payload) relies on this. User-facing display paths
+    (the CLI chat-reply rendering) should pass ``include_data=False`` so
+    that protocol metadata like ``{"mode": "chat", "target_agent": null}``
+    does not leak into the visible transcript.
+    """
     if not isinstance(parts, list) and not hasattr(parts, "__iter__"):
         return ""
 
@@ -46,7 +54,7 @@ def extract_parts_text(parts: object) -> str:
             if isinstance(text, str) and text:
                 extracted.append(text)
                 continue
-        if _has_field(part, "data"):
+        if include_data and _has_field(part, "data"):
             data = getattr(part, "data", None)
             if data is None:
                 continue
@@ -115,10 +123,15 @@ def extract_status_text(event: TaskStatusUpdateEvent) -> str:
     return ""
 
 
-def extract_artifact_text(event: TaskArtifactUpdateEvent) -> str:
-    """Pull text from an artifact update event."""
+def extract_artifact_text(event: TaskArtifactUpdateEvent, *, include_data: bool = True) -> str:
+    """Pull text from an artifact update event.
+
+    See ``extract_parts_text`` for the ``include_data`` semantics — set
+    ``include_data=False`` on user-facing display paths so DataPart
+    metadata does not leak into the rendered transcript.
+    """
     if event.artifact and hasattr(event.artifact, "parts"):
-        return extract_parts_text(list(event.artifact.parts))
+        return extract_parts_text(list(event.artifact.parts), include_data=include_data)
     return ""
 
 

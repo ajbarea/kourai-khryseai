@@ -59,8 +59,14 @@ def _extract_status_text(event: TaskStatusUpdateEvent) -> str:
 
 
 def _extract_artifact_text(event: TaskArtifactUpdateEvent) -> str:
-    """Pull display text from an artifact update event."""
-    return _extract_artifact_text_shared(event)
+    """Pull display text from an artifact update event.
+
+    Skips DataPart metadata — Hephaestus's chat artifact carries a
+    ``{"mode": "chat", "target_agent": null}`` data-part that is protocol
+    bookkeeping, not speech, and the CLI is the user-facing channel.
+    Inter-agent A2A reads keep the default ``include_data=True``.
+    """
+    return _extract_artifact_text_shared(event, include_data=False)
 
 
 def _handoff_chatter(from_agent: str, to_agent: str) -> str | None:
