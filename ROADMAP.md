@@ -5,7 +5,7 @@ A public, living plan for where the forge is heading. Items here are either
 *currently working on* lives in [IMPL.md](./IMPL.md) — when it lands, the
 matching milestone here collapses to a single line under "Shipped".
 
-Last reviewed: 2026-05-05. Active focus: **M6 ElevenLabs hybrid as pre-player-release blocker** (promoted 2026-05-03 after walking back the M18 Phase 2 SSML investment — ElevenLabs v3's actual May 2026 docs don't support SSML break tags, so the producer-side SSML markup was wrong for the M6 target; see Shipped log entry for #152). See [IMPL.md](./IMPL.md) for the active work, the open invariants, and the priority-ordered "Up next" list. Pre-release perfection stance unchanged: May 2026 best practice no matter the cost, **web-search the SPECIFIC target's primary docs at the planning step** (not just at implementation), architectural fix over expedient patch. Sister-repo audit weekly cron runs Mondays 12:00 UTC.
+Last reviewed: 2026-05-06. Active focus: **M6 ElevenLabs hybrid as pre-player-release blocker** (promoted 2026-05-03 after walking back the M18 Phase 2 SSML investment — ElevenLabs v3's actual May 2026 docs don't support SSML break tags, so the producer-side SSML markup was wrong for the M6 target; see Shipped log entry for #152). M6 sub-task 2 (audio cache layer) shipped under Kokoro 2026-05-06 [#174] — engine-agnostic via fetch-injection, rides along into the ElevenLabs swap. See [IMPL.md](./IMPL.md) for the active work, the open invariants, and the priority-ordered "Up next" list. Pre-release perfection stance unchanged: May 2026 best practice no matter the cost, **web-search the SPECIFIC target's primary docs at the planning step** (not just at implementation), architectural fix over expedient patch. Sister-repo audit weekly cron runs Mondays 12:00 UTC.
 
 ---
 
@@ -760,6 +760,26 @@ file-of-origin.
 One-line per item, newest first. Detail moves to git history when work
 lands — these docs are plans + scratchpad, not a historical archive.
 
+- 2026-05-06 — **TTS audio cache layer (M6 sub-task 2)** [#174].
+  `kourai_common.tts_cache` content-addressable disk cache wraps the
+  engine bytes-returning synth call. Cache key is `sha256` of
+  length-prefixed `(text, voice_id, model_id, sorted-keys-json(voice_settings))`
+  — length-prefixing chosen over a NUL separator after a regression
+  test demanded collision resistance against the unverifiable "no NUL
+  in inputs" invariant. Layout: `${XDG_CACHE_HOME:-~/.cache}/kourai/tts/{key[:2]}/{key}.{ext}`;
+  oldest-mtime-first eviction at 500 MB cap on miss-write via
+  `asyncio.to_thread`. Opt-in via `RealtimeTTSEngine(cache_dir=...)`
+  (default `None` keeps existing CLI / GUI / test paths uncached);
+  enabled at vn_bridge construction where static dialogue dicts
+  (`HANDOFF_LINES`, `VICTORY_LINES`, `AGENT_QUOTES`, greetings) yield
+  near-100% hit rate once warm. Engine-agnostic via fetch-injection,
+  so the same module rides along into the ElevenLabs SDK swap at M6
+  sub-task 3 without engine coupling. 44 new unit tests; 3075/3075
+  pass. `research(2026-05)`: rolled custom rather than diskcache —
+  spec wants greppable hex filenames + 2-char shard prefix; diskcache
+  is rowid-keyed values inside SQLite, ~3 MB dep we don't need.
+  ElevenLabs has no server-side cache by request hash (verified via
+  cookbook + API reference 2026-05); client-side cache is canonical.
 - 2026-05-06 — **Prune dead host-side anticipatory infrastructure**.
   Deletes the staged-but-unwired stratum of GUI features (Scratchpad,
   PipelineStatusIndicator, StatusBubbles, AgentPersonality

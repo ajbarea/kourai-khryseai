@@ -6,20 +6,23 @@ to a one-liner under "Shipped" and this file resets to the next milestone.
 Git history is the archive — these docs are plans + scratchpad, not a
 historical record.
 
-Updated: 2026-05-06 · Active focus: **M6 sub-task 2 — TTS audio
-cache layer (`kourai_common.tts_cache`)** (in progress on
-`feat/m6-tts-audio-cache`). Shipping the cache module under Kokoro
-first to validate the shape, per the M6 spec; the per-engine markup
-adapter (sub-task 1) and the ElevenLabs SDK swap (sub-task 3) ride
-along on this foundation when their ship-readiness gates clear.
-Pre-player-release blocker still M6 overall. SSML markup investment
-reverted [#152]; defensive strip helpers stay. Cross-host DRY sweep
-merged in [#170] — 10 extractions to `kourai_common/`, fixed a 13×
-GUI music-volume divergence bug. Dead host-side anticipatory infra
-pruned in [#173] — 9 source / 6 test files / ~2.6k LOC; 7 cross-host
-rebuild items filed in ROADMAP backlog. main is clean; issue #126
-(upstream-blocked `@xmldom/xmldom@0.8.12` HIGH bundled inside npm
-11.13.0) is auto-managed by
+Updated: 2026-05-06 · Active focus: **M6 sub-task 2 shipped [#174]
+under Kokoro** — `kourai_common.tts_cache` content-addressable disk
+cache validated against the spec'd shape (sha256-of-length-prefixed
+inputs, sharded `{key[:2]}/{key}.{ext}` layout, 500 MB cap with
+oldest-mtime-first eviction); enabled at vn_bridge construction
+where the static dialogue dicts give near-100% hit rate once warm.
+Sub-task ordering rolls forward: per-engine markup adapter (sub-task
+1) bundles with the production swap (sub-task 4); ElevenLabs SDK
+integration (sub-task 3) still gated on M20 + VN smoke landing
+first. Pre-player-release blocker still M6 overall. SSML markup
+investment reverted [#152]; defensive strip helpers stay. Cross-host
+DRY sweep merged in [#170] — 10 extractions to `kourai_common/`,
+fixed a 13× GUI music-volume divergence bug. Dead host-side
+anticipatory infra pruned in [#173] — 9 source / 6 test files /
+~2.6k LOC; 7 cross-host rebuild items filed in ROADMAP backlog.
+main is clean; issue #126 (upstream-blocked `@xmldom/xmldom@0.8.12`
+HIGH bundled inside npm 11.13.0) is auto-managed by
 `.github/workflows/issue-126-rescan.yml` — Saturdays 14:17 UTC from
 2026-05-16, auto-closes once upstream lands `>=0.8.13`.
 
@@ -179,20 +182,25 @@ reference audio post-adapter-ship.
 
 1. **Per-engine markup adapter** — `kourai_common.tts_markup.apply_engine_markup`.
    Ships when caller exists (i.e., bundled with sub-task 4 below).
-2. **Audio cache layer — IN PROGRESS** (`feat/m6-tts-audio-cache`,
-   2026-05-06) — `kourai_common.tts_cache.cached_synthesize`. Wraps
-   the engine call regardless of engine. ~1 disk-stat per call when
-   warm; tiny cost. Shipping under Kokoro first to validate the cache
-   shape, then ride along into the ElevenLabs swap. Cache key:
-   `sha256(text + voice_id + model_id + sorted-keys-json(voice_settings))`;
-   layout: `${XDG_CACHE_HOME:-~/.cache}/kourai/tts/{key[:2]}/{key}.{ext}`;
-   eviction: oldest-mtime-first when total > 500 MB cap; opt-in via
+2. **Audio cache layer — SHIPPED under Kokoro [#174]** —
+   `kourai_common.tts_cache.cached_synthesize`. Engine-agnostic via
+   fetch-injection; same module wraps Kokoro now and ElevenLabs at
+   sub-task 3 swap. Cache key:
+   `sha256(length-prefixed(text, voice_id, model_id, sorted-keys-json(voice_settings)))`
+   — length-prefixing for collision resistance even if a separator
+   byte appears in any input (NUL-separator turned out to be an
+   unverifiable invariant once a regression test demanded it).
+   Layout: `${XDG_CACHE_HOME:-~/.cache}/kourai/tts/{key[:2]}/{key}.{ext}`;
+   eviction: oldest-mtime-first when total > 500 MB cap, on
+   miss-write via `asyncio.to_thread`; opt-in via
    `RealtimeTTSEngine(cache_dir=...)` (default `None` = uncached so
-   existing tests stay green); enabled at vn_bridge construction.
-   Spec deviates from the IMPL sketch in one respect: the public API
-   takes a `fetch` callable (engine-agnostic) instead of being engine-
-   coupled, so the same module wraps Kokoro and ElevenLabs without
-   re-declaring the engine surface inside the cache module.
+   existing tests stay green); enabled at vn_bridge construction
+   where static dialogue dicts repeat constantly across players. CLI
+   / GUI integration deferred — current `speak()` streams synth into
+   PyAudio playback rather than returning bytes; routing through
+   cache there is non-trivial and the high-volume target is the VN
+   surface anyway. Re-enter when ElevenLabs swap forces `speak()` to
+   refactor against bytes.
 3. **ElevenLabs SDK integration** — `pyproject.toml` adds `elevenlabs`
    dep; new `ElevenLabsEngine` class implementing the same
    `RealtimeTTSEngine` public surface (`speak`, `speak_sync`,
