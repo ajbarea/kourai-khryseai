@@ -10,7 +10,9 @@ Updated: 2026-05-05 · Active focus: **M6 ElevenLabs hybrid as
 pre-player-release blocker** (spec'd 2026-05-05 against ElevenLabs
 May 2026 docs — see M6 section below; implementation queued behind
 M20 + VN smoke). SSML markup investment reverted [#152]; defensive
-strip helpers stay. main is clean; issue #126 (upstream-blocked
+strip helpers stay. **Cross-host DRY sweep complete on branch
+`chore/cross-host-dry-sweep`** (5 commits, all 10 items shipped,
+3103 unit pass) — PR pending. main is clean; issue #126 (upstream-blocked
 `@xmldom/xmldom@0.8.12` HIGH bundled inside npm 11.13.0) is
 auto-managed by `.github/workflows/issue-126-rescan.yml` —
 Saturdays 14:17 UTC from 2026-05-16, auto-closes once upstream
@@ -339,7 +341,7 @@ Foundations first because most items need the new `paths.py`:
    unit pass.
 
 5. **Items #4 / #5 / #6 / #7 — pure-logic GUI extractions** ✅ shipped
-   in one rollup commit (TBD-after-commit). Four mechanical moves of
+   in one rollup commit (a5d1d78). Four mechanical moves of
    pure-logic modules from `hosts/gui/` to `shared/src/kourai_common/`,
    each leaving the GUI module as a thin re-export shim so existing
    GUI imports + tests keep working unchanged:
