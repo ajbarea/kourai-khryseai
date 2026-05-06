@@ -305,6 +305,22 @@ opts into emitting these kinds.
 - **Specialist parity for fact recall.** Today only metis reads
   `build_fact_context` with project scope; techne / kallos / dokimasia /
   hephaestus inherit the gap. Defer until a non-metis PAUSE caller surfaces.
+- **Cache-tighten `get_enriched_system_prompt` follow-on (post-#177).**
+  The PR #177 fix split system content into two cache blocks (static +
+  semantic_summary), but the "static" block contains
+  `get_enriched_system_prompt`'s output, which itself concatenates the
+  truly-static `SYSTEM_PROMPT` with dynamic player context (identity +
+  memories + alignment + romance + personality adaptation + memory
+  moments + virtues). Every player-state shift currently invalidates
+  what should be the always-cacheable block. Fix: return a structured
+  list of (truly-static, dynamic-player-context) blocks; let callers
+  pass that list directly as system content; `_build_contextual_messages`
+  appends the semantic_summary block on top. 12+ call sites in
+  `agents/{puck,hephaestus,dokimasia,kallos,aletheia,aidos,techne,mneme,metis}/agent.py`
+  to update. Stays within Anthropic's 4-breakpoint-per-request limit
+  (BP1 SYSTEM_PROMPT, BP2 player context, BP3 summary, BP4 first user
+  in agentic loop). File as one focused PR when next session has room
+  for it; partial migration would be anticipatory infra.
 - **Sisters audit weekly cron** (`trig_013uP9ryCLYscBKS7X6PB5og`,
   Mondays 12:00 UTC) opens drift PRs and a rollup issue automatically.
 - **Issue #126 auto-rescan** (`.github/workflows/issue-126-rescan.yml`)
