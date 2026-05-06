@@ -670,6 +670,27 @@ architectural moves; valuable but not the first lift.
 One-line per item, newest first. Detail moves to git history when work
 lands — these docs are plans + scratchpad, not a historical archive.
 
+- 2026-05-06 — **Centralize VN companion-spirits palette to
+  `script_data.rpy` constants** [#172]. Resolves the "VN companion-spirits
+  brightening" follow-up filed alongside #171. Walked back the originally
+  scoped `_bright_hex(AGENT_COLORS[name])` substitution after computing
+  the actual brightening output: `_bright_hex(#009E73)` is `#65FFD5`
+  (vibrant neon mint, RGB-distance 102 from VN's `#7FBC8C`) and
+  `_bright_hex(#D55E00)` is `#FFA965` (peach-orange, distance 71 from
+  VN's `#E8728C`). The VN literals aren't drift from canonical — they're
+  a separate desaturated companion-spirits palette ("panel tint when the
+  panel is for puck/cupid", semantically distinct from "puck/cupid's
+  representing color"). Centralizes within VN scope without forcing
+  derivation: 5 named constants in `script_data.rpy`'s `init python:`
+  block (`VN_PUCK_ACCENT`, `VN_CUPID_ACCENT`, plus the three
+  alpha-suffixed Cupid variants for body fill / emphasized fill / hover
+  states), 15 literal sites across `screens_relationships.rpy` and
+  `screens_companion_spirits.rpy` swapped to constant references.
+  Regression guard at `tests/unit/test_vn_companion_accent.py` (7 cases)
+  asserts the hex literals don't reappear in any VN `.rpy` outside
+  `script_data.rpy` and locks the constant→value bindings. Latent visual
+  risk: zero — every rendered site reads the same hex as before, routed
+  through a name. 3136/3136 unit pass.
 - 2026-05-06 — **Re-canonicalize `hex_color` + `rgb` on
   `AGENT_METADATA`** [#171]. Follow-up from the cross-host DRY sweep
   IMPL "Notes / open invariants". PR #12 (April 24) added VN
