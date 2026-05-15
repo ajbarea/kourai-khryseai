@@ -453,10 +453,8 @@ def _banner() -> str:
 # Terminal markdown rendering — lightweight, no dependencies
 # ---------------------------------------------------------------------------
 def _render_markdown(text: str) -> str:
-    """Render basic markdown to ANSI-colored terminal output.
-
-    Handles: **bold**, *italic*, `code`, ```code blocks```, --- separators,
-    and # headings.  Designed for commit messages and agent output.
+    """Render basic markdown to ANSI-colored terminal output: **bold**,
+    *italic*, `code`, ```code blocks```, --- separators, and # headings.
     """
     lines = text.split("\n")
     rendered: list[str] = []

@@ -1,24 +1,11 @@
-"""Flash effect manager for agent handoff visual indicator.
-
-Manages flash effect on portrait panel during agent handoff. Provides
-configurable duration (200-500ms) with alpha fade animation from 150 to 0.
-"""
+"""Flash effect for agent-handoff visual indicator (200-500ms alpha fade)."""
 
 from __future__ import annotations
 
 
 class FlashEffect:
-    """Manages agent handoff flash effect on portrait panel.
-
-    Displays a flash effect with alpha fade animation when agents hand off.
-    Supports configurable duration between 200ms and 500ms. Uses delta time
-    for consistent animation speed regardless of frame rate.
-
-    Attributes:
-        min_duration_ms: Minimum duration in milliseconds (default 200).
-        max_duration_ms: Maximum duration in milliseconds (default 500).
-        current_duration_ms: Current duration setting in milliseconds.
-        active: Whether the flash effect is currently active.
+    """Alpha-fade flash (configurable 200-500ms) driven by delta time so animation
+    speed is frame-rate independent.
     """
 
     def __init__(
@@ -41,15 +28,7 @@ class FlashEffect:
         self._end_alpha = 0
 
     def trigger(self, duration_ms: int | None = None) -> None:
-        """Trigger flash effect.
-
-        Begins the flash effect with the specified duration or the current
-        duration setting. The effect will fade alpha from 150 to 0 over the
-        specified duration.
-
-        Args:
-            duration_ms: Duration in milliseconds. If None, uses current_duration_ms.
-        """
+        """Start the alpha-fade (150 -> 0) over `duration_ms` or the current setting."""
         self._timer = 0.0
         self.active = True
 
@@ -60,20 +39,7 @@ class FlashEffect:
             )
 
     def update(self, dt: float) -> tuple[bool, int]:
-        """Update effect and return (active, alpha).
-
-        Advances the flash effect by the given delta time and returns the
-        current active state and alpha value. Uses delta time for consistent
-        animation speed regardless of frame rate.
-
-        Args:
-            dt: Delta time in seconds since last update.
-
-        Returns:
-            Tuple of (active, alpha) where:
-            - active: Whether the effect is still active
-            - alpha: Current alpha value (0-255)
-        """
+        """Advance by `dt` seconds and return (active, alpha 0-255)."""
         if not self.active:
             return (False, 0)
 
@@ -95,17 +61,9 @@ class FlashEffect:
         return (self.active, alpha)
 
     def is_complete(self) -> bool:
-        """Check if effect has finished.
-
-        Returns:
-            True if the effect has finished, False otherwise.
-        """
         return not self.active
 
     def reset(self) -> None:
-        """Reset the flash effect.
-
-        Stops the effect and resets all state to initial values.
-        """
+        """Stop the effect and clear all state."""
         self.active = False
         self._timer = 0.0

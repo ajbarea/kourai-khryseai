@@ -1,7 +1,4 @@
-"""TTS settings persistence and configuration.
-
-Handles saving/loading TTS preferences to JSON config.
-"""
+"""TTS settings persistence — save/load TTS preferences to JSON."""
 
 from __future__ import annotations
 

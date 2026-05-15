@@ -1,8 +1,4 @@
-"""Integration of FlashEffect with PortraitPanel for agent handoff visual indicator.
-
-Manages flash effect on portrait panel during agent handoff. Triggers flash
-when agent switches and applies alpha blending to portrait during flash.
-"""
+"""Integration of FlashEffect with PortraitPanel for agent handoff visual indicator."""
 
 from __future__ import annotations
 
@@ -10,16 +6,7 @@ from .flash_effect import FlashEffect
 
 
 class PortraitFlashIntegration:
-    """Integrates flash effect with portrait panel during agent handoff.
-
-    Triggers flash effect when agent handoff is detected and applies alpha
-    blending to the portrait during the flash. Coordinates with PortraitPanel
-    to provide visual feedback for agent switches.
-
-    Attributes:
-        flash_effect: The FlashEffect instance managing the flash animation.
-        enabled: Whether the flash effect is enabled.
-    """
+    """Flash effect on portrait handoff with alpha blending."""
 
     def __init__(self, enabled: bool = True) -> None:
         """Initialize PortraitFlashIntegration.
@@ -32,15 +19,7 @@ class PortraitFlashIntegration:
         self._last_agent: str | None = None
 
     def on_agent_switch(self, new_agent: str, duration_ms: int | None = None) -> None:
-        """Handle agent handoff by triggering flash effect.
-
-        Called when the portrait panel switches to a new agent. Triggers the
-        flash effect with the specified duration or default.
-
-        Args:
-            new_agent: The name of the new agent.
-            duration_ms: Optional duration in milliseconds for the flash effect.
-        """
+        """Trigger the flash effect on agent switch."""
         if not self.enabled:
             return
 

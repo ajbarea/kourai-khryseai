@@ -1,7 +1,4 @@
-"""Integration of TTS and dialogue pacing into the GUI.
-
-Handles voice playback, pacing, and agent personality in the main dialogue loop.
-"""
+"""TTS and dialogue pacing integration for the GUI."""
 
 from __future__ import annotations
 

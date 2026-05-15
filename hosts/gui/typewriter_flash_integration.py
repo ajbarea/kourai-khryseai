@@ -1,8 +1,4 @@
-"""Integration of FlashEffect with TypewriterManager for coordinated animations.
-
-Manages pause/resume of typewriter effect during flash effect. Pauses typewriter
-when flash starts and resumes when flash completes.
-"""
+"""Integration of FlashEffect with TypewriterManager for coordinated animations."""
 
 from __future__ import annotations
 
@@ -14,17 +10,7 @@ if TYPE_CHECKING:
 
 
 class TypewriterFlashIntegration:
-    """Coordinates typewriter and flash effects during agent handoff.
-
-    Pauses the typewriter effect when a flash effect starts and resumes it
-    when the flash completes. This prevents text animation from competing
-    with the flash effect for visual attention.
-
-    Attributes:
-        typewriter: The TypewriterManager instance.
-        flash_effect: The FlashEffect instance.
-        enabled: Whether the integration is enabled.
-    """
+    """Pause typewriter during flash so text animation doesn't compete with the flash."""
 
     def __init__(
         self,
@@ -45,11 +31,7 @@ class TypewriterFlashIntegration:
         self._was_paused_before_flash = False
 
     def on_flash_start(self) -> None:
-        """Handle flash effect start by pausing typewriter.
-
-        Called when a flash effect starts. Pauses the typewriter if it's
-        currently active, saving the previous pause state.
-        """
+        """Pause the typewriter, remembering the prior pause state so resume is conditional."""
         if not self.enabled:
             return
 
@@ -61,11 +43,7 @@ class TypewriterFlashIntegration:
             self.typewriter.pause()
 
     def on_flash_complete(self) -> None:
-        """Handle flash effect completion by resuming typewriter.
-
-        Called when a flash effect completes. Resumes the typewriter if it
-        was paused by the flash (not if it was already paused).
-        """
+        """Resume the typewriter only if the flash paused it (not if it was already paused)."""
         if not self.enabled:
             return
 
@@ -74,14 +52,7 @@ class TypewriterFlashIntegration:
             self.typewriter.resume()
 
     def update(self, dt: float) -> None:
-        """Update integration state and manage pause/resume.
-
-        Updates the flash effect and manages typewriter pause/resume based
-        on the flash state.
-
-        Args:
-            dt: Delta time in seconds since last update.
-        """
+        """Advance flash state by `dt` seconds and resume typewriter on flash completion."""
         if not self.enabled:
             return
 

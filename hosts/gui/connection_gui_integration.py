@@ -1,7 +1,4 @@
-"""Integration of ConnectionManager with the GUI.
-
-Provides connection status display in the title bar and reconnect button functionality.
-"""
+"""Connection status display + reconnect button for the GUI title bar."""
 
 from __future__ import annotations
 

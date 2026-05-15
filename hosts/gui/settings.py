@@ -1,8 +1,4 @@
-"""Settings persistence manager for Kourai Khryseai GUI.
-
-Handles loading and saving user preferences to a JSON configuration file.
-Supports all settings defined in the Settings data model with sensible defaults.
-"""
+"""GUI settings persistence — load/save user preferences to a JSON config file."""
 
 from __future__ import annotations
 
@@ -38,12 +34,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
 
 
 class SettingsManager:
-    """Manages settings persistence using JSON configuration file.
-
-    Loads settings from a JSON config file on initialization, provides get/set
-    methods for all settings, and persists changes to file. Handles file I/O
-    errors gracefully and uses sensible defaults when settings file doesn't exist.
-    """
+    """User settings persisted to JSON, with `DEFAULT_SETTINGS` as the fallback baseline."""
 
     def __init__(self, config_path: Path | str) -> None:
         """Initialize SettingsManager with config file path.

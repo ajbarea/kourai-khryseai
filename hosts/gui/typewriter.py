@@ -1,29 +1,11 @@
-"""Typewriter effect manager for character-by-character text display.
-
-Manages character-by-character text display with delta time for consistent
-animation speed regardless of frame rate. Supports skip functionality,
-speed settings (10ms to 100ms), pause/resume, and motion sensitivity.
-"""
+"""Character-by-character typewriter effect (skip, pause/resume, motion-sensitivity)."""
 
 from __future__ import annotations
 
 
 class TypewriterManager:
-    """Manages character-by-character text display with delta time.
-
-    Displays text one character at a time using delta time for consistent
-    animation speed regardless of frame rate. Supports skip, pause/resume,
-    and motion sensitivity settings.
-
-    Attributes:
-        min_speed_ms: Minimum speed in milliseconds per character (default 10).
-        max_speed_ms: Maximum speed in milliseconds per character (default 100).
-        current_speed_ms: Current speed setting in milliseconds per character.
-        active: Whether the typewriter effect is currently active.
-        paused: Whether the typewriter effect is currently paused.
-        current_text: The full text being displayed.
-        displayed_chars: Number of characters currently displayed.
-        motion_sensitivity_enabled: Whether motion sensitivity is enabled.
+    """Character-by-character text reveal driven by delta time, with skip,
+    pause/resume, and motion-sensitivity bypass.
     """
 
     def __init__(
@@ -66,15 +48,7 @@ class TypewriterManager:
         self._pending_audio = False
 
     def start(self, text: str, speed_ms: int | None = None) -> None:
-        """Start typewriter effect for text.
-
-        Begins displaying the given text character-by-character using the
-        specified speed or the current speed setting.
-
-        Args:
-            text: The text to display.
-            speed_ms: Speed in milliseconds per character. If None, uses current_speed_ms.
-        """
+        """Begin revealing `text` at `speed_ms` per char (or the current setting)."""
         self.current_text = text
         self.displayed_chars = 0
         self._timer = 0.0
