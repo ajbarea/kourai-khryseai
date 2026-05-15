@@ -20,16 +20,13 @@ import asyncio
 import logging
 import sys
 from typing import TYPE_CHECKING, Any
-from unittest.mock import patch
 
 if TYPE_CHECKING:
     from aiohttp.connector import TCPConnector
 
 # Setup logging
 log_handler = logging.FileHandler("/tmp/m14_diagnosis.log", "w")
-log_handler.setFormatter(
-    logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
-)
+log_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -59,7 +56,7 @@ async def _patched_acquire(self: TCPConnector) -> Any:
         result = await _original_acquire(self)
         log.debug("✓ Connection acquired from pool")
         return result
-    except asyncio.TimeoutError as e:
+    except asyncio.TimeoutError:
         log.error(
             f"✗ Pool acquire timeout! pool_size={pool_size}, waiters={waiters}. "
             f"This is the M14 bottleneck."
@@ -115,9 +112,7 @@ async def diagnose():
         from agents.metis.agent import discuss_tradeoffs
         from agents.hephaestus.agent import determine_pipeline
 
-        log.info(
-            "Spawning Metis discuss_tradeoffs as parallel task (simulating M14 dispatch)..."
-        )
+        log.info("Spawning Metis discuss_tradeoffs as parallel task (simulating M14 dispatch)...")
         metis_task = asyncio.create_task(
             discuss_tradeoffs("implement a feature"),
             name="metis-discuss-tradeoffs",
@@ -147,16 +142,12 @@ async def diagnose():
                 await task
                 log.info(f"✓ {task.get_name()} completed")
             except asyncio.TimeoutError:
-                log.error(
-                    f"✗ {task.get_name()} timed out (pool exhaustion — THIS IS THE BUG)"
-                )
+                log.error(f"✗ {task.get_name()} timed out (pool exhaustion — THIS IS THE BUG)")
             except Exception as e:
                 log.warning(f"✗ {task.get_name()} failed: {type(e).__name__}")
 
         for task in pending:
-            log.error(
-                f"✗ {task.get_name()} still pending (parallel dispatch exceeded timeout)"
-            )
+            log.error(f"✗ {task.get_name()} still pending (parallel dispatch exceeded timeout)")
             task.cancel()
 
     except Exception as e:
@@ -164,7 +155,7 @@ async def diagnose():
 
     log.info("\n" + "=" * 80)
     log.info("Diagnostic complete.")
-    log.info(f"Full log saved to: /tmp/m14_diagnosis.log")
+    log.info("Full log saved to: /tmp/m14_diagnosis.log")
     log.info("=" * 80)
 
 

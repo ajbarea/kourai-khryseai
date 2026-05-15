@@ -18,11 +18,7 @@ from typing import TYPE_CHECKING
 logging_config = {
     "version": 1,
     "disable_existing_loggers": False,
-    "formatters": {
-        "detailed": {
-            "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        }
-    },
+    "formatters": {"detailed": {"format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"}},
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
@@ -61,7 +57,6 @@ if TYPE_CHECKING:
     pass
 
 # Now import the agent module
-from agents.hephaestus.agent_executor import HephaestusAgentExecutor
 
 log = logging.getLogger(__name__)
 
@@ -81,8 +76,6 @@ async def test_m14_parallel_dispatch_timeout():
     os.environ.setdefault("KOURAI_LOG_LEVEL", "DEBUG")
 
     # Import after env setup
-    from agents.hephaestus.agent_executor import HephaestusAgentExecutor
-    from kourai_common.llm import chat
     from agents.metis.agent import discuss_tradeoffs
 
     log.info("\nPhase 1: Testing single Hephaestus routing call (baseline)")
@@ -128,7 +121,7 @@ async def test_m14_parallel_dispatch_timeout():
 
         for task in done:
             try:
-                result = await task
+                _ = await task
                 log.info(f"✓ {task.get_name()} succeeded")
             except Exception as e:
                 log.error(f"✗ {task.get_name()} failed: {type(e).__name__}: {e}")

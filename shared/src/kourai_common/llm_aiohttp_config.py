@@ -40,7 +40,7 @@ def create_aiohttp_session() -> aiohttp.ClientSession:
         limit=300,  # Total concurrent connections (per LiteLLM docs)
         limit_per_host=75,  # Per-host limit (default 10 was too restrictive for M14)
         ttl_dns_cache=300,
-        ssl=None,  # Use default SSL context
+        ssl=True,  # Use default SSL context
     )
 
     # No request_timeout here; will be set per-call in _execute_completion()

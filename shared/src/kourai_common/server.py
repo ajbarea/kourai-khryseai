@@ -53,6 +53,7 @@ def build_a2a_app(
         yield
         # Shutdown: close aiohttp session to prevent resource leaks
         from kourai_common.llm_aiohttp_config import close_aiohttp_session
+
         await close_aiohttp_session()
 
     app = Starlette(routes=routes, lifespan=lifespan)

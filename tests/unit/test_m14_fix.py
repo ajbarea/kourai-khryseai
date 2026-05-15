@@ -8,7 +8,6 @@ Verifies that:
 
 from __future__ import annotations
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -23,6 +22,7 @@ class TestAIOHTTPSessionConfig:
         from kourai_common.llm_aiohttp_config import create_aiohttp_session
 
         session = create_aiohttp_session()
+        assert session.connector is not None
         assert session.connector._limit_per_host == 75, "Should use limit_per_host=75"
         assert session.connector._limit == 300, "Should use limit=300"
         await session.close()
@@ -72,7 +72,9 @@ class TestExecutionCompletionM14Fix:
         from kourai_common.llm import _execute_completion
 
         with patch("kourai_common.llm.litellm.acompletion", new_callable=AsyncMock) as mock_llm:
-            mock_llm.return_value = MagicMock(choices=[MagicMock(message=MagicMock(content="test"))])
+            mock_llm.return_value = MagicMock(
+                choices=[MagicMock(message=MagicMock(content="test"))]
+            )
 
             with patch("kourai_common.llm.get_aiohttp_session") as mock_get_session:
                 mock_session = MagicMock()
@@ -98,7 +100,7 @@ class TestExecutionCompletionM14Fix:
         with patch("kourai_common.llm.litellm.acompletion", new_callable=AsyncMock) as mock_llm:
             mock_llm.return_value = MagicMock()
 
-            with patch("kourai_common.llm.get_aiohttp_session") as mock_get_session:
+            with patch("kourai_common.llm.get_aiohttp_session"):
                 await _execute_completion(
                     timeout_seconds=10.0,
                     model="test-model",
@@ -117,7 +119,9 @@ class TestExecutionCompletionM14Fix:
         from kourai_common.llm import _execute_completion
 
         with patch("kourai_common.llm.litellm.acompletion", new_callable=AsyncMock) as mock_llm:
-            mock_llm.return_value = MagicMock(choices=[MagicMock(message=MagicMock(content="test"))])
+            mock_llm.return_value = MagicMock(
+                choices=[MagicMock(message=MagicMock(content="test"))]
+            )
 
             with patch("kourai_common.llm.get_aiohttp_session"):
                 await _execute_completion(
