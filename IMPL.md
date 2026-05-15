@@ -28,10 +28,6 @@ Working through these in order — small, self-contained, don't need AJ at the k
   `api.anthropic.com` cleanly via `urllib`; hang is at the LiteLLM +
   aiohttp transport layer. Retry logic IS firing — system is resilient,
   just slow. File a GitHub issue with reproduction + log capture.
-- **`docs/configuration.md` accuracy + spirits tier-table decision.**
-  README simplified tier table omits aidos/aletheia/cupid/puck rows;
-  docs page should either fully list them or explicitly link to
-  `shared/src/kourai_common/config.py` as canonical.
 - **Host-area docstring deslop pass** that #184 deferred —
   Manages/Handles/Provides narrative WHAT-comments in `hosts/cli/` and
   `hosts/gui/`.
