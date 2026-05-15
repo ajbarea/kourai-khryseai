@@ -8,18 +8,17 @@ cross-cutting invariants, and "next up" ordering live in
 If this file is more than ~50 lines, something queued or referential has
 crept in — extract it back to ROADMAP.
 
-Updated: 2026-05-06
+Updated: 2026-05-14
 
 ## In flight
 
-Nothing actively building. NE Agents Day prep shipped through #184; the
-QR-code reviewer experience is verified end-to-end. Friday's poster
-session is a passive watch.
+Nothing actively building. NE Agents Day 2026 poster session shipped 2026-05-10
+(NYC, Jane Street). QR-code reviewer experience verified end-to-end;
+demo fielded live. Back to full-speed development as of 2026-05-14.
 
 ## Next pickups
 
-After Friday, working through these in order — small, self-contained,
-don't need AJ at the keyboard:
+Working through these in order — small, self-contained, don't need AJ at the keyboard:
 
 - **Hephaestus aiohttp `TimeoutError` on M14 parallel routing.** Smoke
   on 2026-05-06 sent `"hi dokimasia, are you there?"` to hephaestus;

@@ -5,12 +5,10 @@ A public, living plan for where the forge is heading. Items here are either
 *currently working on* lives in [IMPL.md](./IMPL.md) — when it lands, the
 matching milestone here collapses to a single line under "Shipped".
 
-Last reviewed: 2026-05-06. Active focus through Friday: **NE AI Agents
-Day 2026 poster prep** — QR-code-driven repo browsing is the realistic
-review surface, so the next 48 hours go to clean README / getting-
-started / cli.md, slop-free comments and docstrings, and a fresh-
-clone path that actually works. Post-Friday returns to **M6 ElevenLabs
-hybrid** (sub-task 2 audio cache layer shipped [#174]; sub-tasks
+Last reviewed: 2026-05-14. **NE AI Agents Day 2026 poster session shipped
+2026-05-10** (NYC, Jane Street; QR-code demo live). Polish phase complete.
+Now resuming full-speed development with **M6 ElevenLabs hybrid** as the
+next priority (sub-task 2 audio cache layer shipped [#174]; sub-tasks
 1/3/4/5 still gate on M20 + VN smoke). See [IMPL.md](./IMPL.md) for
 the live blocker list, open invariants, and priority-ordered "Up next".
 Pre-release perfection stance unchanged: current best practice no
@@ -80,6 +78,110 @@ suppresses one symptom. The real fix is one of:
 3. Cleanup pass via `docker exec -u 1000` to chmod-then-rm during teardown.
 
 Option 1 is cleanest if it doesn't break agent-internal deps that assume UID 1000.
+
+---
+## M6 — ElevenLabs hybrid (pre-player-release blocker)
+
+> Status: spec'd 2026-05-05 · Implementation queued · Gated on M20
+> audio-led reveal + VN smoke landing first
+
+Promoted from "future-future" 2026-05-03 after strategic review of the
+character-voice-quality gap between Kokoro (current) and ElevenLabs.
+Character voice IS the product (per-maiden personality is the core
+mechanic); Kokoro plays 10 voicepacks but cannot deliver per-character
+emotional control. ElevenLabs can.
+
+Spec landed 2026-05-05; verified against ElevenLabs's May 2026 docs.
+[VOICE_CASTING_PLAN.md](../tools/voice-lab/VOICE_CASTING_PLAN.md) has
+voice IDs + per-maiden settings cast. The `tools/voice-lab/` Next.js
+app is the casting/preview surface that landed pre-2026-05; production
+wiring (M6) is the swap from Kokoro into the same `RealtimeTTSEngine`
+public surface.
+
+### Engine + model strategy
+
+| Model | Use | Latency | Price | Markup support |
+|---|---|---|---|---|
+| `eleven_flash_v2_5` | routine dialogue, handoffs | ~75ms | $0.06 / 1k chars | `<break>` works but ElevenLabs warns against overuse — use natural punctuation |
+| `eleven_v3` | victory lines, key handoffs, onboarding | ~1-2s | $0.12 / 1k chars | `[bracket]` audio tags for emotional control; **no** SSML break tags |
+
+### Required add-ons before player release
+
+#### 1. Per-engine markup adapter
+
+Producers emit plain text with optional inline `[bracket]` audio
+direction hints. The adapter at the engine boundary translates per
+target engine:
+
+| Engine | Behavior |
+|---|---|
+| `eleven_v3` | Keep `[bracket]` tags. Tag effect decays after ~4-5 words; producers should write short tagged segments. Layered tags supported (`[nervously][whispers]`). |
+| `eleven_flash_v2_5` / `eleven_multilingual_v2` | Strip brackets — v3 audio tags don't apply. Emotional tone comes from `voice_settings.style` + low `stability` + per-maiden voice training. Skip `<break>` per ElevenLabs's instability warning. |
+| `kokoro` (current) | Strip brackets. No SSML, no audio tags; punctuation carries everything. |
+
+Tag vocabulary (lift from ElevenLabs's documented set, scoped to
+maidens — skip the cinematic ones that don't fit pipeline dialogue):
+
+- Voice cues: `[whispers]`, `[sighs]`, `[exhales]`, `[laughs]`,
+  `[sarcastic]`, `[curious]`, `[excited]`, `[crying]`
+- Layered (per ElevenLabs docs): `[nervously][whispers]`,
+  `[softly][sighs]`, etc.
+- Skip: `[applause]`, `[clapping]`, `[gasps]`, `[sings]`, accent
+  tags — too rare or character-mismatched.
+
+The existing `kourai_common.ssml.strip_ssml` defensive layer stays in
+place. Order at the engine boundary: strip SSML (defensive) → apply
+engine markup adapter → synthesize.
+
+`research(2026-05)`: ElevenLabs `prompting/eleven-v3` audio-tag list,
+help-center "How do audio tags work with Eleven v3" 4-5-word decay note,
+help-center "Do pauses and SSML phoneme tags work" model support matrix.
+
+#### 2. Audio caching layer — SHIPPED [#174]
+
+`kourai_common.tts_cache.cached_synthesize`. Engine-agnostic via
+fetch-injection; same module wraps Kokoro now and ElevenLabs at sub-task
+3 swap. Cache key:
+`sha256(length-prefixed(text, voice_id, model_id, sorted-keys-json(voice_settings)))`.
+Layout: `${XDG_CACHE_HOME:-~/.cache}/kourai/tts/{key[:2]}/{key}.{ext}`;
+oldest-mtime-first eviction at 500 MB cap. Opt-in via
+`RealtimeTTSEngine(cache_dir=...)`; enabled at vn_bridge construction
+where static dialogue dicts repeat across players. CLI / GUI integration
+deferred — current `speak()` streams synth into PyAudio playback rather
+than returning bytes; routing through cache is non-trivial. Re-enter
+when ElevenLabs swap forces `speak()` to refactor against bytes.
+
+#### 3. Per-persona prosody design pass
+
+With adapter + cache shipped and ElevenLabs reference audio in hand
+(via `tools/voice-lab` Next.js scratchpad), decide per-maiden defaults:
+
+- Kallos: `[whispers]` for teasing asides, lower stability for expressiveness.
+- Dokimasia: `[sarcastic]` defaults during validation failures.
+- Aidos / Aletheia: highest stability + lowest style for clinical / authoritative validation tone (already in VOICE_CASTING_PLAN.md).
+- Hephaestus: gruff via `style` slider + voice training (no `[gruff]` tag exists).
+
+Deferred under the SSML plan; now design-tractable against real
+reference audio post-adapter-ship.
+
+### Sub-task order + gating
+
+1. **Per-engine markup adapter** — `kourai_common.tts_markup.apply_engine_markup`. Ships when caller exists (i.e., bundled with sub-task 4).
+2. **Audio cache layer — SHIPPED [#174]** (see #2 above).
+3. **ElevenLabs SDK integration** — `pyproject.toml` adds `elevenlabs` dep; new `ElevenLabsEngine` class implementing the same `RealtimeTTSEngine` public surface. Engine selected via `KOURAI_TTS_ENGINE=elevenlabs|kokoro` env (default `kokoro` until cutover). `client.text_to_speech.convert(voice_id, text, model_id, voice_settings=VoiceSettings(...), output_format)` returns bytes.
+4. **Voice-lab → production wiring** — flip default to `elevenlabs`, smoke through CLI / GUI / VN.
+5. **Per-persona prosody pass** — tune voice_settings + audio tag defaults per maiden against reference audio.
+
+**Production swap gated on M20 + VN smoke landing first** — character
+voice quality is most visible against a polished dialogue UX; doing M6
+before audio-led reveal lands would burn ElevenLabs spend chasing UX
+bugs we already know about.
+
+### Cost projections (2026-05 ElevenLabs API pricing)
+
+- Pre-release dev (~200 lines/day × 50 chars): ~$22/month.
+- 100 active players (~200 lines/session × 30 sessions): ~$2,160/month uncached → ~$430-1,080/month after cache layer (50-80% hit rate on static dialogue, near-100% on v3 lines after warm).
+- 1000 active players: ~$21,600/month → ~$4,300-10,800/month with cache.
 
 ---
 
@@ -425,110 +527,6 @@ M20 on M18+M19 is one coordinated UX wave rather than three drips.
 
 ---
 
-## M6 — ElevenLabs hybrid (pre-player-release blocker)
-
-> Status: spec'd 2026-05-05 · Implementation queued · Gated on M20
-> audio-led reveal + VN smoke landing first
-
-Promoted from "future-future" 2026-05-03 after strategic review of the
-character-voice-quality gap between Kokoro (current) and ElevenLabs.
-Character voice IS the product (per-maiden personality is the core
-mechanic); Kokoro plays 10 voicepacks but cannot deliver per-character
-emotional control. ElevenLabs can.
-
-Spec landed 2026-05-05; verified against ElevenLabs's May 2026 docs.
-[VOICE_CASTING_PLAN.md](../tools/voice-lab/VOICE_CASTING_PLAN.md) has
-voice IDs + per-maiden settings cast. The `tools/voice-lab/` Next.js
-app is the casting/preview surface that landed pre-2026-05; production
-wiring (M6) is the swap from Kokoro into the same `RealtimeTTSEngine`
-public surface.
-
-### Engine + model strategy
-
-| Model | Use | Latency | Price | Markup support |
-|---|---|---|---|---|
-| `eleven_flash_v2_5` | routine dialogue, handoffs | ~75ms | $0.06 / 1k chars | `<break>` works but ElevenLabs warns against overuse — use natural punctuation |
-| `eleven_v3` | victory lines, key handoffs, onboarding | ~1-2s | $0.12 / 1k chars | `[bracket]` audio tags for emotional control; **no** SSML break tags |
-
-### Required add-ons before player release
-
-#### 1. Per-engine markup adapter
-
-Producers emit plain text with optional inline `[bracket]` audio
-direction hints. The adapter at the engine boundary translates per
-target engine:
-
-| Engine | Behavior |
-|---|---|
-| `eleven_v3` | Keep `[bracket]` tags. Tag effect decays after ~4-5 words; producers should write short tagged segments. Layered tags supported (`[nervously][whispers]`). |
-| `eleven_flash_v2_5` / `eleven_multilingual_v2` | Strip brackets — v3 audio tags don't apply. Emotional tone comes from `voice_settings.style` + low `stability` + per-maiden voice training. Skip `<break>` per ElevenLabs's instability warning. |
-| `kokoro` (current) | Strip brackets. No SSML, no audio tags; punctuation carries everything. |
-
-Tag vocabulary (lift from ElevenLabs's documented set, scoped to
-maidens — skip the cinematic ones that don't fit pipeline dialogue):
-
-- Voice cues: `[whispers]`, `[sighs]`, `[exhales]`, `[laughs]`,
-  `[sarcastic]`, `[curious]`, `[excited]`, `[crying]`
-- Layered (per ElevenLabs docs): `[nervously][whispers]`,
-  `[softly][sighs]`, etc.
-- Skip: `[applause]`, `[clapping]`, `[gasps]`, `[sings]`, accent
-  tags — too rare or character-mismatched.
-
-The existing `kourai_common.ssml.strip_ssml` defensive layer stays in
-place. Order at the engine boundary: strip SSML (defensive) → apply
-engine markup adapter → synthesize.
-
-`research(2026-05)`: ElevenLabs `prompting/eleven-v3` audio-tag list,
-help-center "How do audio tags work with Eleven v3" 4-5-word decay note,
-help-center "Do pauses and SSML phoneme tags work" model support matrix.
-
-#### 2. Audio caching layer — SHIPPED [#174]
-
-`kourai_common.tts_cache.cached_synthesize`. Engine-agnostic via
-fetch-injection; same module wraps Kokoro now and ElevenLabs at sub-task
-3 swap. Cache key:
-`sha256(length-prefixed(text, voice_id, model_id, sorted-keys-json(voice_settings)))`.
-Layout: `${XDG_CACHE_HOME:-~/.cache}/kourai/tts/{key[:2]}/{key}.{ext}`;
-oldest-mtime-first eviction at 500 MB cap. Opt-in via
-`RealtimeTTSEngine(cache_dir=...)`; enabled at vn_bridge construction
-where static dialogue dicts repeat across players. CLI / GUI integration
-deferred — current `speak()` streams synth into PyAudio playback rather
-than returning bytes; routing through cache is non-trivial. Re-enter
-when ElevenLabs swap forces `speak()` to refactor against bytes.
-
-#### 3. Per-persona prosody design pass
-
-With adapter + cache shipped and ElevenLabs reference audio in hand
-(via `tools/voice-lab` Next.js scratchpad), decide per-maiden defaults:
-
-- Kallos: `[whispers]` for teasing asides, lower stability for expressiveness.
-- Dokimasia: `[sarcastic]` defaults during validation failures.
-- Aidos / Aletheia: highest stability + lowest style for clinical / authoritative validation tone (already in VOICE_CASTING_PLAN.md).
-- Hephaestus: gruff via `style` slider + voice training (no `[gruff]` tag exists).
-
-Deferred under the SSML plan; now design-tractable against real
-reference audio post-adapter-ship.
-
-### Sub-task order + gating
-
-1. **Per-engine markup adapter** — `kourai_common.tts_markup.apply_engine_markup`. Ships when caller exists (i.e., bundled with sub-task 4).
-2. **Audio cache layer — SHIPPED [#174]** (see #2 above).
-3. **ElevenLabs SDK integration** — `pyproject.toml` adds `elevenlabs` dep; new `ElevenLabsEngine` class implementing the same `RealtimeTTSEngine` public surface. Engine selected via `KOURAI_TTS_ENGINE=elevenlabs|kokoro` env (default `kokoro` until cutover). `client.text_to_speech.convert(voice_id, text, model_id, voice_settings=VoiceSettings(...), output_format)` returns bytes.
-4. **Voice-lab → production wiring** — flip default to `elevenlabs`, smoke through CLI / GUI / VN.
-5. **Per-persona prosody pass** — tune voice_settings + audio tag defaults per maiden against reference audio.
-
-**Production swap gated on M20 + VN smoke landing first** — character
-voice quality is most visible against a polished dialogue UX; doing M6
-before audio-led reveal lands would burn ElevenLabs spend chasing UX
-bugs we already know about.
-
-### Cost projections (2026-05 ElevenLabs API pricing)
-
-- Pre-release dev (~200 lines/day × 50 chars): ~$22/month.
-- 100 active players (~200 lines/session × 30 sessions): ~$2,160/month uncached → ~$430-1,080/month after cache layer (50-80% hit rate on static dialogue, near-100% on v3 lines after warm).
-- 1000 active players: ~$21,600/month → ~$4,300-10,800/month with cache.
-
----
 
 ## Next up — priority order
 
