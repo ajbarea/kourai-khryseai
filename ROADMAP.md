@@ -382,12 +382,16 @@ under the same URI without colliding with other extensions.
 ## M20 — Audio-text synchronization across CLI / GUI / VN
 
 > Status: in progress · Sub-task 1 (Kokoro voice + pipeline pre-warm)
-> shipped 2026-05-02 · Sub-tasks 2-4 planned · Surfaced 2026-04-29
-> (post-rebuild CLI session) · Depends on M19 (RealtimeTTS provides
-> word-level timing callbacks for Kokoro English voices) and M18
-> (content-kind metadata routes dialogue-only to the synced reveal
-> path) · Player- and developer-experience improvement spanning all
-> three player surfaces
+> shipped 2026-05-02 · Sub-task 2 (audio-led reveal) Tier 1+2 shipped
+> for CLI 2026-05-15 (boot greeting + streaming dialogue) and GUI
+> Tier 1 shipped (typewriter word-paced mode); Sub-task 3 three-surface
+> rollout — VN-side pending live smoke; Sub-task 4 settings toggles —
+> `dialogue_sync_mode` shipped, `text_speed_factor` + `tts_everything`
+> still planned · Surfaced 2026-04-29 (post-rebuild CLI session) ·
+> Depends on M19 (RealtimeTTS provides word-level timing callbacks for
+> Kokoro English voices) and M18 (content-kind metadata routes
+> dialogue-only to the synced reveal path) · Player- and developer-
+> experience improvement spanning all three player surfaces
 
 ### Why
 
@@ -554,10 +558,6 @@ patch. Pick by impact + caller reality, not file-of-origin.
   timeout)` A2A timeout-and-fallback wrapper. Skip the
   `/replay-tutorial` command pending Slice 3 (replays a still-stub
   flight scene = anticipatory).
-- **Cross-host pipeline-status** — `kourai_common.pipeline_status`
-  data layer (PipelineState frozen + PipelineTracker with handoff hooks)
-  + vn_bridge wiring (replaces the local `current_agent` variable). GUI
-  integration (refactor of GUIState's agent fields) deferred to Phase 2.
 - **Cross-host status-feed** — `kourai_common.status_feed` (RingBuffer[T]
   + StatusEvent typed record). One writer, three subscribers (CLI
   `/debug` slash, future GUI bottom overlay, file-write). Replaces
@@ -959,6 +959,13 @@ file-of-origin.
 One-line per item, newest first. Detail moves to git history when work
 lands — these docs are plans + scratchpad, not a historical archive.
 
+- 2026-05-15 — **Cross-host pipeline-status Phase 1** [#191]. `kourai_common.pipeline_status` (PipelineState frozen + PipelineTracker) replaces vn_bridge's bare `current_agent` string. GUI Phase 2 (GUIState agent-field refactor) deferred until a concrete caller lands; handoff-hooks API likewise deferred.
+- 2026-05-15 — **Host-area docstring deslop sweep** [#190]. Cleared `Manages/Handles/Provides` narrative WHAT-docstrings across `hosts/cli` + `hosts/gui`; 12 files, -152 lines, zero behavioral change. Closes the deferral from #184.
+- 2026-05-15 — **`speak_with_karaoke` helper extraction** [#189]. Two near-identical karaoke state machines in `__main__.py` (boot greeting) + `streaming.py` (in-session dialogue) consolidated into one shared helper with `on_no_words` / `on_no_audio` / `before_open` hooks. Six new unit tests pin all three outcome branches.
+- 2026-05-15 — **Karaoke boot-greeting empty-quote fix** [#185]. Kokoro CPU / muted-audio path opened the karaoke shell but never closed it with text — now slots the greeting inside the shell when no `on_word` callback fires. (Originally opened 2026-05-06; rebased + merged 2026-05-15.)
+- 2026-05-15 — **CI fast-lane restoration** [#188]. Reverted the matrix-theater + `|| true` ruff-silencing parts of #187; switched to `--output-format=github` for inline PR annotations + restored `integration-tests` to the PR lane. Cleaned up the 11 ruff violations that snuck through during the gating outage. Codecov slug fix kept.
+- 2026-05-15 — **M14 parallel timeout fix** [c46ce56] [f1481b8] [0d86fed]. Tuned aiohttp `TCPConnector` pool (limit_per_host=75 per LiteLLM docs) + disabled `request_timeout` for SSE streaming (Anthropic API guidance) so Metis + Hephaestus concurrent LLM calls no longer contend for pool slots. Diagnostic script + 170-line unit tests included.
+- 2026-05-15 — **Karaoke streaming Tier 2 fallback fix** [ce1e438]. Audio-only path (Kokoro CPU emits `on_audio_start` without `on_word`) previously rendered an empty `""` quote pair; now falls back to the static formatted box.
 - 2026-05-06 — **Pre-presentation polish bundle** [#184]. Slop sweep + first-impression CLI playthrough fixes for the NE Agents Day 2026 QR-code-clone audience. Five real bugs caught by playing through `make cli` as a first-time developer: Hephaestus contradicted himself on roster (said "four" / listed five / skipped four spirits — fixed with explicit 10-entity FULL ROSTER block); routing JSON `{"mode":"chat","target_agent":null}` leaked into every chat reply (added `include_data` flag to `extract_parts_text`/`extract_artifact_text`, CLI passes `False`); 47 KB of httpcore/PIL/HF/torch DEBUG flood on every boot (`setup_logging` now strips pre-existing root handlers + pins `logging.basicConfig` to no-op + `_RootDebugFilter` for bare `name="root"` records); TTS log lines landed inside speech-preview quotes (silenced `kourai_common.tts_realtime` INFO on console); torch FutureWarnings/UserWarning visible on every boot (scoped `module=torch\..*` filter before RealtimeTTS import). Plus: AGENTS.md (per arxiv 2511.12884v1), CITATION.cff + README BibTeX, MCC pillars in architecture docs, 10 broken GitHub URLs, 30+ deslop edits across agent prompts. Boot output went 47 KB → 5 useful lines.
 - 2026-05-06 — **Docker runtime workspace pyproject** [#182]. Runtime stage missed the workspace `pyproject.toml`; `kourai_common.paths.find_project_root()` raised at import, crash-looping every Python agent.
 - 2026-05-06 — **Retry exponential-backoff jitter (±20%)** [#181].
