@@ -20,9 +20,6 @@ jobs:
   lint:
     name: Linting
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v6.0.2
 
@@ -35,7 +32,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6.2.0
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version-file: "pyproject.toml"
 
       - name: Install system audio dependencies
         # PyAudio (pulled in by RealtimeTTS via hosts/gui) builds against
@@ -52,15 +49,10 @@ jobs:
         run: uv run ruff format --check .
 
       - name: Run ruff lint
-        run: uv run ruff check . --output-format json > /tmp/ruff-output.json || true
-
-      - name: Upload lint results as artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: lint-results-py${{ matrix.python-version }}
-          path: /tmp/ruff-output.json
-          retention-days: 30
+        # research(2026-05): --output-format=github emits ::error:: annotations
+        # so violations appear inline on the PR diff. Replaces #187's
+        # JSON-to-file + `|| true` which silently swallowed failures.
+        run: uv run ruff check --output-format=github .
 
       - name: Run ty type check
         run: uv run ty check agents hosts/cli hosts/gui mcp_servers shared/src tests
@@ -68,9 +60,6 @@ jobs:
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v6.0.2
 
@@ -83,7 +72,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6.2.0
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version-file: "pyproject.toml"
 
       - name: Install system audio dependencies
         # PyAudio (pulled in by RealtimeTTS via hosts/gui) builds against
@@ -110,7 +99,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: unit-test-results-py${{ matrix.python-version }}
+          name: unit-test-results
           path: logs/
           retention-days: 30
 
@@ -134,3 +123,106 @@ jobs:
           report_type: test_results
           fail_ci_if_error: false
 
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    env:
+      DOCKER_HUB_USERNAME: ajb6289
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v6.2.0
+        with:
+          python-version-file: "pyproject.toml"
+
+      - name: Install system audio dependencies
+        # PyAudio (pulled in by RealtimeTTS via hosts/gui) builds against
+        # PortAudio headers; ubuntu-latest doesn't ship them.
+        uses: awalsh128/cache-apt-pkgs-action@v1.6.0
+        with:
+          packages: portaudio19-dev
+          version: 1.0
+
+      - name: Install dependencies
+        run: uv sync --all-packages --dev --frozen
+
+      - name: Create .env for CI
+        run: |
+          cat > .env << 'EOF'
+          DOCKER_HUB_USERNAME=ajb6289
+          KOURAI_PROVIDER=local
+          KOURAI_MODEL_TIER=cheap
+          KOURAI_LOG_LEVEL=INFO
+          ENVIRONMENT=ci
+          SERVICE_VERSION=0.1.0
+          EOF
+
+      - name: Set up Docker Buildx
+        # Required for GHA layer caching (cache-from/cache-to type=gha).
+        uses: docker/setup-buildx-action@v4.0.0
+
+      - name: Build context7-mcp sidecar image
+        # mode=max caches intermediate layers — matters here because the
+        # npm install is its own layer and we want it back across runs.
+        # load=true makes the image visible to the integration tests below.
+        uses: docker/build-push-action@v7.1.0
+        with:
+          context: .
+          file: docker/context7-mcp.Dockerfile
+          tags: ${{ env.DOCKER_HUB_USERNAME }}/kourai-khryseai:context7-mcp
+          cache-from: type=gha,scope=context7-mcp
+          cache-to: type=gha,mode=max,scope=context7-mcp
+          load: true
+
+      - name: Build memory-mcp sidecar image
+        uses: docker/build-push-action@v7.1.0
+        with:
+          context: .
+          file: docker/memory-mcp.Dockerfile
+          tags: ${{ env.DOCKER_HUB_USERNAME }}/kourai-khryseai:memory-mcp
+          cache-from: type=gha,scope=memory-mcp
+          cache-to: type=gha,mode=max,scope=memory-mcp
+          load: true
+
+      - name: Create logs directory
+        run: mkdir -p logs
+
+      - name: Run integration tests
+        run: uv run pytest tests/integration/ -m integration -v --tb=short --cov=. --cov-report=xml:logs/coverage.xml --cov-report=term-missing --junitxml=logs/junit.xml
+
+      - name: Upload test results as artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-results
+          path: logs/
+          retention-days: 30
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v6.0.0
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: ajbarea/kourai-khryseai
+          files: logs/coverage.xml
+          flags: integration
+          fail_ci_if_error: false
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v6.0.0
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: ajbarea/kourai-khryseai
+          files: logs/junit.xml
+          flags: integration
+          report_type: test_results
+          fail_ci_if_error: false
