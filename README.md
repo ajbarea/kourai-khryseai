@@ -76,7 +76,7 @@ You describe your goal. **Hephaestus** acts as the Forge Master — narrating in
 | Agent | Role | When they appear |
 |-------|------|----------|
 | 🎭 **Puck** | Guide | Tutorial, idle nudges, minigame facilitation |
-| 💘 **Cupid** | Romance | Relationship coaching and confession scenes (0.6+ affinity) |
+| 💘 **Cupid** | Romance | Relationship coaching and confession scenes (0.7+ affinity, Tier 3 Bonded) |
 
 **Quality Validators**
 
@@ -139,7 +139,7 @@ When agents face meaningful choices, they ask. You provide direction. This preve
 
 ### 5. Feedback Loops
 
-If Kallos finds issues Techne can fix, they iterate up to 3 rounds automatically. Otherwise, they report what remains. Nothing silent.
+If Kallos finds issues Techne can fix, they iterate up to 5 rounds automatically (tunable via `KOURAI_MAX_ITERATIONS`). Otherwise, they report what remains. Nothing silent.
 
 ---
 
@@ -290,7 +290,7 @@ Choose model tiers per environment. Default uses Haiku (fast, cheap). Upgrade to
 
 ```bash
 # .env
-KOURAI_PROVIDER=claude        # or 'local' for Ollama
+KOURAI_PROVIDER=anthropic     # anthropic | google | local (Ollama)
 KOURAI_MODEL_TIER=standard    # cheap | standard | smart
 ```
 
