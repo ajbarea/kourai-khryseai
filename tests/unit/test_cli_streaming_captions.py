@@ -55,6 +55,10 @@ def _captured(monkeypatch):
         captured.append(text)
 
     monkeypatch.setattr("hosts.cli.streaming._echo", _capture)
+    # speak_with_karaoke lives in hosts.cli.rendering and references _echo
+    # from that module's globals, so the karaoke open/word/close writes
+    # need their own patch — streaming._echo is a separate binding.
+    monkeypatch.setattr("hosts.cli.rendering._echo", _capture)
     monkeypatch.setattr("hosts.cli.streaming._render_markdown", lambda text: text)
     monkeypatch.setattr("hosts.cli.streaming._extract_artifact_text", lambda _: "")
     monkeypatch.setattr(

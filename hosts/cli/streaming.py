@@ -34,9 +34,7 @@ from hosts.cli.rendering import (
     _comms_window,
     _echo,
     _render_markdown,
-    karaoke_dialogue_close,
-    karaoke_dialogue_open,
-    karaoke_word_separator,
+    speak_with_karaoke,
     synthesis_indicator,
     synthesis_indicator_clear,
 )
@@ -259,73 +257,47 @@ async def send_and_stream(
                         # Tier 2 (deferred box) fallback. The closures
                         # are invoked synchronously inside this iteration's
                         # `await tts.speak(...)` and never outlive it, so
-                        # `formatted`, `agent`, `face`, `karaoke_started`,
-                        # `indicator_shown`, `last_was_word`, and
-                        # `words_revealed` cannot rebind before either
-                        # callback runs. Suppressed with B023 inline.
-                        karaoke_started = [False]
-                        last_was_word = [False]
-                        words_revealed = [False]
+                        # `formatted`, `agent`, `face`, and `indicator_shown`
+                        # cannot rebind before either fallback runs.
+                        # Suppressed with B023 inline.
                         indicator_shown = [False]
                         face = _MAIDEN_FACES.get(agent or "", "")
 
                         # Pre-render the synthesis indicator so the player
                         # sees that the agent is about to speak during the
-                        # ~3s Kokoro CPU synthesis-wait window before
-                        # _open_karaoke fires.
+                        # ~3s Kokoro CPU synthesis-wait window before the
+                        # karaoke shell opens.
                         _echo(synthesis_indicator(agent or "", face), nl=False)
                         indicator_shown[0] = True
 
-                        def _open_karaoke() -> None:
-                            if karaoke_started[0]:  # noqa: B023
-                                return
+                        def _clear_indicator() -> None:
                             if indicator_shown[0]:  # noqa: B023
                                 _echo(synthesis_indicator_clear(), nl=False)
                                 indicator_shown[0] = False  # noqa: B023
-                            _echo(
-                                karaoke_dialogue_open(agent or "", face),  # noqa: B023
-                                nl=False,
-                            )
-                            karaoke_started[0] = True  # noqa: B023
 
-                        def _reveal_word(word: object) -> None:
-                            w = getattr(word, "word", "")
-                            if not w:
-                                return
-                            sep = karaoke_word_separator(w, last_was_word[0])  # noqa: B023
-                            _echo(sep + w, nl=False)
-                            last_was_word[0] = True  # noqa: B023
-                            words_revealed[0] = True  # noqa: B023
+                        def _fallback_no_words() -> None:
+                            # Karaoke opened but no on_word fired. Abandon
+                            # the open shell and drop to the static box so
+                            # the dialogue text still lands on screen.
+                            _echo(formatted)  # noqa: B023
+
+                        def _fallback_no_audio() -> None:
+                            # Tier 2 — neither callback fired. Wipe the
+                            # indicator first so the box doesn't render
+                            # below a stuck ellipsis line.
+                            _clear_indicator()
+                            _echo(formatted)  # noqa: B023
 
                         msg = text.split(" ", 1)[-1] if " " in text else text
-                        try:
-                            await tts.speak(
-                                msg,
-                                agent,
-                                on_audio_start=_open_karaoke,
-                                on_word=_reveal_word,
-                            )
-                        finally:
-                            if karaoke_started[0]:
-                                if words_revealed[0]:
-                                    # Close the karaoke quote after words
-                                    # were revealed.
-                                    _echo(karaoke_dialogue_close(), nl=False)
-                                else:
-                                    # Karaoke started but no words revealed
-                                    # (Kokoro CPU engine or auto-muted).
-                                    # Fall back to static text render.
-                                    _echo(formatted)
-                            else:
-                                # Tier 2 fallback — neither audio_start
-                                # nor on_word fired (auto-muted, engine
-                                # never reached playback). Wipe the
-                                # indicator first so the box doesn't
-                                # render below a stuck ellipsis line.
-                                if indicator_shown[0]:
-                                    _echo(synthesis_indicator_clear(), nl=False)
-                                    indicator_shown[0] = False
-                                _echo(formatted)
+                        await speak_with_karaoke(
+                            tts,
+                            msg,
+                            agent or "",
+                            face,
+                            on_no_words=_fallback_no_words,
+                            on_no_audio=_fallback_no_audio,
+                            before_open=_clear_indicator,
+                        )
                     elif will_display and will_speak:
                         # M20 sub-task 4 "instant" mode: legacy behavior
                         # — text appears immediately, audio catches up.

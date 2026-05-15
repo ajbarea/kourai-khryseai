@@ -32,7 +32,10 @@ from hosts.cli.styling import (
 from kourai_common.ssml import strip_ssml
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
+
+    from kourai_common.tts_realtime import RealtimeTTSEngine
 
 # Save a reference to the real stdout BEFORE prompt_toolkit's patch_stdout
 # can wrap it.  Dense ANSI (pixel art, true-color) gets mangled by
@@ -311,6 +314,67 @@ def karaoke_word_separator(word_text: str, last_was_word: bool) -> str:
     if last_was_word and not is_punct:
         return " "
     return ""
+
+
+async def speak_with_karaoke(
+    tts: RealtimeTTSEngine,
+    text: str,
+    agent: str,
+    face: str,
+    *,
+    on_no_words: Callable[[], None],
+    on_no_audio: Callable[[], None],
+    before_open: Callable[[], None] | None = None,
+) -> None:
+    """Karaoke-led TTS playback with hook-based fallbacks.
+
+    Wires up the karaoke state flags (started, last_was_word, words_revealed)
+    and the on_audio_start / on_word closures around ``await tts.speak(...)``,
+    then routes into one of three outcomes:
+
+    1. Happy path — both callbacks fire. Helper echoes the karaoke open,
+       words append per on_word, helper echoes the closing quote.
+    2. ``on_audio_start`` fired but ``on_word`` never did (Kokoro CPU,
+       muted audio). Helper opens the shell, then calls ``on_no_words``.
+       Caller decides whether to slot fallback text inside the shell and
+       close it, or abandon the shell and render an alternate box.
+    3. Neither fired (auto-mute, engine error). Helper calls ``on_no_audio``.
+
+    ``before_open`` fires once just before ``karaoke_dialogue_open`` echoes
+    — used by streaming.py to clear its pre-rendered synthesis indicator
+    so the karaoke line lands on a fresh row.
+    """
+    karaoke_started = [False]
+    last_was_word = [False]
+    words_revealed = [False]
+
+    def _open() -> None:
+        if karaoke_started[0]:
+            return
+        if before_open is not None:
+            before_open()
+        _echo(karaoke_dialogue_open(agent, face), nl=False)
+        karaoke_started[0] = True
+
+    def _reveal(word: object) -> None:
+        w = getattr(word, "word", "")
+        if not w:
+            return
+        sep = karaoke_word_separator(w, last_was_word[0])
+        _echo(sep + w, nl=False)
+        last_was_word[0] = True
+        words_revealed[0] = True
+
+    try:
+        await tts.speak(text, agent, on_audio_start=_open, on_word=_reveal)
+    finally:
+        if karaoke_started[0]:
+            if words_revealed[0]:
+                _echo(karaoke_dialogue_close(), nl=False)
+            else:
+                on_no_words()
+        else:
+            on_no_audio()
 
 
 def _maiden_card(name: str) -> str:
