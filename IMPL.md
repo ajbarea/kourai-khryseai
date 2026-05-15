@@ -28,10 +28,7 @@ Working through these in order — small, self-contained, don't need AJ at the k
   `api.anthropic.com` cleanly via `urllib`; hang is at the LiteLLM +
   aiohttp transport layer. Retry logic IS firing — system is resilient,
   just slow. File a GitHub issue with reproduction + log capture.
-- **Host-area docstring deslop pass** that #184 deferred —
-  Manages/Handles/Provides narrative WHAT-comments in `hosts/cli/` and
-  `hosts/gui/`.
 
-After those: **M6 ElevenLabs hybrid** is the next milestone (gated on
+After that: **M6 ElevenLabs hybrid** is the next milestone (gated on
 M20 + VN smoke landing first; full spec in
 [ROADMAP.md → M6](./ROADMAP.md#m6--elevenlabs-hybrid-pre-player-release-blocker)).
