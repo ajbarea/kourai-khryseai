@@ -9,9 +9,8 @@ from .message_history import MessageHistory
 
 
 class KeyboardShortcuts:
-    """Manages keyboard shortcuts for the InputBar.
+    """Keyboard shortcuts for the InputBar.
 
-    Handles:
     - Ctrl+K: Focus the input bar
     - Ctrl+L: Clear the input bar
     - Up/Down arrows: Navigate message history

@@ -193,7 +193,7 @@ def run_loading_screen(
     image_alpha = 0  # Splash image opacity (0–255)
     skip_cards = False  # True if user presses key during cards
 
-    # Flush accumulated delta from asset loading so the first frame's dt is near-zero
+    # Flush accumulated delta from asset loading so the first frame's dt is minimal
     clock.tick()
 
     while True:

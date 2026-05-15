@@ -1,11 +1,4 @@
-"""Enhanced DialogueHistory with AutoScrollManager integration.
-
-This module provides an enhanced DialogueHistory class that integrates
-with AutoScrollManager to support:
-- Toggle functionality to enable/disable auto-scrolling
-- Scroll position preservation when disabled
-- Visual distance indicator showing distance from bottom
-"""
+"""DialogueHistory with auto-scroll toggle, preserved scroll position, and distance indicator."""
 
 from __future__ import annotations
 
@@ -30,13 +23,7 @@ SCROLLBAR = (50, 40, 25)
 
 
 class DialogueHistoryWithAutoScroll:
-    """Enhanced DialogueHistory with auto-scroll toggle and distance indicator.
-
-    Integrates AutoScrollManager to provide:
-    - Toggle functionality to enable/disable auto-scrolling
-    - Scroll position preservation when disabled
-    - Visual distance indicator showing distance from bottom
-    """
+    """DialogueHistory with auto-scroll toggle, preserved scroll position, and distance indicator."""
 
     PAD = 14
     BUBBLE_MAX_W = DIALOGUE_W - 40
