@@ -47,6 +47,7 @@ from kourai_common.messaging import (
     stream_event,
     user_message,
 )
+from kourai_common.pipeline_status import PipelineTracker
 from kourai_common.ssml import strip_ssml
 from kourai_common.tts_cache import default_cache_dir
 from kourai_common.tts_realtime import RealtimeTTSEngine
@@ -375,7 +376,7 @@ async def handle_message(request: Request) -> StreamingResponse:
     )
 
     async def stream_response() -> AsyncGenerator[str, None]:
-        current_agent = "hephaestus"
+        tracker = PipelineTracker(initial_agent="hephaestus")
         found_artifact = False
         try:
             async for response in client.send_message(send_request(message)):
@@ -383,12 +384,12 @@ async def handle_message(request: Request) -> StreamingResponse:
                 if isinstance(event, Message):
                     text = extract_message_text(event)
                     if text:
-                        portrait_state = infer_portrait_state(current_agent, text)
+                        portrait_state = infer_portrait_state(tracker.current_agent, text)
                         for beat in _paginate(text):
                             yield (
                                 json.dumps(
                                     {
-                                        "agent": current_agent,
+                                        "agent": tracker.current_agent,
                                         "message": beat,
                                         "portrait": portrait_state,
                                     }
@@ -404,9 +405,9 @@ async def handle_message(request: Request) -> StreamingResponse:
                     lower = status_msg.lower()
                     for name in AGENT_NAMES:
                         if name in lower:
-                            current_agent = name
+                            tracker.handoff(name)
                             break
-                    log.info(f"Status ({current_agent}): {status_msg[:100]}")
+                    log.info(f"Status ({tracker.current_agent}): {status_msg[:100]}")
                     # Strict M18 routing: only KIND_DIALOGUE goes to the
                     # VN dialogue layer.
                     kind = get_content_kind(event.status.message)
@@ -451,16 +452,16 @@ async def handle_message(request: Request) -> StreamingResponse:
                                     )
                         text = extract_artifact_text(event)
                         if text:
-                            log.info(f"Artifact ({current_agent}): {text[:80]}")
+                            log.info(f"Artifact ({tracker.current_agent}): {text[:80]}")
                             text = process_agent_output(
-                                text, current_player_id, source_agent=current_agent
+                                text, current_player_id, source_agent=tracker.current_agent
                             )
-                            portrait_state = infer_portrait_state(current_agent, text)
+                            portrait_state = infer_portrait_state(tracker.current_agent, text)
                             for beat in _paginate(text):
                                 yield (
                                     json.dumps(
                                         {
-                                            "agent": current_agent,
+                                            "agent": tracker.current_agent,
                                             "message": beat,
                                             "portrait": portrait_state,
                                         }
