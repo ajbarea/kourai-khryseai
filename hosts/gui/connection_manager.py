@@ -13,8 +13,6 @@ if TYPE_CHECKING:
 
 
 class ConnectionManager:
-    """Manages connection state and reconnection UI."""
-
     def __init__(self, reconnect_callback: Callable[[], None] | None = None) -> None:
         """Initialize ConnectionManager.
 

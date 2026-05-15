@@ -16,8 +16,6 @@ if TYPE_CHECKING:
 
 
 class TTSSettingsConfig:
-    """Manages TTS settings persistence."""
-
     DEFAULT_CONFIG: ClassVar[dict[str, Any]] = {
         "tts_enabled": True,
         "pacing_mode": "NORMAL",

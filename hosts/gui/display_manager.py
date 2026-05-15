@@ -29,8 +29,6 @@ logger = logging.getLogger(__name__)
 
 
 class DisplayManager:
-    """Manages the pygame display surface, mode, and windowed size."""
-
     def __init__(self, settings: SettingsManager) -> None:
         self.mode = normalize_display_mode(settings.get("display_mode", DISPLAY_MODE_WINDOWED))
         self.windowed_size = get_saved_windowed_size(settings)

@@ -4,8 +4,6 @@ from .high_contrast_colors import get_color_palette, is_wcag_aa_compliant
 
 
 class HighContrastGUIIntegration:
-    """Manages high contrast mode integration with the GUI."""
-
     def __init__(self, gui_instance, settings_manager):
         """Initialize high contrast integration.
 

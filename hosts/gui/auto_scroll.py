@@ -8,8 +8,6 @@ from __future__ import annotations
 
 
 class AutoScrollManager:
-    """Manages auto-scroll state and distance-from-bottom indicator."""
-
     def __init__(self) -> None:
         self.enabled = True
         self._distance_lines = 0

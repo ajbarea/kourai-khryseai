@@ -26,8 +26,6 @@ class QuickAction:
 
 
 class QuickActionBar:
-    """Manages floating action pills above the input bar."""
-
     def __init__(self) -> None:
         self.actions = [
             QuickAction(
