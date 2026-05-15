@@ -27,10 +27,6 @@ Working through these in order — small, self-contained, don't need AJ at the k
   deleted status_bubbles parallel state stores. Two current writers (CLI
   `/debug` slash, file-write). GUI bottom-overlay subscriber is anticipatory;
   skip it.
-- **Cross-host pipeline-status** — `kourai_common.pipeline_status` data
-  layer (PipelineState frozen + PipelineTracker with handoff hooks) +
-  vn_bridge wiring (replaces the local `current_agent` variable). Phase 2
-  GUI refactor of `GUIState`'s agent fields is anticipatory; defer.
 - **Puck Slice 2 helper** — `_invoke_agent_live(agent, prompt, fallback,
   timeout)` A2A timeout-and-fallback wrapper. Skip the `/replay-tutorial`
   command pending Slice 3 (replays a still-stub flight scene = anticipatory).
