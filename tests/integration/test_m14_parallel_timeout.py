@@ -12,7 +12,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from typing import TYPE_CHECKING
 
 # Enable aiohttp debug logging BEFORE importing anything that uses it
 logging_config = {
@@ -28,7 +27,7 @@ logging_config = {
         },
         "aiohttp_file": {
             "class": "logging.FileHandler",
-            "filename": "/tmp/aiohttp_debug.log",
+            "filename": "/tmp/aiohttp_debug.log",  # noqa: S108  # CI runner /tmp is isolated; diagnostic path is intentional
             "level": "DEBUG",
             "formatter": "detailed",
         },
@@ -53,8 +52,6 @@ import logging.config
 
 logging.config.dictConfig(logging_config)
 
-if TYPE_CHECKING:
-    pass
 
 # Now import the agent module
 

@@ -193,10 +193,11 @@ async def test_dialogue_karaoke_reveals_words_progressively(_captured):
 
 
 @pytest.mark.asyncio
-async def test_dialogue_karaoke_close_fires_even_if_no_words_revealed(_captured):
-    """If on_audio_start fires but on_word never does (engine error
-    after audio_start, mock test, etc.), the open quote still gets
-    closed in the finally block — no dangling open ANSI/quote state.
+async def test_dialogue_karaoke_falls_back_to_static_when_no_words_revealed(_captured):
+    """If on_audio_start fires but on_word never does (Kokoro CPU engine,
+    auto-muted path, etc.), the karaoke path falls back to rendering the
+    full formatted dialogue text — otherwise the user sees a bare empty
+    quote pair "" instead of the line.
     """
 
     async def _audio_only_speak(*args, on_audio_start=None, on_word=None, **kwargs):
@@ -212,10 +213,10 @@ async def test_dialogue_karaoke_close_fires_even_if_no_words_revealed(_captured)
     await send_and_stream(client, "prompt", "ctx-1", tts=tts, captions_enabled=True)
 
     visual = "".join(_captured)
-    # No fallback Tier 2 box — karaoke header opened, just no body.
-    assert "[FORMATTED]" not in visual
-    # Closing quote landed.
-    assert '"' in visual
+    # Karaoke started but no words: render the full formatted text so the
+    # dialogue is visible rather than collapsing to an empty quote pair.
+    assert "[FORMATTED]" in visual
+    assert "Welcome back to the forge." in visual
 
 
 @pytest.mark.asyncio
