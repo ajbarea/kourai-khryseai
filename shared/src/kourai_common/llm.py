@@ -12,6 +12,7 @@ import httpx
 import litellm
 
 from kourai_common.config import AGENT_TIMEOUTS, get_model
+from kourai_common.llm_aiohttp_config import get_aiohttp_session
 from kourai_common.memory import (
     add_message,
     get_agent_state,
@@ -116,7 +117,14 @@ class LLMResponseError(LLMError):
     ),
 )
 async def _execute_completion(timeout_seconds: float, **kwargs: Any) -> Any:
-    """Execute acompletion with built-in retries for capacity/network issues."""
+    """Execute acompletion with built-in retries for capacity/network issues.
+
+    M14 fix (May 2026): Uses custom aiohttp.ClientSession with tuned
+    TCPConnector (limit_per_host=75) to prevent pool exhaustion when
+    multiple concurrent requests (Metis + Hephaestus) hit the same API.
+    Disables request_timeout for streaming to prevent mid-body abort
+    (aiohttp issue #10313: timeout includes pool queue wait time).
+    """
     # Route all requests through a proxy when configured (e.g. litellm mock in tests).
     # Without this, litellm routes anthropic/ models directly to the Anthropic API,
     # bypassing OPENAI_API_BASE entirely.
@@ -126,13 +134,27 @@ async def _execute_completion(timeout_seconds: float, **kwargs: Any) -> Any:
         api_base = os.getenv("OLLAMA_API_BASE")
     if api_base and "api_base" not in kwargs:
         kwargs["api_base"] = api_base
-    # Belt-and-braces with the asyncio.timeout below: ``request_timeout`` is
-    # what propagates into LiteLLM's underlying httpx/aiohttp transport, so a
-    # stuck TCP connect actually surfaces as a Timeout instead of a hanging
-    # task that asyncio.timeout has to forcibly cancel. The wrapper stays as
-    # the outer guard for cases where the transport itself doesn't honor the
-    # deadline (older aiohttp versions had bugs around this).
-    kwargs.setdefault("request_timeout", timeout_seconds)
+
+    # M14 M14 parallel timeout fix: Inject custom aiohttp session with tuned pool.
+    # Per LiteLLM May 2026 best practice, use shared_session parameter to inject
+    # the globally optimized session (limit_per_host=75 for concurrent streaming).
+    kwargs["shared_session"] = get_aiohttp_session()
+
+    # For streaming responses, disable request_timeout to prevent mid-body abort.
+    # Per Anthropic API docs, SSE streams must not timeout while waiting for chunks.
+    # aiohttp issue #10313 notes that timeout clock includes pool queue wait time,
+    # so setting a finite timeout during peak M14 parallel dispatch will kill healthy
+    # streams. Streaming responses are guarded by the outer asyncio.timeout() below.
+    if kwargs.get("stream"):
+        kwargs["request_timeout"] = None
+    else:
+        # Non-streaming: set finite timeout for connection establishment.
+        # Belt-and-braces with the asyncio.timeout below: request_timeout propagates
+        # into LiteLLM's underlying transport, so a stuck TCP connect surfaces as
+        # Timeout instead of a hanging task that asyncio.timeout has to forcibly
+        # cancel. The wrapper stays as the outer guard for transport bugs.
+        kwargs.setdefault("request_timeout", timeout_seconds)
+
     async with asyncio.timeout(timeout_seconds):
         return await litellm.acompletion(**kwargs)
 

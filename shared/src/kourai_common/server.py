@@ -45,4 +45,14 @@ def build_a2a_app(
     routes = []
     routes.extend(create_agent_card_routes(agent_card))
     routes.extend(create_jsonrpc_routes(request_handler, rpc_url="/"))
-    return Starlette(routes=routes)
+    app = Starlette(routes=routes)
+
+    # Register cleanup for the M14 aiohttp session on app shutdown.
+    # The session is lazily initialized on first LLM call; ensure it's
+    # closed when the server shuts down to prevent resource leaks.
+    @app.add_event_handler("shutdown")
+    async def cleanup_aiohttp_session():
+        from kourai_common.llm_aiohttp_config import close_aiohttp_session
+        await close_aiohttp_session()
+
+    return app
