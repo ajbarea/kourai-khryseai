@@ -8,26 +8,32 @@ cross-cutting invariants, and "next up" ordering live in
 If this file is more than ~50 lines, something queued or referential has
 crept in — extract it back to ROADMAP.
 
-Updated: 2026-05-14
+Updated: 2026-05-15
 
 ## In flight
 
-Nothing actively building. NE Agents Day 2026 poster session shipped 2026-05-10
-(NYC, Jane Street). QR-code reviewer experience verified end-to-end;
-demo fielded live. Back to full-speed development as of 2026-05-14.
+Nothing actively building. Recent sweep on 2026-05-15 cleared two IMPL
+entries: M14 parallel timeout shipped (#c46ce56 tuned aiohttp pool +
+streaming timeout; #0d86fed unit tests; #f1481b8 diagnostics) and the
+host-area docstring deslop pass landed (#190). CI fast lane was also
+restored (#188) so the pre-push gate gates again.
 
 ## Next pickups
 
 Working through these in order — small, self-contained, don't need AJ at the keyboard:
 
-- **Hephaestus aiohttp `TimeoutError` on M14 parallel routing.** Smoke
-  on 2026-05-06 sent `"hi dokimasia, are you there?"` to hephaestus;
-  HTTP 200 SSE opened but body never streamed. Container logs show
-  `_execute_completion failed (attempt 2), retrying in 4.4s:
-  TimeoutError`. Network from inside the container reaches
-  `api.anthropic.com` cleanly via `urllib`; hang is at the LiteLLM +
-  aiohttp transport layer. Retry logic IS firing — system is resilient,
-  just slow. File a GitHub issue with reproduction + log capture.
+- **Cross-host status-feed** — `kourai_common.status_feed` (RingBuffer[T]
+  + StatusEvent typed record). Replaces `hosts/gui/debug_log.py` + the
+  deleted status_bubbles parallel state stores. Two current writers (CLI
+  `/debug` slash, file-write). GUI bottom-overlay subscriber is anticipatory;
+  skip it.
+- **Cross-host pipeline-status** — `kourai_common.pipeline_status` data
+  layer (PipelineState frozen + PipelineTracker with handoff hooks) +
+  vn_bridge wiring (replaces the local `current_agent` variable). Phase 2
+  GUI refactor of `GUIState`'s agent fields is anticipatory; defer.
+- **Puck Slice 2 helper** — `_invoke_agent_live(agent, prompt, fallback,
+  timeout)` A2A timeout-and-fallback wrapper. Skip the `/replay-tutorial`
+  command pending Slice 3 (replays a still-stub flight scene = anticipatory).
 
 After that: **M6 ElevenLabs hybrid** is the next milestone (gated on
 M20 + VN smoke landing first; full spec in
