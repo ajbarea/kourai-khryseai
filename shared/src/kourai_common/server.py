@@ -10,6 +10,7 @@ natively.
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
 
 from a2a.server.request_handlers import DefaultRequestHandler
@@ -45,14 +46,15 @@ def build_a2a_app(
     routes = []
     routes.extend(create_agent_card_routes(agent_card))
     routes.extend(create_jsonrpc_routes(request_handler, rpc_url="/"))
-    app = Starlette(routes=routes)
 
-    # Register cleanup for the M14 aiohttp session on app shutdown.
-    # The session is lazily initialized on first LLM call; ensure it's
-    # closed when the server shuts down to prevent resource leaks.
-    @app.add_event_handler("shutdown")
-    async def cleanup_aiohttp_session():
+    @asynccontextmanager
+    async def lifespan(app: Starlette):
+        # Startup (nothing needed)
+        yield
+        # Shutdown: close aiohttp session to prevent resource leaks
         from kourai_common.llm_aiohttp_config import close_aiohttp_session
         await close_aiohttp_session()
+
+    app = Starlette(routes=routes, lifespan=lifespan)
 
     return app
