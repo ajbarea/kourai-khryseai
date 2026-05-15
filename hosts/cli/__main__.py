@@ -46,9 +46,8 @@ from hosts.cli.rendering import (
     _maiden_card,
     _maiden_gallery,
     karaoke_dialogue_close,
-    karaoke_dialogue_open,
-    karaoke_word_separator,
     set_raw_out,
+    speak_with_karaoke,
 )
 from hosts.cli.settings import CLISettings
 from hosts.cli.streaming import _connect_with_url_override, get_last_result, send_and_stream
@@ -633,50 +632,23 @@ async def main(
         # M20 sub-task 2 Tier 1 (karaoke single-line) + Tier 2
         # (deferred box) fallback. Reveals the greeting word-by-word
         # in lockstep with audio for the FIRST thing the player sees.
-        # If TTS auto-muted or playback never reaches audio_start, the
-        # finally-fallback prints the full box so the greeting isn't
-        # silently lost.
         _greet_face = _MAIDEN_FACES[_greet_name]
-        _karaoke_started = [False]
-        _last_was_word = [False]
-        _words_revealed = [0]
 
-        def _open_greeting_karaoke() -> None:
-            if _karaoke_started[0]:
-                return
-            _echo(karaoke_dialogue_open(_greet_name, _greet_face), nl=False)
-            _karaoke_started[0] = True
+        def _slot_greeting_inside_shell() -> None:
+            # Karaoke opened but no on_word fired (Kokoro CPU or muted
+            # audio path). Slot the greeting text inside the open shell
+            # before closing so the user sees the line instead of `""`.
+            _echo(_greet_quote, nl=False)
+            _echo(karaoke_dialogue_close(), nl=False)
 
-        def _reveal_greeting_word(word: object) -> None:
-            w = getattr(word, "word", "")
-            if not w:
-                return
-            sep = karaoke_word_separator(w, _last_was_word[0])
-            _echo(sep + w, nl=False)
-            _last_was_word[0] = True
-            _words_revealed[0] += 1
-
-        try:
-            await tts.speak(
-                _greet_quote,
-                _greet_name,
-                on_audio_start=_open_greeting_karaoke,
-                on_word=_reveal_greeting_word,
-            )
-        finally:
-            if _karaoke_started[0]:
-                # Karaoke opened (`Kallos (◕ᴗ◕✿) "`) but on_word may not
-                # have fired even once — Kokoro on CPU and the muted
-                # audio path both routinely yield zero per-word events
-                # while still firing on_audio_start. Without this fall-
-                # through the player saw empty quote pairs (`""`) where
-                # the greeting should have been; print the actual text
-                # before the closing quote so the line reads correctly.
-                if _words_revealed[0] == 0:
-                    _echo(_greet_quote, nl=False)
-                _echo(karaoke_dialogue_close(), nl=False)
-            else:
-                _echo(_greet_line)
+        await speak_with_karaoke(
+            tts,
+            _greet_quote,
+            _greet_name,
+            _greet_face,
+            on_no_words=_slot_greeting_inside_shell,
+            on_no_audio=lambda: _echo(_greet_line),
+        )
     elif tts:
         # M20 sub-task 4 "instant" mode: legacy behavior — greeting
         # text appears immediately, audio catches up.
