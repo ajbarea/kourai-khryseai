@@ -7,12 +7,8 @@ Based on May 2026 best practices from LiteLLM and Anthropic API docs.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
 
 import aiohttp
-
-if TYPE_CHECKING:
-    pass
 
 log = logging.getLogger(__name__)
 

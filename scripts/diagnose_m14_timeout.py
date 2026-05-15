@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from aiohttp.connector import TCPConnector
 
 # Setup logging
-log_handler = logging.FileHandler("/tmp/m14_diagnosis.log", "w")
+log_handler = logging.FileHandler("/tmp/m14_diagnosis.log", "w")  # noqa: S108  # diagnostic script: fixed path documented in module docstring
 log_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
 
 logging.basicConfig(
@@ -56,7 +56,7 @@ async def _patched_acquire(self: TCPConnector) -> Any:
         result = await _original_acquire(self)
         log.debug("✓ Connection acquired from pool")
         return result
-    except asyncio.TimeoutError:
+    except TimeoutError:
         log.error(
             f"✗ Pool acquire timeout! pool_size={pool_size}, waiters={waiters}. "
             f"This is the M14 bottleneck."
@@ -100,7 +100,7 @@ async def diagnose():
             timeout=5.0,
         )
         log.info(f"✓ Single call succeeded: {result[:50]}...")
-    except asyncio.TimeoutError:
+    except TimeoutError:
         log.error("✗ Single call timed out (pool acquire timeout)")
     except Exception as e:
         log.warning(f"Single call failed (expected if no API key): {type(e).__name__}")
@@ -109,8 +109,8 @@ async def diagnose():
     log.info("-" * 80)
 
     try:
-        from agents.metis.agent import discuss_tradeoffs
         from agents.hephaestus.agent import determine_pipeline
+        from agents.metis.agent import discuss_tradeoffs
 
         log.info("Spawning Metis discuss_tradeoffs as parallel task (simulating M14 dispatch)...")
         metis_task = asyncio.create_task(
@@ -141,7 +141,7 @@ async def diagnose():
             try:
                 await task
                 log.info(f"✓ {task.get_name()} completed")
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 log.error(f"✗ {task.get_name()} timed out (pool exhaustion — THIS IS THE BUG)")
             except Exception as e:
                 log.warning(f"✗ {task.get_name()} failed: {type(e).__name__}")

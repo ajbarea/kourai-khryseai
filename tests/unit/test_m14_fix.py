@@ -30,8 +30,8 @@ class TestAIOHTTPSessionConfig:
     @pytest.mark.asyncio
     async def test_session_singleton(self):
         """get_aiohttp_session() returns same instance across calls."""
-        from kourai_common.llm_aiohttp_config import get_aiohttp_session, close_aiohttp_session
         import kourai_common.llm_aiohttp_config
+        from kourai_common.llm_aiohttp_config import close_aiohttp_session, get_aiohttp_session
 
         # Reset the global session
         kourai_common.llm_aiohttp_config._global_session = None
@@ -46,13 +46,12 @@ class TestAIOHTTPSessionConfig:
     @pytest.mark.asyncio
     async def test_session_cleanup(self):
         """close_aiohttp_session() closes the session."""
+        # Reset the global session
+        import kourai_common.llm_aiohttp_config
         from kourai_common.llm_aiohttp_config import (
             close_aiohttp_session,
             get_aiohttp_session,
         )
-
-        # Reset the global session
-        import kourai_common.llm_aiohttp_config
 
         kourai_common.llm_aiohttp_config._global_session = None
 
@@ -142,9 +141,9 @@ class TestServerShutdownHook:
 
     def test_app_with_lifespan_builds(self):
         """build_a2a_app() creates app with lifespan for aiohttp cleanup."""
-        from kourai_common.server import build_a2a_app
         from kourai_common.agent_cards import build_card
         from kourai_common.base_executor import BaseAgentExecutor
+        from kourai_common.server import build_a2a_app
 
         # Create a minimal executor
         class TestExecutor(BaseAgentExecutor):
