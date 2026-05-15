@@ -260,11 +260,12 @@ async def send_and_stream(
                         # are invoked synchronously inside this iteration's
                         # `await tts.speak(...)` and never outlive it, so
                         # `formatted`, `agent`, `face`, `karaoke_started`,
-                        # `indicator_shown`, and `last_was_word` cannot
-                        # rebind before either callback runs. Suppressed
-                        # with B023 inline.
+                        # `indicator_shown`, `last_was_word`, and
+                        # `words_revealed` cannot rebind before either
+                        # callback runs. Suppressed with B023 inline.
                         karaoke_started = [False]
                         last_was_word = [False]
+                        words_revealed = [False]
                         indicator_shown = [False]
                         face = _MAIDEN_FACES.get(agent or "", "")
 
@@ -294,6 +295,7 @@ async def send_and_stream(
                             sep = karaoke_word_separator(w, last_was_word[0])  # noqa: B023
                             _echo(sep + w, nl=False)
                             last_was_word[0] = True  # noqa: B023
+                            words_revealed[0] = True  # noqa: B023
 
                         msg = text.split(" ", 1)[-1] if " " in text else text
                         try:
@@ -305,11 +307,15 @@ async def send_and_stream(
                             )
                         finally:
                             if karaoke_started[0]:
-                                # Close the open quote regardless of
-                                # whether on_word fired (engine could
-                                # error after audio_start but before any
-                                # word).
-                                _echo(karaoke_dialogue_close(), nl=False)
+                                if words_revealed[0]:
+                                    # Close the karaoke quote after words
+                                    # were revealed.
+                                    _echo(karaoke_dialogue_close(), nl=False)
+                                else:
+                                    # Karaoke started but no words revealed
+                                    # (Kokoro CPU engine or auto-muted).
+                                    # Fall back to static text render.
+                                    _echo(formatted)
                             else:
                                 # Tier 2 fallback — neither audio_start
                                 # nor on_word fired (auto-muted, engine

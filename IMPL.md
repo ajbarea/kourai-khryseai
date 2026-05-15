@@ -28,10 +28,6 @@ Working through these in order — small, self-contained, don't need AJ at the k
   `api.anthropic.com` cleanly via `urllib`; hang is at the LiteLLM +
   aiohttp transport layer. Retry logic IS firing — system is resilient,
   just slow. File a GitHub issue with reproduction + log capture.
-- **Karaoke Tier 2 fallback prints empty `""` quote pair when Kokoro on
-  CPU doesn't fire `on_word` callbacks.** Cosmetic. Fix is to fall
-  through to a static text print in the karaoke close path when no words
-  were revealed.
 - **`docs/configuration.md` accuracy + spirits tier-table decision.**
   README simplified tier table omits aidos/aletheia/cupid/puck rows;
   docs page should either fully list them or explicitly link to
