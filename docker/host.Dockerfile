@@ -44,7 +44,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked \
         apk add --no-cache build-base portaudio-dev; \
     fi
 
-COPY --from=ghcr.io/astral-sh/uv:0.10.10 /uv /uvx /usr/local/bin/
+COPY --from=ghcr.io/astral-sh/uv:0.11.14 /uv /uvx /usr/local/bin/
 
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
