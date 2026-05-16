@@ -12,10 +12,15 @@ Updated: 2026-05-16
 
 ## In flight
 
-Nothing actively building. 2026-05-16 shipped the May 2026 model/pricing
-verification sweep (#192 host-side gemini-2.5-flash-lite migration +
-cache threshold corrections + Opus 4.7 tokenizer caveat; #193 sibling
-docs propagation). See ROADMAP shipped log for details.
+Nothing actively building. 2026-05-16 shipped two sweeps back-to-back:
+the May 2026 model/pricing verification sweep (#192 host-side
+gemini-2.5-flash-lite migration + cache threshold corrections + Opus
+4.7 tokenizer caveat; #193 sibling docs propagation) followed by the
+May 2026 infra freshness sweep (#194 — `uv` 0.10.10 → 0.11.14,
+`@upstash/context7-mcp` 2.1.6 → 2.2.5, `dozzle` v10.5.0 → v10.5.3,
+`nodejs-22` → `nodejs-24` in sandbox; all other Docker/GHA/Python pins
+verified FRESH against primary sources). See ROADMAP shipped log for
+details.
 
 ## Next pickups
 
