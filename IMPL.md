@@ -12,32 +12,10 @@ Updated: 2026-05-16
 
 ## In flight
 
-**2026-05-16 model/pricing verification sweep** (branch
-`docs/cache-thresholds-may-2026-verify`):
-
-- `gemini-2.0-flash` deprecates 2026-06-01 per Google's pricing page;
-  migrated `MODELS_*_GOOGLE` (21 refs across three tiers) to
-  `gemini-2.5-flash-lite` — the price-identical, GA successor (input
-  $0.10, output $0.40, cache $0.01 per MTok). Added the 2.5-flash-lite
-  entry to `GEMINI_PRICING`; kept the 2.0-flash entry as a deprecated
-  legacy line so historical `/usage` cost-resolution still works.
-- Corrected the min-cacheable-prefix comment in `llm.py`: Sonnet 4.6
-  is **1024 tokens** (not 2048), Haiku 4.5 is **4096 tokens** —
-  important call-out for the default CHEAP tier since every agent rides
-  on Haiku 4.5 and sub-4k prompts pass `cache_control` through without
-  caching. Verified against
-  `platform.claude.com/docs/en/build-with-claude/prompt-caching`.
-- Freshened `pricing.py` date markers (April 2026 → 2026-05 verified)
-  and added an Opus 4.7 tokenizer caveat: new tokenizer consumes up to
-  ~1.35× more tokens for the same source text, so projecting Opus 4.7
-  spend from Opus 4.6 historical usage will under-quote by up to ~35%.
-  Per-token math stays correct (LiteLLM reports actual tokens).
-- Anthropic rates re-verified against
-  `platform.claude.com/docs/en/about-claude/pricing` — Haiku 4.5,
-  Sonnet 4.6, Opus 4.6, Opus 4.7 all match. No code change needed on
-  Anthropic side.
-
-Tests: 3167 unit passed locally; lint clean.
+Nothing actively building. 2026-05-16 shipped the May 2026 model/pricing
+verification sweep (#192 host-side gemini-2.5-flash-lite migration +
+cache threshold corrections + Opus 4.7 tokenizer caveat; #193 sibling
+docs propagation). See ROADMAP shipped log for details.
 
 ## Next pickups
 

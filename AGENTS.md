@@ -66,4 +66,4 @@ abstract names.
 - **API keys** via `.env`; `.env.example` is the placeholder template. Never commit a real key.
 - **Sandboxed forge tools** via `KOURAI_SANDBOX=container` route every agent-issued shell call through a locked-down `--network=none` container.
 - **Performance harness**: `tests/performance/test_performance_profiler.py` is the single source of truth for any quantitative perf claim. Anything else is unsupported.
-- **Prompt caching**: split into `[truly-static (1h TTL), player-dynamic (5m TTL)]` blocks per Anthropic May 2026 guidance.
+- **Prompt caching**: split into `[truly-static (1h TTL), player-dynamic (5m TTL)]` blocks per [Anthropic's caching guidance](https://platform.claude.com/docs/en/build-with-claude/prompt-caching) (verified May 2026; the 1h TTL is opt-in since the 2026-03-06 default change).
