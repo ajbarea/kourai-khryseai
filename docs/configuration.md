@@ -211,9 +211,9 @@ KOURAI_PROVIDER=local
 
     | Tier | Model | Claude equivalent |
     |---|---|---|
-    | `cheap` | Gemini 2.0 Flash (all agents) | Haiku 4.5 |
-    | `standard` | Gemini 2.5 Pro (heavy) / Flash (light) | Sonnet 4.6 / Haiku 4.5 |
-    | `smart` | Gemini 2.5 Pro (all agents) | Opus 4.7 |
+    | `cheap` | Gemini 2.5 Flash-Lite (all agents) | Haiku 4.5 |
+    | `standard` | Gemini 2.5 Pro (Hephaestus / Metis / Techne) + Flash-Lite (others) | Sonnet 4.6 / Haiku 4.5 |
+    | `smart` | Gemini 2.5 Pro (most) + Flash-Lite (Puck / Aidos) | Opus 4.7 (Metis) / Sonnet 4.6 |
 
     !!! warning "Google free tier"
         Free tier prompts are used to improve Google's products. Switch to Paid tier in AI Studio to opt out.
