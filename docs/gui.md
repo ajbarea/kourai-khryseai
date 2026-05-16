@@ -120,11 +120,14 @@ skip, motion-sensitivity toggle for accessibility).
 
 Each agent speaks through a per-agent neural voice. The runtime engine
 is [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) via
-RealtimeTTS — local, Apache-2.0, ~350 MB RAM on CPU. Edge-TTS is the
-documented cloud fallback for environments where Kokoro can't load.
-Audio plays at 44.1 kHz stereo with peak + loudness normalization, runs
-under ~100 ms latency, and the master volume / per-agent voice override
-live in [Configuration → Text-to-Speech](configuration.md#text-to-speech-configuration).
+RealtimeTTS — local, Apache-2.0, ~4 GB system RAM per upstream
+guidance on CPU. Edge-TTS is the documented cloud fallback for
+environments where Kokoro can't load. Audio plays at 44.1 kHz stereo
+with peak + loudness normalization; measured first-chunk latency on
+streaming `RealtimeTTS.play()` is ~3s (full latency table in
+[ROADMAP M20](../ROADMAP.md#m20--audio-text-synchronization-across-cli--gui--vn)),
+and the master volume / per-agent voice override live in
+[Configuration → Text-to-Speech](configuration.md#text-to-speech-configuration).
 
 Voice pacing controls the delay before an agent speaks: `INSTANT` /
 `FAST` (0.5 s) / `NORMAL` (1.5 s, default) / `SLOW` (3.0 s, light-novel

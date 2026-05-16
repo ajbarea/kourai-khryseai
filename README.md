@@ -275,8 +275,8 @@ Visual interface with agent portraits, dialogue bubbles, and neural text-to-spee
 
 - 🎨 Full-color agent portraits (JRPG aesthetic)
 - 💬 Real-time dialogue with streaming responses
-- 🔊 Low-latency neural voice synthesis (**Kokoro-82M local SLM** + Edge-TTS fallback)
-- ⚡ **170ms "Human-Like" Latency** via real-time audio chunk streaming
+- 🔊 Neural voice synthesis (**Kokoro-82M local SLM** + Edge-TTS fallback)
+- ⚡ **~3s to first audio chunk** on streaming `RealtimeTTS.play()` (measured 2026-05-03; full latency table in [ROADMAP M20](./ROADMAP.md#m20--audio-text-synchronization-across-cli--gui--vn))
 - ⚙️ Settings for accessibility and voice customization
 - 📜 Scrollable chat history
 
@@ -306,7 +306,7 @@ Companion spirits (Puck, Cupid, Aidos, Aletheia) and tier overrides are detailed
 
 Kourai Khryseai prioritizes local execution for privacy and speed.
 
-- **Kokoro-82M (Default)**: High-quality, Apache 2.0 local TTS. Runs on CPU with ~350MB RAM.
+- **Kokoro-82M (Default)**: High-quality, Apache 2.0 local TTS. CPU inference supported; ~4GB system RAM per upstream guidance ([hexgrad/Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M)).
 - **Edge-TTS (Fallback)**: Microsoft Azure Neural voices (requires internet).
 
 See [Configuration](docs/configuration.md) for full environment variable reference.
@@ -316,7 +316,7 @@ See [Configuration](docs/configuration.md) for full environment variable referen
 ## Development
 
 ```bash
-make test       # Run unit and integration tests (80%+ coverage)
+make test       # Run unit + integration + performance tests (~73% project coverage, 80% patch-coverage target)
 make lint       # Run ruff, ty, formatters
 make docs       # Serve docs locally at http://localhost:8000
 make help       # Show all available commands
