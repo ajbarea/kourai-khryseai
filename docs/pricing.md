@@ -28,8 +28,9 @@ and what to watch out for cost-wise.
 
     | Tier | Model | Used by |
     |---|---|---|
-    | `cheap` | Gemini 2.0 Flash | All agents |
-    | `standard` / `smart` | Gemini 2.5 Pro | Heavy agents / all agents |
+    | `cheap` | Gemini 2.5 Flash-Lite | All agents |
+    | `standard` | Gemini 2.5 Pro + Flash-Lite | Hephaestus / Metis / Techne on Pro, others on Flash-Lite |
+    | `smart` | Gemini 2.5 Pro (Puck / Aidos on Flash-Lite) | All agents |
 
     !!! warning "Google free tier"
         Free tier prompts are used to improve Google's products. Switch to Paid tier in AI Studio to opt out.
@@ -80,8 +81,9 @@ each fix loop hit the cache for the `[system + tools + initial-user]` prefix
 — typically 2K–10K tokens of file contents and git context.
 
 Cross-call caching of just the agent system prompt does **not** pay today
-(the prompts are below Anthropic's 2048 / 4096-token cache thresholds for
-Sonnet / Opus); within-loop is the actual win.
+(the prompts are below Anthropic's 1024-token Sonnet 4.6 and 4096-token
+Haiku 4.5 / Opus 4.6+ thresholds, [verified May 2026](https://platform.claude.com/docs/en/build-with-claude/prompt-caching));
+within-loop is the actual win.
 
 ## In-session usage tracking
 
