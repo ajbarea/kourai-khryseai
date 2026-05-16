@@ -105,6 +105,11 @@ $ make cli
 $ make gui
 ```
 
+**Or VN (Ren'Py visual novel):**
+```bash
+$ make vn        # resolves Ren'Py SDK from KOURAI_RENPY_EXE or local install
+```
+
 ### 2. Hephaestus Orchestrates
 
 Hephaestus routes your request through a pipeline and acts as **Forge Master** throughout. Before each specialist is called, Hephaestus narrates an in-character handoff line and passes the **full Forge Transcript** — every message from every agent so far — to the next specialist. Most requests flow: **Metis → Techne → Dokimasia → Kallos → Mneme**. Quick fixes skip planning. Pure styling requests skip coding.
@@ -181,6 +186,11 @@ make cli
 **GUI (richer experience with voices and visuals):**
 ```bash
 make gui
+```
+
+**VN (Ren'Py visual novel with affinity, romance routes, save/load):**
+```bash
+make vn          # see hosts/vn/README.md for Ren'Py SDK resolution
 ```
 
 See [Getting Started](docs/getting-started.md) for detailed setup and troubleshooting.
@@ -279,6 +289,19 @@ Visual interface with agent portraits, dialogue bubbles, and neural text-to-spee
 - ⚡ **~3s to first audio chunk** on streaming `RealtimeTTS.play()` (measured 2026-05-03; full latency table in [ROADMAP M20](./ROADMAP.md#m20--audio-text-synchronization-across-cli--gui--vn))
 - ⚙️ Settings for accessibility and voice customization
 - 📜 Scrollable chat history
+
+### VN (Ren'Py Visual Novel)
+
+Dating-sim inspired interface where the Golden Maidens are characters with personality, affinity tiers, and romance routes. Connects to the same agent backend through the `vn-bridge` Docker service (`:10010`). Built on Ren'Py 8.5.2.
+
+- 🏛️ Warm forge aesthetic — gold, cream, charcoal
+- 💛 Affinity HUD — tracks your relationship tier with each maiden
+- 💬 Gossip system — idle agents share personality-driven flavor text
+- 🎭 Choice events — agents present choices that affect affinity
+- 💘 Romance routes — Cupid coaches confession scenes at Tier 3 Bonded (0.7+ affinity)
+- 💾 Full save/load — portrait thumbnails, conversation context, bridge reconnect
+
+See [VN Reference](docs/vn.md) for architecture and [`hosts/vn/README.md`](hosts/vn/README.md) for SDK resolution and per-platform launcher notes.
 
 ---
 
