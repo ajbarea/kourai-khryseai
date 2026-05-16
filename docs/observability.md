@@ -74,7 +74,7 @@ The compose file labels every service with a `dev.dozzle.group` so the Dozzle si
 
 | Group | Members | Purpose |
 |---|---|---|
-| `agents` | mneme, kallos, techne, dokimasia, metis, puck, cupid, aidos, aletheia, hephaestus | The 10 A2A specialists |
+| `agents` | mneme, kallos, techne, dokimasia, metis, puck, cupid, aidos, aletheia, hephaestus | The 10 A2A agents (6 specialists + 2 companions + 2 validators) |
 | `mcp` | memory-mcp, context7-mcp | MCP sidecars the agents call into |
 | `observability` | jaeger, prometheus, dozzle | The triad itself |
 | `infra` | vn-bridge | Bridges + future infrastructure |

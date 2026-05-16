@@ -122,7 +122,7 @@ Nothing decisive happens silently — that prevents wasted tokens on speculation
 
 <div class="grid cards" markdown>
 
--   :material-api:{ .lg .middle } **Protocol** — [A2A](https://a2a-protocol.org), open agent-to-agent (pinned `>=0.3.25,<1.0`; M7 tracks the 1.0 cutover)
+-   :material-api:{ .lg .middle } **Protocol** — [A2A](https://a2a-protocol.org), open agent-to-agent (pinned `>=1.0,<2.0`; M7 cutover shipped 2026-04-30)
 -   :material-brain:{ .lg .middle } **LLM** — [LiteLLM](https://docs.litellm.ai/) wrapping Anthropic, Google, and Ollama
 -   :material-language-python:{ .lg .middle } **Language** — Python `>=3.12,<3.14`
 -   :material-server:{ .lg .middle } **Server** — [Starlette](https://www.starlette.io/) + uvicorn via `a2a-sdk`

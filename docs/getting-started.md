@@ -1,6 +1,6 @@
 # Getting Started
 
-Kourai Khryseai works as a **real-time conversation** with ten AI specialists. You describe what you need, they ask clarifying questions, show their work as they build it, and iterate based on your feedback. Three paths to the same system:
+Kourai Khryseai works as a **real-time conversation** with ten AI agents (six specialists, two companion spirits, two quality validators). You describe what you need, they ask clarifying questions, show their work as they build it, and iterate based on your feedback. Three paths to the same system:
 
 - **CLI** — Fast, scriptable, terminal-based
 - **GUI** — Rich desktop experience with agent portraits, TTS, and visual effects
