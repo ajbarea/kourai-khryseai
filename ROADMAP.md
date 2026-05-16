@@ -5,7 +5,7 @@ A public, living plan for where the forge is heading. Items here are either
 *currently working on* lives in [IMPL.md](./IMPL.md) — when it lands, the
 matching milestone here collapses to a single line under "Shipped".
 
-Last reviewed: 2026-05-14. **NE AI Agents Day 2026 poster session shipped
+Last reviewed: 2026-05-16. **NE AI Agents Day 2026 poster session shipped
 2026-05-10** (NYC, Jane Street; QR-code demo live). Polish phase complete.
 Now resuming full-speed development with **M6 ElevenLabs hybrid** as the
 next priority (sub-task 2 audio cache layer shipped [#174]; sub-tasks
@@ -588,10 +588,17 @@ tied to any single one. Update when an invariant changes.
   [PR #74](https://github.com/ajbarea/kourai-khryseai/pull/74) capture
   the round-trip design when the first forge MCP tool wants `ctx.elicit()`.
 - **MCP spec version pinned to 2025-11-25** — confirmed still current as
-  of 2026-05-06 (no new revision since November 2025; v2.1 SEPs in
+  of 2026-05-16 (no new revision since November 2025; v2.1 SEPs in
   flight, not yet adopted). Spec drift watcher cron
   (`scripts/watch_protocols.py`, runs Sundays 13:00 UTC) flags any
   subsequent revision.
+- **Opus 4.7 tokenizer caveat.** Same per-token rates as Opus 4.6, but
+  the new tokenizer can consume up to ~1.35× more tokens for the same
+  source text. Cost *accounting* stays correct (LiteLLM reports actual
+  tokens), but cost *projection* from Opus 4.6 historical usage
+  under-quotes by up to ~35%. Affects metis (the only SMART-tier
+  Opus 4.7 caller today). Captured in `pricing.py` header comment so
+  the planning surface, not the accounting one, carries the caveat.
 - **`run_post_task_hooks` orchestration unwired.** Layer is fully tested
   but no production call sites; `synthesise_fact_from_pause` lives
   directly in `streaming.py` as the pragmatic answer. Promotion is

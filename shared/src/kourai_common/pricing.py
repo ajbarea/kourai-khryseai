@@ -48,9 +48,15 @@ class ModelPricing:
     cache_write_1h_per_m: float
 
 
-# April 2026 published rates (per million tokens, USD).
+# research(2026-05): rates verified against
+# https://platform.claude.com/docs/en/about-claude/pricing on 2026-05-16.
 # Anthropic invariants: output = 5x input, cache_read = 0.1x input,
-# cache_write_5min = 1.25x input, cache_write_1h = 2x input.
+# cache_write_5min = 1.25x input, cache_write_1h = 2x input. Opus 4.7 carries
+# the same per-token rates as Opus 4.6 but ships a new tokenizer that may
+# consume up to ~1.35× as many tokens for the same source text — projecting
+# Opus 4.7 spend from Opus 4.6 historical usage will under-quote by up to
+# ~35%. The math here remains correct because LiteLLM reports actual tokens
+# consumed; the caveat lives at the planning surface, not the accounting one.
 ANTHROPIC_PRICING: dict[str, ModelPricing] = {
     "anthropic/claude-haiku-4-5-20251001": ModelPricing(
         input_per_m=1.0,
@@ -83,13 +89,34 @@ ANTHROPIC_PRICING: dict[str, ModelPricing] = {
 }
 
 
-# Gemini April 2026 rates. 2.5-pro uses the under-200K-context tier (most
-# of our calls fit easily); long-context calls would land slightly higher
-# but the gap is small and the under-counting is documented.
-# cache_write_*_per_m left at 0 — Gemini's caching pricing is per-hour
-# storage, not per-write; the model doesn't fit our shape cleanly.
+# research(2026-05): Gemini rates verified against
+# https://ai.google.dev/gemini-api/docs/pricing on 2026-05-16. 2.5-pro uses
+# the under-200K-context tier (most of our calls fit easily); long-context
+# calls would land slightly higher but the gap is small and the
+# under-counting is documented. cache_write_*_per_m left at 0 — Gemini's
+# caching pricing is per-hour storage, not per-write; the model doesn't fit
+# our shape cleanly. gemini-2.0-flash is **deprecated and shuts down
+# 2026-06-01** per Google's pricing page; kourai's config maps migrated to
+# `gemini-2.5-flash-lite` (price-identical successor) in the same 2026-05
+# sweep that introduced this comment. The 2.0-flash entry stays so historical
+# session logs still cost-resolve instead of silently quoting `$ —`.
 GEMINI_PRICING: dict[str, ModelPricing] = {
     "gemini/gemini-2.0-flash": ModelPricing(
+        # DEPRECATED 2026-06-01. Retained for /usage cost-resolution against
+        # pre-migration session logs only. Cache pinned at the 0.1x invariant
+        # under-counts the true rate ($0.025/MTok per Google's pricing page),
+        # but the entry is read-only-historical so the divergence stays
+        # confined to legacy logs.
+        input_per_m=0.10,
+        output_per_m=0.40,
+        cache_read_per_m=0.01,
+        cache_write_5min_per_m=0.0,
+        cache_write_1h_per_m=0.0,
+    ),
+    "gemini/gemini-2.5-flash-lite": ModelPricing(
+        # Price-identical drop-in successor to the deprecated 2.0-flash;
+        # cache_read at 0.01/MTok matches the 0.1x invariant and the Google
+        # pricing page's published rate.
         input_per_m=0.10,
         output_per_m=0.40,
         cache_read_per_m=0.01,
