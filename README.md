@@ -8,7 +8,7 @@
 
 *Ten specialized AI agents that collaborate with you on development—you guide each step, they show their work, iterate in real-time.*
 
-[![A2A Protocol](https://img.shields.io/badge/A2A_Protocol-v0.4-4285F4?style=flat-square&logo=google&logoColor=white)](https://a2a-protocol.org)
+[![A2A Protocol](https://img.shields.io/badge/A2A_Protocol-v1-4285F4?style=flat-square&logo=google&logoColor=white)](https://a2a-protocol.org)
 [![Python](https://img.shields.io/badge/Python-3.12+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
 [![uv](https://img.shields.io/badge/uv-package_manager-DE5FE9?style=flat-square)](https://docs.astral.sh/uv/)
 [![codecov](https://codecov.io/gh/ajbarea/kourai-khryseai/graph/badge.svg?token=bNiUvETLLU)](https://codecov.io/gh/ajbarea/kourai-khryseai)
@@ -19,7 +19,7 @@
 **Collaborate, don't automate. See your agents think. Guide them in real-time.**
 
 ```
-$ make cli
+$ uv run kourai-dev cli
 
 ❯ add user authentication
 
@@ -95,19 +95,19 @@ Each is an independent HTTP server communicating via the open [A2A protocol](htt
 
 **CLI (interactive REPL):**
 ```bash
-$ make cli
+$ uv run kourai-dev cli
 
 ❯ implement CSV export with tests
 ```
 
 **Or GUI (visual interface):**
 ```bash
-$ make gui
+$ uv run kourai-dev gui
 ```
 
 **Or VN (Ren'Py visual novel):**
 ```bash
-$ make vn        # resolves Ren'Py SDK from KOURAI_RENPY_EXE or local install
+$ uv run kourai-dev vn   # resolves Ren'Py SDK from KOURAI_RENPY_EXE or local install
 ```
 
 ### 2. Hephaestus Orchestrates
@@ -150,13 +150,15 @@ If Kallos finds issues Techne can fix, they iterate up to 5 rounds automatically
 
 ## Quick Start
 
+> Every `uv run kourai-dev <cmd>` below has a `make <cmd>` shorthand if you prefer — the Makefile is a thin compatibility wrapper around the same dev CLI.
+
 ### 1. Install
 
 ```bash
 git clone https://github.com/ajbarea/kourai-khryseai.git
 cd kourai-khryseai
 
-make setup        # Install dependencies (equivalent: uv sync --all-packages)
+uv sync --all-packages    # Install all workspace dependencies
 cp .env.example .env
 # Edit .env — add your ANTHROPIC_API_KEY
 ```
@@ -164,33 +166,33 @@ cp .env.example .env
 **Using Ollama instead (free, local)?**
 ```bash
 # Install Ollama, pull models, then:
-KOURAI_PROVIDER=local make cli
+KOURAI_PROVIDER=local uv run kourai-dev cli
 ```
 
 ### 2. Start the Agents
 
 ```bash
-make up           # Build images and start all 10 agents + vn-bridge + observability stack
-make status       # Check health
+uv run kourai-dev up        # Build images and start all 10 agents + vn-bridge + observability stack
+uv run kourai-dev status    # Check health
 ```
 
 ### 3. Your First Conversation
 
 **CLI:**
 ```bash
-make cli
+uv run kourai-dev cli
 
 ❯ implement CSV export with tests
 ```
 
 **GUI (richer experience with voices and visuals):**
 ```bash
-make gui
+uv run kourai-dev gui
 ```
 
 **VN (Ren'Py visual novel with affinity, romance routes, save/load):**
 ```bash
-make vn          # see hosts/vn/README.md for Ren'Py SDK resolution
+uv run kourai-dev vn        # see hosts/vn/README.md for Ren'Py SDK resolution
 ```
 
 See [Getting Started](docs/getting-started.md) for detailed setup and troubleshooting.
@@ -200,7 +202,7 @@ See [Getting Started](docs/getting-started.md) for detailed setup and troublesho
 Create a real on-disk git project that the maidens forge into. Each player turn runs in a git worktree on a `forge/...` branch — accept to fast-forward into `main`, discard to throw it away.
 
 ```bash
-make cli
+uv run kourai-dev cli
 
 ❯ /project new hello-forge --template python
 ❯ /project use hello-forge
@@ -214,8 +216,8 @@ Projects live under `~/.kourai_khryseai/projects/<player_id>/`. Templates: `empt
 **Sandboxed execution (opt-in):** route every agent-issued command through a locked-down container.
 
 ```bash
-make sandbox-image                    # one-time: build the kourai-sandbox image
-KOURAI_SANDBOX=container make cli     # pytest, ruff, etc. now run in --network=none containers
+uv run kourai-dev sandbox-image                  # one-time: build the kourai-sandbox image
+KOURAI_SANDBOX=container uv run kourai-dev cli   # pytest, ruff, etc. now run in --network=none containers
 ```
 
 If `docker` isn't on your PATH, the CLI logs a warning and falls back to host execution — devs aren't blocked.
@@ -225,35 +227,36 @@ If `docker` isn't on your PATH, the CLI logs a warning and falls back to host ex
 ## Architecture
 
 ```
-                    YOU (CLI or GUI)
-                           │
-                      A2A · SSE
-                           ▼
-                  🔥 HEPHAESTUS (Orchestrator)
-                         :10000
-                    ┌─────┼─────┐
-         A2A        │     │     │      A2A
-      ┌──────────┬──┤     │     ├──┬──────────┐
-      │          │  │     │     │  │          │
-   📐 METIS  ⚙️ TECHNE  🧪 DOKIMASIA  ✨ KALLOS  📜 MNEME
-   :10001     :10002     :10003      :10004    :10005
-      │          │  │     │     │  │          │
-      └──────────┴──┤     │     ├──┴──────────┘
-                  │     │     │
-                 MCP Servers
-              (filesystem, git, shell)
-                     │
-              OpenTelemetry → Jaeger ◄──► Prometheus
-                   :16686 (UI)         :9090 (UI)
+              YOU  (CLI · GUI · Ren'Py VN)
+                     │            │
+                A2A · SSE     HTTP/NDJSON
+                     │            ▼
+                     │      vn-bridge :10010
+                     ▼            │
+              🔥 HEPHAESTUS  ◄────┘
+              (Orchestrator)
+                  :10000
+        ┌────┬────┼────┬────┐
+        ▼    ▼    ▼    ▼    ▼              Companions / Validators
+     📐 METIS  ⚙️ TECHNE  🧪 DOKIMASIA      🎭 PUCK    💘 CUPID
+     :10001    :10002    :10003             :10006    :10007
+     ✨ KALLOS  📜 MNEME                     🪞 AIDOS   📚 ALETHEIA
+     :10004    :10005                        :10008    :10009
+        │
+        ▼
+  MCP servers — forge + shell (in-repo) · memory-mcp + context7-mcp (sidecars)
+        │
+        ▼
+  OpenTelemetry → Jaeger :16686 · Prometheus :9090 · Dozzle :8888
 ```
 
 **Key points:**
-- Each agent is an independent HTTP server with its own model assignment
-- A2A protocol enables peer-to-peer communication without a central broker
-- Hephaestus maintains a **Forge Transcript** and passes the full history to every specialist — each agent sees all prior reasoning before contributing
-- Real-time streaming via SSE allows agents to show work as it happens
-- MCP servers handle filesystem, git, and shell access
-- Jaeger + Prometheus trace every request and monitor performance
+- Each of the 10 agents is an independent HTTP server with its own model assignment.
+- A2A protocol enables peer-to-peer communication without a central broker; Ren'Py speaks through `vn-bridge`, a synchronous-to-async HTTP/NDJSON shim on `:10010`.
+- Hephaestus maintains a **Forge Transcript** and passes the full history to every specialist — each agent sees all prior reasoning before contributing.
+- Real-time streaming via SSE allows agents to show work as it happens.
+- MCP layer: two in-repo servers (`mcp_servers/forge`, `mcp_servers/shell`) for filesystem / git / shell access; two Docker sidecars (`memory-mcp`, `context7-mcp`) for knowledge graph + library docs.
+- Jaeger + Prometheus + Dozzle cover traces, metrics, and live logs (`uv run kourai-dev observe` opens all three).
 
 ---
 
@@ -339,10 +342,13 @@ See [Configuration](docs/configuration.md) for full environment variable referen
 ## Development
 
 ```bash
-make test       # Run unit + integration + performance tests (~73% project coverage, 80% patch-coverage target)
-make lint       # Run ruff, ty, formatters
-make docs       # Serve docs locally at http://localhost:8000
-make help       # Show all available commands
+uv run kourai-dev validate    # Quick pre-push gate: lint + unit tests
+uv run kourai-dev lint        # ruff format --check + ruff check + ty (CI-equivalent)
+uv run kourai-dev fix         # Auto-apply ruff format + safe/unsafe fixes
+uv run kourai-dev test        # Full suite: unit + integration + performance (~73% project coverage, 80% patch-coverage target)
+uv run kourai-dev observe     # Open Jaeger, Prometheus, Dozzle in browser
+uv run kourai-dev docs        # Serve docs locally at http://localhost:8000
+uv run kourai-dev help        # Show all available commands
 ```
 
 **Stack:**
@@ -377,13 +383,13 @@ Hephaestus auto-selects the right pipeline based on your request:
 
 ## Observability
 
-Every request creates a distributed trace across all agents. Open Jaeger at [`localhost:16686`](http://localhost:16686) or Prometheus at [`localhost:9090`](http://localhost:9090) to see:
+Every request creates a distributed trace across all agents. `uv run kourai-dev observe` opens the three-pane diagnostic surface in your browser:
 
-- Full request flow as a single trace
-- Per-agent LLM call latency
-- Error locations and context
-- **RED metrics** (Rate, Error, Duration) via Jaeger SPM
-- Real-time performance visualization
+- **Jaeger** ([`localhost:16686`](http://localhost:16686)) — traces: A2A hops, MCP tool calls, full pipeline timing. RED metrics (Rate, Error, Duration) via the spanmetrics connector.
+- **Prometheus** ([`localhost:9090`](http://localhost:9090)) — metrics: latency percentiles, rates, error counts.
+- **Dozzle** ([`localhost:8888`](http://localhost:8888)) — live per-container log tail with trace IDs stamped on every span-bound line.
+
+Trace → flow. Metric → aggregate. Log → narrative. See [Observability docs](docs/observability.md) for the cross-tool linking pattern and triage runbook.
 
 ---
 
@@ -398,7 +404,10 @@ Full docs are available at [Kourai Khryseai](https://ajbarea.github.io/kourai-kh
 - [Architecture](docs/architecture/index.md) — System design and patterns
 - [CLI Reference](docs/cli.md) — Commands and options
 - [GUI Reference](docs/gui.md) — Interface and voice settings
+- [VN Reference](docs/vn.md) — Ren'Py architecture, bridge protocol, save/load
+- [Observability](docs/observability.md) — Jaeger / Prometheus / Dozzle triage runbook
 - [Configuration](docs/configuration.md) — Environment variables and model assignment
+- [Pricing](docs/pricing.md) — Per-tier cost structure for Anthropic / Google / Ollama
 
 ---
 
