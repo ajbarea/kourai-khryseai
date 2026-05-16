@@ -37,10 +37,14 @@ WORKING_MEMORY_LIMIT = 5
 # Anthropic prompt caching (see ROADMAP.md M4).
 # LiteLLM forwards `cache_control` blocks to Anthropic / Gemini / Vertex and
 # silently drops them on other providers, so the markers below are safe to
-# emit unconditionally. Min cacheable prefix tokens (April 2026):
-# Sonnet 4.6 = 2048, Opus 4.6 / 4.7 = 4096 — sub-threshold prefixes are
-# silently ignored by Anthropic with no charge, so marking small prompts
-# costs nothing.
+# emit unconditionally. Min cacheable prefix tokens (verified 2026-05 against
+# https://platform.claude.com/docs/en/build-with-claude/prompt-caching):
+# Sonnet 4.6 = 1024, Opus 4.6 / 4.7 = 4096, Haiku 4.5 = 4096 — sub-threshold
+# prefixes are silently ignored by Anthropic with no charge, so marking small
+# prompts costs nothing. The 4096-token Haiku threshold matters for the
+# default CHEAP tier (every agent on Haiku 4.5): a system prompt under that
+# size will pass `cache_control` through but never cache, surfacing as
+# `cache_creation_input_tokens == cache_read_input_tokens == 0` in usage.
 _EPHEMERAL_CACHE: dict[str, str] = {"type": "ephemeral"}
 
 

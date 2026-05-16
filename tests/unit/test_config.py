@@ -46,7 +46,7 @@ class TestGetModel:
         monkeypatch.setattr("kourai_common.config.MODEL_TIER", "cheap")
 
         result = config.get_model("hephaestus")
-        assert result == "gemini/gemini-2.0-flash"
+        assert result == "gemini/gemini-2.5-flash-lite"
 
     def test_get_model_invalid_provider_defaults_anthropic(self, monkeypatch):
         """Test invalid provider falls back to anthropic."""

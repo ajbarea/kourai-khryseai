@@ -50,29 +50,29 @@ MODELS_SMART = {
 
 # Google Gemini model tiers — mapped to Claude capability equivalents
 MODELS_CHEAP_GOOGLE = {
-    "hephaestus": "gemini/gemini-2.0-flash",
-    "metis": "gemini/gemini-2.0-flash",
-    "techne": "gemini/gemini-2.0-flash",
-    "dokimasia": "gemini/gemini-2.0-flash",
-    "kallos": "gemini/gemini-2.0-flash",
-    "mneme": "gemini/gemini-2.0-flash",
-    "puck": "gemini/gemini-2.0-flash",
-    "cupid": "gemini/gemini-2.0-flash",
-    "aidos": "gemini/gemini-2.0-flash",
-    "aletheia": "gemini/gemini-2.0-flash",
+    "hephaestus": "gemini/gemini-2.5-flash-lite",
+    "metis": "gemini/gemini-2.5-flash-lite",
+    "techne": "gemini/gemini-2.5-flash-lite",
+    "dokimasia": "gemini/gemini-2.5-flash-lite",
+    "kallos": "gemini/gemini-2.5-flash-lite",
+    "mneme": "gemini/gemini-2.5-flash-lite",
+    "puck": "gemini/gemini-2.5-flash-lite",
+    "cupid": "gemini/gemini-2.5-flash-lite",
+    "aidos": "gemini/gemini-2.5-flash-lite",
+    "aletheia": "gemini/gemini-2.5-flash-lite",
 }
 
 MODELS_STANDARD_GOOGLE = {
     "hephaestus": "gemini/gemini-2.5-pro",
     "metis": "gemini/gemini-2.5-pro",
     "techne": "gemini/gemini-2.5-pro",
-    "dokimasia": "gemini/gemini-2.0-flash",
-    "kallos": "gemini/gemini-2.0-flash",
-    "mneme": "gemini/gemini-2.0-flash",
-    "puck": "gemini/gemini-2.0-flash",
-    "cupid": "gemini/gemini-2.0-flash",
-    "aidos": "gemini/gemini-2.0-flash",
-    "aletheia": "gemini/gemini-2.0-flash",
+    "dokimasia": "gemini/gemini-2.5-flash-lite",
+    "kallos": "gemini/gemini-2.5-flash-lite",
+    "mneme": "gemini/gemini-2.5-flash-lite",
+    "puck": "gemini/gemini-2.5-flash-lite",
+    "cupid": "gemini/gemini-2.5-flash-lite",
+    "aidos": "gemini/gemini-2.5-flash-lite",
+    "aletheia": "gemini/gemini-2.5-flash-lite",
 }
 
 MODELS_SMART_GOOGLE = {
@@ -82,9 +82,9 @@ MODELS_SMART_GOOGLE = {
     "dokimasia": "gemini/gemini-2.5-pro",
     "kallos": "gemini/gemini-2.5-pro",
     "mneme": "gemini/gemini-2.5-pro",
-    "puck": "gemini/gemini-2.0-flash",
+    "puck": "gemini/gemini-2.5-flash-lite",
     "cupid": "gemini/gemini-2.5-pro",
-    "aidos": "gemini/gemini-2.0-flash",
+    "aidos": "gemini/gemini-2.5-flash-lite",
     "aletheia": "gemini/gemini-2.5-pro",
 }
 
