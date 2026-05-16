@@ -20,7 +20,7 @@ WORKDIR /app
 # Pre-install packages so the container starts instantly (avoids npx cold-download).
 RUN --mount=type=cache,target=/root/.npm,sharing=locked \
     npm install --cache /root/.npm -g \
-        @upstash/context7-mcp@2.1.6 \
+        @upstash/context7-mcp@2.2.5 \
         supergateway@3.4.3 && \
     supergateway --version
 

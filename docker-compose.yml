@@ -114,7 +114,7 @@ services:
   # single browser tab. Docker socket bind is read-only; UI binds
   # localhost-only so nothing leaks beyond the dev box.
   dozzle:
-    image: amir20/dozzle:v10.5.0
+    image: amir20/dozzle:v10.5.3
     labels:
       dev.dozzle.group: observability
     volumes:

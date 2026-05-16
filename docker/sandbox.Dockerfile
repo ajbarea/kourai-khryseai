@@ -32,13 +32,20 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # network kills it before the missing binary matters. uv comes from apk
 # (Wolfi keeps it current); ruff + pytest go in via uv pip --system to
 # pin them to current PyPI releases.
+#
+# research(2026-05): nodejs-24 (Active LTS through April 2028) over
+# nodejs-22 (Maintenance LTS, EOL April 2027). Node 24 ships npm v11
+# (~65% faster installs than v10) and stable native TypeScript
+# type-stripping. Wolfi packages both; tracking the current LTS keeps
+# the agent sandbox aligned with what new repos pick.
+# source: nodejs.org/en/about/previous-releases
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked \
     apk add --no-cache \
         python-${PYTHON_VERSION} \
         py${PYTHON_VERSION}-pip \
         git \
         ca-certificates \
-        nodejs-22 \
+        nodejs-24 \
         npm \
         uv
 
