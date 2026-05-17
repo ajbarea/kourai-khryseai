@@ -187,19 +187,24 @@ EOF
 
     if (( AUTOPILOT == 1 )); then
         # 3-pane vertical stack: REPL (40%), claude autopilot (30%), ops (30%).
-        # Step 1: peel 60% off the bottom of the REPL pane for the lower stack.
-        tmux split-window -t "${session}:0.0" -v -l 60%
-        # Step 2: split the lower stack 50/50 — top half = autopilot, bottom = ops.
+        #
+        # The autopilot pane runs `claude` directly with the bootstrap prompt
+        # as a positional argument. Per 2026 Anthropic CLI docs + known
+        # behavior (claude-code#23456): typing the prompt via tmux send-keys
+        # AFTER claude has started leaves the text in the input field
+        # un-submitted, because Enter at the startup-screen idle prompt is
+        # captured as a literal newline rather than processed as submit.
+        # The fix is to pass it as the positional `prompt` arg —
+        # `claude [options] [command] [prompt]` — which auto-submits as the
+        # first user message.
+        local autopilot_cmd="claude --dangerously-skip-permissions 'Read scripts/theoros_autopilot.md and execute its instructions to drive an autonomous theoros session.'"
+        # Step 1: peel 60% off the bottom of the REPL pane for the autopilot pane.
+        tmux split-window -t "${session}:0.0" -v -l 60% "$autopilot_cmd"
+        # Step 2: split the lower pane in half — ops takes the bottom 50%.
         if [[ -n "$ops" ]]; then
             tmux split-window -t "${session}:0.1" -v -l 50% "$ops"
             ops_pane_json="\"${session}:0.2\""
         fi
-        # Step 3: launch claude in pane 0.1 (the autopilot slot).
-        tmux send-keys -t "${session}:0.1" "claude" Enter
-        # Step 4: wait for claude to be ready, then send the single-line
-        # bootstrap message that points it at the full autopilot brief.
-        sleep 3
-        tmux send-keys -t "${session}:0.1" "Read scripts/theoros_autopilot.md and execute its instructions to drive an autonomous theoros session." Enter
         autopilot_pane_json="\"${session}:0.1\""
     elif [[ -n "$ops" ]]; then
         # Manual mode: 2-pane layout with ops below REPL. Used by the
