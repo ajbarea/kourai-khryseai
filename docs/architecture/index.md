@@ -28,7 +28,7 @@ not a UX-only affordance.
   [Hephaestus ↔ Specialists](#hephaestus-specialists-the-forge-transcript)
   below).
 - **Trace-ID injection** — `_OtelTraceFilter` in
-  `shared/src/kourai_common/log.py:89` threads the active trace ID into
+  `shared/src/kourai_common/log.py` threads the active trace ID into
   every log record so a Jaeger span is grep-findable in Dozzle without
   any code change between observation and search.
 
@@ -49,10 +49,10 @@ not a UX-only affordance.
 
 - **Bounded Kallos⇅Techne repair loop** — when Kallos finds lint or
   style issues Techne can fix, Hephaestus iterates Techne→Kallos up to
-  `KOURAI_MAX_ITERATIONS` rounds (default 5; see
-  `shared/src/kourai_common/config.py:136` and
-  `agents/hephaestus/agent.py:593`). Beyond the bound, the remainder
-  is reported, not silently retried.
+  `KOURAI_MAX_ITERATIONS` rounds (default 5; defined in
+  `shared/src/kourai_common/config.py::MAX_ITERATIONS`, driven by the
+  loop body in `agents/hephaestus/agent.py`). Beyond the bound, the
+  remainder is reported, not silently retried.
 - **Graceful TTS auto-mute** — `is_audio_output_available()` in
   `shared/src/kourai_common/audio_env.py` probes PortAudio after cheap
   early-exits (env, headless Linux, WSL2-without-WSLg) so a missing

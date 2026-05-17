@@ -15,7 +15,7 @@
 
 ## Why this exists
 
-Today's CLI onboarding (`hosts/cli/onboarding.py`) is a 224-line scripted form: name, pronunciation, mode toggle, title, role, pronouns. Puck appears as two static italicized lines and Hephaestus as a single closing line. Neither agent is invoked. The form collects data; it doesn't *introduce* the player to the game.
+Today's CLI onboarding (`hosts/cli/onboarding.py`) is a ~213-line scripted form: name, pronunciation, mode toggle, title, role, pronouns. Puck appears as two static italicized lines and Hephaestus as a single closing line. Neither agent is invoked. The form collects data; it doesn't *introduce* the player to the game.
 
 This spec replaces the scripted form with a **flight-scene tutorial** in which Puck is invoked as an actual A2A agent and escorts the player to meet Hephaestus and the maidens for the first time. Vibe references: Berserk's Puck (chaotic-good trickster, comic relief, sweet underneath) + Yu Yu Hakusho ep. 1 (Botan ferrying Urameshi to King Enma — the psychopomp gas-up).
 
@@ -194,7 +194,13 @@ Total: **3 LLM calls** for the new tutorial, vs. 0 today. All three have canned 
 
 Each gets its own spec when its turn comes:
 
-1. **Aidos / Aletheia registry parity** — add to `AGENT_METADATA`, decide CLI surface (slash command? Hephaestus-routed only?). Closes the "CLI doesn't know about all 10 agents" gap from the audit.
+1. **Aidos / Aletheia registry parity** — ~~add to
+   `AGENT_METADATA`~~ **closed 2026-05-17** (entries with
+   canonical Okabe-Ito CVD-safe colors + epithets landed in
+   `shared/src/kourai_common/agents.py`; VN `AGENT_CHARS` extended
+   in `hosts/vn/kourai_vn/game/script_data.rpy`). Remaining: decide
+   CLI surface (slash command? Hephaestus-routed only?). Closes the
+   "CLI doesn't know about all 10 agents" gap from the audit.
 2. **GUI port of this tutorial** — `hosts/gui/onboarding_ui.py` (611 lines today) gets the same beat structure with pygame-rendered dialogue.
 3. **VN port of this tutorial** — Ren'Py scene with Puck sprite, forge background, Hephaestus reveal via sprite-swap. The flagship visual treatment of the flight scene.
 4. **Shared-layer cleanup** from the parity audit:
