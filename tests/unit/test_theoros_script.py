@@ -97,14 +97,14 @@ def test_up_creates_tmux_session(monkeypatch):
     """Up creates a detached tmux session named per session_name."""
     # Override the skill-context REPL to something that does not depend on docker.
     monkeypatch.setenv("THEOROS_REPL_OVERRIDE", "bash -c 'while true; do sleep 1; done'")
-    result = _run("up")
+    result = _run("up", "--no-autopilot")
     assert result.returncode == 0, f"stderr: {result.stderr}\nstdout: {result.stdout}"
     assert _session_exists("kourai-theoros"), "tmux session not created"
 
 
 def test_up_writes_state_file_with_required_fields(monkeypatch):
     monkeypatch.setenv("THEOROS_REPL_OVERRIDE", "bash -c 'while true; do sleep 1; done'")
-    result = _run("up")
+    result = _run("up", "--no-autopilot")
     assert result.returncode == 0, result.stderr
     assert STATE_FILE.is_file()
     state = json.loads(STATE_FILE.read_text())
@@ -124,14 +124,14 @@ def test_up_writes_state_file_with_required_fields(monkeypatch):
 
 def test_up_prints_attach_instructions(monkeypatch):
     monkeypatch.setenv("THEOROS_REPL_OVERRIDE", "bash -c 'while true; do sleep 1; done'")
-    result = _run("up")
+    result = _run("up", "--no-autopilot")
     assert "tmux attach -t kourai-theoros -r" in result.stdout
 
 
 def test_down_kills_session_and_removes_state_file(monkeypatch):
     monkeypatch.setenv("THEOROS_REPL_OVERRIDE", "bash -c 'while true; do sleep 1; done'")
     # up first
-    up = _run("up")
+    up = _run("up", "--no-autopilot")
     assert up.returncode == 0, up.stderr
     assert _session_exists("kourai-theoros")
     assert STATE_FILE.is_file()
@@ -162,7 +162,7 @@ def test_up_creates_two_panes_when_ops_command_present(monkeypatch):
     """With ops_command in YAML/env, up creates a split layout (2 panes)."""
     monkeypatch.setenv("THEOROS_REPL_OVERRIDE", "bash -c 'while true; do sleep 1; done'")
     monkeypatch.setenv("THEOROS_OPS_OVERRIDE", "bash -c 'while true; do sleep 1; done'")
-    result = _run("up")
+    result = _run("up", "--no-autopilot")
     assert result.returncode == 0, result.stderr
     assert _pane_count("kourai-theoros") == 2
 
@@ -170,7 +170,7 @@ def test_up_creates_two_panes_when_ops_command_present(monkeypatch):
 def test_up_state_file_records_ops_pane(monkeypatch):
     monkeypatch.setenv("THEOROS_REPL_OVERRIDE", "bash -c 'while true; do sleep 1; done'")
     monkeypatch.setenv("THEOROS_OPS_OVERRIDE", "bash -c 'while true; do sleep 1; done'")
-    result = _run("up")
+    result = _run("up", "--no-autopilot")
     assert result.returncode == 0, result.stderr
     state = json.loads(STATE_FILE.read_text())
     assert state["ops_pane"] == "kourai-theoros:0.1"
@@ -178,9 +178,9 @@ def test_up_state_file_records_ops_pane(monkeypatch):
 
 def test_up_refuses_when_session_exists(monkeypatch):
     monkeypatch.setenv("THEOROS_REPL_OVERRIDE", "bash -c 'while true; do sleep 1; done'")
-    first = _run("up")
+    first = _run("up", "--no-autopilot")
     assert first.returncode == 0, first.stderr
-    second = _run("up")
+    second = _run("up", "--no-autopilot")
     assert second.returncode != 0
     combined = second.stderr + second.stdout
     assert "already running" in combined
@@ -201,7 +201,7 @@ def test_up_runs_prerequisites_and_aborts_on_failure(tmp_path, monkeypatch):
         "```\n"
     )
     monkeypatch.setenv("THEOROS_SKILL_CONTEXT_OVERRIDE", str(fake_ctx))
-    result = _run("up")
+    result = _run("up", "--no-autopilot")
     assert result.returncode != 0
     assert "intentional failure for the test" in (result.stderr + result.stdout)
     # Session must NOT have been created.
@@ -249,7 +249,7 @@ def _tmux_option(session: str, option: str) -> str:
 def test_up_enables_mouse_and_raises_scrollback(monkeypatch):
     """Up should set mouse on + history-limit 20000 for ergonomic spectating."""
     monkeypatch.setenv("THEOROS_REPL_OVERRIDE", "bash -c 'while true; do sleep 1; done'")
-    result = _run("up")
+    result = _run("up", "--no-autopilot")
     assert result.returncode == 0, result.stderr
 
     assert _tmux_option("kourai-theoros", "mouse") == "on", (
@@ -259,3 +259,64 @@ def test_up_enables_mouse_and_raises_scrollback(monkeypatch):
         "history-limit should be raised from tmux's 2000-line default "
         "(2026 balanced recommendation)"
     )
+
+
+# --- Autopilot mode tests ---
+
+
+def test_up_default_mode_requires_claude_on_path(monkeypatch):
+    """Autopilot is on by default; missing `claude` binary fails fast.
+
+    Sandboxed PATH that keeps /usr/bin and /bin (so the subprocess can find
+    bash) but excludes user-local dirs where Claude Code typically installs
+    (~/.local/bin or /usr/local/bin).
+    """
+    monkeypatch.setenv("THEOROS_REPL_OVERRIDE", "bash -c 'sleep 1'")
+    monkeypatch.setenv("PATH", "/usr/bin:/bin")
+    if shutil.which("claude") is not None:
+        pytest.skip("claude is installed in /usr/bin or /bin on this host; can't sandbox it out")
+    result = _run("up")
+    assert result.returncode != 0
+    combined = result.stderr + result.stdout
+    assert "Autopilot requires" in combined
+    assert "claude" in combined.lower()
+
+
+def test_no_autopilot_records_autopilot_zero_in_state_file(monkeypatch):
+    """--no-autopilot is recorded as autopilot=0 + autopilot_pane=null."""
+    monkeypatch.setenv("THEOROS_REPL_OVERRIDE", "bash -c 'while true; do sleep 1; done'")
+    result = _run("up", "--no-autopilot")
+    assert result.returncode == 0, result.stderr
+    state = json.loads(STATE_FILE.read_text())
+    assert state["autopilot"] == 0
+    assert state["autopilot_pane"] is None
+
+
+def test_no_autopilot_uses_two_pane_layout(monkeypatch):
+    """--no-autopilot produces 2 panes (REPL + ops), not 3."""
+    monkeypatch.setenv("THEOROS_REPL_OVERRIDE", "bash -c 'while true; do sleep 1; done'")
+    monkeypatch.setenv("THEOROS_OPS_OVERRIDE", "bash -c 'while true; do sleep 1; done'")
+    result = _run("up", "--no-autopilot")
+    assert result.returncode == 0, result.stderr
+    assert _pane_count("kourai-theoros") == 2
+
+
+def test_autopilot_brief_exists():
+    """The driver brief is required for autopilot mode."""
+    brief = REPO_ROOT / "scripts" / "theoros_autopilot.md"
+    assert brief.is_file(), f"missing autopilot brief: {brief}"
+    text = brief.read_text(encoding="utf-8")
+    assert "autopilot" in text.lower()
+    assert "kourai-theoros:0.0" in text  # references the REPL pane
+    assert "kourai-theoros:0.1" in text  # references its own pane
+    assert "kourai-theoros:0.2" in text  # references the ops pane
+
+
+def test_prompt_library_exists_and_has_curated_entries():
+    """Golden-dataset prompt library required for autopilot's prompt loop."""
+    library = REPO_ROOT / "tests" / "fixtures" / "theoros_prompts.md"
+    assert library.is_file(), f"missing prompt library: {library}"
+    text = library.read_text(encoding="utf-8")
+    # 2026 best practice for golden datasets: ≥10 curated entries.
+    p_count = sum(1 for i in range(1, 30) if f"P{i:02d}" in text)
+    assert p_count >= 10, f"prompt library has {p_count} P-numbered entries, expected >= 10"

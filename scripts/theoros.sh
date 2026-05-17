@@ -159,6 +159,15 @@ EOF
     # Run prerequisites before allocating any tmux state.
     run_prerequisites
 
+    # Autopilot pre-flight: require `claude` on PATH unless the operator
+    # opted out. The brief is the file Claude reads as its first action;
+    # missing it is a configuration error worth failing fast on.
+    local autopilot_brief="$REPO_ROOT/scripts/theoros_autopilot.md"
+    if (( AUTOPILOT == 1 )); then
+        command -v claude >/dev/null 2>&1 || err "Autopilot requires the 'claude' CLI on PATH. Install Claude Code (https://docs.claude.com/code) or rerun with --no-autopilot for the manual flow."
+        [[ -f "$autopilot_brief" ]] || err "Missing autopilot brief: $autopilot_brief"
+    fi
+
     repl="${THEOROS_REPL_OVERRIDE:-$(get_repl_command)}"
     ops="${THEOROS_OPS_OVERRIDE:-$(get_ops_command)}"
     sf="$(state_file_path)"
@@ -169,18 +178,33 @@ EOF
     # from tmux's 2000-line default. Use -g (global) for mouse — it's the
     # canonical 2026 idiom and propagates more reliably to attached clients
     # than the session-scoped form. history-limit is per-session.
-    # 50000 is the 2026 "balanced" recommendation for active dev sessions —
-    # ~8 MB total memory for 2 panes, trivial cost.
+    # 50000 is the 2026 "balanced" recommendation for active dev sessions.
     tmux set-option -g mouse on
     tmux set-option -t "$session" history-limit 50000
 
     local ops_pane_json="null"
-    if [[ -n "$ops" ]]; then
-        # Pass the ops command directly to split-window (same pattern as the
-        # top pane uses for new-session). Avoids the shell-startup vs
-        # send-keys race that caused doubled-command output in the bottom
-        # pane during smoke.
-        tmux split-window -t "${session}:0" -v -l 40% "$ops"
+    local autopilot_pane_json="null"
+
+    if (( AUTOPILOT == 1 )); then
+        # 3-pane vertical stack: REPL (40%), claude autopilot (30%), ops (30%).
+        # Step 1: peel 60% off the bottom of the REPL pane for the lower stack.
+        tmux split-window -t "${session}:0.0" -v -l 60%
+        # Step 2: split the lower stack 50/50 — top half = autopilot, bottom = ops.
+        if [[ -n "$ops" ]]; then
+            tmux split-window -t "${session}:0.1" -v -l 50% "$ops"
+            ops_pane_json="\"${session}:0.2\""
+        fi
+        # Step 3: launch claude in pane 0.1 (the autopilot slot).
+        tmux send-keys -t "${session}:0.1" "claude" Enter
+        # Step 4: wait for claude to be ready, then send the single-line
+        # bootstrap message that points it at the full autopilot brief.
+        sleep 3
+        tmux send-keys -t "${session}:0.1" "Read scripts/theoros_autopilot.md and execute its instructions to drive an autonomous theoros session." Enter
+        autopilot_pane_json="\"${session}:0.1\""
+    elif [[ -n "$ops" ]]; then
+        # Manual mode: 2-pane layout with ops below REPL. Used by the
+        # techne:theoros skill when Claude drives from a CC conversation.
+        tmux split-window -t "${session}:0.0" -v -l 40% "$ops"
         ops_pane_json="\"${session}:0.1\""
     fi
 
@@ -198,14 +222,30 @@ EOF
   "repl_pid": $repl_pid,
   "attach_cmd": "tmux attach -t $session -r",
   "driver_pane": "$driver_pane",
-  "ops_pane": $ops_pane_json
+  "autopilot_pane": $autopilot_pane_json,
+  "ops_pane": $ops_pane_json,
+  "autopilot": $((AUTOPILOT == 1 ? 1 : 0))
 }
 EOF
 
-    info "theoros session ready."
-    info "  Spectate:   tmux attach -t $session -r"
-    info "  Take over:  tmux attach -t $session"
-    info "  Tear down:  make theoros-down"
+    if (( AUTOPILOT == 1 )); then
+        info "theoros session ready (autopilot)."
+        info "  Spectate:   tmux attach -t $session -r"
+        info "  Take over:  tmux attach -t $session"
+        info "  Tear down:  make theoros-down"
+        info ""
+        info "Claude is driving the REPL via the middle pane. Watch all three:"
+        info "  top    — kourai REPL (the game)"
+        info "  middle — Claude's reasoning"
+        info "  bottom — docker compose logs"
+    else
+        info "theoros session ready (manual mode)."
+        info "  Spectate:   tmux attach -t $session -r"
+        info "  Take over:  tmux attach -t $session"
+        info "  Tear down:  make theoros-down"
+        info ""
+        info "No autopilot — drive the REPL yourself or invoke /techne:theoros in a Claude conversation."
+    fi
 }
 
 cmd_down() {
@@ -222,14 +262,22 @@ cmd_down() {
 
 # --- Dispatch ---
 
+# Autopilot is the default for `up`. The techne:theoros skill passes
+# --no-autopilot when invoking from inside a Claude Code conversation
+# (where Claude is already the driver and a second pane would be redundant).
+AUTOPILOT=1
+
 # Only dispatch when run directly; allow sourcing for helper-level testing.
 if [[ "${BASH_SOURCE[0]:-}" == "${0}" ]]; then
     case "${1:-}" in
-        up)     cmd_up ;;
+        up)
+            [[ "${2:-}" == "--no-autopilot" ]] && AUTOPILOT=0
+            cmd_up
+            ;;
         down)   cmd_down ;;
         status) cmd_status ;;
         *)
-            printf 'Usage: bash %s {up|down|status}\n' "$0" >&2
+            printf 'Usage: bash %s {up [--no-autopilot]|down|status}\n' "$0" >&2
             exit 2
             ;;
     esac

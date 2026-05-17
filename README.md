@@ -353,13 +353,13 @@ uv run kourai-dev help        # Show all available commands
 
 ### Live observed dev session (`make theoros`)
 
-Spins up a split tmux session where Claude drives `make cli` (top pane) and you spectate the agent container logs (bottom pane). Run `make theoros`, then attach from another terminal:
+Spins up a 3-pane tmux session in **autopilot mode**: an autonomous `claude` CLI in the middle pane drives `make cli` (top pane) through a curated prompt library at `tests/fixtures/theoros_prompts.md`, while the bottom pane tails docker logs. Run `make theoros`, then attach from another terminal:
 
 ```bash
 tmux attach -t kourai-theoros -r
 ```
 
-`make theoros-down` tears it down. `make theoros-status` shows the JSON state file. See [docs/theoros.md](docs/theoros.md) for the role split and discipline rules.
+You watch all three panes — REPL, Claude's reasoning, agent logs. `make theoros-down` tears it down. `make theoros-status` shows the JSON state file. For manual driving (no autopilot pane), run `bash scripts/theoros.sh up --no-autopilot`. See [docs/theoros.md](docs/theoros.md) for the role split, the prompt library, and troubleshooting.
 
 **Stack:**
 - **Framework** — [a2a-sdk](https://github.com/a2a-org/a2a-sdk) + [Starlette](https://www.starlette.io/)
