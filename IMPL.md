@@ -8,19 +8,30 @@ cross-cutting invariants, and "next up" ordering live in
 If this file is more than ~50 lines, something queued or referential has
 crept in — extract it back to ROADMAP.
 
-Updated: 2026-05-16
+Updated: 2026-05-17
 
 ## In flight
 
-Nothing actively building. 2026-05-16 shipped two sweeps back-to-back:
-the May 2026 model/pricing verification sweep (#192 host-side
-gemini-2.5-flash-lite migration + cache threshold corrections + Opus
-4.7 tokenizer caveat; #193 sibling docs propagation) followed by the
-May 2026 infra freshness sweep (#194 — `uv` 0.10.10 → 0.11.14,
-`@upstash/context7-mcp` 2.1.6 → 2.2.5, `dozzle` v10.5.0 → v10.5.3,
-`nodejs-22` → `nodejs-24` in sandbox; all other Docker/GHA/Python pins
-verified FRESH against primary sources). See ROADMAP shipped log for
-details.
+Nothing actively building. Three back-to-back freshness sweeps shipped
+2026-05-16 → 2026-05-17:
+
+- #192 + #193 (2026-05-16) — May 2026 model/pricing verification.
+  Host-side gemini-2.5-flash-lite migration + cache threshold
+  corrections + Opus 4.7 tokenizer caveat (+ sibling docs propagation).
+- #194 (2026-05-16) — May 2026 infra freshness. `uv` 0.10.10 → 0.11.14,
+  `@upstash/context7-mcp` 2.1.6 → 2.2.5, `dozzle` v10.5.0 → v10.5.3,
+  `nodejs-22` → `nodejs-24` in sandbox.
+- #195 (2026-05-17) — May 2026 app-SDK freshness. Seven safe bumps
+  inside existing lower-bound ranges via `uv lock --upgrade-package`:
+  a2a-sdk 1.0.2 → 1.0.3, huggingface-hub 1.13.0 → 1.15.0, litellm
+  1.83.14 → 1.85.0 (cache-shape compat verified by passing all 31
+  `test_llm.py` cache tests), mcp 1.27.0 → 1.27.1, numpy 2.4.4 → 2.4.5,
+  pydantic 2.12.5 → 2.13.4, uvicorn 0.46.0 → 0.47.0. **RealtimeTTS
+  0.6.1 → 0.7.1 deferred** (KokoroEngine→KokoroVoice breaking change;
+  needs voice-load path updates + AJ-in-loop live smoke — backlog
+  entry in ROADMAP under "Surfaced 2026-05-17").
+
+See ROADMAP shipped log for one-liners.
 
 ## Next pickups
 
