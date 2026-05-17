@@ -84,19 +84,18 @@ Ten agents across three tiers — each with unique personality, color, and visua
 | **kallos** | The Muse | Rose-gold warmth (255, 220, 160) | Style guardian, aesthetic perfection |
 | **mneme** | The Oracle | Mystic purple-gold (180, 150, 220) | Memory keeper, documentation |
 
-### Companion Spirits
+### Supporting agents (backend-only in the GUI today)
 
-| Agent | Title | Color | Role |
-|---|---|---|---|
-| **puck** | The Trickster | Amber (245, 158, 11) | Tutorial guide, nudges, minigames |
-| **cupid** | The Matchmaker | Coral pink (251, 113, 133) | Romance spirit, affinity tracking, confession coaching |
-
-### Quality Validators
-
-| Agent | Title | Color | Role |
-|---|---|---|---|
-| **aidos** | The Mirror | Silver (192, 192, 210) | Anti-slop detection, pattern screening |
-| **aletheia** | The Scholar | Emerald (16, 185, 129) | Research validation, citation checking |
+The Pygame GUI currently renders panels for the six core specialists
+above. The four supporting agents — **Puck** (The Jester, tutorial
+companion), **Cupid** (The Aspect, romance companion), **Aidos** (anti-slop
+validator), and **Aletheia** (research validator) — exist in the agent
+backend and are reachable from the CLI / VN, but their GUI portrait
+panels aren't wired yet. Puck and Cupid already carry Okabe-Ito
+CVD-safe palette entries in `kourai_common.agents.AGENT_METADATA`
+ready for portrait rollout; Aidos / Aletheia visual metadata lands when
+their panels do. See the [Agents](agents/index.md) page for the full
+ten-agent roster.
 
 ### Avatar Assets
 

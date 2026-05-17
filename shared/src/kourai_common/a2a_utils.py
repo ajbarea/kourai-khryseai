@@ -45,10 +45,9 @@ def make_a2a_http_client(
 
     Every outbound A2A request now MUST carry this header per the v1.0
     spec — without it, a v1.0 server silently downgrades to 0.3
-    semantics. Centralising the construction means we have one place
-    to bump the version when M7 (a2a-sdk 1.0 migration) is ready, and
-    every client (CLI, GUI, VN bridge, Hephaestus → specialist) gets
-    the header for free.
+    semantics. Centralising the construction gives every client (CLI,
+    GUI, VN bridge, Hephaestus → specialist) the header for free from
+    a single bump site.
 
     ``timeout`` is forwarded as-is to ``httpx.AsyncClient`` so callers
     keep their existing timeout policy. ``extra_headers`` merges into

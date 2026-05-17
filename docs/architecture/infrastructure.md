@@ -37,8 +37,8 @@ Multi-stage build: builder installs deps with `uv`, runtime copies only the venv
 ??? question "Why `a2a-sdk` directly, not AgentStack?"
     [AgentStack](https://agentstack.beeai.dev/) requires Kubernetes via Lima VM. Windows support needs WSL2. Frequent breaking changes. Decision: `a2a-sdk` + Starlette + uvicorn gives full A2A compliance without K8s overhead.
 
-??? question "Why A2A 0.3.x, not 1.0?"
-    v1.0 has breaking changes: Part type unification, enum case changes, method renames, well-known URL rename. Pinned at `a2a-sdk[http-server]>=0.3.25,<1.0` (shared) until the M7 cutover lands. The 1.0.x migration is bigger than the dual-shape inspection firewall the codebase carries today.
+??? question "Why A2A 1.0.x (M7 cutover, shipped 2026-04-30)?"
+    1.0 introduced breaking changes — Part type unification, enum case changes, method renames, well-known URL rename — that the codebase had been firewalled against via a dual-shape inspection layer under the prior `>=0.3.25,<1.0` pin. The M7 cutover (six phases) retired the firewall, switched every client to the 1.0 JSON-RPC binding, and shipped `AgentCard.supported_interfaces` declaring v1.0 only. The shared pin is now `a2a-sdk[http-server]>=1.0,<2.0`.
 
 ??? question "Why LiteLLM?"
     Model-agnostic interface. Claude for production, Ollama for free local dev. Swap with one env var: `KOURAI_PROVIDER=local`.
