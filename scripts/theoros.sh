@@ -92,13 +92,22 @@ cmd_status() {
 }
 
 cmd_up() {
-    local session repl sf
+    local session repl ops sf
     session="$(get_session_name)"
     repl="${THEOROS_REPL_OVERRIDE:-$(get_repl_command)}"
+    ops="${THEOROS_OPS_OVERRIDE:-$(get_ops_command)}"
     sf="$(state_file_path)"
 
-    # Create the tmux session detached.
+    # Create the tmux session detached (top pane only at this point).
     tmux new-session -d -s "$session" "$repl"
+
+    # Optional bottom pane for the ops-signal command.
+    local ops_pane_json="null"
+    if [[ -n "$ops" ]]; then
+        tmux split-window -t "${session}:0" -v -l 40%
+        tmux send-keys -t "${session}:0.1" "$ops" Enter
+        ops_pane_json="\"${session}:0.1\""
+    fi
 
     # Capture REPL pane PID for the state file.
     local repl_pid driver_pane
@@ -116,7 +125,7 @@ cmd_up() {
   "repl_pid": $repl_pid,
   "attach_cmd": "tmux attach -t $session -r",
   "driver_pane": "$driver_pane",
-  "ops_pane": null
+  "ops_pane": $ops_pane_json
 }
 EOF
 

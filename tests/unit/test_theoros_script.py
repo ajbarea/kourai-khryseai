@@ -126,3 +126,30 @@ def test_down_is_idempotent_when_no_session():
     """down on a stopped repo should be a no-op success."""
     result = _run("down")
     assert result.returncode == 0, result.stderr
+
+
+def _pane_count(session: str) -> int:
+    result = subprocess.run(
+        ["tmux", "list-panes", "-t", f"{session}:0", "-F", "#{pane_id}"],
+        capture_output=True,
+        text=True,
+    )
+    return len(result.stdout.strip().splitlines()) if result.returncode == 0 else 0
+
+
+def test_up_creates_two_panes_when_ops_command_present(monkeypatch):
+    """With ops_command in YAML/env, up creates a split layout (2 panes)."""
+    monkeypatch.setenv("THEOROS_REPL_OVERRIDE", "bash -c 'while true; do sleep 1; done'")
+    monkeypatch.setenv("THEOROS_OPS_OVERRIDE", "bash -c 'while true; do sleep 1; done'")
+    result = _run("up")
+    assert result.returncode == 0, result.stderr
+    assert _pane_count("kourai-theoros") == 2
+
+
+def test_up_state_file_records_ops_pane(monkeypatch):
+    monkeypatch.setenv("THEOROS_REPL_OVERRIDE", "bash -c 'while true; do sleep 1; done'")
+    monkeypatch.setenv("THEOROS_OPS_OVERRIDE", "bash -c 'while true; do sleep 1; done'")
+    result = _run("up")
+    assert result.returncode == 0, result.stderr
+    state = json.loads(STATE_FILE.read_text())
+    assert state["ops_pane"] == "kourai-theoros:0.1"
