@@ -87,7 +87,15 @@ def test_up_writes_state_file_with_required_fields(monkeypatch):
     assert result.returncode == 0, result.stderr
     assert STATE_FILE.is_file()
     state = json.loads(STATE_FILE.read_text())
-    for key in ("session", "started_at", "cwd", "repl_pid", "attach_cmd", "driver_pane", "ops_pane"):
+    for key in (
+        "session",
+        "started_at",
+        "cwd",
+        "repl_pid",
+        "attach_cmd",
+        "driver_pane",
+        "ops_pane",
+    ):
         assert key in state, f"state file missing required key: {key}"
     assert isinstance(state["repl_pid"], int), "repl_pid should be a JSON integer, not a string"
     assert state["session"] == "kourai-theoros"
@@ -97,3 +105,24 @@ def test_up_prints_attach_instructions(monkeypatch):
     monkeypatch.setenv("THEOROS_REPL_OVERRIDE", "bash -c 'while true; do sleep 1; done'")
     result = _run("up")
     assert "tmux attach -t kourai-theoros -r" in result.stdout
+
+
+def test_down_kills_session_and_removes_state_file(monkeypatch):
+    monkeypatch.setenv("THEOROS_REPL_OVERRIDE", "bash -c 'while true; do sleep 1; done'")
+    # up first
+    up = _run("up")
+    assert up.returncode == 0, up.stderr
+    assert _session_exists("kourai-theoros")
+    assert STATE_FILE.is_file()
+
+    # down
+    down = _run("down")
+    assert down.returncode == 0, down.stderr
+    assert not _session_exists("kourai-theoros")
+    assert not STATE_FILE.exists()
+
+
+def test_down_is_idempotent_when_no_session():
+    """down on a stopped repo should be a no-op success."""
+    result = _run("down")
+    assert result.returncode == 0, result.stderr

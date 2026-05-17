@@ -127,7 +127,15 @@ EOF
 }
 
 cmd_down() {
-    err "cmd_down not implemented yet (Task 4)"
+    local session sf
+    session="$(get_session_name)"
+    sf="$(state_file_path)"
+
+    if tmux has-session -t "$session" 2>/dev/null; then
+        tmux kill-session -t "$session"
+    fi
+    rm -f "$sf"
+    info "theoros session '$session' stopped."
 }
 
 # --- Dispatch ---
