@@ -185,3 +185,23 @@ def test_up_runs_prerequisites_and_aborts_on_failure(tmp_path, monkeypatch):
     assert "intentional failure for the test" in (result.stderr + result.stdout)
     # Session must NOT have been created.
     assert not _session_exists("kourai-theoros")
+
+
+def test_makefile_exposes_theoros_targets():
+    makefile = REPO_ROOT / "Makefile"
+    text = makefile.read_text()
+    for target in ("theoros:", "theoros-down:", "theoros-status:"):
+        assert target in text, f"Makefile missing target: {target}"
+
+
+def test_make_help_lists_theoros():
+    """`make help` output should list the three theoros targets."""
+    result = subprocess.run(
+        ["make", "help"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    for needle in ("theoros", "theoros-down", "theoros-status"):
+        assert needle in result.stdout, f"`make help` does not surface '{needle}'"
