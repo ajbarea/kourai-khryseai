@@ -92,6 +92,29 @@ Subagent scan-area split:
 - Config/build: `pyproject.toml`, `Makefile`, `.github/workflows/**`, `zensical.toml`, `docker-compose*.yml`, `docker/**/Dockerfile`, `.vscode/**`
 - Docs (opt-in): `docs/**/*.md`
 
+## theoros
+
+```yaml
+repl_command: make cli
+session_name: kourai-theoros
+ops_command: docker compose logs -f --tail 0 metis mneme hephaestus
+prerequisites:
+  - command: docker compose ps --status running --quiet | grep -q .
+    message: "Core containers not running. Run 'make up' first."
+```
+
+**Aesthetic vs operational responsibility** — the human judges left column, Claude observes right column:
+
+| Aesthetic (AJ's eyes/ears) | Operational (Claude via logs) |
+|---|---|
+| Does Metis's voice sound natural? | Did Metis receive the request? |
+| Does recall narration feel earned? | Did `narration emitted` fire? |
+| Does audio crackle / clip? | What sample rate did pygame init at? |
+| Does the comms-window layout look right? | What was the box width / content length? |
+| Does the chat feel coherent across turns? | What did Hephaestus's user-message body contain? |
+
+The `ops_command` services list is curated per session — adjust for the agents you're exercising. The full agent set is `metis mneme kallos dokimasia puck cupid aidos aletheia hephaestus vn-bridge`.
+
 ## working_docs
 
 - **ROADMAP.md** and **IMPL.md** in this repo are editable working docs — the "Kourai creative latitude" rule. Rewrite anything that doesn't feel perfect; treat them as persistent scratchpads, not read-only canon. (Cross-project rule lives in `~/.claude/CLAUDE.md`; this section confirms it for kourai.)
