@@ -229,6 +229,7 @@ def test_up_enables_mouse_and_raises_scrollback(monkeypatch):
     assert _tmux_option("kourai-theoros", "mouse") == "on", (
         "mouse should be enabled for scroll / pane select / resize"
     )
-    assert _tmux_option("kourai-theoros", "history-limit") == "20000", (
-        "history-limit should be raised from tmux's 2000-line default"
+    assert _tmux_option("kourai-theoros", "history-limit") == "50000", (
+        "history-limit should be raised from tmux's 2000-line default "
+        "(2026 balanced recommendation)"
     )

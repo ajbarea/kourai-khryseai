@@ -166,10 +166,10 @@ EOF
     tmux new-session -d -s "$session" "$repl"
 
     # UX: enable mouse (pane select / scroll / resize) and raise scrollback
-    # from tmux's 2000-line default so the ops pane has room to breathe under
-    # high-traffic docker compose logs.
+    # from tmux's 2000-line default. 50000 is the 2026 "balanced" recommendation
+    # for active dev sessions — ~8 MB total memory for 2 panes, trivial cost.
     tmux set-option -t "$session" mouse on
-    tmux set-option -t "$session" history-limit 20000
+    tmux set-option -t "$session" history-limit 50000
 
     local ops_pane_json="null"
     if [[ -n "$ops" ]]; then
