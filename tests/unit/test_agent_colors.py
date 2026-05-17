@@ -22,7 +22,18 @@ import pytest
 
 from kourai_common.agents import AGENT_METADATA
 
-_ALL_AGENTS = ("hephaestus", "metis", "techne", "dokimasia", "kallos", "mneme", "puck", "cupid")
+_ALL_AGENTS = (
+    "hephaestus",
+    "metis",
+    "techne",
+    "dokimasia",
+    "kallos",
+    "mneme",
+    "puck",
+    "cupid",
+    "aidos",
+    "aletheia",
+)
 
 
 @pytest.mark.parametrize("name", _ALL_AGENTS)
@@ -56,13 +67,15 @@ def test_hex_color_matches_rgb(name: str):
     )
 
 
-def test_puck_and_cupid_use_okabe_ito_values():
-    # puck and cupid are the secondary-roster agents the GUI's gold theme
-    # doesn't cover; CLI styling.py shipped Okabe-Ito values for them.
-    # Lock in those exact values so a future "let's pick a vibe" PR has
-    # to consciously override the CVD-safe palette in code review.
-    assert AGENT_METADATA["puck"]["hex_color"] == "#009E73"  # Okabe-Ito bluish green
-    assert AGENT_METADATA["cupid"]["hex_color"] == "#D55E00"  # Okabe-Ito vermillion
+def test_secondary_agents_use_okabe_ito_values():
+    # puck / cupid / aidos / aletheia are the secondary-roster agents the
+    # GUI's gold theme doesn't cover; all four use Okabe-Ito CVD-safe
+    # palette entries. Lock in the exact values so a future "let's pick a
+    # vibe" PR has to consciously override the palette in code review.
+    assert AGENT_METADATA["puck"]["hex_color"] == "#009E73"  # bluish green
+    assert AGENT_METADATA["cupid"]["hex_color"] == "#D55E00"  # vermillion
+    assert AGENT_METADATA["aidos"]["hex_color"] == "#56B4E9"  # sky blue
+    assert AGENT_METADATA["aletheia"]["hex_color"] == "#0072B2"  # blue
 
 
 def test_six_main_maidens_keep_gui_gold_palette():

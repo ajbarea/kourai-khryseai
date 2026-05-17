@@ -127,6 +127,20 @@ AGENT_METADATA: dict[str, dict[str, str | tuple[int, int, int] | list[str]]] = {
         "rgb": (213, 94, 0),
         "hex_color": "#D55E00",  # Okabe-Ito vermillion — CVD-safe
     },
+    "aidos": {
+        "title": "The Mirror",
+        "epithet": "Mirror of Honesty",
+        "desc": "Anti-slop validator — concrete-language enforcer, strips marketing prose",
+        "rgb": (86, 180, 233),
+        "hex_color": "#56B4E9",  # Okabe-Ito sky blue — CVD-safe
+    },
+    "aletheia": {
+        "title": "The Witness",
+        "epithet": "Witness to Truth",
+        "desc": "Research validator — citation enforcer, web-checks claims",
+        "rgb": (0, 114, 178),
+        "hex_color": "#0072B2",  # Okabe-Ito blue — CVD-safe
+    },
 }
 
 # --- Personality Data (Quotes) ---

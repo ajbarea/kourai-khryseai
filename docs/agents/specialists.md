@@ -1,12 +1,74 @@
-# Specialists
+# Agents Reference
+
+The full per-agent reference. Hephaestus orchestrates; the six core
+specialists run pipelines; the two companion spirits guide the player
+experience; the two quality validators screen output. For the high-level
+taxonomy, runtime discovery flow, and `@mention` routing, see the
+[Agents Overview](index.md).
+
+---
+
+## File layout (every agent)
+
+Every agent under `agents/<name>/` ships the same three Python modules:
+
+| File | Purpose |
+|---|---|
+| `agent.py` | Core logic — LLM prompts, tool loops, mode detection, agent-specific output shaping |
+| `agent_executor.py` | A2A protocol bridge: parses inbound messages, emits TextPart / DataPart, manages OTEL spans, handles fix loops where applicable |
+| `__main__.py` | AgentCard advertisement (skills, version, streaming capability) + uvicorn server startup |
+
+Agent-specific files (e.g. Hephaestus's `confirmation.py` and
+`remote_connections.py`) are called out inline below.
+
+---
+
+## 🔥 Hephaestus — Orchestrator
+
+<img src="../assets/avatars/hephaestus_neutral.png" class="specialist-avatar" alt="Hephaestus — Master of the Forge">
+
+**Port `10000`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/hephaestus/`](https://github.com/ajbarea/kourai-khryseai/tree/main/agents/hephaestus)
+
+The brain of the system. Receives user requests, uses its LLM to decide which specialists to invoke and in what order, then executes the pipeline sequentially while streaming progress back to the host.
+
+**Key behaviors:**
+
+- **LLM-based routing** — Analyzes the user's natural language request against pipeline templates to select agents. Falls back to `mneme` if the LLM returns nothing valid.
+- **Forge Order Confirmation (M13)** — Before any pipeline runs, Hephaestus emits a `CONFIRM_ORDER: <tier> "<read-back>"` token (parser in `confirmation.py`). The CLI surfaces this as an `INPUT_REQUIRED` pause; the player sees a Hephaestus comms-window read-back of what's about to ship and confirms (or redirects) before tokens get spent. `/yolo` opts out for power users.
+- **Parallel Metis discussion (M14)** — On smart / clarify-tier confirmations, Metis's `discuss_tradeoffs` call is spawned in parallel with the routing classifier so the dead zone between "Analyzing request..." and the confirmation card carries useful architectural notes.
+- **Direct Agent Mentions** — Requests starting with `@<agent>` bypass LLM routing for a direct 1-on-1 pipeline. See the [Overview](index.md#mention-routing) for the full shorthand-alias table.
+- **ASK_USER & Proactive UX** — If the request is ambiguous, responds with `ASK_USER: <question>` and proposes A/B options.
+- **Sequential execution** — Calls each specialist via A2A `message/send` with `streaming=True`. Context accumulates from one agent to the next while intermediate status messages stream to the host.
+- **Kallos-Techne feedback loop** — When both are in the pipeline and Kallos finds lint issues, automatically loops Techne (fix) → Kallos (re-check) up to `MAX_ITERATIONS` (`5` by default; `KOURAI_MAX_ITERATIONS` env override).
+- **Affinity / virtue / jealousy** — Updates player affinity per interaction, increments `sophia` / `synergy` on success, monitors affinity gaps and routes to Cupid when jealousy triggers.
+- **Graceful degradation** — If a specialist is unreachable, it's skipped and the pipeline continues.
+
+**Pipeline templates:**
+
+| Request pattern | Agents selected |
+|---|---|
+| `"implement X"` | metis → techne → dokimasia → kallos → mneme |
+| `"fix bug X"` | techne → dokimasia → kallos → mneme |
+| `"add tests for X"` | dokimasia → kallos → mneme |
+| `"clean up X"` | kallos → mneme |
+| `"commit prep"` | mneme |
+| `"plan X"` | metis |
+| `"lint/format X"` | kallos |
+| `"@puck, how's it going?"` | puck (direct 1-on-1) |
+
+**Agent-specific files:** `confirmation.py` (M13 `CONFIRM_ORDER` parser),
+`remote_connections.py` (`RemoteAgentConnection` wrapper +
+`AgentInputRequired` exception).
+
+---
 
 ## 📐 Metis — Planner
 
 <img src="../assets/avatars/metis_neutral.png" class="specialist-avatar" alt="Metis — Architect of Intent">
 
-**Port `10001`** · Model varies by [tier](../configuration.md#llm-models) (Opus on `smart`) · [`agents/metis/`](https://github.com/ajbarea/kourai-khryseai/tree/main/agents/metis)
+**Port `10001`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/metis/`](https://github.com/ajbarea/kourai-khryseai/tree/main/agents/metis)
 
-Transforms rough ideas into detailed implementation specs. On the `smart` tier, uses the most capable model (Opus) because planning quality determines everything downstream.
+Transforms rough ideas into detailed implementation specs. Planning quality determines everything downstream, so the `smart` tier routes Metis to the most capable model available.
 
 **What it produces:**
 
@@ -27,13 +89,7 @@ Before generating a spec, Metis runs shell commands to gather project context:
 
 This context is injected into the LLM prompt so specs are grounded in the actual codebase, not generic.
 
-**Files:**
-
-| File | Purpose |
-|---|---|
-| `agent.py` | `get_project_context()`, `create_spec()`, `create_spec_stream()` |
-| `agent_executor.py` | A2A bridge, context injection, OTEL spans |
-| `__main__.py` | AgentCard, server startup |
+`agent.py` carries `get_project_context()`, `create_spec()`, and `create_spec_stream()` for streaming variants.
 
 ---
 
@@ -57,7 +113,7 @@ The tool loop is shared with Kallos and Dokimasia — see [Internals](../archite
 
 **Port `10003`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/dokimasia/`](https://github.com/ajbarea/kourai-khryseai/tree/main/agents/dokimasia)
 
-Writes pytest test suites and runs them. Handles both test generation (LLM) and test execution (subprocess). Uses `run_fix_loop()` to iterate on failing tests up to 3 times before reporting.
+Writes pytest test suites and runs them. Handles both test generation (LLM) and test execution (subprocess). Uses `run_fix_loop()` to iterate on failing tests up to `max_iters=10` before reporting.
 
 **Two modes:**
 
@@ -72,13 +128,7 @@ Writes pytest test suites and runs them. Handles both test generation (LLM) and 
 
 Target: **80%+ code coverage**.
 
-**Files:**
-
-| File | Purpose |
-|---|---|
-| `agent.py` | `run_pytest()`, `generate_tests()`, result parsing |
-| `agent_executor.py` | Mode detection, fix loop, A2A bridge, OTEL spans |
-| `__main__.py` | AgentCard, server startup |
+`agent.py` carries `run_pytest()`, `generate_tests()`, and result parsing.
 
 ---
 
@@ -120,13 +170,7 @@ flowchart LR
     DEC -->|"No"| DONE
 ```
 
-**Files:**
-
-| File | Purpose |
-|---|---|
-| `agent.py` | `run_make_lint()`, `fix_lint_issues()`, `run_style_check()` |
-| `agent_executor.py` | A2A bridge, fix loop, virtue updates, OTEL spans |
-| `__main__.py` | AgentCard, server startup |
+`agent.py` carries `run_make_lint()`, `fix_lint_issues()`, and `run_style_check()`.
 
 ---
 
@@ -156,19 +200,13 @@ Files: path/to/changed/file.py, path/to/other.py
 - No marketing language ("robust", "comprehensive")
 - **Never generates `git commit`, `git push`, or `git tag` commands** — committing is your job
 
-**Files:**
-
-| File | Purpose |
-|---|---|
-| `agent.py` | `generate_commit_messages()`, `generate_commit_messages_stream()` |
-| `agent_executor.py` | A2A bridge, artifact emission, OTEL spans |
-| `__main__.py` | AgentCard, server startup |
+`agent.py` carries `generate_commit_messages()` and a streaming variant.
 
 ---
 
 ## 🎭 Puck — Companion Spirit
 
-<img src="../assets/avatars/puck_neutral.png" class="specialist-avatar" alt="Puck — Voice of Reason">
+<img src="../assets/avatars/puck_neutral.png" class="specialist-avatar" alt="Puck — Spirit of Mischief">
 
 **Port `10006`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/puck/`](https://github.com/ajbarea/kourai-khryseai/tree/main/agents/puck)
 
@@ -182,19 +220,13 @@ A mischievous daimon who guides the player experience. Not a development agent �
 
 **Personality:** Pragmatic, mischievous, warm. Not romanceable — strictly a companion.
 
-**Files:**
-
-| File | Purpose |
-|---|---|
-| `agent.py` | Mode detection, personality prompt with `personality_baseline` |
-| `agent_executor.py` | A2A bridge, TextPart output |
-| `__main__.py` | AgentCard, server startup |
+`agent.py` carries mode detection and the personality prompt with `personality_baseline`.
 
 ---
 
 ## 💘 Cupid — Romance Spirit
 
-<img src="../assets/avatars/cupid_neutral.png" class="specialist-avatar" alt="Cupid — Aspect of Love">
+<img src="../assets/avatars/cupid_neutral.png" class="specialist-avatar" alt="Cupid — Arrow of the Heart">
 
 **Port `10007`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/cupid/`](https://github.com/ajbarea/kourai-khryseai/tree/main/agents/cupid)
 
@@ -209,19 +241,13 @@ An eros spirit who coaches the player through romantic progression with the maid
 
 **Personality:** Romantic idealist, emotionally intelligent, encouraging. Not romanceable.
 
-**Files:**
-
-| File | Purpose |
-|---|---|
-| `agent.py` | Relationship context building, personality prompt |
-| `agent_executor.py` | A2A bridge, affinity context injection |
-| `__main__.py` | AgentCard, server startup |
+`agent.py` carries relationship context building and the personality prompt; `agent_executor.py` injects the affinity context across agents.
 
 ---
 
 ## 🪞 Aidos — Anti-Slop Validator
 
-<img src="../assets/avatars/aidos_neutral.png" class="specialist-avatar" alt="Aidos — The Honest Mirror">
+<img src="../assets/avatars/aidos_neutral.png" class="specialist-avatar" alt="Aidos — Mirror of Honesty">
 
 **Port `10008`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/aidos/`](https://github.com/ajbarea/kourai-khryseai/tree/main/agents/aidos)
 
@@ -240,19 +266,13 @@ Detects and eliminates vague, corporate, and passive language from agent output.
 
 **Output:** TextPart + DataPart with `{slop_words_found: int, clean: bool}`.
 
-**Files:**
-
-| File | Purpose |
-|---|---|
-| `agent.py` | Pattern lists, regex detection, LLM analysis |
-| `agent_executor.py` | A2A bridge, structured artifact emission |
-| `__main__.py` | AgentCard, server startup |
+`agent.py` carries the pattern lists, regex detection, and LLM analysis.
 
 ---
 
 ## 📚 Aletheia — Research Validator
 
-<img src="../assets/avatars/aletheia_neutral.png" class="specialist-avatar" alt="Aletheia — Seeker of Truth">
+<img src="../assets/avatars/aletheia_neutral.png" class="specialist-avatar" alt="Aletheia — Witness to Truth">
 
 **Port `10009`** · Model varies by [tier](../configuration.md#llm-models) · [`agents/aletheia/`](https://github.com/ajbarea/kourai-khryseai/tree/main/agents/aletheia)
 
@@ -267,10 +287,4 @@ Validates citations, claims, and factual assertions in agent output. Uses regex-
 
 **Output:** TextPart + DataPart with `{claims_found: int, verified: bool}`.
 
-**Files:**
-
-| File | Purpose |
-|---|---|
-| `agent.py` | Claim detection, citation validation, LLM verification |
-| `agent_executor.py` | A2A bridge, structured artifact emission |
-| `__main__.py` | AgentCard, server startup |
+`agent.py` carries claim detection, citation validation, and LLM verification.

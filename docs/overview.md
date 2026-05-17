@@ -22,7 +22,7 @@ Specialists run as independent HTTP servers communicating via the open [A2A prot
 | **Companion spirits** | 🎭 Puck, 💘 Cupid | Tutorial, idle nudges, romance coaching |
 | **Quality validators** | 🪞 Aidos, 📚 Aletheia | Anti-slop screening + research validation |
 
-Per-agent detail lives in **[Agents](agents/index.md)** and **[Specialists](agents/specialists.md)**.
+Per-agent detail lives in the **[Agents Overview](agents/index.md)** and **[Agents Reference](agents/specialists.md)**.
 
 ---
 

@@ -54,6 +54,8 @@ init python:
     mn  = Character("Mneme",      color=AGENT_METADATA["mneme"]["hex_color"])
     pck = Character("Puck",       color=AGENT_METADATA["puck"]["hex_color"])
     cpd = Character("Cupid",      color=AGENT_METADATA["cupid"]["hex_color"])
+    aid = Character("Aidos",      color=AGENT_METADATA["aidos"]["hex_color"])
+    ale = Character("Aletheia",   color=AGENT_METADATA["aletheia"]["hex_color"])
     p   = Character("Player",     color="#E8E8E8")
 
     # Agent ID → (Character, epithet) for dynamic dialogue routing
@@ -66,6 +68,8 @@ init python:
         "mneme":      (mn,  AGENT_METADATA["mneme"]["epithet"]),
         "puck":       (pck, AGENT_METADATA["puck"]["epithet"]),
         "cupid":      (cpd, AGENT_METADATA["cupid"]["epithet"]),
+        "aidos":      (aid, AGENT_METADATA["aidos"]["epithet"]),
+        "aletheia":   (ale, AGENT_METADATA["aletheia"]["epithet"]),
     }
 
     # Name → epithet lookup for the say screen subtitle display.

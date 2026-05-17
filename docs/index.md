@@ -102,13 +102,13 @@ hide:
       <a href="agents/specialists/#aidos-anti-slop-validator" class="agent-card agent-card--aidos">
         <img src="assets/avatars/aidos_neutral.png" class="agent-avatar" alt="Aidos" width="96" height="96" loading="lazy" decoding="async">
         <div class="agent-name">Aidos</div>
-        <div class="agent-epithet">Mirror of Truth</div>
+        <div class="agent-epithet">Mirror of Honesty</div>
         <p>Detects hollow prose, forces specificity, kills the slop</p>
       </a>
       <a href="agents/specialists/#aletheia-research-validator" class="agent-card agent-card--aletheia">
         <img src="assets/avatars/aletheia_neutral.png" class="agent-avatar" alt="Aletheia" width="96" height="96" loading="lazy" decoding="async">
         <div class="agent-name">Aletheia</div>
-        <div class="agent-epithet">Keeper of Truth</div>
+        <div class="agent-epithet">Witness to Truth</div>
         <p>Validates citations, cross-checks facts, grounds agents in reality</p>
       </a>
     </div>
