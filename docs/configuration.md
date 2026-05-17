@@ -68,14 +68,6 @@ HF_TOKEN=hf_xxx...
 
 Create a write-scope token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens). The bucket ID is auto-derived as `<your-username>/kourai-artifacts` via the HF API. Override with `KOURAI_BUCKET_ID` if needed.
 
-### Player Project Database
-
-Used by Techne and Dokimasia for database schema introspection. Only needed for database-backed player projects.
-
-```bash
-DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/mydb
-```
-
 ### Docker Hub
 
 For pushing built images and build cache.
@@ -85,14 +77,6 @@ DOCKER_HUB_USERNAME=your-username
 ```
 
 Setup: create an account at [hub.docker.com](https://hub.docker.com), create a PAT under Security settings, then `docker login`.
-
-### OpenAI (Fallback)
-
-Optional fallback provider via LiteLLM.
-
-```bash
-OPENAI_API_KEY=sk-proj-...
-```
 
 ---
 

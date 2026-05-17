@@ -423,11 +423,13 @@ This work composes with the existing vFL roadmap:
 
 In `shared/src/kourai_common/federation/`:
 
+- ✓ `memoir.py` — Forge Memoir reader/writer with the dual-face contract
+  *(scaffolded — first cut landed alongside `memoir_schema.py` and
+  `host_helpers.py`, marking Phase 1 of the Phasing list as in-progress)*
 - `client.py` — vFL client wrapper, registers a forge with the server,
   handles round-trip flow
 - `adapters.py` — per-agent council/bond LoRA management, freeze/unfreeze
   logic, layer-targeting for each specialist
-- `memoir.py` — Forge Memoir reader/writer with the dual-face contract
 - `local_trainer.py` — consumes Memoir entries, computes per-agent loss,
   updates LoRA. Bond-only loop runs every session; council loop runs only
   on rounds.
