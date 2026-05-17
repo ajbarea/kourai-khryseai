@@ -399,6 +399,30 @@ TASK_GROUPS: tuple[tuple[str, tuple[tuple[str, Task], ...]], ...] = (
                     env_extra=(("KOURAI_POSTER_DEMO", "1"),),
                 ),
             ),
+            (
+                "theoros",
+                Task(
+                    description="Start observed live dev session (Claude drives, spectate via `tmux attach -t kourai-theoros -r`)",
+                    command_factory=lambda: ["bash", "scripts/theoros.sh", "up"],
+                    timed=False,
+                ),
+            ),
+            (
+                "theoros-down",
+                Task(
+                    description="Stop observed live dev session",
+                    command_factory=lambda: ["bash", "scripts/theoros.sh", "down"],
+                    timed=False,
+                ),
+            ),
+            (
+                "theoros-status",
+                Task(
+                    description="Show theoros session state (JSON)",
+                    command_factory=lambda: ["bash", "scripts/theoros.sh", "status"],
+                    timed=False,
+                ),
+            ),
         ),
     ),
     (
@@ -486,30 +510,6 @@ TASK_GROUPS: tuple[tuple[str, tuple[tuple[str, Task], ...]], ...] = (
                 Task(
                     description="Open observability UIs in browser (Jaeger, Prometheus, Dozzle)",
                     command_factory=lambda: python_script("scripts", "observe.py"),
-                    timed=False,
-                ),
-            ),
-            (
-                "theoros",
-                Task(
-                    description="Start observed live dev session (Claude drives, spectate via `tmux attach -t kourai-theoros -r`)",
-                    command_factory=lambda: ["bash", "scripts/theoros.sh", "up"],
-                    timed=False,
-                ),
-            ),
-            (
-                "theoros-down",
-                Task(
-                    description="Stop observed live dev session",
-                    command_factory=lambda: ["bash", "scripts/theoros.sh", "down"],
-                    timed=False,
-                ),
-            ),
-            (
-                "theoros-status",
-                Task(
-                    description="Show theoros session state (JSON)",
-                    command_factory=lambda: ["bash", "scripts/theoros.sh", "status"],
                     timed=False,
                 ),
             ),
