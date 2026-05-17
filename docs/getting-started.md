@@ -83,9 +83,9 @@ Start everything:
 docker compose up
 ```
 
-All ten agents (six specialists, four companion spirits) plus the
-vn-bridge service and the observability stack (Jaeger, Prometheus,
-Dozzle, memory-mcp, context7-mcp).
+All ten agents (six specialists, two companion spirits, two quality
+validators) plus the vn-bridge service and the observability stack
+(Jaeger, Prometheus, Dozzle, memory-mcp, context7-mcp).
 
 To start a single agent (plus its dependencies):
 
