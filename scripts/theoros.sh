@@ -166,15 +166,21 @@ EOF
     tmux new-session -d -s "$session" "$repl"
 
     # UX: enable mouse (pane select / scroll / resize) and raise scrollback
-    # from tmux's 2000-line default. 50000 is the 2026 "balanced" recommendation
-    # for active dev sessions — ~8 MB total memory for 2 panes, trivial cost.
-    tmux set-option -t "$session" mouse on
+    # from tmux's 2000-line default. Use -g (global) for mouse — it's the
+    # canonical 2026 idiom and propagates more reliably to attached clients
+    # than the session-scoped form. history-limit is per-session.
+    # 50000 is the 2026 "balanced" recommendation for active dev sessions —
+    # ~8 MB total memory for 2 panes, trivial cost.
+    tmux set-option -g mouse on
     tmux set-option -t "$session" history-limit 50000
 
     local ops_pane_json="null"
     if [[ -n "$ops" ]]; then
-        tmux split-window -t "${session}:0" -v -l 40%
-        tmux send-keys -t "${session}:0.1" "$ops" Enter
+        # Pass the ops command directly to split-window (same pattern as the
+        # top pane uses for new-session). Avoids the shell-startup vs
+        # send-keys race that caused doubled-command output in the bottom
+        # pane during smoke.
+        tmux split-window -t "${session}:0" -v -l 40% "$ops"
         ops_pane_json="\"${session}:0.1\""
     fi
 

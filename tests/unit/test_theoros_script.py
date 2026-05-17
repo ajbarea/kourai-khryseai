@@ -208,9 +208,14 @@ def test_make_help_lists_theoros():
 
 
 def _tmux_option(session: str, option: str) -> str:
-    """Read a tmux option value from a live session."""
+    """Read the effective tmux option value visible to a session.
+
+    Uses -A so inherited global options surface (some options are set globally
+    with `-g` for canonical 2026 propagation behavior; without -A they would
+    return empty when queried per-session).
+    """
     result = subprocess.run(
-        ["tmux", "show-options", "-t", session, option],
+        ["tmux", "show-options", "-A", "-t", session, option],
         capture_output=True,
         text=True,
         check=True,
