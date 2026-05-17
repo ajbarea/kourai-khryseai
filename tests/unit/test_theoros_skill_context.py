@@ -41,6 +41,12 @@ def test_theoros_yaml_block_has_required_fields():
     assert re.search(r"^session_name:\s*\S", yaml, flags=re.MULTILINE), (
         "`session_name` field missing"
     )
+    assert re.search(r"^ops_command:\s*\S", yaml, flags=re.MULTILINE), (
+        "`ops_command` field missing"
+    )
+    assert re.search(r"^prerequisites:\s*$", yaml, flags=re.MULTILINE), (
+        "`prerequisites` field missing"
+    )
 
 
 def test_theoros_aesthetic_operational_table_present():
