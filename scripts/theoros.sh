@@ -92,7 +92,38 @@ cmd_status() {
 }
 
 cmd_up() {
-    err "cmd_up not implemented yet (Task 3)"
+    local session repl sf
+    session="$(get_session_name)"
+    repl="${THEOROS_REPL_OVERRIDE:-$(get_repl_command)}"
+    sf="$(state_file_path)"
+
+    # Create the tmux session detached.
+    tmux new-session -d -s "$session" "$repl"
+
+    # Capture REPL pane PID for the state file.
+    local repl_pid driver_pane
+    driver_pane="${session}:0.0"
+    repl_pid="$(tmux list-panes -t "$driver_pane" -F '#{pane_pid}' | head -n1)"
+
+    # Write the state file.
+    local now
+    now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    cat > "$sf" <<EOF
+{
+  "session": "$session",
+  "started_at": "$now",
+  "cwd": "$REPO_ROOT",
+  "repl_pid": $repl_pid,
+  "attach_cmd": "tmux attach -t $session -r",
+  "driver_pane": "$driver_pane",
+  "ops_pane": null
+}
+EOF
+
+    info "theoros session ready."
+    info "  Spectate:   tmux attach -t $session -r"
+    info "  Take over:  tmux attach -t $session"
+    info "  Tear down:  make theoros-down"
 }
 
 cmd_down() {
