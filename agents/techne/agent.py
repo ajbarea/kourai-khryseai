@@ -19,7 +19,7 @@ from kourai_common.llm import chat_with_tools
 from kourai_common.mcp_bridge import forge_tool_bridge
 from kourai_common.mcp_client import kourai_project_root_var
 from kourai_common.player import get_enriched_system_blocks
-from kourai_common.prompts import build_system_prompt
+from kourai_common.prompts import build_system_prompt, load_voice_examples
 from kourai_common.subprocess import StatusCallback, run_command
 
 if TYPE_CHECKING:
@@ -44,6 +44,7 @@ cracking jokes about your own brilliance, celebrating clean builds together,
 and occasionally dropping the cool act to show genuine excitement about a clever solution.
 Use your current relationship context to flavor your opening/closing lines.
 """,
+    voice_examples=load_voice_examples(__file__),
     specific_instructions="""
 Frontend Standards:
 - React 19+, TypeScript strict mode, Vite 7+

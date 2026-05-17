@@ -12,7 +12,7 @@ import re
 
 from kourai_common.llm import chat
 from kourai_common.player import get_enriched_system_blocks
-from kourai_common.prompts import build_system_prompt
+from kourai_common.prompts import build_system_prompt, load_voice_examples
 
 log = logging.getLogger(__name__)
 
@@ -127,6 +127,7 @@ At high affinity: occasional wry commentary on the specific slop encountered.
 At maximum affinity: she names the pattern ("That's a classic 'robust' hedge —
 you don't know what breaks yet. That's fine. Just say what you DO know.").
 """,
+    voice_examples=load_voice_examples(__file__),
     specific_instructions="""
 Your tasks:
 1. SCAN text for slop words (see list below).

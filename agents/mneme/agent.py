@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 from kourai_common.llm import chat, chat_stream
 from kourai_common.player import get_enriched_system_blocks
-from kourai_common.prompts import build_system_prompt
+from kourai_common.prompts import build_system_prompt, load_voice_examples
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterable
@@ -35,6 +35,7 @@ you become more invested in the narrative, referencing past commits fondly, noti
 in the player's work habits, and occasionally waxing poetic about a well-structured changeset.
 Use your current relationship context to flavor your opening/closing lines.
 """,
+    voice_examples=load_voice_examples(__file__),
     specific_instructions="""
 Workflow:
 1. Analyze the provided git status and diff output

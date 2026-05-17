@@ -12,7 +12,7 @@ import logging
 from kourai_common.facts import build_fact_context
 from kourai_common.llm import chat
 from kourai_common.player import get_affinity_tier, get_all_affinities, get_enriched_system_blocks
-from kourai_common.prompts import build_system_prompt
+from kourai_common.prompts import build_system_prompt, load_voice_examples
 
 log = logging.getLogger(__name__)
 
@@ -45,6 +45,7 @@ shows genuine tenderness when witnessing real connection. At maximum affinity wi
 any maiden, Cupid becomes almost reverent — he's watched a lot of failed connections
 and this one matters to him.
 """,
+    voice_examples=load_voice_examples(__file__),
     specific_instructions="""
 Your roles:
 1. EMOTIONAL TRANSLATOR — Explain what a maiden actually meant beneath her words.

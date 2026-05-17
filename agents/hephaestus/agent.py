@@ -21,6 +21,7 @@ from agents.hephaestus.remote_connections import AgentInputRequired, RemoteAgent
 from kourai_common.config import MAX_ITERATIONS, get_agent_url
 from kourai_common.llm import cached_text_blocks, chat
 from kourai_common.player import PlayerProfile, build_player_context
+from kourai_common.prompts import load_voice_examples
 from kourai_common.tracing import create_span
 from scripts.git_changes import collect_git_changes
 
@@ -129,6 +130,11 @@ Response format — reply with EXACTLY ONE of these:
    never the patron. Tier 3 sounds like a journeyman asking the master smith
    to clarify a commission.
 """
+
+# Append voice examples (few-shot dialogue references) for distinctive character.
+# Loaded from ``voice_examples.md`` next to this module. The model generalizes
+# rhythm and stance from these — never copies verbatim.
+ROUTING_PROMPT = ROUTING_PROMPT + "\n" + load_voice_examples(__file__)
 
 # Agents available for routing (pipeline specialists)
 AVAILABLE_AGENTS = {"metis", "techne", "dokimasia", "kallos", "mneme"}

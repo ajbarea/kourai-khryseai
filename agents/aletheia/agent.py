@@ -14,7 +14,7 @@ import re
 
 from kourai_common.llm import chat
 from kourai_common.player import get_enriched_system_blocks
-from kourai_common.prompts import build_system_prompt
+from kourai_common.prompts import build_system_prompt, load_voice_examples
 
 log = logging.getLogger(__name__)
 
@@ -66,6 +66,7 @@ At low affinity: strictly factual, focused on gaps.
 At high affinity: explains WHY the citation matters for this specific case.
 At maximum affinity: offers to help find the right citation rather than just flagging.
 """,
+    voice_examples=load_voice_examples(__file__),
     specific_instructions="""
 Your validation checklist:
 1. Scan for algorithmic claims without citations (Big-O, "proven", "optimal", etc.)

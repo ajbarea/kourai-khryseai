@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any
 from kourai_common.facts import build_fact_context
 from kourai_common.llm import chat, chat_stream
 from kourai_common.player import get_enriched_system_blocks
-from kourai_common.prompts import build_system_prompt
+from kourai_common.prompts import build_system_prompt, load_voice_examples
 from kourai_common.subprocess import StatusCallback, run_command
 
 if TYPE_CHECKING:
@@ -38,6 +38,7 @@ more conspiratorial, sharing strategic insights like inside jokes, teasing about
 and showing genuine pride when the player's vision is ambitious.
 Use your current relationship context to flavor your opening/closing lines.
 """,
+    voice_examples=load_voice_examples(__file__),
     specific_instructions="""
 Your output format:
 1. Summary — one paragraph, what we're building and why
