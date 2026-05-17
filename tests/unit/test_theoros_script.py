@@ -153,3 +153,35 @@ def test_up_state_file_records_ops_pane(monkeypatch):
     assert result.returncode == 0, result.stderr
     state = json.loads(STATE_FILE.read_text())
     assert state["ops_pane"] == "kourai-theoros:0.1"
+
+
+def test_up_refuses_when_session_exists(monkeypatch):
+    monkeypatch.setenv("THEOROS_REPL_OVERRIDE", "bash -c 'while true; do sleep 1; done'")
+    first = _run("up")
+    assert first.returncode == 0, first.stderr
+    second = _run("up")
+    assert second.returncode != 0
+    combined = second.stderr + second.stdout
+    assert "already running" in combined
+    assert "make theoros-down" in combined
+
+
+def test_up_runs_prerequisites_and_aborts_on_failure(tmp_path, monkeypatch):
+    """When a prerequisite command exits non-zero, up aborts with the named message."""
+    fake_ctx = tmp_path / "skill-context.md"
+    fake_ctx.write_text(
+        "## theoros\n\n"
+        "```yaml\n"
+        "repl_command: bash -c 'sleep 1'\n"
+        "session_name: kourai-theoros\n"
+        "prerequisites:\n"
+        "  - command: false\n"
+        '    message: "intentional failure for the test"\n'
+        "```\n"
+    )
+    monkeypatch.setenv("THEOROS_SKILL_CONTEXT_OVERRIDE", str(fake_ctx))
+    result = _run("up")
+    assert result.returncode != 0
+    assert "intentional failure for the test" in (result.stderr + result.stdout)
+    # Session must NOT have been created.
+    assert not _session_exists("kourai-theoros")
