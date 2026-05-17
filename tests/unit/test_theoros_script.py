@@ -205,3 +205,30 @@ def test_make_help_lists_theoros():
     assert result.returncode == 0, result.stderr
     for needle in ("theoros", "theoros-down", "theoros-status"):
         assert needle in result.stdout, f"`make help` does not surface '{needle}'"
+
+
+def _tmux_option(session: str, option: str) -> str:
+    """Read a tmux option value from a live session."""
+    result = subprocess.run(
+        ["tmux", "show-options", "-t", session, option],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    # tmux output form: "<option> <value>"
+    parts = result.stdout.strip().split(None, 1)
+    return parts[1] if len(parts) == 2 else ""
+
+
+def test_up_enables_mouse_and_raises_scrollback(monkeypatch):
+    """Up should set mouse on + history-limit 20000 for ergonomic spectating."""
+    monkeypatch.setenv("THEOROS_REPL_OVERRIDE", "bash -c 'while true; do sleep 1; done'")
+    result = _run("up")
+    assert result.returncode == 0, result.stderr
+
+    assert _tmux_option("kourai-theoros", "mouse") == "on", (
+        "mouse should be enabled for scroll / pane select / resize"
+    )
+    assert _tmux_option("kourai-theoros", "history-limit") == "20000", (
+        "history-limit should be raised from tmux's 2000-line default"
+    )
