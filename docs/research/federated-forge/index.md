@@ -563,9 +563,15 @@ in the references section.
 
 ## Phasing — dependency-ordered, not time-bound
 
-1. **Forge Memoir replaces OpenTelemetry as training source.** New schema
-   in `kourai_common/federation/memoir.py`. Host write paths from CLI / GUI
-   / VN. Replay tooling for inspection. OTel stays for monitoring.
+> **Status convention.** `⏳` = scaffolding partly landed · `✅` = phase
+> complete · no marker = planned (the default; an unmarked phase has
+> not been started). Convention reused by other spec docs in this site.
+
+1. ⏳ **Forge Memoir replaces OpenTelemetry as training source.** Schema
+   landed in `shared/src/kourai_common/federation/memoir.py` +
+   `memoir_schema.py` + `host_helpers.py` (per the `feat/memoir` work
+   from #16 forward). Still pending: host write paths from CLI / GUI /
+   VN, replay tooling for inspection. OTel stays for monitoring.
 2. **Per-agent LoRA adapter scaffolding.** Council + bond adapters wired
    into each agent's LLM call via LiteLLM tool-use plumbing. Freeze/unfreeze
    semantics for inference. Layer-targeting per agent.

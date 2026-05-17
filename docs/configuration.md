@@ -204,14 +204,15 @@ KOURAI_PROVIDER=local
 
 === "Local / Ollama :material-server: (free)"
 
-    Set `KOURAI_PROVIDER=local` to use these via [Ollama](https://ollama.com/):
+    Set `KOURAI_PROVIDER=local` to use these via [Ollama](https://ollama.com/).
+    No tier dimension on this provider — model selection per agent is
+    fixed by what fits on commodity hardware.
 
     | Agent | Model | VRAM |
     |---|---|---|
-    | 🔥 Hephaestus, 📐 Metis, ⚙️ Techne | llama3.3:70b | ~40GB |
-    | 🧪 Dokimasia | qwen2.5-coder:32b | ~20GB |
-    | ✨📜🎭💘🪞 Others | llama3.3:8b | ~5GB |
-    | 📚 Aletheia | llama3.3:70b | ~40GB |
+    | 🔥 Hephaestus · 📐 Metis · ⚙️ Techne · 📚 Aletheia | `llama3.3:70b` | ~40 GB |
+    | 🧪 Dokimasia | `qwen2.5-coder:32b` | ~20 GB |
+    | ✨ Kallos · 📜 Mneme · 🎭 Puck · 💘 Cupid · 🪞 Aidos | `llama3.3:8b` | ~5 GB |
 
     No per-token charges. You pay electricity and hardware only.
 
