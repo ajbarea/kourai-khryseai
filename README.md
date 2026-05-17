@@ -351,6 +351,16 @@ uv run kourai-dev docs        # Serve docs locally at http://localhost:8000
 uv run kourai-dev help        # Show all available commands
 ```
 
+### Live observed dev session (`make theoros`)
+
+Spins up a split tmux session where Claude drives `make cli` (top pane) and you spectate the agent container logs (bottom pane). Run `make theoros`, then attach from another terminal:
+
+```bash
+tmux attach -t kourai-theoros -r
+```
+
+`make theoros-down` tears it down. `make theoros-status` shows the JSON state file. See [docs/theoros.md](docs/theoros.md) for the role split and discipline rules.
+
 **Stack:**
 - **Framework** — [a2a-sdk](https://github.com/a2a-org/a2a-sdk) + [Starlette](https://www.starlette.io/)
 - **Language** — Python 3.12+ with modern type hints
