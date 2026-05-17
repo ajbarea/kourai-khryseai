@@ -489,6 +489,30 @@ TASK_GROUPS: tuple[tuple[str, tuple[tuple[str, Task], ...]], ...] = (
                     timed=False,
                 ),
             ),
+            (
+                "theoros",
+                Task(
+                    description="Start observed live dev session (Claude drives, spectate via `tmux attach -t kourai-theoros -r`)",
+                    command_factory=lambda: ["bash", "scripts/theoros.sh", "up"],
+                    timed=False,
+                ),
+            ),
+            (
+                "theoros-down",
+                Task(
+                    description="Stop observed live dev session",
+                    command_factory=lambda: ["bash", "scripts/theoros.sh", "down"],
+                    timed=False,
+                ),
+            ),
+            (
+                "theoros-status",
+                Task(
+                    description="Show theoros session state (JSON)",
+                    command_factory=lambda: ["bash", "scripts/theoros.sh", "status"],
+                    timed=False,
+                ),
+            ),
         ),
     ),
     (

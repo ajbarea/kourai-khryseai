@@ -185,4 +185,4 @@ sandbox-image:             ## Build the kourai-sandbox image used when KOURAI_SA
 # ---------------------------------------------------------------------------
 
 help:                      ## Show this help message
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-26s %s\n", $$1, $$2}'
+	@$(UV_DEV) help
