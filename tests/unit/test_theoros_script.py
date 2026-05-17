@@ -87,8 +87,9 @@ def test_up_writes_state_file_with_required_fields(monkeypatch):
     assert result.returncode == 0, result.stderr
     assert STATE_FILE.is_file()
     state = json.loads(STATE_FILE.read_text())
-    for key in ("session", "started_at", "cwd", "repl_pid", "attach_cmd", "driver_pane"):
+    for key in ("session", "started_at", "cwd", "repl_pid", "attach_cmd", "driver_pane", "ops_pane"):
         assert key in state, f"state file missing required key: {key}"
+    assert isinstance(state["repl_pid"], int), "repl_pid should be a JSON integer, not a string"
     assert state["session"] == "kourai-theoros"
 
 
