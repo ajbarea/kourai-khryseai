@@ -15,7 +15,9 @@ def test_theoros_docs_covers_required_sections():
         "# Theoros",
         "## Role split",
         "## Starting a session",
-        "## Aesthetic vs operational",
+        "## What's in the session",
+        "## State",
+        "## Tear down",
         "## Troubleshooting",
     ):
         assert heading in text, f"docs/theoros.md missing section: {heading}"
