@@ -552,7 +552,12 @@ patch. Pick by impact + caller reality, not file-of-origin.
 - **VN dialogue-presentation polish** (illuminated-manuscript framing) —
   parchment + plaque corner flourishes, epithet subtitle.
 
-**Self-contained workable** (ship clean without AJ in-loop):
+**Anticipatory — re-audited 2026-05-16, gated on real second consumer**:
+
+These looked self-contained but the current-caller picks are exhausted —
+see IMPL.md "Next pickups" for the per-item verdict. Each requires
+either an intentional anticipatory-gate override (flag in the PR body)
+or a real second consumer landing.
 
 - **Puck Slice 2 helper** — `_invoke_agent_live(agent, prompt, fallback,
   timeout)` A2A timeout-and-fallback wrapper. Skip the
@@ -562,18 +567,19 @@ patch. Pick by impact + caller reality, not file-of-origin.
   + StatusEvent typed record). One writer, three subscribers (CLI
   `/debug` slash, future GUI bottom overlay, file-write). Replaces
   debug_log.py + the deleted status_bubbles parallel state stores.
+  Anticipatory until the CLI `/debug` slash command actually lands.
 - **Cross-host gossip-render** — `kourai_common.gossip_render`
   (RenderedRound). gossip_core / gossip_models already canonical
   from #170; what's missing is the host-agnostic structured-render
   translation. Renderers collapse to ~30-line ANSI / pygame / Ren'Py
-  adapters.
+  adapters. Anticipatory until a host renderer exists.
 - **Cross-host codex** (in-game encyclopedia) — biggest scope; fixes
   the broken VN codex screens; Mass Effect-shape data + unlock triggers.
   Best done as one large PR; live smoke needed for VN parchment-book
   renderer.
 - **Per-agent motion language** — polish, lands last.
 
-Music playlist (#11) — content-driven; AJ adds tracks to
+Music playlist — content-driven; AJ adds tracks to
 `assets/audio/music/` over time. No code work.
 
 ---
@@ -829,20 +835,14 @@ architectural moves; valuable but not the first lift.
   twice.
 - **Property-tested agent-coordination invariants:** `hypothesis` is
   already heavily used (~11 test files use `@given` strategies for
-  GUI scaling, settings, dialogue history, etc. as of 2026-04-26). What
-  the original entry intended — agent-level invariants — hasn't
-  shipped yet. Specifically: every `INPUT_REQUIRED` resumes on exactly
-  the agent that raised it, every pipeline exits in exactly one of
-  {complete, discarded, error}. (The original entry mentioned
-  `HandoffMessage` round-trips, but that type doesn't exist in the
-  codebase — the closest analog is `AgentInputRequired`.) Property
-  tests over randomised pipeline state machines would catch
-  coordination drift early. every `HandoffMessage` round-trips through
-  serialisation, every `INPUT_REQUIRED` resumes on exactly the agent
-  that raised it, every pipeline exits in exactly one of {complete,
-  discarded, error}. Property tests over randomised agent call graphs
-  would catch coordination drift early. Start with one invariant
-  (`HandoffMessage` round-trip) and expand from there.
+  GUI scaling, settings, dialogue history, etc. as of 2026-04-26).
+  Missing: agent-level invariants over randomised pipeline state
+  machines. Target invariants: every `AgentInputRequired`
+  (`agents/hephaestus/remote_connections.py:38`) resumes on exactly
+  the agent that raised it; every pipeline exits in exactly one of
+  {complete, discarded, error}; every A2A `Message` round-trips
+  through serialisation. Start with the `AgentInputRequired`
+  round-trip invariant and expand from there.
 - **Bonds + Codex as player-accessible panels (VN):** dating-sim
   convention — the player can check relationship status anytime, but
   it's never in their face during scenes. Today `screen affinity_hud`

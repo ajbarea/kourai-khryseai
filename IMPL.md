@@ -13,25 +13,12 @@ Updated: 2026-05-17
 ## In flight
 
 Nothing actively building. Three back-to-back freshness sweeps shipped
-2026-05-16 → 2026-05-17:
-
-- #192 + #193 (2026-05-16) — May 2026 model/pricing verification.
-  Host-side gemini-2.5-flash-lite migration + cache threshold
-  corrections + Opus 4.7 tokenizer caveat (+ sibling docs propagation).
-- #194 (2026-05-16) — May 2026 infra freshness. `uv` 0.10.10 → 0.11.14,
-  `@upstash/context7-mcp` 2.1.6 → 2.2.5, `dozzle` v10.5.0 → v10.5.3,
-  `nodejs-22` → `nodejs-24` in sandbox.
-- #195 (2026-05-17) — May 2026 app-SDK freshness. Seven safe bumps
-  inside existing lower-bound ranges via `uv lock --upgrade-package`:
-  a2a-sdk 1.0.2 → 1.0.3, huggingface-hub 1.13.0 → 1.15.0, litellm
-  1.83.14 → 1.85.0 (cache-shape compat verified by passing all 31
-  `test_llm.py` cache tests), mcp 1.27.0 → 1.27.1, numpy 2.4.4 → 2.4.5,
-  pydantic 2.12.5 → 2.13.4, uvicorn 0.46.0 → 0.47.0. **RealtimeTTS
-  0.6.1 → 0.7.1 deferred** (KokoroEngine→KokoroVoice breaking change;
-  needs voice-load path updates + AJ-in-loop live smoke — backlog
-  entry in ROADMAP under "Surfaced 2026-05-17").
-
-See ROADMAP shipped log for one-liners.
+2026-05-16 → 2026-05-17 (#192/#193 model+pricing, #194 infra,
+#195 app-SDK). See ROADMAP shipped log for one-liners. The one
+deferred bump — **RealtimeTTS 0.6.1 → 0.7.1** (KokoroEngine →
+KokoroVoice breaking change) — is captured in ROADMAP under
+"Surfaced 2026-05-17 from app-SDK freshness sweep" and gates on
+AJ-in-loop live smoke.
 
 ## Next pickups
 
