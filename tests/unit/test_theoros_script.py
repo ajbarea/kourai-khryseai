@@ -42,7 +42,9 @@ def test_status_reports_no_session_when_state_missing():
 
 
 def test_status_prints_state_file_when_present():
-    STATE_FILE.write_text(json.dumps({"session": "kourai-theoros", "started_at": "2026-05-17T00:00:00Z"}))
+    STATE_FILE.write_text(
+        json.dumps({"session": "kourai-theoros", "started_at": "2026-05-17T00:00:00Z"})
+    )
     result = _run("status")
     assert result.returncode == 0, result.stderr
     assert "kourai-theoros" in result.stdout

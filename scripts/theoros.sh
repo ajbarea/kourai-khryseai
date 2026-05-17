@@ -101,12 +101,15 @@ cmd_down() {
 
 # --- Dispatch ---
 
-case "${1:-}" in
-    up)     cmd_up ;;
-    down)   cmd_down ;;
-    status) cmd_status ;;
-    *)
-        printf 'Usage: bash %s {up|down|status}\n' "$0" >&2
-        exit 2
-        ;;
-esac
+# Only dispatch when run directly; allow sourcing for helper-level testing.
+if [[ "${BASH_SOURCE[0]:-}" == "${0}" ]]; then
+    case "${1:-}" in
+        up)     cmd_up ;;
+        down)   cmd_down ;;
+        status) cmd_status ;;
+        *)
+            printf 'Usage: bash %s {up|down|status}\n' "$0" >&2
+            exit 2
+            ;;
+    esac
+fi

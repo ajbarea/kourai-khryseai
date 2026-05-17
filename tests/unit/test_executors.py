@@ -246,7 +246,7 @@ class TestMetisExecutor:
         executor = MetisAgentExecutor()
         ctx = _make_context(
             "implement CSV export",
-            metadata={"project_root": "/tmp/forge/abc123"},  # noqa: S108
+            metadata={"project_root": "/tmp/forge/abc123"},
         )
         queue = _make_queue()
 
@@ -374,7 +374,7 @@ class TestTechneExecutor:
         executor = TechneAgentExecutor()
         ctx = _make_context(
             "fix auth.py null check",
-            metadata={"project_root": "/tmp/forge/abc123"},  # noqa: S108
+            metadata={"project_root": "/tmp/forge/abc123"},
         )
         queue = _make_queue()
 
