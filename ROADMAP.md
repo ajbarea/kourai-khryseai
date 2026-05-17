@@ -959,6 +959,20 @@ file-of-origin.
   Live-smoke required (AJ at the keyboard) for each visual change to
   confirm against the parchment background.
 
+### Surfaced 2026-05-17 from app-SDK freshness sweep
+
+- **RealtimeTTS 0.6.1 → 0.7.1 migration.** `KokoroEngine` now consumes
+  `KokoroVoice` instances rather than the previous voice-name string
+  interface (breaking). `tools/voice-lab/` casting metadata and
+  `shared/src/kourai_common/tts_realtime.py` voice-load paths both need
+  updating. Companion wins available in 0.7.x: built-in trim-silence +
+  fade hooks (could retire bits of `kourai_common.audio_dsp`), expanded
+  `on_word` callback coverage. **Gated on AJ-in-loop live smoke** for
+  CLI + GUI + VN since Kokoro is the karaoke path's primary engine and
+  voice-name regressions are easy to miss without ear-on. Captured
+  here rather than M6 (M6 is the ElevenLabs hybrid). source:
+  github.com/KoljaB/RealtimeTTS/releases
+
 ---
 
 ## Shipped
