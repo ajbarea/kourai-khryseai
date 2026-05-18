@@ -60,6 +60,10 @@ class Task:
     # tee=False -> direct passthrough so stdin/TTY behavior is preserved
     # (GUIs, docker attaches, interactive prompts).
     tee: bool = True
+    # Per-task env overrides layered on top of build_env(). Used by demo
+    # targets that need to flip a flag (e.g. KOURAI_POSTER_DEMO=1) before
+    # reusing the production host launcher.
+    env_extra: tuple[tuple[str, str], ...] = ()
 
 
 def _default_project_renpy_exe() -> Path:
@@ -370,6 +374,31 @@ TASK_GROUPS: tuple[tuple[str, tuple[tuple[str, Task], ...]], ...] = (
                     tee=False,
                 ),
             ),
+            (
+                "gui-demo",
+                Task(
+                    description="Launch Pygame GUI in scripted demo mode (no network, no LLM — for poster screenshots)",
+                    command_factory=lambda: [sys.executable, "-m", "hosts.gui", "--demo"],
+                    tee=False,
+                ),
+            ),
+            (
+                "cli-demo",
+                Task(
+                    description="Launch terminal CLI in scripted demo mode (no network, no LLM — for poster screenshots)",
+                    command_factory=lambda: [sys.executable, "-m", "hosts.cli", "--demo"],
+                    tee=False,
+                ),
+            ),
+            (
+                "vn-demo",
+                Task(
+                    description="Launch Ren'Py VN in scripted demo mode (no bridge, no Docker — for poster screenshots)",
+                    command_factory=_build_vn_command,
+                    tee=False,
+                    env_extra=(("KOURAI_POSTER_DEMO", "1"),),
+                ),
+            ),
         ),
     ),
     (
@@ -535,21 +564,30 @@ def print_help() -> None:
     print()
 
 
-def run_process(command: list[str], *, cwd: Path) -> int:
+def run_process(command: list[str], *, cwd: Path, env: dict[str, str]) -> int:
     """Direct passthrough for tee=False tasks (preserves stdin/TTY)."""
     try:
-        result = subprocess.run(command, cwd=cwd, env=build_env(), check=False)
+        result = subprocess.run(command, cwd=cwd, env=env, check=False)
     except FileNotFoundError:
         print(f"Command not found: {command[0]}", file=sys.stderr)
         return 127
     return result.returncode
 
 
+def _task_env(task: Task) -> dict[str, str]:
+    """Build the env for a task: process env + Task.env_extra overrides."""
+    env = build_env()
+    for key, value in task.env_extra:
+        env[key] = value
+    return env
+
+
 def _execute_task(task: Task, command: list[str], *, label: str) -> int:
     """Dispatch a leaf task by tee mode."""
+    env = _task_env(task)
     if task.tee:
-        return run_step(command, check=False, label=label, cwd=task.cwd, env=build_env())
-    return run_process(command, cwd=task.cwd)
+        return run_step(command, check=False, label=label, cwd=task.cwd, env=env)
+    return run_process(command, cwd=task.cwd, env=env)
 
 
 def run_task(name: str, extra_args: list[str] | None = None) -> int:
@@ -592,7 +630,7 @@ def run_task(name: str, extra_args: list[str] | None = None) -> int:
         task = TASKS[name]
         result = _execute_task(task, task.command_factory() + extra_args, label=name)
         if result == 0:
-            run_process(["docker", "compose", "ps"], cwd=task.cwd)
+            run_process(["docker", "compose", "ps"], cwd=task.cwd, env=build_env())
         elapsed = time.perf_counter() - start
         if result == 0:
             print(f"[TIMER] Target rebuild completed in {elapsed:.2f}s")

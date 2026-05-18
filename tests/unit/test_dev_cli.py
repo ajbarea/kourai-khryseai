@@ -41,7 +41,7 @@ def test_yolo_runs_clean_down_setup_upgrade_clean(monkeypatch) -> None:
     """The composite yolo task should run the five steps in order."""
     commands: list[list[str]] = []
 
-    def fake_run_process(command: list[str], *, cwd: Path) -> int:
+    def fake_run_process(command: list[str], *, cwd: Path, env: dict[str, str]) -> int:
         commands.append(command)
         assert cwd == dev_cli.PROJECT_ROOT
         return 0
@@ -79,7 +79,7 @@ def test_restart_runs_down_then_up(monkeypatch) -> None:
     """The composite restart task should run down then up."""
     commands: list[list[str]] = []
 
-    def fake_run_process(command: list[str], *, cwd: Path) -> int:
+    def fake_run_process(command: list[str], *, cwd: Path, env: dict[str, str]) -> int:
         commands.append(command)
         return 0
 
@@ -115,7 +115,7 @@ def test_passthrough_args_forwarded(monkeypatch) -> None:
     """Extra args after -- should be appended to the command."""
     captured: dict[str, object] = {}
 
-    def fake_run_process(command: list[str], *, cwd: Path) -> int:
+    def fake_run_process(command: list[str], *, cwd: Path, env: dict[str, str]) -> int:
         captured["command"] = command
         return 0
 
@@ -210,7 +210,7 @@ def test_rebuild_aborts_with_honest_error_when_substep_fails(monkeypatch, capsys
     seconds`` and made the rebuild look like a no-op.
     """
 
-    def fake_run_process(command: list[str], *, cwd) -> int:  # type: ignore[no-untyped-def]
+    def fake_run_process(command: list[str], *, cwd, env) -> int:  # type: ignore[no-untyped-def]
         if command == ["docker", "compose", "down", "--remove-orphans"]:
             return 1
         return 0
@@ -236,7 +236,7 @@ def test_rebuild_aborts_with_honest_error_when_substep_fails(monkeypatch, capsys
 def test_failing_leaf_task_reports_failure_in_timer(monkeypatch, capsys) -> None:
     """Leaf timed tasks should not print 'completed' when they exited non-zero."""
 
-    def fake_run_process(command: list[str], *, cwd) -> int:  # type: ignore[no-untyped-def]
+    def fake_run_process(command: list[str], *, cwd, env) -> int:  # type: ignore[no-untyped-def]
         return 5
 
     monkeypatch.setattr(dev_cli, "run_process", fake_run_process)
@@ -253,7 +253,7 @@ def test_failing_leaf_task_reports_failure_in_timer(monkeypatch, capsys) -> None
 def test_rebuild_success_timer_uses_sub_second_precision(monkeypatch, capsys) -> None:
     """Successful rebuild reports elapsed with 2-decimal seconds, not rounded."""
 
-    def fake_run_process(command: list[str], *, cwd) -> int:  # type: ignore[no-untyped-def]
+    def fake_run_process(command: list[str], *, cwd, env) -> int:  # type: ignore[no-untyped-def]
         return 0
 
     def fake_run_step(command, *, check=False, label=None, cwd=None, env=None) -> int:  # type: ignore[no-untyped-def]
@@ -272,10 +272,39 @@ def test_rebuild_success_timer_uses_sub_second_precision(monkeypatch, capsys) ->
     assert " 0 seconds" not in captured.out
 
 
+def test_demo_targets_registered_in_task_groups() -> None:
+    """cli-demo / gui-demo / vn-demo must be discoverable via `make help`.
+
+    Regression guard: these targets existed in the Makefile but bypassed
+    dev_cli, so `kourai-dev help` (and therefore `make help`) didn't list
+    them. The Makefile header advertises a complete delegation contract;
+    a target reachable from `make` but not `kourai-dev` violates it.
+    """
+    for name in ("cli-demo", "gui-demo", "vn-demo"):
+        assert name in dev_cli.TASKS, f"{name} not registered in TASK_GROUPS"
+        task = dev_cli.TASKS[name]
+        assert "demo" in task.description.lower()
+
+
+def test_vn_demo_sets_poster_demo_env(monkeypatch) -> None:
+    """vn-demo flips KOURAI_POSTER_DEMO=1 so script_poster_demo.rpy activates."""
+    captured: dict[str, object] = {}
+
+    def fake_run_process(command, *, cwd, env):  # type: ignore[no-untyped-def]
+        captured["env"] = env
+        return 0
+
+    monkeypatch.setattr(dev_cli, "run_process", fake_run_process)
+
+    assert dev_cli.run_task("vn-demo") == 0
+    env = cast("dict[str, str]", captured["env"])
+    assert env.get("KOURAI_POSTER_DEMO") == "1"
+
+
 def test_composite_task_aborts_with_honest_error_when_substep_fails(monkeypatch, capsys) -> None:
     """Same fix applies to COMPOSITE_TASKS targets (yolo, restart, dev, dev-vn)."""
 
-    def fake_run_process(command: list[str], *, cwd) -> int:  # type: ignore[no-untyped-def]
+    def fake_run_process(command: list[str], *, cwd, env) -> int:  # type: ignore[no-untyped-def]
         if command == ["docker", "compose", "down", "--remove-orphans"]:
             return 2
         return 0
