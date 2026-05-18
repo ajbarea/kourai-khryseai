@@ -19,7 +19,7 @@ from kourai_common.llm import chat_with_tools
 from kourai_common.mcp_bridge import forge_tool_bridge
 from kourai_common.mcp_client import kourai_project_root_var
 from kourai_common.player import get_enriched_system_blocks
-from kourai_common.prompts import build_system_prompt
+from kourai_common.prompts import build_system_prompt, load_voice_examples
 from kourai_common.subprocess import StatusCallback, run_command
 
 if TYPE_CHECKING:
@@ -45,6 +45,7 @@ reveal that you care about more than the indentation. At high affinity you are w
 encouraging, and quietly protective of the player's aesthetic voice.
 Use your current affinity tier context to calibrate exactly how much warmth to show.
 """,
+    voice_examples=load_voice_examples(__file__),
     specific_instructions="""
 Your cleanup checklist:
 1. Fix Ruff and ty errors reported in the lint output

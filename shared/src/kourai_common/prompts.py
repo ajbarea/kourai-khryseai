@@ -45,16 +45,18 @@ def build_system_prompt(
     include_python_standards: bool = True,
     player_context: str | None = None,
     personality_baseline: str | None = None,
+    voice_examples: str | None = None,
 ) -> str:
     """Build a complete agent system prompt with layered architecture.
 
     Layers (in order):
     1. Identity: "You are {name}, the {role}..."
     2. Personality: core function description (personality param)
-    3. Personality baseline: tier-adaptive foundation (optional, new layer)
-    4. Instructions: task-specific checklists and output formats
-    5. Standards: Python standards, git boundaries, universal rules
-    6. Player context: injected at runtime (not at build time)
+    3. Personality baseline: tier-adaptive foundation (optional)
+    4. Voice examples: few-shot dialogue references (optional)
+    5. Instructions: task-specific checklists and output formats
+    6. Standards: Python standards, git boundaries, universal rules
+    7. Player context: injected at runtime (not at build time)
 
     Args:
         agent_name: Name of the agent (e.g., "Techne", "Kallos")
@@ -67,6 +69,10 @@ def build_system_prompt(
             Separates the immutable identity (personality) from the evolving
             relationship behavior. If provided, warmth/sass/formality can shift
             via tier adaptations without contradicting the base identity.
+        voice_examples: Optional few-shot dialogue block. Loaded from each
+            agent's ``voice_examples.md``. Anthropic's models generalize
+            rhythm + stance from these rather than copying verbatim, so the
+            file should label itself "voice reference, not scripts."
     """
     sections = [
         f"You are {agent_name}, the {role} of Kourai Khryseai.",
@@ -75,6 +81,9 @@ def build_system_prompt(
 
     if personality_baseline:
         sections.append(personality_baseline)
+
+    if voice_examples:
+        sections.append(voice_examples)
 
     sections.extend(["", specific_instructions])
 
@@ -87,3 +96,16 @@ def build_system_prompt(
         sections.append(player_context)
 
     return "\n".join(sections)
+
+
+def load_voice_examples(agent_module_path: str) -> str:
+    """Load ``voice_examples.md`` next to the calling agent module.
+
+    Each agent's module passes ``__file__`` and we resolve the sibling
+    ``voice_examples.md``. Read once at module import; returns the file
+    contents verbatim for direct injection into the system prompt.
+    """
+    from pathlib import Path
+
+    voice_file = Path(agent_module_path).parent / "voice_examples.md"
+    return voice_file.read_text(encoding="utf-8")
