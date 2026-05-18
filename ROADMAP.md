@@ -973,6 +973,19 @@ file-of-origin.
   here rather than M6 (M6 is the ElevenLabs hybrid). source:
   github.com/KoljaB/RealtimeTTS/releases
 
+### Surfaced 2026-05-18 from make-delegation audit
+
+- **`smoke-m18` + `sandbox-image` `kourai-dev` registration.** The
+  demo-target fix [#200] resolves the bulk of the Makefile-delegation
+  drift, but two non-demo targets still bypass `$(UV_DEV)`:
+  `smoke-m18` (uses `uvx --with pexpect python scripts/...`) and
+  `sandbox-image` (uses `docker build`). The tail helpers (`logs`,
+  `logs-tail`) are trivial enough to stay shell-only. The two
+  non-trivial holdouts are honest registration candidates once a
+  second caller surfaces — Windows-without-make dev, or a CI matrix
+  that wants to invoke them via the cross-platform CLI. Defer until
+  the second caller exists.
+
 ---
 
 ## Shipped

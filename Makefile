@@ -13,7 +13,7 @@
 ## measure intent, not trivial formatting noise.
 ##
 
-.PHONY: help check-env setup setup-artifacts upgrade yolo dev dev-vn up down restart rebuild status gui cli vn docs observe fix lint validate test test-unit test-integration test-performance audit deps clean clean-cache clean-tests prune logs logs-tail sandbox-image
+.PHONY: help check-env setup setup-artifacts upgrade yolo dev dev-vn up down restart rebuild status gui gui-demo cli cli-demo vn vn-demo docs observe fix lint validate test test-unit test-integration test-performance audit deps clean clean-cache clean-tests prune logs logs-tail sandbox-image
 .DEFAULT_GOAL := help
 
 UV_DEV := uv run --no-active --package kourai-common kourai-dev
@@ -74,19 +74,19 @@ gui:                       ## Launch Pygame GUI (runs on host machine)
 	@$(UV_DEV) gui
 
 gui-demo:                  ## Launch GUI in scripted demo mode (no network, no LLM — for poster screenshots)
-	@uv run --no-active --package kourai-common python -m hosts.gui --demo
+	@$(UV_DEV) gui-demo
 
 cli:                       ## Launch terminal CLI client (runs on host machine)
 	@$(UV_DEV) cli
 
 cli-demo:                  ## Launch CLI in scripted demo mode (no network, no LLM — for poster screenshots)
-	@uv run --no-active --package kourai-common python -m hosts.cli --demo
+	@$(UV_DEV) cli-demo
 
 vn:                        ## Launch Ren'Py Visual Novel GUI (runs on host machine)
 	@$(UV_DEV) vn
 
 vn-demo:                   ## Launch VN in scripted demo mode (no bridge, no Docker — for poster screenshots)
-	@KOURAI_POSTER_DEMO=1 $(UV_DEV) vn
+	@$(UV_DEV) vn-demo
 
 smoke-m18:                 ## Drive full-pipeline live smoke (preferences pre-seed → dev turn → completion); requires `make up`
 	@uvx --with pexpect python scripts/smoke_m18_full_pipeline.py

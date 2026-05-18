@@ -8,17 +8,37 @@ cross-cutting invariants, and "next up" ordering live in
 If this file is more than ~50 lines, something queued or referential has
 crept in — extract it back to ROADMAP.
 
-Updated: 2026-05-17
+Updated: 2026-05-18
 
 ## In flight
 
-Nothing actively building. Three back-to-back freshness sweeps shipped
-2026-05-16 → 2026-05-17 (#192/#193 model+pricing, #194 infra,
-#195 app-SDK). See ROADMAP shipped log for one-liners. The one
-deferred bump — **RealtimeTTS 0.6.1 → 0.7.1** (KokoroEngine →
-KokoroVoice breaking change) — is captured in ROADMAP under
-"Surfaced 2026-05-17 from app-SDK freshness sweep" and gates on
-AJ-in-loop live smoke.
+Five PRs open as of 2026-05-18, in roughly this merge order:
+
+1. **#197 `feat/voice-examples`** — CLEAN, independent, ready to merge.
+2. **#196 `feat/theoros`** — CLEAN after the test-isolation fix
+   (commit 77e2b58 — autouse `_isolated_skill_context` fixture for
+   `test_theoros_script.py`). Retarget #198 to main before merging
+   this one (stacked-base rule).
+3. **#199 `docs/generalize-poster-title`** — CHAI 2026 poster title
+   generalized to "Multi-Agent Software Development"; docs-only.
+4. **#198 `feat/theoros-autopilot`** — autopilot mode for theoros;
+   stacks on #196. Rebased onto fixed feat/theoros HEAD; needs
+   retarget-to-main once #196 lands.
+5. **#200 `fix/dev-cli-demo-targets`** — registers cli-demo /
+   gui-demo / vn-demo in `dev_cli.TASK_GROUPS` so `make help`
+   surfaces them. Adds `Task.env_extra` to wire `KOURAI_POSTER_DEMO`
+   for vn-demo without a Makefile env-prefix hack. Surfaced
+   2026-05-18 by auditing make-help vs Makefile reality.
+
+The 2026-05-16 → 2026-05-17 freshness sweeps (#192/#193 model+pricing,
+#194 infra, #195 app-SDK) shipped. The one deferred bump —
+**RealtimeTTS 0.6.1 → 0.7.1** (KokoroEngine → KokoroVoice breaking
+change) — is captured in ROADMAP under "Surfaced 2026-05-17 from
+app-SDK freshness sweep" and gates on AJ-in-loop live smoke.
+
+A follow-up Makefile-delegation audit (the residual `smoke-m18` /
+`sandbox-image` targets that still bypass `kourai-dev`) is captured
+in ROADMAP under "Surfaced 2026-05-18 from make-delegation audit".
 
 ## Next pickups
 
