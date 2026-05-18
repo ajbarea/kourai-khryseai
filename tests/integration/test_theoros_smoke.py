@@ -66,9 +66,10 @@ def test_make_theoros_lifecycle(tmp_path):
         "THEOROS_SKILL_CONTEXT_OVERRIDE": str(fake_ctx),
     }
 
-    # up
+    # up — use the script directly with --no-autopilot to keep the smoke hermetic
+    # (autopilot mode would launch a real `claude` CLI session, out of scope here).
     up = subprocess.run(
-        ["make", "theoros"],
+        ["bash", "scripts/theoros.sh", "up", "--no-autopilot"],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
