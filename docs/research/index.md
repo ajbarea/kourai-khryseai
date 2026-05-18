@@ -20,7 +20,7 @@ Multi-agent coding systems that treat collaboration as a *supervised* problem â€
 
 ---
 
-## [Narrative Interfaces for Kourai Khryseai](chai-2026-narrative-interfaces/index.md)
+## [Narrative Interfaces for Multi-Agent Software Development](chai-2026-narrative-interfaces/index.md)
 
 <a href="chai-2026-narrative-interfaces/index.md">
   <img src="chai-2026-narrative-interfaces/narrative-interfaces-poster.jpg"
