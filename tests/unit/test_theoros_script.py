@@ -46,6 +46,27 @@ def _clean():
     _kill_session_if_exists("kourai-theoros")
 
 
+@pytest.fixture(autouse=True)
+def _isolated_skill_context(tmp_path, monkeypatch):
+    """Point theoros.sh at a no-prerequisites skill-context fixture.
+
+    Production `.claude/skill-context.md` gates `up` on a `docker compose ps`
+    prerequisite that's never true in the unit-test runner. Tests that exercise
+    specific prerequisite behavior (e.g. test_up_runs_prerequisites_and_aborts_on_failure)
+    set their own override later in the test body — monkeypatch's last-write-wins
+    semantics make that work without coordination.
+    """
+    fake_ctx = tmp_path / "skill-context.md"
+    fake_ctx.write_text(
+        "## theoros\n\n"
+        "```yaml\n"
+        "session_name: kourai-theoros\n"
+        "repl_command: bash -c 'sleep 1'\n"
+        "```\n"
+    )
+    monkeypatch.setenv("THEOROS_SKILL_CONTEXT_OVERRIDE", str(fake_ctx))
+
+
 def test_script_is_executable_via_bash():
     assert SCRIPT.is_file(), f"{SCRIPT} not found"
 
