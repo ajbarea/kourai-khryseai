@@ -1,6 +1,6 @@
 # CHAI 2026 — Narrative Interfaces (Poster)
 
-**Title:** Narrative Interfaces for Kourai Khryseai
+**Title:** Narrative Interfaces for Multi-Agent Software Development
 
 **Author:** AJ Barea, Rochester Institute of Technology (`ajb6289@rit.edu`)
 
@@ -14,7 +14,7 @@
 
 - [narrative-interfaces-poster.pdf](narrative-interfaces-poster.pdf) — conference poster (36 × 24 in, print quality)
 
-<img src="narrative-interfaces-poster.jpg" class="research-poster" alt="Narrative Interfaces poster — Kourai Khryseai">
+<img src="narrative-interfaces-poster.jpg" class="research-poster" alt="Narrative Interfaces for Multi-Agent Software Development — conference poster">
 
 ## Summary
 
