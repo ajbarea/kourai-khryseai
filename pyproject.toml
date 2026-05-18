@@ -97,7 +97,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "E402", "S603", "S607", "ASYNC221"]  # Assert + importorskip + subprocess in test helpers
+"tests/**" = ["S101", "E402", "S603", "S607", "ASYNC221", "S108"]  # Assert + importorskip + subprocess in test helpers; S108 for intentional /tmp paths mirroring script state file
 "shared/src/kourai_common/dev_cli.py" = ["T201", "S603"]  # CLI tool: intentional print output and safe subprocess calls
 "shared/src/kourai_common/dev_log.py" = ["T201"]  # Dev runner: intentional console echo alongside the log file
 "shared/src/kourai_common/projects.py" = ["S603", "S607"]  # Invokes git on player-owned project paths

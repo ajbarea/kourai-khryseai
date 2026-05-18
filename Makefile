@@ -13,7 +13,7 @@
 ## measure intent, not trivial formatting noise.
 ##
 
-.PHONY: help check-env setup setup-artifacts upgrade yolo dev dev-vn up down restart rebuild status gui gui-demo cli cli-demo vn vn-demo docs observe fix lint validate test test-unit test-integration test-performance audit deps clean clean-cache clean-tests prune logs logs-tail sandbox-image
+.PHONY: help check-env setup setup-artifacts upgrade yolo dev dev-vn up down restart rebuild status gui gui-demo cli cli-demo vn vn-demo docs observe theoros theoros-down theoros-status fix lint validate test test-unit test-integration test-performance audit deps clean clean-cache clean-tests prune logs logs-tail sandbox-image
 .DEFAULT_GOAL := help
 
 UV_DEV := uv run --no-active --package kourai-common kourai-dev
@@ -104,6 +104,15 @@ docs:                      ## Serve project documentation (Zensical on http://lo
 
 observe:                   ## Open observability UIs in browser (Jaeger, Prometheus, Dozzle)
 	@$(UV_DEV) observe
+
+theoros:                   ## Start observed live dev session (Claude drives, spectate via `tmux attach -t kourai-theoros -r`)
+	@bash scripts/theoros.sh up
+
+theoros-down:              ## Stop observed live dev session
+	@bash scripts/theoros.sh down
+
+theoros-status:            ## Show theoros session state (JSON)
+	@bash scripts/theoros.sh status
 
 # ---------------------------------------------------------------------------
 # Quality Gates

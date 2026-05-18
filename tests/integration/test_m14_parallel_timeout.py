@@ -27,7 +27,7 @@ logging_config = {
         },
         "aiohttp_file": {
             "class": "logging.FileHandler",
-            "filename": "/tmp/aiohttp_debug.log",  # noqa: S108  # CI runner /tmp is isolated; diagnostic path is intentional
+            "filename": "/tmp/aiohttp_debug.log",  # CI runner /tmp is isolated; diagnostic path is intentional
             "level": "DEBUG",
             "formatter": "detailed",
         },

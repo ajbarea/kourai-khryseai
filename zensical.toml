@@ -37,6 +37,7 @@ nav = [
   { "Interfaces" = [
       { "CLI Reference" = "cli.md" },
       { "GUI Reference" = "gui.md" },
+      { "Theoros" = "theoros.md" },
       { "VN Reference" = "vn.md" },
   ]},
   { "Configuration" = "configuration.md" },

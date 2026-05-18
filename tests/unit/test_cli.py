@@ -413,7 +413,7 @@ class TestForgeMetadataPropagation:
             client,
             "first",
             "ctx-1",
-            forge_metadata={"project_root": "/tmp"},  # noqa: S108
+            forge_metadata={"project_root": "/tmp"},
         )
         assert cont is False
         assert len(sends) == 1  # original send only, no follow-up
