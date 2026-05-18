@@ -36,15 +36,9 @@ The 2026-05-16 → 2026-05-17 freshness sweeps (#192/#193 model+pricing,
 change) — is captured in ROADMAP under "Surfaced 2026-05-17 from
 app-SDK freshness sweep" and gates on AJ-in-loop live smoke.
 
-### Follow-up surfaced 2026-05-18
-
-Three other Makefile targets bypass the delegation contract:
-`smoke-m18` (uses `uvx --with pexpect`), `logs` / `logs-tail` (tail
-helpers), `sandbox-image` (docker build). The tail helpers are
-trivial enough to stay shell-only; `smoke-m18` and `sandbox-image`
-are honest candidates for `TASK_GROUPS` registration once a second
-caller (Windows dev? CI?) shows the cross-platform pain. Flagged
-not filed.
+A follow-up Makefile-delegation audit (the residual `smoke-m18` /
+`sandbox-image` targets that still bypass `kourai-dev`) is captured
+in ROADMAP under "Surfaced 2026-05-18 from make-delegation audit".
 
 ## Next pickups
 
