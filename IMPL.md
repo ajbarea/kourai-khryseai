@@ -8,57 +8,48 @@ cross-cutting invariants, and "next up" ordering live in
 If this file is more than ~50 lines, something queued or referential has
 crept in — extract it back to ROADMAP.
 
-Updated: 2026-05-18
+Updated: 2026-05-19
 
 ## In flight
 
-Five PRs open as of 2026-05-18, in roughly this merge order:
+Nothing currently open. The 2026-05-16 → 2026-05-18 wave landed cleanly:
 
-1. **#197 `feat/voice-examples`** — CLEAN, independent, ready to merge.
-2. **#196 `feat/theoros`** — CLEAN after the test-isolation fix
-   (commit 77e2b58 — autouse `_isolated_skill_context` fixture for
-   `test_theoros_script.py`). Retarget #198 to main before merging
-   this one (stacked-base rule).
-3. **#199 `docs/generalize-poster-title`** — CHAI 2026 poster title
-   generalized to "Multi-Agent Software Development"; docs-only.
-4. **#198 `feat/theoros-autopilot`** — autopilot mode for theoros;
-   stacks on #196. Rebased onto fixed feat/theoros HEAD; needs
-   retarget-to-main once #196 lands.
-5. **#200 `fix/dev-cli-demo-targets`** — registers cli-demo /
-   gui-demo / vn-demo in `dev_cli.TASK_GROUPS` so `make help`
-   surfaces them. Adds `Task.env_extra` to wire `KOURAI_POSTER_DEMO`
-   for vn-demo without a Makefile env-prefix hack. Surfaced
-   2026-05-18 by auditing make-help vs Makefile reality.
+- #192/#193 — May 2026 model + pricing verification + docs propagation
+- #194 — May 2026 infra freshness sweep (uv, context7-mcp, dozzle, nodejs)
+- #195 — May 2026 app-SDK freshness sweep (7 bumps via uv.lock)
+- #196 — feat/theoros (observed live REPL session)
+- #197 — feat/voice-examples (few-shot voice examples for distinctive character)
+- #198 — feat/theoros-autopilot (3-pane autopilot layout)
+- #199 — docs/generalize-poster-title (CHAI 2026 poster generalization)
+- #200 — fix/dev-cli-demo-targets (cli-demo / gui-demo / vn-demo registration)
+- #201 — chore/license-mit-swap (Apache 2.0 → MIT)
 
-The 2026-05-16 → 2026-05-17 freshness sweeps (#192/#193 model+pricing,
-#194 infra, #195 app-SDK) shipped. The one deferred bump —
-**RealtimeTTS 0.6.1 → 0.7.1** (KokoroEngine → KokoroVoice breaking
-change) — is captured in ROADMAP under "Surfaced 2026-05-17 from
-app-SDK freshness sweep" and gates on AJ-in-loop live smoke.
+Deferred from this wave, still tracked:
 
-A follow-up Makefile-delegation audit (the residual `smoke-m18` /
-`sandbox-image` targets that still bypass `kourai-dev`) is captured
-in ROADMAP under "Surfaced 2026-05-18 from make-delegation audit".
+- **RealtimeTTS 0.6.1 → 0.7.1** — KokoroEngine → KokoroVoice breaking change.
+  See ROADMAP "Surfaced 2026-05-17 from app-SDK freshness sweep". Gated on
+  AJ-in-loop live smoke (Kokoro is karaoke's primary engine; voice-name
+  regressions are easy to miss without ear-on).
+- **`smoke-m18` / `sandbox-image` `kourai-dev` registration** — see
+  ROADMAP "Surfaced 2026-05-18 from make-delegation audit". Gated on a
+  real second caller (Windows-without-make dev or CI matrix).
 
 ## Next pickups
 
-Re-audited 2026-05-16 against actual call sites. Previously-listed
-"small self-contained" picks turned out to be anticipatory:
+Live-smoke-gated work dominates the priority list (M6 sub-tasks 1/3/4/5,
+VN polish, Puck Slice 3/4). Without AJ at the keyboard, the productive
+moves are:
 
-- ~~Cross-host status-feed~~ — no CLI `/debug` slash command exists
-  (greps empty in `hosts/cli/`); sole consumer remains
-  `hosts/gui/debug_log.py`. Skip until a real second consumer lands.
-- ~~Puck Slice 2 helper~~ — `/replay-tutorial` is still stub-gated.
-- ~~Cross-host gossip-render~~ — no host renderers yet; shared-logic-only.
-- ~~Cross-host codex~~ — needs live VN smoke for the parchment-book
-  renderer.
-
-The clean current-caller picks are exhausted. Next moves require
-either an intentional anticipatory-gate override (flag it in the PR
-body) or **M20 + VN live smoke** to unblock M6 ElevenLabs hybrid.
-
-**Audit-mode work always available**: docs/*.md drift sweep,
-/techne:sisters cross-repo audit, CLAUDE.md / AGENTS.md drift check.
+- **Audit-mode work** — `/techne:sisters` cross-repo drift, `/techne:docsync`
+  on docs/**/*.md + README.md + AGENTS.md, CLAUDE.md drift check.
+- **Planned non-gated milestones** — M5 (UID alignment), M12 (dynamic
+  sizing across GUI), M15 (forge logging architecture). None require
+  live smoke; each lands as a focused PR.
+- **DRY-sweep follow-ups deferred from #170** — pyloudnorm migration of
+  `AudioNormalizer`, VN demo-script bridge, Pydantic v2 migration of
+  `CLISettings`. File when the corresponding pain point surfaces; not
+  blocking.
 
 Next priority milestone: **M6 ElevenLabs hybrid** (full spec in
 [ROADMAP.md → M6](./ROADMAP.md#m6--elevenlabs-hybrid-pre-player-release-blocker)).
+Gated on M20 + VN live smoke landing first.

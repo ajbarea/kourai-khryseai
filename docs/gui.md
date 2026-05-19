@@ -118,8 +118,8 @@ skip, motion-sensitivity toggle for accessibility).
 ## Text-to-Speech 🎙️
 
 Each agent speaks through a per-agent neural voice. The runtime engine
-is [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) via
-RealtimeTTS — local, Apache-2.0, ~4 GB system RAM per upstream
+is [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) (Apache-2.0)
+via RealtimeTTS (MIT) — local, ~4 GB system RAM per upstream
 guidance on CPU. Edge-TTS is the documented cloud fallback for
 environments where Kokoro can't load. Audio plays at 44.1 kHz stereo
 with peak + loudness normalization; measured first-chunk latency on

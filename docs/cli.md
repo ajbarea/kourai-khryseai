@@ -26,6 +26,8 @@ uv run python -m hosts.cli
 | `--timeout SECONDS` | `600` | Request timeout |
 | `-v`, `--verbose` | Off | Show timing, event counts, and debug details |
 | `-p`, `--prompt TEXT` | *(interactive)* | Run a single prompt non-interactively (headless mode) |
+| `--voice` / `--no-voice` | *(saved setting)* | Override TTS on/off for this run. `--no-voice` for unattended runs (smoke driver, headless CI, WSL2 without an audio device) |
+| `--demo` | Off | Scripted Hephaestus→Metis pause scene, no network, no LLM (for poster screenshots and recordings) |
 
 ```bash title="Examples"
 # Connect to a specific Hephaestus instance
