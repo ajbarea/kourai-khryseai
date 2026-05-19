@@ -8,10 +8,10 @@ The Makefile remains available as a thin compatibility wrapper, but this
 module is the single source of truth for supported developer commands.
 
 Output captured by ``DevLog`` (see ``kourai_common.dev_log``) lands in
-``logs/dev-latest.log`` plus a timestamped archive. Tasks marked ``tee=True``
-stream through ``run_step``; ``tee=False`` tasks (interactive GUIs, docker
-attaches, the HF setup prompt) pass through directly so stdin/TTY behavior is
-preserved.
+``logs/dev-runner-latest.log`` plus a timestamped archive. Tasks marked
+``tee=True`` stream through ``run_step``; ``tee=False`` tasks (interactive
+GUIs, docker attaches, the HF setup prompt) pass through directly so
+stdin/TTY behavior is preserved.
 """
 
 from __future__ import annotations

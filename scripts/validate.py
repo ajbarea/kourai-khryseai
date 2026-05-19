@@ -110,7 +110,7 @@ def _run_validate() -> int:
         print(f"+ All checks passed ({passed_count}/{total})")
     else:
         print(f"x {total - passed_count}/{total} checks failed")
-        print("  Full details: logs/dev-latest.log")
+        print("  Full details: logs/dev-runner-latest.log")
     print("=" * 60 + "\n")
 
     LOG.event("INFO", f"Validation complete -- {passed_count}/{total} passed")

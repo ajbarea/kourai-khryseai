@@ -163,15 +163,16 @@ prune:                     ## Remove stopped containers, dangling images, unused
 
 # ---------------------------------------------------------------------------
 # Logs
-#   These do NOT go through kourai-dev — scripts truncate dev-latest.log when
-#   they open, which would erase what we're trying to read.
+#   These do NOT go through kourai-dev — scripts truncate
+#   dev-runner-latest.log when they open, which would erase what we're
+#   trying to read.
 # ---------------------------------------------------------------------------
 
-logs:                      ## Show the last 200 lines of logs/dev-latest.log
-	@tail -n 200 logs/dev-latest.log 2>/dev/null || echo "no logs yet — run any make target first"
+logs:                      ## Show the last 200 lines of logs/dev-runner-latest.log
+	@tail -n 200 logs/dev-runner-latest.log 2>/dev/null || echo "no logs yet — run any make target first"
 
-logs-tail:                 ## Follow logs/dev-latest.log (Ctrl-C to exit)
-	@tail -f logs/dev-latest.log
+logs-tail:                 ## Follow logs/dev-runner-latest.log (Ctrl-C to exit)
+	@tail -f logs/dev-runner-latest.log
 
 # ---------------------------------------------------------------------------
 # Sandbox (player project execution)

@@ -43,8 +43,8 @@ Fast audit = `clean → check-env → fix → validate`. Four commands.
 
 Stop-early phase: Phase 1 (clean / check-env). Also: if `make fix` fails with a real tool error (not "nothing to fix"), stop — the check pass won't have a clean baseline.
 
-Log archive: `logs/dev-<YYYYMMDDTHHMMSS>-<cmd>.log` + pointer `logs/dev-latest.log`.
-Do **not** read `dev-latest.log` (overwritten each invocation).
+Log archive: `logs/dev-<YYYYMMDDTHHMMSS>-<cmd>.log` + pointer `logs/dev-runner-latest.log`.
+Do **not** read `dev-runner-latest.log` (overwritten each invocation).
 
 Do-not-run targets (interactive, long-running, or destructive):
 - `make docs` (zensical serve), `make gui`, `make cli`, `make vn`, `make dev`, `make dev-vn`

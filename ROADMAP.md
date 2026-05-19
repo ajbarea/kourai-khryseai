@@ -290,10 +290,10 @@ widget that caches rendered surfaces.
 ## M15 — Forge logging architecture
 
 > Status: partial — LiteLLM DEBUG demote shipped; OTel trace-ID
-> correlation shipped (`_OtelTraceFilter` in `shared/src/kourai_common/log.py`).
-> Host bind-mounts + tool-event JSONL + session-id correlation + dev-latest
-> rename remain planned · Operational hygiene · Surfaced 2026-04-26 during
-> M1 Round 6 validation
+> correlation shipped (`_OtelTraceFilter` in `shared/src/kourai_common/log.py`);
+> dev-runner-latest.log rename shipped. Host bind-mounts + tool-event JSONL
+> + session-id correlation remain planned · Operational hygiene ·
+> Surfaced 2026-04-26 during M1 Round 6 validation
 
 What Round 6 exposed: the host's `logs/` directory has stale per-agent log
 files (`logs/hephaestus.log`, `logs/metis.log`, `logs/kallos.log`,
@@ -304,11 +304,12 @@ kourai-khryseai-techne-1` was the only way to validate that 22 `'type':
 work, smoke validation, and CI artifact collection.
 
 **Why.** Smoke recipes that grep host log files (`SMOKE_TODO.md` Round 6
-told you to grep `logs/dev-latest.log` for tool_use frames) silently never
-matched because the log mount was broken. Future smoke recipes will hit
-the same wall. Beyond smoke, tool-event observability matters for poster
-demos, customer support, and onboarding new contributors who want to see
-what the swarm actually did.
+told you to grep `logs/dev-latest.log` for tool_use frames — that file is
+now `logs/dev-runner-latest.log`) silently never matched because the log
+mount was broken. Future smoke recipes will hit the same wall. Beyond
+smoke, tool-event observability matters for poster demos, customer
+support, and onboarding new contributors who want to see what the swarm
+actually did.
 
 **Scope.**
 
@@ -327,10 +328,12 @@ what the swarm actually did.
   in one command. **Partial today:** `_OtelTraceFilter` already injects
   the OTel trace-id (32-char hex) into every record via the format string;
   session-id is the orthogonal correlation key that still needs threading.
-- **Rename / retire `dev-latest.log`.** It's the dev-runner wrapper output
-  (~933 bytes), not a live agent trace. The name implies otherwise. Either
-  rename to `logs/dev-runner-latest.log` or kill it entirely and rely on
-  the timestamped `logs/dev-<ts>-<cmd>.log` files.
+- ~~**Rename / retire `dev-latest.log`.**~~ **Shipped 2026-05-19** —
+  renamed to `logs/dev-runner-latest.log` across `dev_log.py`,
+  `dev_cli.py`, the Makefile `logs` / `logs-tail` targets, and the
+  per-script error pointers. The name now reflects its actual content
+  (dev-runner wrapper output) instead of implying it holds live agent
+  traces.
 - ~~**Demote LiteLLM DEBUG default in containers.**~~ **Shipped** —
   `shared/src/kourai_common/llm.py:33` sets `litellm.suppress_debug_info = True`
   unconditionally; there are no `litellm.set_verbose = True` call sites

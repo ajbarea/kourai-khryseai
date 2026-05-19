@@ -76,12 +76,12 @@ frames closing the loop; **zero `parse_and_apply_fixes` hits** across all 6
 agent containers (techne, hephaestus, metis, dokimasia, kallos, mneme).
 Wall-clock: 244.8s on 6a, 418.6s on 6b — both under the 462s v2 baseline.
 
-**Note for future smoke recipes:** the original grep targets (`logs/dev-latest.log`)
-were wrong — that file is the dev-runner wrapper output, not agent traces.
-The agent log volume mounts to host are stale; live traces only live inside
-containers today. M15 (forge logging architecture, ROADMAP) fixes this.
-Until then, validate tool_use frames via `docker logs kourai-khryseai-techne-1`,
-not `logs/dev-latest.log`.
+**Note for future smoke recipes:** the original grep targets (`logs/dev-latest.log`,
+now `logs/dev-runner-latest.log`) were wrong — that file is the dev-runner wrapper
+output, not agent traces. The agent log volume mounts to host are stale; live traces
+only live inside containers today. M15 (forge logging architecture, ROADMAP) fixes
+this. Until then, validate tool_use frames via `docker logs kourai-khryseai-techne-1`,
+not the dev-runner log.
 
 ### Pre-flight status (verified 2026-04-22)
 
@@ -107,9 +107,10 @@ strictly the live REPL loop.
 - [x] After streaming, validated tool_use via:
       `docker logs kourai-khryseai-techne-1 | grep -cE "['\"]type['\"]\s*:\s*['\"]tool_use['\"]"`
       → **22 hits** with `toolu_*` IDs proving real provider blocks.
-      *(Note: the original grep target — `logs/dev-latest.log` — was wrong;
-      that file is dev-runner wrapper output, not agent traces. M15 fixes
-      this. Until then, use `docker logs` for tool_use validation.)*
+      *(Note: the original grep target — `logs/dev-latest.log`, now renamed
+      `logs/dev-runner-latest.log` — was wrong; that file is dev-runner
+      wrapper output, not agent traces. M15 (in flight) fixes this. Until
+      then, use `docker logs` for tool_use validation.)*
 - [x] `parse_and_apply_fixes` count across all 6 agent containers: **zero**
       (`for c in techne hephaestus metis dokimasia kallos mneme; do count=$(docker logs kourai-khryseai-${c}-1 2>&1 | grep -c parse_and_apply_fixes); echo "$c: $count"; done`)
 - [x] `/project status` → one active forge session (`946e593a`)

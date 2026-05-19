@@ -141,7 +141,7 @@ def _run_audit() -> int:
 
         print("\n" + "=" * 60)
         print("+ Audit passed" if passed else "x Audit failed")
-        print("  Full details: logs/dev-latest.log")
+        print("  Full details: logs/dev-runner-latest.log")
         print("=" * 60 + "\n")
         return 0 if passed else 1
 
@@ -150,7 +150,7 @@ def _run_audit() -> int:
     LOG.event("WARN", "No audit backend available")
     print("\n" + "=" * 60)
     print("+ Audit skipped")
-    print("  Full details: logs/dev-latest.log")
+    print("  Full details: logs/dev-runner-latest.log")
     print("=" * 60 + "\n")
     return 0
 
