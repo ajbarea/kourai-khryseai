@@ -289,7 +289,11 @@ widget that caches rendered surfaces.
 
 ## M15 — Forge logging architecture
 
-> Status: planned · Operational hygiene · Surfaced 2026-04-26 during M1 Round 6 validation
+> Status: partial — LiteLLM DEBUG demote shipped; OTel trace-ID
+> correlation shipped (`_OtelTraceFilter` in `shared/src/kourai_common/log.py`).
+> Host bind-mounts + tool-event JSONL + session-id correlation + dev-latest
+> rename remain planned · Operational hygiene · Surfaced 2026-04-26 during
+> M1 Round 6 validation
 
 What Round 6 exposed: the host's `logs/` directory has stale per-agent log
 files (`logs/hephaestus.log`, `logs/metis.log`, `logs/kallos.log`,
@@ -320,15 +324,19 @@ what the swarm actually did.
   thread it through `setup_logging()` as a logger filter so every record
   emitted during a session carries `session_id=<id>` in the format string.
   Then `grep session=<id> logs/*.log` answers "what happened in session X"
-  in one command.
+  in one command. **Partial today:** `_OtelTraceFilter` already injects
+  the OTel trace-id (32-char hex) into every record via the format string;
+  session-id is the orthogonal correlation key that still needs threading.
 - **Rename / retire `dev-latest.log`.** It's the dev-runner wrapper output
   (~933 bytes), not a live agent trace. The name implies otherwise. Either
   rename to `logs/dev-runner-latest.log` or kill it entirely and rely on
   the timestamped `logs/dev-<ts>-<cmd>.log` files.
-- **Demote LiteLLM DEBUG default in containers.** Useful for smoke
-  testing; verbose noise for steady state. New env var `KOURAI_LLM_DEBUG`
-  (default unset / INFO) gates the `litellm.set_verbose = True` line.
-  Smoke recipes set it; production-ish runs don't.
+- ~~**Demote LiteLLM DEBUG default in containers.**~~ **Shipped** —
+  `shared/src/kourai_common/llm.py:33` sets `litellm.suppress_debug_info = True`
+  unconditionally; there are no `litellm.set_verbose = True` call sites
+  anywhere in the codebase. Smoke runs that want LiteLLM verbosity can
+  toggle locally; production-ish runs are quiet by default. (Verified
+  2026-05-19 via `grep -rn 'litellm.set_verbose\|litellm.verbose'`.)
 
 **Done when.**
 

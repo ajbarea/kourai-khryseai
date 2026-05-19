@@ -11,7 +11,7 @@ authors:
     email: ajb6289@rit.edu
 repository-code: "https://github.com/ajbarea/kourai-khryseai"
 url: "https://ajbarea.github.io/kourai-khryseai/"
-license: Apache-2.0
+license: MIT
 abstract: >-
   Multi-agent coding systems are increasingly capable, but their
   coordination decisions are often opaque to the supervisor. Kourai
