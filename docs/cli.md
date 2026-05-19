@@ -72,10 +72,11 @@ navigate, `Tab` or `Enter` accepts the highlighted entry.
 | `/project current` | Show the active project |
 | `/project clear` | Clear the active project |
 | `/project status` | Show pending forge sessions on active project |
-| `/project accept <session_id>` | Merge a forge session into main |
-| `/project discard <session_id>` | Discard a forge session |
+| `/project accept [session_id]` | Merge a forge session into main (latest if no id given) |
+| `/project discard [session_id]` | Discard a forge session (latest if no id given) |
+| `/project delete <name\|id> [--purge] [--yes]` | Delete a project from the registry (`--purge` removes worktrees, `--yes` skips confirmation) |
 | `/copy` | Copy last result to clipboard |
-| `/save <file>` | Save last result to a file |
+| `/save [filename]` | Save last result to a file |
 | `/clear` | Clear the screen |
 | Any other text | Send as a request to Hephaestus |
 
