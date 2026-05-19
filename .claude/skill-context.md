@@ -13,7 +13,7 @@ toolchain / path / tooling changes.
 - runner_module: `kourai-dev` session logger (writes `logs/dev-<ts>-<cmd>.log`)
 - has: docker-compose stack, GUI host, MCP servers; no Rust, no frontend
 
-## audit (aj-audit)
+## audit
 
 Full audit = 10 `make` targets, in order:
 
@@ -54,7 +54,7 @@ Do-not-run targets (interactive, long-running, or destructive):
 
 Cross-archive sweep also looks for `CVE-` hits from step 10 — report counts, informational only.
 
-## ci_audit (aj-ci-audit)
+## ci_audit
 
 Referenced configs a CI failure can trace to:
 - `pyproject.toml`
@@ -67,7 +67,7 @@ Tool error markers (extend the default grep set):
 - `pip-audit` (advisory findings; informational)
 - `docker` / `compose` (integration-test container errors)
 
-## slop_ground_truth (aj-deslop / aj-reslop / aj-docsync)
+## slop_ground_truth
 
 Source of truth for numeric performance / scale claims:
 
@@ -75,7 +75,7 @@ Source of truth for numeric performance / scale claims:
 
 Any quantitative perf/scale claim not traceable there is slop.
 
-## scan_scope (aj-deslop / aj-reslop)
+## scan_scope
 
 Skip paths:
 - `.venv/`, `node_modules/`, `dist/`, `build/`, `site/`, `out/`
@@ -144,7 +144,7 @@ The `ops_command` services list is curated per session — adjust for the agents
 
 - VN host (`hosts/vn/`) targets **Ren'Py 8.5.x**. My recall keeps producing Ren'Py 6.x APIs that crash. **Always resolve API questions via context7** (`mcp__claude_ai_Context7__query-docs` against `renpy`) before writing `config.*` settings, init priorities, or special screen overrides (`screen main_menu`, `screen game_menu`, etc.). Don't trust my pattern-match for anything 6.x-vs-8.x sensitive.
 
-## docs_site (aj-docs-site)
+## docs_site
 
 - config: `zensical.toml`
 - workflow: `.github/workflows/docs.yml`

@@ -6,7 +6,7 @@ of truth for *what*; this file is the source of truth for *why*.
 
 Shared toolchain-pin rationale (pytest 9.0.3 floor, ruff/ty floors,
 `requires-python = ">=3.12,<3.14"`) lives with the
-[aj-sisters](.claude/skill-context.md) drift-detection skill — those are
+cross-repo [drift-detection skill](.claude/skill-context.md) — those are
 cross-repo policy, not kourai-specific decisions.
 
 kourai is the cleanest-layered of the three sisters. The root
@@ -89,7 +89,7 @@ its listed deps are dev tooling, grouped under `[dependency-groups]`.
 
 - **`zensical>=0.0.24`** — docs generator; floor pinned because earlier
   versions had broken nav-ordering behavior. Same tool lives in
-  phalanx-fl and vFL; aj-sisters audits for drift.
+  phalanx-fl and vFL; cross-repo drift audit covers all three.
 
 ### uv-specific: the aiohttp override
 
