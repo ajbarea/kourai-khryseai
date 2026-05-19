@@ -109,7 +109,7 @@ def _run_deps(args: argparse.Namespace) -> int:
 
     print("=" * 60)
     print("+ Dependency tree generated")
-    print("  Full details: logs/dev-latest.log\n")
+    print("  Full details: logs/dev-runner-latest.log\n")
     LOG.event("INFO", "Dependency tree analysis complete")
     return 0
 

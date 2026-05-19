@@ -202,7 +202,7 @@ def _run_tests() -> int:
         return 0
     failed = total - passed_count
     print(f"x {failed}/{total} suites failed")
-    print("  See logs/dev-latest.log for details\n")
+    print("  See logs/dev-runner-latest.log for details\n")
     LOG.event("ERROR", f"{failed}/{total} suites failed")
     return 1
 

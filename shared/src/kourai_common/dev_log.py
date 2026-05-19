@@ -1,10 +1,10 @@
 """Structured dev-session logger.
 
-A single session writes to ``logs/dev-latest.log`` (truncated on open so the
-newest run is at a stable path) plus a timestamped archive. Subprocess output
-is streamed live to the terminal *and* teed to the log with ISO timestamps and
-per-step context tags. Every session ends with a SUMMARY block listing
-per-step rc + elapsed.
+A single session writes to ``logs/dev-runner-latest.log`` (truncated on open
+so the newest run is at a stable path) plus a timestamped archive. Subprocess
+output is streamed live to the terminal *and* teed to the log with ISO
+timestamps and per-step context tags. Every session ends with a SUMMARY block
+listing per-step rc + elapsed.
 
 When ``KOURAI_DEV_SESSION=1`` is set in the environment, ``DevLog.open()``
 becomes a no-op so a child process invoked from another DevLog session does
@@ -93,7 +93,7 @@ class DevLog:
             return
         LOGS_DIR.mkdir(exist_ok=True)
         ts = _dt.datetime.now().strftime("%Y%m%dT%H%M%S")
-        self.latest_path = LOGS_DIR / "dev-latest.log"
+        self.latest_path = LOGS_DIR / "dev-runner-latest.log"
         self.archive_path = LOGS_DIR / f"dev-{ts}-{command}.log"
         self.file = self.latest_path.open("w", encoding="utf-8", buffering=1)
         atexit.register(self.close)

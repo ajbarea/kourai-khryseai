@@ -6,7 +6,7 @@ both invoke this script with ``--check-only`` so they mirror CI's strict
 ``ruff format --check`` semantics; the ``fix`` task uses ``--fix-only``
 to apply auto-formatters without then verifying. Running the script with
 no flags runs both passes in order — useful for ad-hoc local cleanup.
-Output streams live to the terminal and to ``logs/dev-latest.log`` (see
+Output streams live to the terminal and to ``logs/dev-runner-latest.log`` (see
 scripts/dev_log.py).
 
 Usage:
@@ -88,7 +88,7 @@ def check_pass() -> int:
     if overall == 0:
         print(f"{C_GREEN}+ All checks passed{C_RESET}\n")
     else:
-        print(f"{C_RED}x Some checks failed. Full details: logs/dev-latest.log{C_RESET}\n")
+        print(f"{C_RED}x Some checks failed. Full details: logs/dev-runner-latest.log{C_RESET}\n")
     return overall
 
 
