@@ -91,6 +91,7 @@ These variables have sensible defaults in code. You only need to set them if you
 | `KOURAI_LOG_LEVEL` | `INFO` | Logging level: `DEBUG`, `INFO`, `WARNING`, `ERROR` |
 | `KOURAI_MAX_ITERATIONS` | `5` | Max Kallos / Techne feedback loop iterations before giving up |
 | `KOURAI_STREAM_ENABLED` | `true` | Enable SSE streaming for real-time progress |
+| `KOURAI_MODEL_OVERRIDE` | *(unset)* | Force a single model for every agent (bypasses tier mapping). Useful for `MOCK` in tests or a one-off cross-tier comparison |
 
 ### Infrastructure & Observability
 
@@ -116,6 +117,29 @@ When `KOURAI_PROVIDER=local`, `make setup` will check Ollama connectivity and au
 | `BACKUP_USER` | *(auto-detected from HF_TOKEN)* | HuggingFace username for backup ownership |
 | `BACKUP_BUCKET_NAME` | `kourai-backups` | HF bucket name for player data backups |
 | `BACKUP_RETENTION_DAYS` | `30` | Days to retain old backups before cleanup |
+
+### Sandbox (Techne command execution)
+
+Techne runs shell commands either directly on the host (default) or inside an ephemeral Docker container. The `make sandbox-image` target builds the container image once; `KOURAI_SANDBOX=container` flips the runner for the rest of the process.
+
+| Variable | Default | Description |
+|---|---|---|
+| `KOURAI_SANDBOX` | `host` | `host` runs commands as direct subprocesses; `container` wraps each call in `docker run --rm --network none` against `KOURAI_SANDBOX_IMAGE`. Unknown values fall back to host with a warning |
+| `KOURAI_SANDBOX_IMAGE` | `kourai-sandbox:latest` | Docker image used by the container runner (built via `make sandbox-image`) |
+| `KOURAI_SANDBOX_TIMEOUT_S` | `300` | Per-command wall-clock timeout, seconds |
+| `KOURAI_SANDBOX_MEMORY` | `512m` | Container memory cap (Docker `--memory` syntax) |
+| `KOURAI_SANDBOX_CPUS` | `1` | Container CPU cap (Docker `--cpus` syntax) |
+| `KOURAI_SANDBOX_PIDS` | `256` | Process count limit inside the container (Docker `--pids-limit`) |
+
+### Host overrides (audio, VN)
+
+Host-side toggles that don't belong to any single agent: useful for unattended runs, debugging, or pointing at a non-default Ren'Py install.
+
+| Variable | Default | Description |
+|---|---|---|
+| `KOURAI_TTS` | *(unset = saved setting)* | Set to `off` / `0` / `false` / `no` to disable TTS for this run. Needed for smoke drivers, headless CI, or WSL2 without an audio device |
+| `KOURAI_AUDIO_DEBUG` | *(unset)* | Set to any truthy value to keep audio subsystem warnings visible (skips the `stderr` muting that hides PortAudio / ALSA spam) |
+| `KOURAI_RENPY_EXE` | *(unset = auto-discover)* | Absolute path to a Ren'Py SDK launcher when `make vn` cannot find a local install |
 
 ---
 
