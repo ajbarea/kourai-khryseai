@@ -28,6 +28,7 @@ from hosts.cli.commands import (
     _active_project,
     _build_key_bindings,
     _copy_to_clipboard,
+    _handle_model_command,
     _handle_preferences_command,
     _handle_project_command,
     _handle_scratchpad_command,
@@ -54,7 +55,7 @@ from hosts.cli.streaming import _connect_with_url_override, get_last_result, sen
 from hosts.cli.styling import _DIM, _GOLD, _GOLD_BOLD, _GOLD_BRIGHT, _ITALIC, _RED, _RESET
 from kourai_common.a2a_utils import make_a2a_http_client
 from kourai_common.audio import AudioManager
-from kourai_common.config import MODEL_TIER, PROVIDER, get_host_agent_url, get_model
+from kourai_common.config import PROVIDER, get_host_agent_url, get_model, get_tier
 from kourai_common.federation.host_helpers import derive_scene_id
 from kourai_common.federation.memoir import Memoir
 from kourai_common.forge_session import ForgeSession, ForgeSessionError
@@ -99,7 +100,7 @@ def _tier_persona_name(tier: str) -> str:
 
 def _active_model_label() -> str:
     model_id = get_model("hephaestus")
-    return f"{PROVIDER}:{_tier_persona_name(MODEL_TIER)} ({model_id.split('/', 1)[-1]})"
+    return f"{PROVIDER}:{_tier_persona_name(get_tier())} ({model_id.split('/', 1)[-1]})"
 
 
 def _apply_audio_settings(
@@ -682,7 +683,7 @@ async def main(
     def _toolbar() -> str:
         img = f"  \U0001f4ce {len(pending_images)} image(s) queued" if pending_images else ""
         return (
-            f"{PROVIDER}:{_tier_persona_name(MODEL_TIER)}"
+            f"{PROVIDER}:{_tier_persona_name(get_tier())}"
             "  ·  Enter send  ·  Alt+V attach image  ·  /help  ·  /q quit"
             f"{img}"
         )
@@ -731,12 +732,8 @@ async def main(
                     )
                     continue
 
-                if prompt_text == "/model_tier":
-                    _echo(f"  {_GOLD}Provider:{_RESET}  {PROVIDER}")
-                    _echo(
-                        f"  {_GOLD}Tier:{_RESET}      {MODEL_TIER} ({_tier_persona_name(MODEL_TIER)})"
-                    )
-                    _echo(f"  {_GOLD}Model:{_RESET}     {get_model('hephaestus')}")
+                if prompt_text == "/model" or prompt_text.startswith(("/model ", "/model_tier")):
+                    _handle_model_command(prompt_text, _tier_persona_name)
                     continue
 
                 if prompt_text in ("/usage", "/cost"):

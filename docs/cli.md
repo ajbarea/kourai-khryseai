@@ -53,7 +53,8 @@ navigate, `Tab` or `Enter` accepts the highlighted entry.
 | `/status` | Show agent name, version, URL, context ID, streaming status |
 | `/help` | Show command help |
 | `/settings` (alias `/config`) | Toggle voice, music, romance, and game systems |
-| `/model_tier` | Show current provider, tier, and model |
+| `/model [cheap\|standard\|smart]` | Show current provider/tier/model — or switch tier mid-session (no restart) |
+| `/model_tier` | Alias for `/model` — kept for back-compat |
 | `/metrics` | Show alignment, affinity, and virtue metrics |
 | `/usage` (alias `/cost`) | Per-(agent, model) tokens + dollar cost for this session |
 | `/reset_usage` | Zero the session usage counter |

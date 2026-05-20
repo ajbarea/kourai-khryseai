@@ -124,6 +124,38 @@ class TestGetModel:
         assert MODELS_SMART["metis"] == "anthropic/claude-opus-4-7"
 
 
+class TestTierMutation:
+    """``/model <tier>`` runtime switching via ``set_tier`` + ``get_tier``."""
+
+    def test_set_tier_mutates_module_state(self, monkeypatch):
+        monkeypatch.setattr("kourai_common.config.MODEL_TIER", "cheap")
+        config.set_tier("smart")
+        assert config.get_tier() == "smart"
+        assert config.MODEL_TIER == "smart"
+
+    def test_get_model_sees_set_tier_change(self, monkeypatch):
+        """The whole point: ``set_tier`` flips what ``get_model`` returns."""
+        monkeypatch.setattr("kourai_common.config.PROVIDER", "anthropic")
+        monkeypatch.setattr("kourai_common.config.MODEL_TIER", "cheap")
+        assert config.get_model("metis") == "anthropic/claude-haiku-4-5-20251001"
+        config.set_tier("smart")
+        assert config.get_model("metis") == "anthropic/claude-opus-4-7"
+
+    def test_set_tier_normalizes_case_and_whitespace(self, monkeypatch):
+        monkeypatch.setattr("kourai_common.config.MODEL_TIER", "cheap")
+        config.set_tier("  SMART  ")
+        assert config.get_tier() == "smart"
+
+    def test_set_tier_rejects_unknown(self, monkeypatch):
+        import pytest
+
+        monkeypatch.setattr("kourai_common.config.MODEL_TIER", "cheap")
+        with pytest.raises(ValueError, match="unknown tier"):
+            config.set_tier("opus")
+        # State unchanged on rejection.
+        assert config.get_tier() == "cheap"
+
+
 class TestGetAgentUrl:
     """Tests for get_agent_url() function."""
 

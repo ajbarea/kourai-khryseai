@@ -41,7 +41,12 @@ SLASH_COMMANDS: tuple[SlashCommand, ...] = (
         arg_hint="[1-9]",
     ),
     SlashCommand("config", "Alias for /settings", arg_hint="[1-9]"),
-    SlashCommand("model_tier", "Show current provider, tier, and model"),
+    SlashCommand(
+        "model",
+        "Show current provider/tier/model — or switch tier mid-session",
+        arg_hint="[cheap|standard|smart]",
+    ),
+    SlashCommand("model_tier", "Alias for /model — kept for back-compat"),
     SlashCommand("usage", "Show running token + dollar cost for this session"),
     SlashCommand(
         "cost", "Alias for /usage — matches OSS-CC vocabulary (ClawCode, Cline, OpenCode)"
