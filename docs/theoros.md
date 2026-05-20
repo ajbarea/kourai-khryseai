@@ -53,7 +53,7 @@ theoros session ready (autopilot).
 Claude is driving the REPL via the middle pane. Watch all three:
   top    — kourai REPL (the game)
   middle — Claude's reasoning
-  bottom — docker compose logs
+  bottom — tool_events.jsonl (structured tool-call stream)
 ```
 
 Attach from another terminal with `-r` for safe spectating. Drop the `-r` to take the wheel mid-session — all panes accept input from any attached client.
@@ -68,9 +68,9 @@ A single tmux session, `kourai-theoros`, with three panes:
 |---|---|---|
 | **Top (40%)** | `kourai-theoros:0.0` | `make cli` — the kourai REPL. Driven by autopilot via `tmux send-keys`. |
 | **Middle (30%)** | `kourai-theoros:0.1` | `claude` CLI — autopilot Claude. Reads `scripts/theoros_autopilot.md`, works through the prompt library, narrates observations. |
-| **Bottom (30%)** | `kourai-theoros:0.2` | `docker compose logs -f --tail 0 <agents>` — native multi-service tail. |
+| **Bottom (30%)** | `kourai-theoros:0.2` | `tail -f logs/tool_events.jsonl` — structured tool-call JSONL stream (one record per tool execution; M15). |
 
-The agent list in the bottom pane is curated, not exhaustive — edit `ops_command:` in `.claude/skill-context.md` to tail different agents per session. The full agent set is `metis mneme kallos dokimasia puck cupid aidos aletheia hephaestus vn-bridge`.
+The bottom pane watches the structured tool-event emitter rather than raw docker logs — per the 2026 Agent DX best practice, this gives Claude a semantic feed (agent, tool, args, ms, result) without parsing ASCII frames. Edit `ops_command:` in `.claude/skill-context.md` to switch back to `docker compose logs -f` for any session where you want the raw per-container view.
 
 The prompt library at `tests/fixtures/theoros_prompts.md` is a **golden dataset** (2026 best practice: curated, not random) of `(input, expected behavior, observable signal)` triples covering every CHAT route. v1 covers 12 prompts; pipeline-triggering prompts are deferred to v2 (they take 5–20 minutes each and create forge sessions to clean up).
 

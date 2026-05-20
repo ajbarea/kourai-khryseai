@@ -28,6 +28,7 @@ uv run python -m hosts.cli
 | `-p`, `--prompt TEXT` | *(interactive)* | Run a single prompt non-interactively (headless mode) |
 | `--voice` / `--no-voice` | *(saved setting)* | Override TTS on/off for this run. `--no-voice` for unattended runs (smoke driver, headless CI, WSL2 without an audio device) |
 | `--demo` | Off | Scripted Hephaestus→Metis pause scene, no network, no LLM (for poster screenshots and recordings) |
+| `--json` | Off | Emit one JSON record per agent event on stdout (JSON Lines). Use with `-p` for agent piping; mirrors OpenAI Codex `--json` and Claude Code `--output-format stream-json` |
 
 ```bash title="Examples"
 # Connect to a specific Hephaestus instance
