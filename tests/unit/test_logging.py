@@ -438,3 +438,100 @@ class TestRunUvicorn:
         kwargs = fake_run.call_args.kwargs
         assert kwargs["log_level"] == "debug"
         assert kwargs["log_config"] is None
+
+
+class TestSessionFilterInjection:
+    """Session IDs from the contextvar flow into formatted log lines."""
+
+    def _reset_root(self) -> logging.Logger:
+        root = logging.getLogger()
+        for h in root.handlers[:]:
+            root.removeHandler(h)
+        return root
+
+    def test_session_id_injected_when_set(self):
+        from kourai_common.log import _SessionFilter, set_session_id
+
+        flt = _SessionFilter()
+        set_session_id("946e593a")
+
+        record = logging.LogRecord(
+            name="agent",
+            level=logging.INFO,
+            pathname=__file__,
+            lineno=1,
+            msg="m",
+            args=(),
+            exc_info=None,
+        )
+        flt.filter(record)
+        assert getattr(record, "sessionID", None) == "946e593a"
+
+    def test_session_id_empty_when_unset(self):
+        from kourai_common.log import _SessionFilter, set_session_id
+
+        flt = _SessionFilter()
+        set_session_id("")
+
+        record = logging.LogRecord(
+            name="agent",
+            level=logging.INFO,
+            pathname=__file__,
+            lineno=1,
+            msg="m",
+            args=(),
+            exc_info=None,
+        )
+        flt.filter(record)
+        assert getattr(record, "sessionID", None) == ""
+
+    def test_session_block_rendered_when_set(self):
+        from kourai_common.log import _CONSOLE_FMT, _CONSOLE_FMT_WITH_TRACE, _TraceAwareFormatter
+
+        formatter = _TraceAwareFormatter(_CONSOLE_FMT, _CONSOLE_FMT_WITH_TRACE)
+        record = logging.LogRecord(
+            name="agent",
+            level=logging.INFO,
+            pathname=__file__,
+            lineno=1,
+            msg="session line",
+            args=(),
+            exc_info=None,
+        )
+        record.otelTraceID = "0"
+        record.sessionID = "946e593a"
+
+        out = formatter.format(record)
+        assert " [session=946e593a]" in out
+        assert "session line" in out
+
+    def test_session_block_omitted_when_empty(self):
+        from kourai_common.log import _CONSOLE_FMT, _CONSOLE_FMT_WITH_TRACE, _TraceAwareFormatter
+
+        formatter = _TraceAwareFormatter(_CONSOLE_FMT, _CONSOLE_FMT_WITH_TRACE)
+        record = logging.LogRecord(
+            name="agent",
+            level=logging.INFO,
+            pathname=__file__,
+            lineno=1,
+            msg="no session line",
+            args=(),
+            exc_info=None,
+        )
+        record.otelTraceID = "0"
+        record.sessionID = ""
+
+        out = formatter.format(record)
+        assert " [session=" not in out
+        assert "no session line" in out
+
+    def test_handlers_carry_session_filter(self):
+        from kourai_common.log import _SessionFilter, setup_logging
+
+        root = self._reset_root()
+        setup_logging("test_session_handlers")
+
+        for h in root.handlers:
+            assert any(isinstance(f, _SessionFilter) for f in h.filters), (
+                f"handler {h!r} missing _SessionFilter"
+            )

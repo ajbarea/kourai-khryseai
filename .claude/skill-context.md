@@ -97,7 +97,7 @@ Subagent scan-area split:
 ```yaml
 repl_command: make cli
 session_name: kourai-theoros
-ops_command: docker compose logs -f --tail 0 metis mneme hephaestus
+ops_command: tail -f logs/tool_events.jsonl
 prerequisites:
   - command: docker compose ps --status running --quiet | grep -q .
     message: "Core containers not running. Run 'make up' first."
@@ -113,7 +113,7 @@ prerequisites:
 | Does the comms-window layout look right? | What was the box width / content length? |
 | Does the chat feel coherent across turns? | What did Hephaestus's user-message body contain? |
 
-The `ops_command` services list is curated per session — adjust for the agents you're exercising. The full agent set is `metis mneme kallos dokimasia puck cupid aidos aletheia hephaestus vn-bridge`.
+The `ops_command` watches the structured tool event JSONL emitter. This aligns with May 2026 Agent DX best practices, giving Claude semantic observability over tool executions across all agents instead of parsing raw Docker logs.
 
 ## working_docs
 

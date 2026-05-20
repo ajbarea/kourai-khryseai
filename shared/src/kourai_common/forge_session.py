@@ -98,6 +98,13 @@ class ForgeSession:
         conn.commit()
 
         log.info("Forge session %s started on %s", session_id[:8], branch)
+
+        # M15: set session contextvar so all subsequent log records from this
+        # host process carry the forge session correlation key.
+        from kourai_common.log import set_session_id
+
+        set_session_id(session_id[:8])
+
         return ForgeSession(
             session_id=session_id,
             project_id=project.project_id,
