@@ -17,16 +17,11 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 # Layout constants
 # ---------------------------------------------------------------------------
-W, H = 1280, 720
-PORTRAIT_W = 310
-DIALOGUE_X = PORTRAIT_W + 8
-DIALOGUE_W = W - PORTRAIT_W - 8
-INPUT_H = 80
-DIALOGUE_H = H - INPUT_H
-BANNER_H = 32
-BANNER_BORDER_H = 2
-BANNER_TOTAL_H = BANNER_H + BANNER_BORDER_H  # 34 — top offset for dialogue area
-SCROLL_CHROME_H = 60  # vertical chrome eaten by banner + padding in scroll math
+W, H = 1920, 1080  # Preferred window size defaults
+# research(2026-05): 1080p is modal at 52.21% of Steam users (April 2026 survey);
+# Ren'Py's modern GUI ships at 1280x720 OR 1920x1080 as designed targets. The
+# LayoutMetrics in layout.py reflows from the live screen size, so any window
+# size works — this is the *preferred* default for a fresh install.
 
 # ---------------------------------------------------------------------------
 # Color palette — deep black + molten gold (defaults)

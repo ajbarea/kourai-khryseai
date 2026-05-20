@@ -5,7 +5,8 @@ from __future__ import annotations
 import pygame
 import pygame.freetype
 
-from .constants import DIALOGUE_X, FONT_AGENT, INPUT_H, theme
+from . import layout as gui_layout
+from .constants import FONT_AGENT, theme
 from .maidens import AGENTS
 
 
@@ -85,8 +86,9 @@ class QuickActionBar:
 
     def draw(self, surf: pygame.Surface, disabled: bool = False) -> None:
         """Draw the action pills, right-aligned above the input bar."""
+        lm = gui_layout.current_layout
         screen_w, screen_h = surf.get_size()
-        dialogue_w = screen_w - DIALOGUE_X
+        dialogue_w = screen_w - lm.dialogue_x
 
         # Calculate total width to right-align
         total_width = 0
@@ -103,8 +105,8 @@ class QuickActionBar:
             total_width -= self.spacing  # Remove last spacing
 
         # Start X (right aligned within dialogue area)
-        current_x = (DIALOGUE_X + dialogue_w) - total_width - 24
-        current_y = screen_h - INPUT_H - self.height - 12  # 12px above input bar
+        current_x = (lm.dialogue_x + dialogue_w) - total_width - 24
+        current_y = screen_h - lm.input_h - self.height - 12  # 12px above input bar
 
         for action, pill_w, text_rect in rects_info:
             action.rect = pygame.Rect(current_x, current_y, pill_w, self.height)
