@@ -205,6 +205,11 @@ def build_env() -> dict[str, str]:
     if not configured_env or (sys.platform == "win32" and configured_env == ".venv"):
         env["UV_PROJECT_ENVIRONMENT"] = expected_env
 
+    # M5: Inject host UID/GID so docker compose runs containers as the developer,
+    # preventing root/1000 zombie files in bind mounts like .pytest_cache.
+    env["HOST_UID"] = str(getattr(os, "getuid", lambda: 1000)())
+    env["HOST_GID"] = str(getattr(os, "getgid", lambda: 1000)())
+
     return env
 
 

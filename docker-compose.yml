@@ -28,8 +28,10 @@ x-agent-common: &agent-common
     HF_TOKEN: ${HF_TOKEN:-}
     KOURAI_BUCKET_ID: ${KOURAI_BUCKET_ID:-}
     AGENT_ARTIFACTS_DIR: /agent-artifacts
+  user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
   volumes:
     - ./shared:/app/shared
+    - ./logs:/app/logs
   networks:
     - kourai
   restart: unless-stopped
@@ -221,6 +223,7 @@ services:
     volumes:
       - ./agents/mneme:/app/agents/mneme
       - ./shared:/app/shared
+      - ./logs:/app/logs
       - ./tests:/app/tests
     develop:
       watch:
@@ -265,6 +268,7 @@ services:
     volumes:
       - ./agents/kallos:/app/agents/kallos
       - ./shared:/app/shared
+      - ./logs:/app/logs
       - ./tests:/app/tests
       - kourai-artifacts-kallos:/agent-artifacts
       # Forge worktrees live under ~/.kourai_khryseai/projects on the host;
@@ -323,6 +327,7 @@ services:
     volumes:
       - ./agents/techne:/app/agents/techne
       - ./shared:/app/shared
+      - ./logs:/app/logs
       - ./tests:/app/tests
       - kourai-artifacts-techne:/agent-artifacts
       # Forge worktrees live under ~/.kourai_khryseai/projects on the host;
@@ -374,6 +379,7 @@ services:
     volumes:
       - ./agents/dokimasia:/app/agents/dokimasia
       - ./shared:/app/shared
+      - ./logs:/app/logs
       - ./tests:/app/tests
       - kourai-artifacts-dokimasia:/agent-artifacts
       # Forge worktrees live under ~/.kourai_khryseai/projects on the host;
@@ -425,6 +431,7 @@ services:
     volumes:
       - ./agents/metis:/app/agents/metis
       - ./shared:/app/shared
+      - ./logs:/app/logs
       - ./tests:/app/tests
       - kourai-artifacts-metis:/agent-artifacts
       # Forge worktrees live under ~/.kourai_khryseai/projects on the host;
@@ -477,6 +484,7 @@ services:
     volumes:
       - ./agents/puck:/app/agents/puck
       - ./shared:/app/shared
+      - ./logs:/app/logs
     develop:
       watch:
         - action: sync
@@ -520,6 +528,7 @@ services:
     volumes:
       - ./agents/cupid:/app/agents/cupid
       - ./shared:/app/shared
+      - ./logs:/app/logs
     develop:
       watch:
         - action: sync
@@ -564,6 +573,7 @@ services:
     volumes:
       - ./agents/aidos:/app/agents/aidos
       - ./shared:/app/shared
+      - ./logs:/app/logs
     develop:
       watch:
         - action: sync
@@ -607,6 +617,7 @@ services:
     volumes:
       - ./agents/aletheia:/app/agents/aletheia
       - ./shared:/app/shared
+      - ./logs:/app/logs
     develop:
       watch:
         - action: sync
@@ -658,6 +669,7 @@ services:
     volumes:
       - ./agents/vn_bridge:/app/agents/vn_bridge
       - ./shared:/app/shared
+      - ./logs:/app/logs
       - ~/.kourai_khryseai:/home/kourai/.kourai_khryseai
       # See Kallos's mount block above for the rationale on the second
       # host-absolute-path mount that lets git worktree pointers resolve.
@@ -718,6 +730,7 @@ services:
     volumes:
       - ./agents/hephaestus:/app/agents/hephaestus
       - ./shared:/app/shared
+      - ./logs:/app/logs
     develop:
       watch:
         - action: sync
