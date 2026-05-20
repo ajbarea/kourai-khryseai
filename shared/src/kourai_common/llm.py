@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import os
+import time as _time
 from typing import TYPE_CHECKING, Any, cast
 
 import httpx
@@ -462,6 +463,13 @@ async def chat(
     full_messages = await _build_contextual_messages(agent_name, messages, context_id)
     full_messages = _mark_system_cacheable(full_messages)
 
+    # M15: set session contextvar so log records carry the correlation key.
+    if context_id:
+        from kourai_common.log import get_session_id, set_session_id
+
+        if not get_session_id():
+            set_session_id(context_id[:8])
+
     log.debug("LLM call: %s -> %s (%d messages)", agent_name, model, len(full_messages))
 
     try:
@@ -563,6 +571,13 @@ async def chat_stream(
     full_messages = await _build_contextual_messages(agent_name, messages, context_id)
     full_messages = _mark_system_cacheable(full_messages)
 
+    # M15: set session contextvar so log records carry the correlation key.
+    if context_id:
+        from kourai_common.log import get_session_id, set_session_id
+
+        if not get_session_id():
+            set_session_id(context_id[:8])
+
     log.debug("LLM stream: %s -> %s (%d messages)", agent_name, model, len(full_messages))
 
     try:
@@ -654,6 +669,8 @@ async def chat_with_tools(
     model = get_model(agent_name, tier=tier)
     timeout = AGENT_TIMEOUTS.get(agent_name, 120.0)
 
+    from kourai_common.tool_events import log_tool_event
+
     working_messages = await _build_contextual_messages(agent_name, messages, context_id)
     working_messages = _mark_system_cacheable(working_messages)
     working_messages = _mark_first_user_cacheable(working_messages)
@@ -662,6 +679,13 @@ async def chat_with_tools(
     tool_call_log: list[dict[str, Any]] = []
     final_text = ""
     finished_cleanly = False
+
+    # M15: set session contextvar so log records carry the correlation key.
+    if context_id:
+        from kourai_common.log import get_session_id, set_session_id
+
+        if not get_session_id():
+            set_session_id(context_id[:8])
 
     for iteration in range(max_iters):
         log.debug(
@@ -723,16 +747,23 @@ async def chat_with_tools(
             except (json.JSONDecodeError, TypeError, ValueError) as exc:
                 args = {}
                 result = f"ERROR: invalid tool arguments: {exc}"
+                log_tool_event(agent_name, name, args, 0, result)
             else:
                 handler = tool_handlers.get(name)
                 if handler is None:
                     result = f"ERROR: unknown tool {name!r}"
+                    log_tool_event(agent_name, name, args, 0, result)
                 else:
+                    t0 = _time.monotonic()
                     try:
                         result = await handler(**{**args, **handler_ctx})
+                        elapsed_ms = int((_time.monotonic() - t0) * 1000)
+                        log_tool_event(agent_name, name, args, elapsed_ms, result)
                     except Exception as exc:
-                        log.warning("Tool %s failed for %s: %s", name, agent_name, exc)
+                        elapsed_ms = int((_time.monotonic() - t0) * 1000)
                         result = f"ERROR: {type(exc).__name__}: {exc}"
+                        log_tool_event(agent_name, name, args, elapsed_ms, result)
+                        log.warning("Tool %s failed for %s: %s", name, agent_name, exc)
 
             log.debug("tool_use %s args=%s result=%s", name, args, result[:200])
             working_messages.append(

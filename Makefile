@@ -174,6 +174,17 @@ logs:                      ## Show the last 200 lines of logs/dev-runner-latest.
 logs-tail:                 ## Follow logs/dev-runner-latest.log (Ctrl-C to exit)
 	@tail -f logs/dev-runner-latest.log
 
+logs-agents:               ## Show the last 50 lines of each agent's host-side log (M15)
+	@for f in logs/hephaestus.log logs/metis.log logs/techne.log logs/dokimasia.log logs/kallos.log logs/mneme.log logs/puck.log logs/cupid.log logs/aidos.log logs/aletheia.log; do \
+	    echo "=== $$f ===" && tail -n 50 "$$f" 2>/dev/null || echo "(not found)"; \
+	done
+
+logs-tools:                ## Show the last 100 lines of logs/tool_events.jsonl (M15)
+	@tail -n 100 logs/tool_events.jsonl 2>/dev/null || echo "no tool events yet — run a forge session first"
+
+logs-tools-tail:           ## Follow logs/tool_events.jsonl (Ctrl-C to exit) (M15)
+	@tail -f logs/tool_events.jsonl
+
 # ---------------------------------------------------------------------------
 # Sandbox (player project execution)
 # ---------------------------------------------------------------------------

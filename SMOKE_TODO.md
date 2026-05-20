@@ -76,12 +76,11 @@ frames closing the loop; **zero `parse_and_apply_fixes` hits** across all 6
 agent containers (techne, hephaestus, metis, dokimasia, kallos, mneme).
 Wall-clock: 244.8s on 6a, 418.6s on 6b — both under the 462s v2 baseline.
 
-**Note for future smoke recipes:** the original grep targets (`logs/dev-latest.log`,
-now `logs/dev-runner-latest.log`) were wrong — that file is the dev-runner wrapper
-output, not agent traces. The agent log volume mounts to host are stale; live traces
-only live inside containers today. M15 (forge logging architecture, ROADMAP) fixes
-this. Until then, validate tool_use frames via `docker logs kourai-khryseai-techne-1`,
-not the dev-runner log.
+**Note for future smoke recipes (updated 2026-05-20 — M15 shipped):** with host
+log volume mounts and structured tool-event JSONL in place, validate tool_use frames
+via `grep tool_use logs/tool_events.jsonl` on the host. Per-agent logs are at
+`logs/<agent>.log`. `docker logs` is no longer required for tool-event grep. Session
+correlation: `grep session=<id> logs/<agent>.log`.
 
 ### Pre-flight status (verified 2026-04-22)
 

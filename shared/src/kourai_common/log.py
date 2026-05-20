@@ -2,10 +2,16 @@
 
 Configures both console output and per-agent file logging to logs/<name>.log.
 File logs use RotatingFileHandler to prevent unbounded growth.
+
+Session-ID correlation (M15): a ``contextvars.ContextVar`` holds the current
+forge session ID. ``set_session_id`` sets it; ``_SessionFilter`` injects it
+into every log record as ``%(sessionID)s``. Orthogonal to the OTel trace ID
+— session is the forge-level correlation key, trace is the per-request span.
 """
 
 from __future__ import annotations
 
+import contextvars
 import logging
 import os
 from logging.handlers import RotatingFileHandler
@@ -102,10 +108,42 @@ class _UvicornAccessPathFilter(logging.Filter):
 
 _LOGS_DIR = _logs_dir()
 
+# ── Session-ID correlation (M15) ──────────────────────────────────────
+# Orthogonal to OTel trace-id: session is the forge-level correlation key
+# (set per forge session on the CLI host, per context_id on agents).
+_session_var: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "kourai_session_id",
+    default="",
+)
+
+
+def set_session_id(session_id: str) -> None:
+    """Set the forge session ID for the current async/thread context."""
+    _session_var.set(session_id)
+
+
+def get_session_id() -> str:
+    """Read the current forge session ID (empty string if unset)."""
+    return _session_var.get()
+
+
+class _SessionFilter(logging.Filter):
+    """Inject ``sessionID`` from the forge-session contextvar.
+
+    Mirrors ``_OtelTraceFilter``: always returns True, injects the value
+    so ``_TraceAwareFormatter`` can decide whether to render it.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        record.sessionID = _session_var.get()  # type: ignore[attr-defined]
+        return True
+
+
 # _WITH_TRACE renders [trace=<32-char hex>] when an OTel span is active;
 # the plain variant skips it to avoid 32 zeros of noise on non-traced
 # lines. 32-char hex matches Jaeger UI so trace IDs grep against Dozzle
-# directly.
+# directly. Session block appended when _SessionFilter sets a non-empty
+# sessionID.
 _CONSOLE_FMT = "%(asctime)s [%(name)s] %(levelname)s: %(message)s"
 _CONSOLE_FMT_WITH_TRACE = (
     "%(asctime)s [%(name)s] %(levelname)s [trace=%(otelTraceID)s]: %(message)s"
@@ -138,12 +176,12 @@ class _OtelTraceFilter(logging.Filter):
 
 
 class _TraceAwareFormatter(logging.Formatter):
-    """Switch between two format strings per-record based on trace presence.
+    """Switch between format strings per-record based on trace + session presence.
 
     `_OtelTraceFilter` sets `record.otelTraceID` to a 32-char hex string
-    when a span is active and to "0" otherwise. Embedding the trace block
-    on every non-traced line is visually noisy; we keep it only when it
-    carries signal.
+    when a span is active and to "0" otherwise. `_SessionFilter` sets
+    `record.sessionID` to the forge session ID or empty string. The
+    formatter appends the relevant blocks only when they carry signal.
     """
 
     def __init__(self, fmt_no_trace: str, fmt_with_trace: str) -> None:
@@ -153,10 +191,15 @@ class _TraceAwareFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         trace_id = getattr(record, "otelTraceID", "0")
+        session_id = getattr(record, "sessionID", "")
         if trace_id and trace_id != "0":
             self._style._fmt = self._fmt_with_trace
         else:
             self._style._fmt = self._fmt_no_trace
+        # Append session block when set — avoids a combinatorial explosion
+        # of 4 format strings (trace×session).
+        if session_id:
+            self._style._fmt += " [session=%(sessionID)s]"
         return super().format(record)
 
 
@@ -196,6 +239,7 @@ def setup_logging(name: str, *, level: str | None = None) -> logging.Logger:
     root.setLevel(logging.DEBUG)  # capture everything at root; handlers filter.
 
     trace_filter = _OtelTraceFilter()
+    session_filter = _SessionFilter()
 
     if not any(
         isinstance(h, logging.StreamHandler) and not isinstance(h, RotatingFileHandler)
@@ -205,6 +249,7 @@ def setup_logging(name: str, *, level: str | None = None) -> logging.Logger:
         console.setFormatter(_TraceAwareFormatter(_CONSOLE_FMT, _CONSOLE_FMT_WITH_TRACE))
         console.setLevel(resolved_level)
         console.addFilter(trace_filter)
+        console.addFilter(session_filter)
         # Verbose mode (-v / KOURAI_LOG_LEVEL=DEBUG) keeps everything; otherwise
         # drop 3rd-party INFO chatter from the terminal (still logged to file).
         if console.level > logging.DEBUG:
@@ -223,6 +268,7 @@ def setup_logging(name: str, *, level: str | None = None) -> logging.Logger:
         file_handler.setFormatter(_TraceAwareFormatter(_FILE_FMT, _FILE_FMT_WITH_TRACE))
         file_handler.setLevel(logging.DEBUG)
         file_handler.addFilter(trace_filter)
+        file_handler.addFilter(session_filter)
         root.addHandler(file_handler)
 
     # Logger-level install (not handler) so it applies regardless of which
