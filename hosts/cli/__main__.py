@@ -523,6 +523,14 @@ def _show_metrics_dashboard() -> None:
     help="Play a scripted Hephaestus→Metis pause scene without touching the network "
     "(for poster screenshots and recordings).",
 )
+@click.option(
+    "--json",
+    "json_mode",
+    is_flag=True,
+    default=False,
+    help="Emit one JSON record per event on stdout (JSON Lines). Use with -p for "
+    "agent piping; mirrors OpenAI Codex --json and Claude Code --output-format stream-json.",
+)
 async def main(
     agent: str | None,
     timeout_seconds: int,
@@ -530,6 +538,7 @@ async def main(
     prompt: str | None,
     voice: bool | None,
     demo_mode: bool,
+    json_mode: bool,
 ) -> None:
     """Interactive CLI for Kourai Khryseai agent swarm."""
     setup_logging("cli", level="DEBUG" if verbose else "INFO")
@@ -557,7 +566,7 @@ async def main(
     # Headless mode — run a single prompt and exit (for scripts / piping)
     if prompt:
         try:
-            await _headless(agent, prompt, timeout_seconds, verbose)
+            await _headless(agent, prompt, timeout_seconds, verbose, json_mode)
         finally:
             audio.cleanup()
             if tts:
