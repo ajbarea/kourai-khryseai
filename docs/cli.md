@@ -62,6 +62,10 @@ navigate, `Tab` or `Enter` accepts the highlighted entry.
 | `/permissions` | List gate flags; `/permissions <name>` toggles one (e.g. `auto_approve_reads`) |
 | `/preferences` (alias `/prefs`) | Browse, override, or forget closed-vocab preference facts (M17 Phase 2) |
 | `/compact` | Fold older transcript turns into long-term memory; cache stays warm |
+| `/session` (or `/session show`) | Print active context, agents touched, message + token totals |
+| `/session list` | List known context IDs in the message store (busiest first) |
+| `/session fork` | Clone the current context to a new ID for branching exploration |
+| `/session resume <id>` | Switch the active context to a prior ID (hex prefix accepted) |
 | `/maidens` | Meet the Golden Maidens (list all agents) |
 | `/maidens <name>` | Show a specific maiden by name |
 | `/scratchpad` | List agents with buffered reasoning |

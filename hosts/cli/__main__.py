@@ -32,6 +32,7 @@ from hosts.cli.commands import (
     _handle_preferences_command,
     _handle_project_command,
     _handle_scratchpad_command,
+    _handle_session_command,
     _show_help,
     _show_settings,
 )
@@ -811,6 +812,10 @@ async def main(
                         f"· romance={'ON' if settings.romance_enabled else 'OFF'} "
                         f"· gossip={'ON' if settings.gossip_enabled else 'OFF'}"
                     )
+                    continue
+
+                if prompt_text == "/session" or prompt_text.startswith("/session "):
+                    context_id = _handle_session_command(prompt_text, context_id)
                     continue
 
                 if prompt_text.startswith("/project"):

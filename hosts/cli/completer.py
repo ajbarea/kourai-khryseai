@@ -77,6 +77,19 @@ SLASH_COMMANDS: tuple[SlashCommand, ...] = (
     ),
     SlashCommand("status", "Agent info: name, URL, model, context ID"),
     SlashCommand(
+        "session",
+        "Inspect, fork, or resume the conversation context",
+        arg_hint="[show|list|fork|resume <id>]",
+    ),
+    SlashCommand("session show", "Print current context, turn count, and per-agent message totals"),
+    SlashCommand("session list", "List known context IDs in the message store (busiest first)"),
+    SlashCommand("session fork", "Clone the current context to a new ID for branching exploration"),
+    SlashCommand(
+        "session resume",
+        "Switch the active context to a prior ID",
+        arg_hint="<id>",
+    ),
+    SlashCommand(
         "project new",
         "Forge a new player project",
         arg_hint="<name> [--template python|node|backend|frontend|empty]",
