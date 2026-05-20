@@ -31,7 +31,7 @@ uv run python -m hosts.gui --agent http://192.168.1.50:10000/
 
 ---
 
-## Window Layout (1280×720)
+## Window Layout (1920×1080, responsive)
 
 ```
 ┌────────────────────────────────────────────────────────────┐

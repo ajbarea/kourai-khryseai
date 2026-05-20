@@ -1,12 +1,13 @@
 # Observability
 
-Three browser tabs cover the full diagnostic surface for the agent stack. One command opens all three.
+Three browser tabs plus one tail command cover the full diagnostic surface for the agent stack. One make target opens the browser tabs.
 
 ```bash
-make observe
+make observe          # opens Jaeger, Prometheus, Dozzle
+make logs-tools-tail  # tails the structured tool-event JSONL
 ```
 
-Opens **Jaeger** (`:16686`), **Prometheus** (`:9090`), and **Dozzle** (`:8888`) in your default browser. Cross-platform (Linux, macOS, Windows, WSL2 — see `scripts/observe.py` for the platform handling).
+`make observe` opens **Jaeger** (`:16686`), **Prometheus** (`:9090`), and **Dozzle** (`:8888`) in your default browser. Cross-platform (Linux, macOS, Windows, WSL2 — see `scripts/observe.py` for the platform handling). The tool-event tail runs on the host and watches `logs/tool_events.jsonl` directly — no container access needed.
 
 ---
 
@@ -17,8 +18,9 @@ Opens **Jaeger** (`:16686`), **Prometheus** (`:9090`), and **Dozzle** (`:8888`) 
 | **Jaeger** | traces | *Where did this request go?* — A2A hops, MCP tool calls, full pipeline timing |
 | **Prometheus** | metrics | *How often / how slow?* — rates, durations, percentile latencies |
 | **Dozzle** | logs | *What is THIS agent saying right now?* — per-container live tail |
+| **tool_events.jsonl** | structured tool calls (M15) | *Which tool did which agent run, and how did it return?* — one JSON line per call with `(agent, tool, args, ms, result, session)` |
 
-Trace → flow. Metric → aggregate. Log → narrative. If you read only one column, you should still know which tab to click.
+Trace → flow. Metric → aggregate. Log → narrative. Tool event → semantic audit trail. The fourth lane is grep-friendly (`grep write_file logs/tool_events.jsonl`) and gates the smoke recipes that used to require `docker logs`. Rotates at 5 MB with 3 backups, matching the agent log handler. Session-ID correlation is wired through the same `logging.Filter` mechanism as trace IDs — every record from a forge session carries `[session=<id>]` so a single grep across `logs/*.log` and `logs/tool_events.jsonl` returns the full session.
 
 ---
 
