@@ -5,12 +5,13 @@ A public, living plan for where the forge is heading. Items here are either
 *currently working on* lives in [IMPL.md](./IMPL.md) — when it lands, the
 matching milestone here collapses to a single line under "Shipped".
 
-Last reviewed: 2026-05-19. **NE AI Agents Day 2026 poster session shipped
-2026-05-10** (NYC, Jane Street; QR-code demo live). Polish phase complete.
-Now resuming full-speed development with **M6 ElevenLabs hybrid** as the
-next priority (sub-task 2 audio cache layer shipped [#174]; sub-tasks
-1/3/4/5 still gate on M20 + VN smoke). See [IMPL.md](./IMPL.md) for
-the live blocker list, open invariants, and priority-ordered "Up next".
+Last reviewed: 2026-05-19 (post-#205). **NE AI Agents Day 2026 poster
+session shipped 2026-05-10** (NYC, Jane Street; QR-code demo live).
+Polish phase complete. Now resuming full-speed development with **M6
+ElevenLabs hybrid** as the next priority (sub-task 2 audio cache layer
+shipped [#174]; sub-tasks 1/3/4/5 still gate on M20 + VN smoke). See
+[IMPL.md](./IMPL.md) for the live blocker list, open invariants, and
+priority-ordered "Up next".
 Pre-release perfection stance unchanged: current best practice no
 matter the cost, **web-search the SPECIFIC target's primary docs at the
 planning step**, architectural fix over expedient patch. Sister-repo
@@ -1004,6 +1005,9 @@ file-of-origin.
 One-line per item, newest first. Detail moves to git history when work
 lands — these docs are plans + scratchpad, not a historical archive.
 
+- 2026-05-19 — **dev-runner-latest.log rename (M15 sub-task 4)** [#205]. Stable-path dev-runner log renamed from `logs/dev-latest.log` to `logs/dev-runner-latest.log` across `dev_log.py`, `dev_cli.py`, the Makefile `logs` / `logs-tail` targets, the five per-script error pointers, `.claude/skill-context.md`, and `SMOKE_TODO.md` Round 6 narrative notes. Name now reflects what the file actually holds (dev-runner wrapper output) instead of implying live agent traces. ROADMAP M15 status reframed; remaining M15 work — host bind-mounts, structured tool-event JSONL, session-id correlation — stays planned.
+- 2026-05-19 — **CLI + configuration docs drift (`/project delete` + 9 KOURAI_ env vars)** [#204]. `/techne:docsync`-equivalent cross-reference between `hosts/cli/completer.py:SLASH_COMMANDS` and `docs/cli.md` surfaced a missing `/project delete <name|id> [--purge] [--yes]` row plus three optional-args misdocumented as required (`/project accept`, `/project discard`, `/save`). `grep -rE 'os\.environ' shared/src/` against `docs/configuration.md` surfaced eight previously-undocumented user-facing knobs: `KOURAI_MODEL_OVERRIDE` plus a new Sandbox subsection (`KOURAI_SANDBOX{,_IMAGE,_TIMEOUT_S,_MEMORY,_CPUS,_PIDS}`) plus a new Host overrides subsection (`KOURAI_TTS`, `KOURAI_AUDIO_DEBUG`, `KOURAI_RENPY_EXE`). Internal-only demo vars (`KOURAI_DEMO_INSTANT/SLOW`, `KOURAI_POSTER_DEMO`) intentionally stay undocumented.
+- 2026-05-19 — **Skill-context section-label cleanup** [#203]. `.claude/skill-context.md` section headers shed the `(aj-audit)` / `(aj-ci-audit)` / etc. parentheticals — those referenced project-local skill duplicates superseded by the techne plugin install (and rot every time the plugin renames). `ECOSYSTEM.md` retired two `aj-sisters` references in favour of capability descriptions. `.gitignore` comment updated to reflect canonical skills no longer live at `~/.claude/skills/`. Sister repos (phalanx-fl, vFL) have the same drift, queued for a follow-up sweep.
 - 2026-05-19 — **Post-#201 docsync sweep + IMPL/ROADMAP refresh** [#202]. Three classes of drift surfaced by `/techne:sisters` + `/techne:docsync` after the 2026-05-16/18 wave. License propagation from #201 missed: `README.md` shield + footer, `CITATION.cff` metadata, `docs/gui.md` Kokoro (Apache-2.0) / RealtimeTTS (MIT, verified upstream) precision. CLI doc silence drift: `docs/cli.md` was missing `--voice/--no-voice` and `--demo` rows. M15 status reframed (LiteLLM-DEBUG-demote shipped via `litellm.suppress_debug_info = True`; OTel trace-ID injection shipped; bind-mounts + tool-event JSONL + session-id correlation + dev-latest rename still planned). Sisters audit ran clean — zero cross-repo drift.
 - 2026-05-18 — **License relicense Apache 2.0 → MIT** [#201]. Repo-wide license swap; `LICENSE` rewritten.
 - 2026-05-18 — **Dev-CLI demo target registration** [#200]. `cli-demo` / `gui-demo` / `vn-demo` now registered in `dev_cli.TASK_GROUPS` so `make help` surfaces them. Added `Task.env_extra` to wire `KOURAI_POSTER_DEMO` for vn-demo without a Makefile env-prefix hack.

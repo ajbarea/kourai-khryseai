@@ -12,7 +12,7 @@ Updated: 2026-05-19
 
 ## In flight
 
-Nothing currently open. The 2026-05-16 → 2026-05-18 wave landed cleanly:
+Nothing currently open. The 2026-05-16 → 2026-05-19 wave landed cleanly:
 
 - #192/#193 — May 2026 model + pricing verification + docs propagation
 - #194 — May 2026 infra freshness sweep (uv, context7-mcp, dozzle, nodejs)
@@ -23,6 +23,10 @@ Nothing currently open. The 2026-05-16 → 2026-05-18 wave landed cleanly:
 - #199 — docs/generalize-poster-title (CHAI 2026 poster generalization)
 - #200 — fix/dev-cli-demo-targets (cli-demo / gui-demo / vn-demo registration)
 - #201 — chore/license-mit-swap (Apache 2.0 → MIT)
+- #202 — docs/post-201-drift-impl-roadmap-refresh (license + cli flag drift sweep)
+- #203 — chore/techne-plugin-migration-cleanup (skill-context section labels)
+- #204 — docs(drift) (/project delete + 9 KOURAI_ env vars)
+- #205 — refactor(logs) dev-runner-latest.log rename (M15 sub-task 4)
 
 Deferred from this wave, still tracked:
 
