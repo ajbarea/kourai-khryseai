@@ -678,11 +678,131 @@ def _handle_model_command(prompt_text: str, tier_persona_name) -> None:
     _echo(f"  {_GOLD}Model:{_RESET}     {get_model('hephaestus')}")
 
 
+# ---------------------------------------------------------------------------
+# /session — inspect, list, fork, or resume the conversation context
+# ---------------------------------------------------------------------------
+_SESSION_USAGE = f"  {_DIM}Usage: /session [show|list|fork|resume <id>]{_RESET}"
+
+
+def _handle_session_command(prompt_text: str, current_context_id: str) -> str:
+    """Inspect or mutate the active conversation context.
+
+    Returns the (possibly new) context_id so the REPL can rebind. Bare
+    ``/session`` is treated as ``/session show``. Mirrors ClawCode's
+    ``/session`` shape — show / list / fork / resume — and our existing
+    ``/project`` subcommand vocabulary.
+    """
+    from uuid import uuid4
+
+    from kourai_common.memory import (
+        clone_context,
+        get_history,
+        list_agents_with_history,
+        list_known_contexts,
+    )
+    from kourai_common.usage import get_session_usage
+
+    parts = prompt_text.strip().split(maxsplit=2)
+    sub = parts[1].lower() if len(parts) > 1 else "show"
+    arg = parts[2] if len(parts) > 2 else ""
+
+    if sub == "show":
+        _show_session(current_context_id, get_history, list_agents_with_history, get_session_usage)
+        return current_context_id
+
+    if sub == "list":
+        rows = list_known_contexts(limit=20)
+        if not rows:
+            _echo(
+                f"  {_DIM}No stored contexts yet. The active one is {current_context_id}.{_RESET}"
+            )
+            return current_context_id
+        _echo(f"\n  {_GOLD_BOLD}Known contexts (busiest first){_RESET}")
+        for ctx, msgs, agents in rows:
+            marker = "*" if ctx == current_context_id else " "
+            _echo(
+                f"  {marker} {_GOLD}{ctx[:8]}{_RESET}  "
+                f"{_DIM}{msgs} msgs · {agents} agent(s){_RESET}"
+            )
+        _echo(
+            f"\n  {_DIM}* = active. Resume with /session resume <id-prefix>. "
+            f"Fork with /session fork.{_RESET}"
+        )
+        return current_context_id
+
+    if sub == "fork":
+        new_ctx = uuid4().hex
+        try:
+            count = clone_context(current_context_id, new_ctx)
+        except ValueError as exc:
+            _echo(f"  {_RED}{exc}{_RESET}")
+            return current_context_id
+        _echo(
+            f"  {_GOLD_BRIGHT}✨ Forked to {new_ctx[:8]}{_RESET} "
+            f"{_DIM}({count} messages cloned; original {current_context_id[:8]} preserved){_RESET}"
+        )
+        return new_ctx
+
+    if sub == "resume":
+        if not arg:
+            _echo(
+                f"  {_RED}/session resume needs a context id (use /session list to find one){_RESET}"
+            )
+            return current_context_id
+        target = _resolve_context_prefix(arg.strip(), list_known_contexts)
+        if target is None:
+            _echo(f"  {_RED}no context id matches {arg!r} — try /session list{_RESET}")
+            return current_context_id
+        if target == current_context_id:
+            _echo(f"  {_DIM}Already on {target[:8]}.{_RESET}")
+            return current_context_id
+        _echo(f"  {_GOLD_BRIGHT}✨ Resumed {target[:8]}{_RESET}")
+        return target
+
+    _echo(f"  {_RED}unknown subcommand /{prompt_text.lstrip('/')!r}{_RESET}")
+    _echo(_SESSION_USAGE)
+    return current_context_id
+
+
+def _resolve_context_prefix(prefix: str, list_fn) -> str | None:
+    """Match a user-typed context id (full or hex prefix) against known
+    contexts. Returns the canonical full id, or None if zero / >1 match.
+    """
+    candidates = [ctx for ctx, _, _ in list_fn(limit=1000) if ctx.startswith(prefix)]
+    if len(candidates) == 1:
+        return candidates[0]
+    return None
+
+
+def _show_session(
+    context_id: str,
+    get_history_fn,
+    list_agents_fn,
+    get_usage_fn,
+) -> None:
+    """Print provider/tier-style summary card for ``/session show``."""
+    agents = list_agents_fn(context_id)
+    total_msgs = sum(len(get_history_fn(context_id, a)) for a in agents)
+    usage = get_usage_fn()
+    total_input = sum(u.input_tokens for u in usage.agents.values())
+    total_output = sum(u.output_tokens for u in usage.agents.values())
+
+    _echo(f"\n  {_GOLD_BOLD}Session{_RESET}")
+    _echo(f"  {_GOLD}Context:{_RESET}     {context_id}")
+    _echo(
+        f"  {_GOLD}Agents:{_RESET}      {len(agents)}  {_DIM}{', '.join(agents) or '(none yet)'}{_RESET}"
+    )
+    _echo(f"  {_GOLD}Messages:{_RESET}    {total_msgs}")
+    _echo(f"  {_GOLD}Tokens:{_RESET}      {_DIM}{total_input:,} in · {total_output:,} out{_RESET}")
+    _echo(f"\n  {_DIM}Fork with /session fork; list prior sessions with /session list.{_RESET}")
+
+
 # Re-export for tests/external use.
 __all__ = [
     "KNOWN_TEMPLATES",
     "_PREFERENCES_USAGE",
     "_PROJECT_USAGE",
+    "_SESSION_USAGE",
     "ForgeSession",
     "_active_project",
     "_active_project_fact_id",
@@ -692,7 +812,10 @@ __all__ = [
     "_handle_preferences_command",
     "_handle_project_command",
     "_handle_scratchpad_command",
+    "_handle_session_command",
+    "_resolve_context_prefix",
     "_show_help",
+    "_show_session",
     "_show_settings",
 ]
 

@@ -177,6 +177,56 @@ def list_agents_with_history(context_id: str) -> list[str]:
     return [row[0] for row in cursor.fetchall()]
 
 
+def list_known_contexts(limit: int = 20) -> list[tuple[str, int, int]]:
+    """Enumerate context_ids in the message store, busiest first.
+
+    Returns ``[(context_id, msg_count, agent_count), ...]``. Used by the
+    ``/session list`` slash command for resume targets. No timestamp
+    column on ``messages`` today — busiest-first is the available proxy
+    for "active" until a schema migration adds ``created_at``.
+    """
+    conn = _get_db()
+    cursor = conn.execute(
+        "SELECT context_id, COUNT(*), COUNT(DISTINCT agent_name) "
+        "FROM messages GROUP BY context_id ORDER BY COUNT(*) DESC LIMIT ?",
+        (limit,),
+    )
+    return [(ctx, msgs, agents) for ctx, msgs, agents in cursor.fetchall()]
+
+
+def clone_context(src_context_id: str, dst_context_id: str) -> int:
+    """Copy every message + agent_state row from ``src`` to ``dst``.
+
+    Returns the count of message rows cloned. Used by ``/session fork``
+    to branch exploration ("what if I asked Metis for a different
+    plan?") without losing the original transcript. The destination
+    context_id must be fresh — clone refuses to overwrite existing
+    rows.
+    """
+    conn = _get_db()
+    existing = conn.execute(
+        "SELECT 1 FROM messages WHERE context_id = ? LIMIT 1", (dst_context_id,)
+    ).fetchone()
+    if existing:
+        raise ValueError(f"destination context {dst_context_id!r} already has messages")
+
+    conn.execute(
+        "INSERT INTO messages (context_id, agent_name, idx, role, content, summarized) "
+        "SELECT ?, agent_name, idx, role, content, summarized FROM messages WHERE context_id = ?",
+        (dst_context_id, src_context_id),
+    )
+    conn.execute(
+        "INSERT INTO agent_states (context_id, agent_name, state_json) "
+        "SELECT ?, agent_name, state_json FROM agent_states WHERE context_id = ?",
+        (dst_context_id, src_context_id),
+    )
+    count = conn.execute(
+        "SELECT COUNT(*) FROM messages WHERE context_id = ?", (dst_context_id,)
+    ).fetchone()[0]
+    conn.commit()
+    return count
+
+
 def add_message(context_id: str, agent_name: str, role: str, content: Any) -> None:
     """Add a message to the episodic history."""
     conn = _get_db()
