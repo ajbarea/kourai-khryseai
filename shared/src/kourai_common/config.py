@@ -155,6 +155,32 @@ _PROVIDER_TIERS: dict[str, dict[str, dict[str, str]]] = {
 }
 
 
+TIER_NAMES: tuple[str, ...] = ("cheap", "standard", "smart")
+
+
+def get_tier() -> str:
+    """Read the active tier. Use this from CLI/GUI code instead of
+    ``from kourai_common.config import MODEL_TIER`` — the bare import
+    caches the value and won't see ``set_tier`` mutations.
+    """
+    return MODEL_TIER
+
+
+def set_tier(tier: str) -> None:
+    """Mutate the process-wide ``MODEL_TIER`` so subsequent ``get_model``
+    calls resolve to the new tier without a process restart.
+
+    Used by the CLI ``/model <tier>`` slash command. Raises ``ValueError``
+    on unknown tier name rather than silently falling back — the slash
+    command surface is the validation boundary.
+    """
+    normalized = tier.strip().lower()
+    if normalized not in TIER_NAMES:
+        raise ValueError(f"unknown tier {tier!r}; expected one of {TIER_NAMES}")
+    global MODEL_TIER
+    MODEL_TIER = normalized
+
+
 def get_model(agent_name: str, tier: str | None = None) -> str:
     """Get the LLM model ID for an agent based on the active provider and tier.
 

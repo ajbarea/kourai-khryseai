@@ -639,6 +639,45 @@ def _handle_preferences_command(prompt_text: str, settings: CLISettings) -> None
     _echo(f"\n  {_DIM}Forget with /preferences forget <kind> or /preferences forget --all.{_RESET}")
 
 
+# ---------------------------------------------------------------------------
+# /model — show provider/tier/model or switch tier mid-session
+# ---------------------------------------------------------------------------
+def _handle_model_command(prompt_text: str, tier_persona_name) -> None:
+    """Show or switch the active model tier.
+
+    Forms:
+      ``/model`` — print provider, tier, and resolved Hephaestus model.
+      ``/model <tier>`` — switch tier (cheap | standard | smart) for the
+        rest of this session. Per-call ``tier=`` kwargs in
+        ``chat_with_tools`` still override.
+      ``/model_tier`` / ``/model_tier <tier>`` — alias kept for back-compat.
+
+    The slash command surface is the validation boundary: invalid tier
+    names echo the ValueError and leave config untouched.
+    """
+    from kourai_common.config import PROVIDER, get_model, get_tier, set_tier
+
+    head, _, arg = prompt_text.partition(" ")
+    tier_arg = arg.strip().lower()
+    if tier_arg:
+        try:
+            set_tier(tier_arg)
+        except ValueError as exc:
+            _echo(f"  {_RED}{exc}{_RESET}")
+            return
+        current = get_tier()
+        _echo(
+            f"  {_GOLD}Tier:{_RESET} switched to {current} "
+            f"({tier_persona_name(current)}) — model now {get_model('hephaestus')}"
+        )
+        return
+
+    current = get_tier()
+    _echo(f"  {_GOLD}Provider:{_RESET}  {PROVIDER}")
+    _echo(f"  {_GOLD}Tier:{_RESET}      {current} ({tier_persona_name(current)})")
+    _echo(f"  {_GOLD}Model:{_RESET}     {get_model('hephaestus')}")
+
+
 # Re-export for tests/external use.
 __all__ = [
     "KNOWN_TEMPLATES",
@@ -649,6 +688,7 @@ __all__ = [
     "_active_project_fact_id",
     "_build_key_bindings",
     "_copy_to_clipboard",
+    "_handle_model_command",
     "_handle_preferences_command",
     "_handle_project_command",
     "_handle_scratchpad_command",
