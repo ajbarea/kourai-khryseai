@@ -6,6 +6,7 @@ import time
 
 import pygame
 
+from . import layout as gui_layout
 from .constants import (
     FONT_BODY,
     FONT_INPUT,
@@ -13,7 +14,6 @@ from .constants import (
     GOLD,
     GOLD_DIM,
     INPUT_BG,
-    INPUT_H,
     WHITE,
 )
 from .keyboard_shortcuts import KeyboardShortcuts
@@ -73,8 +73,9 @@ class InputBar:
         self.text += event.text
 
     def draw(self, surf: pygame.Surface) -> None:
+        lm = gui_layout.current_layout
         screen_w, screen_h = surf.get_size()
-        rect = pygame.Rect(0, screen_h - INPUT_H, screen_w, INPUT_H)
+        rect = pygame.Rect(0, screen_h - lm.input_h, screen_w, lm.input_h)
         pygame.draw.rect(surf, INPUT_BG, rect)
 
         if self.waiting_for_agent:
@@ -87,19 +88,21 @@ class InputBar:
                 min(255, agent_color[2] + pulse),
             )
             pygame.draw.line(
-                surf, pulse_color, (0, screen_h - INPUT_H), (screen_w, screen_h - INPUT_H), 2
+                surf, pulse_color, (0, screen_h - lm.input_h), (screen_w, screen_h - lm.input_h), 2
             )
         else:
             pygame.draw.line(
-                surf, GOLD_DIM, (0, screen_h - INPUT_H), (screen_w, screen_h - INPUT_H), 1
+                surf, GOLD_DIM, (0, screen_h - lm.input_h), (screen_w, screen_h - lm.input_h), 1
             )
 
         # Forge mark (left icon)
-        FONT_BODY.render_to(surf, (self.PAD, screen_h - INPUT_H + (INPUT_H - 18) // 2), ">", GOLD)
+        FONT_BODY.render_to(
+            surf, (self.PAD, screen_h - lm.input_h + (lm.input_h - 18) // 2), ">", GOLD
+        )
 
         # Input text area
         text_x = self.PAD + 28
-        text_y = screen_h - INPUT_H + (INPUT_H - 18) // 2
+        text_y = screen_h - lm.input_h + (lm.input_h - 18) // 2
 
         if self.processing and not self.waiting_for_agent:
             # Animated dots while processing
@@ -134,7 +137,7 @@ class InputBar:
                 surf,
                 (
                     screen_w - hint_rect.width - 16,
-                    screen_h - INPUT_H + (INPUT_H - hint_rect.height) // 2,
+                    screen_h - lm.input_h + (lm.input_h - hint_rect.height) // 2,
                 ),
                 hint,
                 GOLD_DIM,

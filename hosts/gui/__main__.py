@@ -28,11 +28,8 @@ from PIL import Image as PILImage
 from kourai_common.audio import AudioManager
 from kourai_common.audio_env import configure_sdl_audio_driver
 
-from .constants import (
-    DIALOGUE_X,
-    INPUT_H,
-    theme,
-)
+from . import layout as gui_layout
+from .constants import theme
 from .display_manager import DisplayManager
 from .gui_state import GUIState
 from .loading_screen import run_loading_screen
@@ -222,16 +219,31 @@ def main(agent_url: str | None = None, demo_mode: bool = False) -> None:
     recv_q = sub.recv_q
     tts_manager = sub.tts_manager
 
-    dialogue_rect = pygame.Rect(DIALOGUE_X, 34, 0, 0)
+    gui_layout.sync_layout(*screen.get_size(), 1.0)
+    dialogue_rect = pygame.Rect(
+        gui_layout.current_layout.dialogue_x, gui_layout.current_layout.banner_total_h, 0, 0
+    )
 
     def sync_layout(screen_w: int, screen_h: int) -> None:
-        dialogue_rect.width = max(screen_w - DIALOGUE_X, 0)
-        dialogue_rect.height = max(screen_h - INPUT_H - dialogue_rect.y, 0)
+        from .constants import get_font_scale
+
+        gui_layout.sync_layout(screen_w, screen_h, get_font_scale())
+        lm = gui_layout.current_layout
+
+        dialogue_rect.x = lm.dialogue_x
+        dialogue_rect.y = lm.banner_total_h
+        dialogue_rect.width = max(screen_w - lm.dialogue_x, 0)
+        dialogue_rect.height = max(screen_h - lm.input_h - dialogue_rect.y, 0)
+
         settings_overlay.update_layout(screen_w, screen_h)
         alignment_panel.update_layout(screen_w, screen_h)
         gossip_panel.update_layout(screen_w, screen_h)
         onboarding.update_layout(screen_w, screen_h)
         memory_viewer.update_layout(screen_w, screen_h)
+
+    from .constants import on_font_scale_change
+
+    on_font_scale_change(lambda: sync_layout(*display.screen.get_size()))
 
     def apply_display_mode(mode: str) -> None:
         display.apply_mode(mode, gui_integration.settings)

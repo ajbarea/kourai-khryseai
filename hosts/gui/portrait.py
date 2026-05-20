@@ -7,6 +7,7 @@ import logging
 import pygame
 from PIL import Image as PILImage
 
+from . import layout as gui_layout
 from .constants import (
     DIM_WHITE,
     FONT_BANNER,
@@ -15,7 +16,6 @@ from .constants import (
     GOLD,
     GOLD_DIM,
     PANEL_BG,
-    PORTRAIT_W,
     get_font_scale,
 )
 from .maidens import AGENTS, get_avatar_path
@@ -84,13 +84,14 @@ class PortraitPanel:
 
     def draw(self, surf: pygame.Surface) -> None:
         screen_h = surf.get_height()
-        panel_rect = pygame.Rect(0, 0, PORTRAIT_W, screen_h)
+        lm = gui_layout.current_layout
+        panel_rect = pygame.Rect(0, 0, lm.portrait_w, screen_h)
 
         # Panel background
         pygame.draw.rect(surf, PANEL_BG, panel_rect)
-        pygame.draw.line(surf, GOLD_DIM, (PORTRAIT_W, 0), (PORTRAIT_W, screen_h), 1)
+        pygame.draw.line(surf, GOLD_DIM, (lm.portrait_w, 0), (lm.portrait_w, screen_h), 1)
 
-        cx = PORTRAIT_W // 2
+        cx = lm.portrait_w // 2
         avatar_y = 24
         avatar_size = self.AVATAR_SIZE
 
@@ -157,7 +158,7 @@ class PortraitPanel:
         # inside the portrait panel at any font scale (the old char-count
         # wrap overflowed the panel at higher zoom levels).
         if self.current_quote:
-            max_quote_w = PORTRAIT_W - 24
+            max_quote_w = lm.portrait_w - 24
             line_h = max(14, int(18 * get_font_scale()))
             wrapped: list[str] = []
             current = ""

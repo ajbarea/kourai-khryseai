@@ -8,7 +8,7 @@ import time
 import pygame
 import pygame.freetype
 
-from . import constants
+from . import constants, layout as gui_layout
 from .maidens import AGENTS
 
 # Pattern for emote cues: *action text*
@@ -110,7 +110,6 @@ class DialogueEntry:
 # ---------------------------------------------------------------------------
 class DialogueHistory:
     PAD = 14
-    BUBBLE_MAX_W = constants.DIALOGUE_W - 40
     _LINE_H_BASE = 20
     _AGENT_LINE_H_BASE = 14
     # Attached-image thumbnail strip rendered under user bubbles (M11).
@@ -134,7 +133,7 @@ class DialogueHistory:
         self._dirty = True
         self._scroll_y = 0
         self._content_h = 0
-        self._viewport_h = constants.DIALOGUE_H
+        self._viewport_h = gui_layout.current_layout.dialogue_h
         self.show_timestamps = True
         self.show_metadata = True
         self.timestamp_format = "24h"
@@ -585,14 +584,21 @@ class DialogueHistory:
 # ---------------------------------------------------------------------------
 def draw_banner(surf: pygame.Surface, connected: bool, agent_url: str) -> None:
     """Top-of-transcript title strip."""
+    lm = gui_layout.current_layout
     screen_w = surf.get_width()
-    dialogue_w = screen_w - constants.DIALOGUE_X
-    r = pygame.Rect(constants.DIALOGUE_X, 0, dialogue_w, 32)
+    dialogue_w = screen_w - lm.dialogue_x
+    r = pygame.Rect(lm.dialogue_x, 0, dialogue_w, lm.banner_h)
     pygame.draw.rect(surf, (10, 8, 5), r)
-    pygame.draw.line(surf, constants.GOLD_DIM, (constants.DIALOGUE_X, 32), (screen_w, 32), 1)
+    pygame.draw.line(
+        surf,
+        constants.GOLD_DIM,
+        (lm.dialogue_x, lm.banner_h),
+        (screen_w, lm.banner_h),
+        lm.banner_border_h,
+    )
 
     title = "KOURAI KHRYSEAI  —  Golden Maidens"
-    constants.FONT_AGENT.render_to(surf, (constants.DIALOGUE_X + 12, 8), title, constants.GOLD)
+    constants.FONT_AGENT.render_to(surf, (lm.dialogue_x + 12, 8), title, constants.GOLD)
 
     status_text = "connected" if connected else "connecting..."
     status_col = (100, 180, 100) if connected else constants.GOLD_DIM

@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING
 
 import pygame
 
-from .constants import DIALOGUE_X, INPUT_H, PORTRAIT_W
 from .dialogue import draw_banner
 
 if TYPE_CHECKING:
@@ -84,6 +83,10 @@ class RenderPipeline:
             screen_w, screen_h = screen.get_size()
             screen.fill(self.theme.dark_bg)
 
+            import hosts.gui.layout as gui_layout
+
+            lm = gui_layout.current_layout
+
             # Background particles (full canvas)
             if not self.gui_integration.settings.get("reduce_motion", False):
                 self.particles.draw(screen)
@@ -92,7 +95,7 @@ class RenderPipeline:
             self.portrait.draw(screen)
             _, flash_alpha = self.flash.update(0.0)  # peek alpha without advancing time
             if flash_alpha > 0:
-                flash_surf = pygame.Surface((PORTRAIT_W, screen_h), pygame.SRCALPHA)
+                flash_surf = pygame.Surface((lm.portrait_w, screen_h), pygame.SRCALPHA)
                 flash_surf.fill((255, 255, 255, flash_alpha))
                 screen.blit(flash_surf, (0, 0))
 
@@ -102,7 +105,11 @@ class RenderPipeline:
 
             # Right panel border
             pygame.draw.line(
-                screen, self.theme.gold_dim, (DIALOGUE_X, 0), (DIALOGUE_X, screen_h - INPUT_H), 1
+                screen,
+                self.theme.gold_dim,
+                (lm.dialogue_x, 0),
+                (lm.dialogue_x, screen_h - lm.input_h),
+                1,
             )
 
             if not self.input_bar.processing:
