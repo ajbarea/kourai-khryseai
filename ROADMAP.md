@@ -391,6 +391,48 @@ under the same URI without colliding with other extensions.
 
 ---
 
+## M21 — Companion A2A routing (no more ventriloquy)
+
+Hephaestus's router has emitted three response shapes since M13:
+`CONFIRM_ORDER:` (read-back gate), agent-list (dev pipeline), and
+`CHAT:<agent>: <body>` (single-agent conversational turn). The
+pipeline path opens real `RemoteAgentConnection`s and streams
+specialist output. The chat path did not — it emitted the router's
+gloss through Hephaestus's own task updater with the target's
+emoji, never invoking the target's container. The companions
+(`puck`, `cupid`, `aidos`, `aletheia`) have full executors with
+their own logic (`analyze_slop`, `respond`, etc.) that simply never
+ran when reached via `@aidos` / `@puck` / etc.
+
+### Fix
+
+`_delegate_chat_to_agent` in `agents/hephaestus/agent_executor.py`
+opens a real A2A connection to the routed target, streams its
+status + final result back through Hephaestus's updater, and falls
+back to an explicit Hephaestus-voiced apology if the target is
+unreachable — never silent failure, never a fake utterance
+attributed to the wrong agent.
+
+### Why this matters
+
+**Player experience.** When the player asks `@aidos check this for
+jargon`, they should see Aidos's real `analyze_slop` output, not
+Hephaestus's gloss. Companion personality lands when the
+companion actually runs.
+
+**Developer experience.** `@`-tag smoke tests now exercise the
+target's container end-to-end (visible in `docker logs <agent>`,
+emits its own OTel span), so AJ's watchplan and presentation
+smokes verify what they appear to verify. Same observability we
+already have for the dev pipeline.
+
+### Live-smoke gate
+
+CLI + GUI round-trip through every companion, and `docker logs
+<agent>` to confirm the container ran. Specialist single-chats
+(`@techne`, `@kallos`, etc.) ride the same code path and should
+also be smoked.
+
 ## M20 — Audio-text synchronization across CLI / GUI / VN
 
 > Status: in progress · Sub-task 1 (Kokoro voice + pipeline pre-warm)

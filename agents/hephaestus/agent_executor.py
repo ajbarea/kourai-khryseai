@@ -5,15 +5,17 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 from a2a.types import Task, UnsupportedOperationError
 
 from agents.hephaestus.agent import determine_pipeline, execute_pipeline
 from agents.hephaestus.confirmation import parse_confirmation_response
+from agents.hephaestus.remote_connections import AgentInputRequired, RemoteAgentConnection
 from agents.metis.agent import discuss_tradeoffs
 from kourai_common.a2a_utils import extract_file_attachments, get_message_metadata
 from kourai_common.base_executor import BaseAgentExecutor
+from kourai_common.config import get_agent_url
 from kourai_common.decorators import executor_error_handler
 from kourai_common.messaging import (
     KIND_DIALOGUE,
@@ -48,7 +50,16 @@ AGENT_EMOJI = {
     "dokimasia": "\U0001f9ea",  # test tube
     "kallos": "\u2728",  # sparkles
     "mneme": "\U0001f4dc",  # scroll
+    "puck": "\U0001f3ad",  # performing arts mask
+    "cupid": "\U0001f498",  # heart with arrow
+    "aidos": "\U0001f6ab",  # no-entry sign / anti-slop verdict
+    "aletheia": "\U0001f52c",  # microscope / citation lens
 }
+
+
+class _ChatDelegationResult(NamedTuple):
+    result_text: str
+    input_required: bool
 
 
 class HephaestusAgentExecutor(BaseAgentExecutor):
@@ -203,15 +214,24 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
                             break
 
                     if target_agent:
-                        # Route to specific agent for casual chat
-                        emoji = AGENT_EMOJI.get(target_agent, "")
-                        await send_working_status(
-                            updater,
+                        # Real A2A delegation — the companion's container
+                        # runs its own executor, emits its own status +
+                        # final result, and Hephaestus forwards everything
+                        # back to the player. Replaces the prior
+                        # ventriloquy where Hephaestus narrated as the
+                        # target using the router's chat_body gloss.
+                        delegated = await self._delegate_chat_to_agent(
+                            target_agent,
+                            user_input,
+                            chat_body,
                             task,
-                            chat_body or f"Connecting to {target_agent}...",
-                            emoji=emoji,
-                            kind=KIND_DIALOGUE,
+                            updater,
+                            forge_meta,
                         )
+                        if delegated.input_required:
+                            return
+                        artifact_text = delegated.result_text or chat_body
+                        responding_agent = target_agent
                     else:
                         # Hephaestus responds directly
                         await send_working_status(
@@ -221,10 +241,12 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
                             emoji=AGENT_EMOJI["hephaestus"],
                             kind=KIND_DIALOGUE,
                         )
+                        artifact_text = chat_body
+                        responding_agent = "hephaestus"
 
                     await updater.add_artifact(
                         [
-                            text_part(chat_body),
+                            text_part(artifact_text),
                             data_part(
                                 {
                                     "mode": "chat",
@@ -238,15 +260,14 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
                     log.info("Hephaestus chat — target: %s", target_agent or "self")
 
                     # Update affinity for the agent that spoke
-                    _responding_agent = target_agent or "hephaestus"
                     _profile = PlayerProfile.load()
                     if _profile:
                         _new_score = update_affinity(
-                            _profile.player_id, _responding_agent, delta=0.02
+                            _profile.player_id, responding_agent, delta=0.02
                         )
                         log.info(
                             "Affinity updated: %s → %.2f (tier %d)",
-                            _responding_agent,
+                            responding_agent,
                             _new_score,
                             get_affinity_tier(_new_score),
                         )
@@ -436,6 +457,92 @@ class HephaestusAgentExecutor(BaseAgentExecutor):
         await send_working_status(
             updater, task, text, emoji=AGENT_EMOJI["metis"], kind=KIND_DIALOGUE
         )
+
+    async def _delegate_chat_to_agent(
+        self,
+        target_agent: str,
+        user_input: str,
+        chat_body: str,
+        task: Task,
+        updater: TaskUpdater,
+        forge_meta: dict | None,
+    ) -> _ChatDelegationResult:
+        """Forward a CHAT-routed turn to the target agent's container via A2A.
+
+        The target's executor runs its real logic (Aidos analyzes slop,
+        Puck improvises, etc.) and streams status + result back; we
+        relay both to the player through Hephaestus's task updater so
+        the conversational thread stays continuous.
+
+        Falls back to a Hephaestus-voiced apology with the router's
+        ``chat_body`` if the target container is unreachable, so a
+        sleeping companion never produces silent failure or a fake
+        utterance attributed to the wrong agent.
+        """
+        emoji = AGENT_EMOJI.get(target_agent, "")
+        url = get_agent_url(target_agent)
+        conn = RemoteAgentConnection(target_agent, url)
+        try:
+            await conn.connect()
+        except Exception as exc:
+            log.warning(
+                "Companion %s unreachable at %s (%s); falling back to Hephaestus voice",
+                target_agent,
+                url,
+                exc,
+            )
+            await send_working_status(
+                updater,
+                task,
+                f"({target_agent} is asleep — let me cover.) {chat_body}",
+                emoji=AGENT_EMOJI["hephaestus"],
+                kind=KIND_DIALOGUE,
+            )
+            return _ChatDelegationResult(result_text=chat_body, input_required=False)
+
+        final_result = ""
+        try:
+            async for event_type, event_text in conn.send(
+                user_input,
+                context_id=task.context_id or "",
+                metadata=forge_meta,
+            ):
+                if event_type == "status":
+                    # The target already prefixes its own emoji via
+                    # send_working_status — don't double-emoji.
+                    await send_working_status(updater, task, event_text, emoji="", kind=KIND_STATUS)
+                elif event_type == "result":
+                    final_result = event_text
+                    await send_working_status(
+                        updater, task, event_text, emoji=emoji, kind=KIND_DIALOGUE
+                    )
+        except AgentInputRequired as exc:
+            await send_input_required(
+                updater,
+                task,
+                f"{emoji} {exc.agent_name} needs your input: {exc.question}",
+                kind=KIND_DIALOGUE,
+            )
+            return _ChatDelegationResult(result_text="", input_required=True)
+        except Exception as exc:
+            log.warning(
+                "Companion %s send() failed mid-stream (%s); falling back to Hephaestus voice",
+                target_agent,
+                exc,
+            )
+            await send_working_status(
+                updater,
+                task,
+                f"({target_agent} dropped the thread — let me cover.) {chat_body}",
+                emoji=AGENT_EMOJI["hephaestus"],
+                kind=KIND_DIALOGUE,
+            )
+            return _ChatDelegationResult(result_text=chat_body, input_required=False)
+        finally:
+            with contextlib.suppress(Exception):
+                await conn.close()
+
+        return _ChatDelegationResult(result_text=final_result, input_required=False)
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
         raise UnsupportedOperationError()
