@@ -124,7 +124,7 @@ guidance on CPU. Edge-TTS is the documented cloud fallback for
 environments where Kokoro can't load. Audio plays at 44.1 kHz stereo
 with peak + loudness normalization; measured first-chunk latency on
 streaming `RealtimeTTS.play()` is ~3s (full latency table in
-[ROADMAP M20](../ROADMAP.md#m20--audio-text-synchronization-across-cli--gui--vn)),
+[ROADMAP M20](https://github.com/ajbarea/kourai-khryseai/blob/main/ROADMAP.md#m20--audio-text-synchronization-across-cli--gui--vn)),
 and the master volume / per-agent voice override live in
 [Configuration → Text-to-Speech](configuration.md#text-to-speech-configuration).
 
