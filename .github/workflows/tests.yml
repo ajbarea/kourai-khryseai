@@ -37,10 +37,14 @@ jobs:
       - name: Install system audio dependencies
         # PyAudio (pulled in by RealtimeTTS via hosts/gui) builds against
         # PortAudio headers; ubuntu-latest doesn't ship them.
-        uses: awalsh128/cache-apt-pkgs-action@v1.6.0
-        with:
-          packages: portaudio19-dev
-          version: 1.0
+        # research(2026-05): replaced awalsh128/cache-apt-pkgs-action with a
+        # direct apt-get install — the action's transitive SHA pin to
+        # actions/cache/restore@v4.3.0 runs on Node 20 (deprecated; default
+        # flips to Node 24 on 2026-06-16, removed entirely 2026-09-16). For a
+        # single 200KB package, install (~5s) is faster than the cache action's
+        # restore overhead anyway. Upstream fix sits in awalsh128/cache-apt-
+        # pkgs-action#193 + #198, unmerged for 5+ weeks.
+        run: sudo apt-get install -y portaudio19-dev
 
       - name: Install dependencies
         run: uv sync --all-packages --dev --frozen
@@ -77,10 +81,9 @@ jobs:
       - name: Install system audio dependencies
         # PyAudio (pulled in by RealtimeTTS via hosts/gui) builds against
         # PortAudio headers; ubuntu-latest doesn't ship them.
-        uses: awalsh128/cache-apt-pkgs-action@v1.6.0
-        with:
-          packages: portaudio19-dev
-          version: 1.0
+        # See the first usage of this step (line ~37) for the research(2026-05)
+        # note on why we don't use awalsh128/cache-apt-pkgs-action.
+        run: sudo apt-get install -y portaudio19-dev
 
       - name: Install dependencies
         run: uv sync --all-packages --dev --frozen
@@ -147,10 +150,9 @@ jobs:
       - name: Install system audio dependencies
         # PyAudio (pulled in by RealtimeTTS via hosts/gui) builds against
         # PortAudio headers; ubuntu-latest doesn't ship them.
-        uses: awalsh128/cache-apt-pkgs-action@v1.6.0
-        with:
-          packages: portaudio19-dev
-          version: 1.0
+        # See the first usage of this step (line ~37) for the research(2026-05)
+        # note on why we don't use awalsh128/cache-apt-pkgs-action.
+        run: sudo apt-get install -y portaudio19-dev
 
       - name: Install dependencies
         run: uv sync --all-packages --dev --frozen
