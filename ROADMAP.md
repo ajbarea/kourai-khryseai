@@ -5,8 +5,8 @@ A public, living plan for where the forge is heading. Items here are either
 *currently working on* lives in [IMPL.md](./IMPL.md) — when it lands, the
 matching milestone here collapses to a single line under "Shipped".
 
-Last reviewed: 2026-05-19 (post-#205). **NE AI Agents Day 2026 poster
-session shipped 2026-05-10** (NYC, Jane Street; QR-code demo live).
+Last reviewed: 2026-05-21 (post-#215, post-platform-reliability sweep).
+**NE AI Agents Day 2026 poster session shipped 2026-05-10** (NYC, Jane Street; QR-code demo live).
 Polish phase complete. Now resuming full-speed development with **M6
 ElevenLabs hybrid** as the next priority (sub-task 2 audio cache layer
 shipped [#174]; sub-tasks 1/3/4/5 still gate on M20 + VN smoke). See
@@ -544,6 +544,380 @@ M20 on M18+M19 is one coordinated UX wave rather than three drips.
 ---
 
 
+## M22 — Forge session replay + reproducibility capture
+
+> Status: planned · Surfaced 2026-05-21 during platform-reliability sweep ·
+> Combines the "killer VN mechanic" from the 2026-05-21 audit-of-audits
+> backlog with reproducibility-capture as a platform guarantee
+> (the article framing: "30-minute postmortem vs 3-day investigation").
+> Depends on M24 (cleaner OTel attributes make replay/branch deterministic)
+
+The forge already serializes every turn into `forge_sessions`. What's
+missing is (a) the ability to stream those turns back through the same
+UI for inspection / debugging / demo, (b) branching from an
+intermediate turn to explore alternate maiden choices, and (c) capture
+of the orchestration context needed to make a replay actually
+deterministic. Today a discarded session leaves you with the diff; it
+should leave you with everything needed to ask "why did Metis pick
+this spec shape" three weeks later.
+
+`research(2026-05)`: Anthropic's "How we built our multi-agent research
+system" calls out replayable trajectories as load-bearing for
+debugging multi-agent drift; platformengineering.org's Agent
+Reliability framework (Test 14, reproducibility) frames the same
+capture as turning open-ended postmortems into 30-minute scoped
+investigations; Anthropic's [Managed Agents engineering essay](https://www.anthropic.com/engineering/managed-agents)
+formalises the same primitive as a "session log [that] sits outside
+the harness" — append-only, queryable by positional slice, durable
+across harness crashes — which is exactly the API shape kourai's
+`forge_sessions` SQLite layer + replay slash should converge toward.
+Kourai stays local-first and provider-agnostic (not adopting the
+hosted Managed Agents runtime), but the session-as-external-log
+shape is the right design north star.
+
+### Scope
+
+**1. Per-session reproducibility capture.** Extend `forge_sessions`
+SQLite schema with versioned-context columns:
+
+- `per_agent_models JSON` — {agent_name: model_id} at session start;
+  carries the full assignment, not just the tier, so a `standard`-tier
+  session today vs after Sonnet 4.7 lands stays distinguishable.
+- `prompt_template_hashes JSON` — {agent_name: sha256} hashed at
+  session start; if `agents/<name>/prompts.py` changes mid-session,
+  the hash anchors which version actually ran.
+- `tool_schema_versions JSON` — {tool_name: version} for every
+  forge / shell / memory-mcp / context7-mcp tool touched.
+- `kourai_git_sha TEXT` — repo HEAD at session start; closes the
+  "what code was the agent running" gap.
+
+Populated lazily on first turn per session; `kourai_common.replay`
+reads it as the canonical environment snapshot.
+
+**2. `/forge replay <session_id>` slash.** Streams stored
+A2A messages back through the same renderer (CLI, GUI, VN), with
+configurable speed (`replay --speed 2x` or `replay --step` for
+turn-by-turn). Branch points (where Hephaestus routed, where the
+player accepted/discarded) get visual markers. Read-only — no
+mutations, no LLM calls, no MCP writes.
+
+**3. `/forge branch <session_id>:<turn_n>` slash.** Clones the
+session up to turn N into a new `session_id`, then continues live
+from that point — same environment snapshot (models / prompts / git
+sha pinned via #1), different player input. Powers the dating-sim
+"what if I'd told Metis to use sessions instead of JWT" exploration
+without losing the original timeline.
+
+**4. Replay-mode renderer affordances.** A small "REPLAY" / "BRANCH
+FROM #N" badge in the CLI status bar + GUI title bar + VN
+HUD so it's visually impossible to mistake a replay for a live
+session. Mneme is suppressed entirely in replay mode (no commits
+get drafted from re-rendered turns).
+
+### Out of scope
+
+- Cross-version replay (replaying a 2026-04 session against
+  2026-08 models). Snapshot pins what *was*; deliberately not
+  retro-fitting current model behavior onto historical context.
+- Persisting MCP-server state alongside the session. memory-mcp
+  drift between replay runs is accepted; replay re-issues queries
+  but doesn't pin responses.
+
+### Done when
+
+- A discarded session can be re-streamed with `/forge replay <id>`
+  and the dialogue lands character-for-character identical to the
+  live run.
+- `/forge branch <id>:5` produces a new session that picks up after
+  turn 5 with the same environment snapshot, and Hephaestus's first
+  routing decision in the new session uses the pinned model / prompt
+  versions even if HEAD has moved.
+- `SELECT per_agent_models, prompt_template_hashes, kourai_git_sha
+  FROM forge_sessions WHERE id = ?` returns populated values for
+  every session created post-M22.
+- The 2026-05-21 backlog bullet "Forge session replay & branching"
+  collapses to this milestone.
+
+---
+
+## M23 — Execution budgets + safety nets
+
+> Status: planned · Surfaced 2026-05-21 during platform-reliability
+> sweep · Combines T9 (execution guardrails) + T11 (fallback
+> strategies) + T21 (emergency stop) from the
+> [Agent Reliability framework](https://platformengineering.org/blog/the-agent-reliability-score-what-your-ai-platform-must-guarantee-before-agents-go-live).
+> Promotes the 2026-05-21 "Cost dashboard" backlog item from
+> visibility-only into actual budget enforcement.
+
+Today's only soft guard is `KOURAI_MAX_ITERATIONS=5`. A buggy
+Techne ↔ Kallos loop can still burn through hundreds of thousands of
+tokens before that ceiling fires, because the iteration limit is
+per-feedback-loop, not per-forge-cycle. The 2026 best-practice
+framing is sharper: **workflow-level token budgets are THE primary
+guardrail**, iteration limits are necessary but secondary.
+
+`research(2026-05)`: MindStudio's "Deploy AI Agents to Production"
+(workflow-level token budgets named as primary guardrail);
+LeanOps "AI Agents Burn 50x More Tokens Than Chats" (multi-agent
+forge cycles measured at 200k–1M+ tokens per task — exactly kourai's
+range); platformengineering.org Agent Reliability T9 + T11 + T21.
+
+### Scope
+
+**1. Workflow-level token budget.** `KOURAI_FORGE_BUDGET_TOKENS`
+(default e.g. 300_000) counted across every LLM call within one
+forge cycle — Hephaestus routing + Metis spec + Techne diff +
+Dokimasia tests + Kallos review + Mneme commit + all retries. When
+80% consumed, Hephaestus emits a status warning to the player;
+when hit, the active specialist gets a "wrap up — budget reached"
+signal in its next prompt and Mneme finalizes whatever's done.
+**Behavior is graceful summarize-and-escalate, not hard-stop** —
+per Anthropic / MindStudio guidance, the agent should land
+gracefully rather than crash mid-write.
+
+**2. USD-derived budget.** `KOURAI_FORGE_BUDGET_USD` (default e.g.
+$5) computed against `pricing.py` rates. Whichever fires first
+between #1 and #2 wins. Caveat: Opus 4.7 tokenizer pin under
+cross-cutting invariants means the USD-projection-from-tokens calc
+under-quotes Opus traffic by up to ~35% — adjust the USD budget
+generously to match.
+
+**3. Per-turn caps.** `KOURAI_MAX_TOOL_CALLS_PER_TURN` (default 30)
+and `KOURAI_MAX_INTERACTION_SECONDS` (default 600) layer on top of
+the workflow budget. Same graceful-stop behavior.
+
+**4. Per-tool circuit breakers.** Wrap `context7-mcp` and
+`memory-mcp` calls in `kourai_common.circuit_breaker` (new module):
+N consecutive failures → open circuit → return "no library docs
+available" / "no memory available" structured fallback instead of
+retry storm. Half-open after backoff window. Replaces the implicit
+retry-until-timeout pattern.
+
+**5. Per-agent emergency stop.** `/stop <agent>` slash command +
+`/stop all` flips a `KOURAI_AGENT_KILLED` flag in
+`kourai_common.agent_state` that Hephaestus's routing layer checks
+before dispatching. Killed agents return a structured
+`{"status": "halted", "reason": "operator_stop"}` artifact; pipeline
+gracefully unwinds. Reachable from any host (CLI / GUI / VN) within
+~5 seconds. Doesn't require `make down`.
+
+**6. Cost visibility (promoted from backlog).** `/cost` slash
+already exists; extend to show session-running + monthly-running
+totals against the active budgets ("$1.23 / $5.00 this forge,
+$87.40 / $200 this month"). GUI gets a subtle bottom-right panel
+mirroring the same numbers. Visibility first; AI-driven
+"Hephaestus suggests dropping to cheap tier" follow-on stays in
+backlog.
+
+### Out of scope
+
+- Per-player budget tiers (shared instance / multi-tenant). Single-
+  player local app doesn't need it yet; revisit if a hosted
+  deployment lands.
+- Automatic model-tier downgrade on budget pressure. Stays manual
+  via existing `KOURAI_MODEL_TIER` / `/model` slash.
+
+### Done when
+
+- A Techne ↔ Kallos thrash loop hits the workflow budget at
+  ~300k cumulative tokens and gets gracefully wound down by Mneme
+  instead of running to `KOURAI_MAX_ITERATIONS=5`.
+- `docker stop context7-mcp` mid-session triggers the circuit
+  breaker; Metis gets a structured "no library docs available"
+  fallback instead of a 30s retry loop.
+- `/stop kallos` mid-pipeline halts Kallos within 5s; Hephaestus
+  acknowledges the operator stop in-character and Mneme drafts a
+  commit against whatever Techne completed.
+- `/cost` shows live forge-vs-budget + month-vs-budget numbers.
+- 2026-05-21 backlog "Cost dashboard in CLI + GUI" collapses into
+  this milestone.
+
+---
+
+## M24 — OpenTelemetry GenAI semconv adoption + reasoning-trace depth
+
+> Status: planned · Surfaced 2026-05-21 during platform-reliability
+> sweep · Promotes the 2026-05-21 "Streaming metrics to client per
+> turn (`--stats`)" backlog item.
+
+Kourai already emits OTel spans into Jaeger, but the span names and
+attribute keys are kourai-bespoke — they don't match the GenAI SIG
+semantic conventions that became the de-facto standard in 2026. Two
+costs: (a) any third-party trace viewer (OpenInference dashboards,
+Phoenix, Langfuse) sees opaque spans instead of recognised
+agent-shape, (b) the article's sharp critique applies — "traces
+capture what agent did without capturing what it saw" — because the
+current spans encode A2A hops + tool calls but not the *reasoning*
+shape behind each routing decision.
+
+`research(2026-05)`: OpenTelemetry GenAI SIG semantic conventions
+([gen-ai-agent-spans](https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-agent-spans/),
+[gen-ai-spans](https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-spans/),
+[gen-ai-metrics](https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-metrics/));
+[platformengineering.org Agent Reliability T22](https://platformengineering.org/blog/the-agent-reliability-score-what-your-ai-platform-must-guarantee-before-agents-go-live)
+(reasoning-trace observability gap).
+
+### Scope
+
+**1. Standard operation names.** Migrate span names to the
+`gen_ai.operation.name` enum: `invoke_agent` for each maiden call,
+`invoke_workflow` for the parent forge cycle (Hephaestus owns this
+span — every other agent span becomes its child), `execute_tool` for
+forge / shell / memory-mcp / context7-mcp calls, `chat` for the
+underlying LLM completion. Replaces the current ad-hoc span naming.
+
+**2. Standard attribute keys.** Replace bespoke keys with the
+spec set:
+
+- `gen_ai.operation.name`, `gen_ai.provider.name`, `gen_ai.agent.name`,
+  `gen_ai.agent.id`
+- `gen_ai.request.model`, `gen_ai.request.temperature`,
+  `gen_ai.request.max_tokens`
+- `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`,
+  `gen_ai.usage.cache_creation.input_tokens`,
+  `gen_ai.usage.cache_read.input_tokens`
+- `gen_ai.response.finish_reasons`, `error.type`
+
+The token-usage keys are the exact ones Anthropic + OpenAI + Gemini
+SDKs already emit; kourai's LiteLLM bridge can pass them through
+unchanged once renamed.
+
+**3. Reasoning-depth events on `invoke_agent` spans.** The semconv
+spec leaves "alternatives considered / decision rationale" open;
+encode them as structured span events keyed under a kourai-namespaced
+extension (`kourai.reasoning.*`) so the standard attrs stay clean:
+
+- `kourai.reasoning.context_assembled` — Forge Transcript turn count
+  + token count + fingerprint hash (NOT full transcript — too large)
+- `kourai.reasoning.tools_considered` — list of tool names the
+  agent had access to this turn
+- `kourai.reasoning.tools_invoked` — subset actually called (Jaeger
+  already shows execute_tool children, but the explicit list lets a
+  "considered 12 tools, called 2" comparison surface)
+- `kourai.reasoning.decision` — short structured rationale string
+  (specialist's one-line answer to "why this approach") — opt-in
+  per agent prompt; not all agents need it
+
+Hephaestus's routing decision is the highest-value place to emit
+this — recording which agents were considered vs which got
+dispatched is exactly the "what the agent saw" depth the article
+critiques today's traces for missing.
+
+**4. Player-facing `/stats` slash (promoted from backlog).** Renders
+the same span data as a per-turn summary at the CLI boundary:
+tokens / wall-time / tool-calls-fired / cache-hit-ratio. Reuses the
+OTel instrumentation — pure render layer, no new measurement code.
+
+### Out of scope
+
+- Migrating from Jaeger to an OpenInference-native viewer (Phoenix,
+  Langfuse). Standard attrs + standard span names mean those become
+  drop-in if we ever want to; not picking the day-1 fight.
+- Auto-generating evals from span data. Adjacent capability,
+  separate milestone if a real caller surfaces.
+
+### Done when
+
+- `gen_ai.operation.name in ('invoke_agent', 'invoke_workflow',
+  'execute_tool')` covers every span emitted by the 10 agents in a
+  smoke run. Bespoke names retired.
+- `gen_ai.usage.input_tokens` + `gen_ai.usage.cache_read.input_tokens`
+  show up on every LLM-call span, matching the values LiteLLM
+  already reports per-call.
+- A Jaeger trace for a single forge cycle shows one
+  `invoke_workflow` root → six `invoke_agent` children → N
+  `execute_tool` grandchildren. Replaces the current flat-ish
+  multi-root pattern.
+- Hephaestus's routing-decision span carries a
+  `kourai.reasoning.tools_considered` event listing every specialist
+  it could have dispatched, plus `kourai.reasoning.decision`
+  naming why it picked the actual pipeline.
+- `/stats` renders the last-turn token / wall-time / tool-call
+  summary at the CLI prompt.
+- 2026-05-21 backlog "Streaming metrics to client per turn" collapses
+  into this milestone.
+
+---
+
+## M25 — Outcome + trajectory metrics
+
+> Status: planned · Surfaced 2026-05-21 during platform-reliability
+> sweep · Smallest scope of the four reliability milestones, biggest
+> research-poster + UX signal-per-line-of-code · Depends on M24
+> (standard semconv) for the trajectory side
+
+The `/project accept | discard <session_id>` slashes have shipped —
+the player explicitly tells the system whether the forge output was
+good. Today that signal goes into the project's git history and
+nowhere else. The article's sharpest concrete failure mode applies
+directly: "an agent that resolves 500 tickets/day, 200 reopened, is
+a liability pretending to be productivity." Kourai has the
+acceptance signal *and* the per-pipeline trajectory data; what's
+missing is wiring them into a feedback loop.
+
+`research(2026-05)`: Galileo "Agent Evaluation Framework" + Confident
+AI "Definitive Agent Evaluation Guide" both name the
+**outcome-vs-trajectory** metric split as 2026 production baseline.
+AlphaEval paper (cited in Future AGI 2026 framework review) finds
+production agents track 2.8 leaf-node evaluation types per task on
+average — kourai's six-specialist pipeline maps cleanly onto that.
+
+### Scope
+
+**1. Outcome counter.** New Prometheus counter
+`kourai_outcome_resolution_total{pipeline, kind, terminal_agent}`
+where `kind ∈ {accept, discard, re_forge, abandon}` and
+`terminal_agent` is the last specialist before the player decided.
+Wired at the `/project accept | discard` slash handler; `re_forge`
+fires when the same session_id gets a second pipeline; `abandon`
+fires when a session goes idle past the M23 timeout without resolution.
+
+**2. Trajectory metrics.** Per forge cycle, recorded against the
+M24 `invoke_workflow` span:
+- `kourai_forge_iterations` — Techne ↔ Kallos round count
+- `kourai_forge_tool_calls` — total `execute_tool` count
+- `kourai_forge_tokens_by_agent{agent_name}` — token sum per maiden
+- `kourai_forge_circuit_breaks_total{tool_name}` — M23 breaker fires
+
+**3. Correlation panel.** New Grafana dashboard
+`agent-reliability.json` joining outcome × trajectory: discard rate
+when Kallos iterations >5, accept rate when Aletheia citations
+returned 0 hits, re_forge rate by terminal_agent. Opens via
+`uv run kourai-dev observe` next to the existing Jaeger / Prometheus /
+Dozzle panels.
+
+**4. Aletheia retrospection (opt-in).** Aletheia already validates
+citations. On `/project discard` with `--reason "..."`, the reason
+string + the trajectory snapshot get appended to a
+`forge_post_mortems` table. Aletheia can be invoked offline against
+the table (`uv run kourai-dev review-discards`) to surface
+correlated patterns — e.g. "60% of discards in the last 7 days had
+Kallos iterations >3 and zero context7 hits." Read-only analysis,
+no auto-action.
+
+### Out of scope
+
+- Auto-tuning prompts based on discard patterns. That's a follow-on
+  research milestone, not this one. This milestone just closes the
+  loop on visibility.
+- Multi-player aggregation. Single-player local, single set of
+  outcomes; aggregation question shifts only if a hosted instance
+  lands.
+
+### Done when
+
+- `curl localhost:9090/api/v1/query?query=kourai_outcome_resolution_total`
+  returns non-zero values after a few `/project accept` /
+  `/project discard` cycles.
+- The correlation panel surfaces the discard / accept ratio per
+  terminal_agent — answering "which maiden's output gets discarded
+  most often" in one glance.
+- `uv run kourai-dev review-discards` prints Aletheia's offline
+  pattern summary from `forge_post_mortems`.
+- Discard reasons (when provided) are queryable.
+
+---
+
 ## Next up — priority order
 
 Pre-release perfection stance: no workarounds, web-search current best
@@ -663,6 +1037,37 @@ tied to any single one. Update when an invariant changes.
   host-side render paths is anticipatory infra. Re-enter once a
   specialist (likely techne for code, metis for spec) opts into emitting
   these kinds.
+- **Subagent contract discipline (Anthropic 4-part).** Every maiden's
+  system prompt must declare: (1) objective, (2) output format,
+  (3) guidance on which tools / sources to use, (4) clear task
+  boundaries. Anthropic's "How we built our multi-agent research
+  system" calls out that "missing any of these causes the subagent to
+  drift." `scripts/check_agent_contracts.py` greps each
+  `agents/*/prompts.py` for the four sections and fails CI on a gap;
+  audit pending — file when adding a new maiden or extending an
+  existing prompt. Anti-pattern is the inverse: dumping the Forge
+  Transcript at a maiden and hoping the role inference holds.
+  `research(2026-05)`: [Anthropic engineering, multi-agent research system](https://www.anthropic.com/engineering/multi-agent-research-system);
+  [effective context engineering](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents).
+- **Stale-assumption audit (whenever a frontier model ships).** Every
+  Hephaestus routing rule, every specialist boundary, every piece of
+  forge scaffolding encodes an assumption about what Claude — or any
+  model in the active provider rotation — couldn't do at the time the
+  scaffolding was written. Anthropic's Managed Agents engineering
+  essay frames this as a recurring failure mode: *"harnesses encode
+  assumptions about what Claude can't do on its own. However, those
+  assumptions need to be frequently questioned because they can go
+  stale."* When a new frontier model lands (Sonnet 4.7, Opus 5,
+  Mythos-class), audit which kourai scaffolding existed to compensate
+  for a capability gap that's now closed; collapse or retire what no
+  longer earns its keep. This is the inverse of speculative-generality
+  YAGNI — it pulls *down* over-engineered orchestration that the
+  model now handles natively, rather than blocking new building.
+  Captured as a recurring invariant rather than a milestone because
+  the work is diffuse and triggered by external events (model
+  releases), not a finite scope.
+  `research(2026-05)`: [Anthropic engineering, Managed Agents](https://www.anthropic.com/engineering/managed-agents);
+  [Building Effective Agents — "start with simplest architecture, add complexity only when simpler solutions demonstrably fall short"](https://www.anthropic.com/research/building-effective-agents).
 
 ---
 
@@ -1027,29 +1432,19 @@ Items from the 2026-05-17 Copilot ecosystem audit that survived a current-state 
   for what was learned. Auto-decay old patterns past a threshold so
   the graph doesn't grow unbounded.
 
-- **Cost dashboard in CLI + GUI.** LiteLLM already tracks tokens
-  per call; `docs/pricing.md` already documents tier pricing. Wiring
-  real-time cost-to-date display into CLI (`/cost` is already shipped
-  per the OSS-CC lift; expand to show session-and-monthly running
-  totals) and a subtle GUI panel is mechanical and is a high-trust
-  signal during long sessions. Tier-1 low-lift; defer the
-  "Techne proactively suggests cheaper tier" behavior to a follow-on
-  — ship visibility first, AI-driven cost optimization later.
+- **Cost dashboard + budget enforcement** — promoted to [M23](#m23--execution-budgets--safety-nets)
+  2026-05-21. Visibility piece (`/cost` totals, GUI panel) bundled
+  with hard budget caps + circuit breakers + emergency stop.
 
-- **Streaming metrics to client per turn (`--stats`).** The Jaeger
-  span data per agent per turn is already there for engineers; piping
-  a player-facing summary (tokens, wall-time, confidence-where-
-  available) makes agent work legible to non-observers. Reuses the
-  existing OpenTelemetry instrumentation; the work is a renderer at
-  the CLI boundary, not new instrumentation.
+- **Streaming metrics to client per turn (`--stats`)** — promoted to
+  [M24](#m24--opentelemetry-genai-semconv-adoption--reasoning-trace-depth)
+  2026-05-21. The CLI renderer rides on top of the OpenTelemetry
+  GenAI semconv adoption rather than landing as a one-off display.
 
-- **Forge session replay & branching.** Forge Transcript already
-  serializes every turn. Replay = stream stored messages back through
-  the same UI, pausing at decision points. Branch = roll back to
-  turn N and inject a different choice. This is the killer VN
-  mechanic and a real milestone-grade slice — file as a future M22
-  (or current next-available milestone number) when the M6/M20 work
-  clears.
+- **Forge session replay & branching** — promoted to
+  [M22](#m22--forge-session-replay--reproducibility-capture)
+  2026-05-21. Replay + branch + the reproducibility-capture columns
+  in `forge_sessions` ship as one coherent slice.
 
 - **Skill-based agent leveling (narrative).** Stackable with affinity
   (orthogonal axes); tracks Kallos accept-rate-per-Techne-diff,
