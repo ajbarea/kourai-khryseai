@@ -1464,21 +1464,11 @@ Items from the 2026-05-17 Copilot ecosystem audit that survived a current-state 
 
 ### Surfaced 2026-05-21 from audit-of-audits — Cross-sister polish
 
-> Source: 2026-05-21 audit-of-audits review "Insights worth keeping". Mirror items live in the matching ROADMAP for the other active sisters.
+> Source: 2026-05-21 audit-of-audits review "Insights worth keeping". Mirror items live in the matching ROADMAP for the other active sisters. Both items shipped 2026-05-21 (this commit's wave); kept here so the audit-of-audit trail stays legible.
 
-- **Add `## Sister ecosystem` block to README.** Name Phalanx-FL /
-  VelocityFL / ajbarea.github.io / techne with their roles
-  (research / performance / visibility / governance) and one-line
-  links. The LDQIS lab page already tells the ecosystem story
-  coherently; the sisters themselves do not.
+- ✅ **`## Sister ecosystem` block in README.** Names Phalanx-FL / VelocityFL / LDQIS / techne / ajbarea.github.io with their ecosystem roles and one-line links. Shipped in 4b0a36c.
 
-- **Cite Project Glasswing posture in README + `docs/security.md`.**
-  Anthropic's April 2026 trustworthy-software initiative
-  ([anthropic.com/glasswing](https://www.anthropic.com/glasswing))
-  is the 2026 frame for multi-agent systems handling sensitive
-  data — exactly Kourai's territory. One paragraph mention is
-  enough; don't over-claim with "only" / "first" / "best"
-  language per AJ's external-prose conventions.
+- ✅ **Project Glasswing posture cited in README + `docs/security.md`.** One-paragraph "Trust + security" section in the README cites [Anthropic's Project Glasswing](https://www.anthropic.com/glasswing) (April 2026) as the 2026 frame for trustworthy multi-agent code generation, names the canonical MCP transport posture (TLS 1.3 + OAuth 2.1 + OIDC + RBAC + RFC 8707), and links to the new `docs/security.md` for the full posture statement. The security doc covers what holds today (implicit Docker-network trust boundary for the MCP sidecars and A2A hops), what to harden before a multi-tenant or cross-host deploy, per-resource access-list policy on MCP tools, PQC hybrid (ML-KEM / Kyber) as a watcher item, and deliberate non-goals (Forge Transcript stays unencrypted to preserve auditability). Web-search verified May 2026 against the MCP authorization spec + Security Boulevard 2026-05 PQC guide.
 
 ### Surfaced 2026-05-21 from audit-of-audits — Security posture documentation
 

@@ -403,6 +403,12 @@ Trace → flow. Metric → aggregate. Log → narrative. See [Observability docs
 
 ---
 
+## Trust + security
+
+Kourai sits in the same conceptual neighborhood as [Anthropic's Project Glasswing](https://www.anthropic.com/glasswing) (April 2026): trustworthy software in the AI era, with frontier models autonomously modifying code at scale. Glasswing's frame is vulnerability discovery; Kourai's is multi-agent development. The shared posture is the same: code that AI agents emit and modify needs to be auditable, trust boundaries between agents need to be explicit, and transport between agents and MCP tools should follow current best practice (TLS 1.3, OAuth 2.1 + OIDC, RBAC, RFC 8707 resource indicators) rather than be reinvented. See [Security posture](docs/security.md) for what holds today, where the implicit trust boundaries are, and what to harden before opening the Docker network to a multi-tenant deploy.
+
+---
+
 ## Documentation
 
 Full docs are available at [Kourai Khryseai](https://ajbarea.github.io/kourai-khryseai/), built with [Zensical](https://zensical.dev).
@@ -416,6 +422,7 @@ Full docs are available at [Kourai Khryseai](https://ajbarea.github.io/kourai-kh
 - [GUI Reference](docs/gui.md) — Interface and voice settings
 - [VN Reference](docs/vn.md) — Ren'Py architecture, bridge protocol, save/load
 - [Observability](docs/observability.md) — Jaeger / Prometheus / Dozzle triage runbook
+- [Security posture](docs/security.md) — Trust boundaries, TLS 1.3 + OAuth 2.1 + RBAC target, PQC watcher
 - [Configuration](docs/configuration.md) — Environment variables and model assignment
 - [Pricing](docs/pricing.md) — Per-tier cost structure for Anthropic / Google / Ollama
 
