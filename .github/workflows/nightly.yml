@@ -35,10 +35,10 @@ jobs:
           python-version-file: "pyproject.toml"
 
       - name: Install system audio dependencies
-        uses: awalsh128/cache-apt-pkgs-action@v1.6.0
-        with:
-          packages: portaudio19-dev
-          version: 1.0
+        # PortAudio headers for PyAudio (pulled in by RealtimeTTS via hosts/gui).
+        # See tests.yml for the research(2026-05) note on why this is a bare
+        # apt-get instead of awalsh128/cache-apt-pkgs-action.
+        run: sudo apt-get install -y portaudio19-dev
 
       - name: Install dependencies
         run: uv sync --all-packages --dev --frozen
@@ -100,10 +100,9 @@ jobs:
       - name: Install system audio dependencies
         # PyAudio (pulled in by RealtimeTTS via hosts/gui) builds against
         # PortAudio headers; ubuntu-latest doesn't ship them.
-        uses: awalsh128/cache-apt-pkgs-action@v1.6.0
-        with:
-          packages: portaudio19-dev
-          version: 1.0
+        # See tests.yml for the research(2026-05) note on why this is a bare
+        # apt-get instead of awalsh128/cache-apt-pkgs-action.
+        run: sudo apt-get install -y portaudio19-dev
 
       - name: Install dependencies
         run: uv sync --all-packages --dev --frozen
