@@ -421,6 +421,18 @@ Full docs are available at [Kourai Khryseai](https://ajbarea.github.io/kourai-kh
 
 ---
 
+## Sister ecosystem
+
+Part of a family of repos exploring agentic AI and federated learning from complementary angles. Kourai Khryseai is the Innovation frontier; the others occupy different roles.
+
+- **[phalanx-fl](https://github.com/ajbarea/phalanx-fl)** — Research. Federated-learning reference platform on Flower + Ray. Eight aggregation strategies (FedAvg, Krum, Multi-Krum, Bulyan, Geometric Median, Trimmed Mean, FedMedian, FedProx) with the attack vocabulary.
+- **[vFL](https://github.com/ajbarea/vFL)** — Performance. Same FL strategies as Rust kernels via PyO3 + FastMCP + Prefect Horizon; crowd-scale speed lane.
+- **[ldqis](https://github.com/ajbarea/ldqis)** — Lab identity. Public website for the Laboratory of Data Quality and Intelligent Security at RIT.
+- **[techne](https://github.com/ajbarea/techne)** — Governance. Claude Code skills plugin: audits, lint/test gates, cross-repo drift detection.
+- **[ajbarea.github.io](https://github.com/ajbarea/ajbarea.github.io)** — Visibility. Portfolio that tells the ecosystem story end-to-end.
+
+---
+
 ## Coverage
 
 <div align="center">
