@@ -391,48 +391,6 @@ under the same URI without colliding with other extensions.
 
 ---
 
-## M21 — Companion A2A routing (no more ventriloquy)
-
-Hephaestus's router has emitted three response shapes since M13:
-`CONFIRM_ORDER:` (read-back gate), agent-list (dev pipeline), and
-`CHAT:<agent>: <body>` (single-agent conversational turn). The
-pipeline path opens real `RemoteAgentConnection`s and streams
-specialist output. The chat path did not — it emitted the router's
-gloss through Hephaestus's own task updater with the target's
-emoji, never invoking the target's container. The companions
-(`puck`, `cupid`, `aidos`, `aletheia`) have full executors with
-their own logic (`analyze_slop`, `respond`, etc.) that simply never
-ran when reached via `@aidos` / `@puck` / etc.
-
-### Fix
-
-`_delegate_chat_to_agent` in `agents/hephaestus/agent_executor.py`
-opens a real A2A connection to the routed target, streams its
-status + final result back through Hephaestus's updater, and falls
-back to an explicit Hephaestus-voiced apology if the target is
-unreachable — never silent failure, never a fake utterance
-attributed to the wrong agent.
-
-### Why this matters
-
-**Player experience.** When the player asks `@aidos check this for
-jargon`, they should see Aidos's real `analyze_slop` output, not
-Hephaestus's gloss. Companion personality lands when the
-companion actually runs.
-
-**Developer experience.** `@`-tag smoke tests now exercise the
-target's container end-to-end (visible in `docker logs <agent>`,
-emits its own OTel span), so AJ's watchplan and presentation
-smokes verify what they appear to verify. Same observability we
-already have for the dev pipeline.
-
-### Live-smoke gate
-
-CLI + GUI round-trip through every companion, and `docker logs
-<agent>` to confirm the container ran. Specialist single-chats
-(`@techne`, `@kallos`, etc.) ride the same code path and should
-also be smoked.
-
 ## M20 — Audio-text synchronization across CLI / GUI / VN
 
 > Status: in progress · Sub-task 1 (Kokoro voice + pipeline pre-warm)
@@ -1047,6 +1005,7 @@ file-of-origin.
 One-line per item, newest first. Detail moves to git history when work
 lands — these docs are plans + scratchpad, not a historical archive.
 
+- 2026-05-21 — **M21 — Companion A2A routing (kill CHAT ventriloquy)** [#215]. `_delegate_chat_to_agent` in `agents/hephaestus/agent_executor.py` opens a real `RemoteAgentConnection` for `CHAT:<agent>:` routes (puck / cupid / aidos / aletheia + specialist single-chats), forwards the target's status + final result back through Hephaestus's updater, and falls back to a Hephaestus-voiced apology if the target is unreachable. Smoked end-to-end: aidos / puck / cupid / aletheia all reached their containers (visible in `docker logs`); negative test with aidos stopped emitted the explicit `"(aidos dropped the thread — let me cover.)"` prefix instead of silent ventriloquy. 5-case unit test covers happy path, URL targeting, unreachable, mid-stream error, INPUT_REQUIRED.
 - 2026-05-19 — **dev-runner-latest.log rename (M15 sub-task 4)** [#205]. Stable-path dev-runner log renamed from `logs/dev-latest.log` to `logs/dev-runner-latest.log` across `dev_log.py`, `dev_cli.py`, the Makefile `logs` / `logs-tail` targets, the five per-script error pointers, `.claude/skill-context.md`, and `SMOKE_TODO.md` Round 6 narrative notes. Name now reflects what the file actually holds (dev-runner wrapper output) instead of implying live agent traces. ROADMAP M15 status reframed; remaining M15 work — host bind-mounts, structured tool-event JSONL, session-id correlation — stays planned.
 - 2026-05-19 — **CLI + configuration docs drift (`/project delete` + 9 KOURAI_ env vars)** [#204]. `/techne:docsync`-equivalent cross-reference between `hosts/cli/completer.py:SLASH_COMMANDS` and `docs/cli.md` surfaced a missing `/project delete <name|id> [--purge] [--yes]` row plus three optional-args misdocumented as required (`/project accept`, `/project discard`, `/save`). `grep -rE 'os\.environ' shared/src/` against `docs/configuration.md` surfaced eight previously-undocumented user-facing knobs: `KOURAI_MODEL_OVERRIDE` plus a new Sandbox subsection (`KOURAI_SANDBOX{,_IMAGE,_TIMEOUT_S,_MEMORY,_CPUS,_PIDS}`) plus a new Host overrides subsection (`KOURAI_TTS`, `KOURAI_AUDIO_DEBUG`, `KOURAI_RENPY_EXE`). Internal-only demo vars (`KOURAI_DEMO_INSTANT/SLOW`, `KOURAI_POSTER_DEMO`) intentionally stay undocumented.
 - 2026-05-19 — **Skill-context section-label cleanup** [#203]. `.claude/skill-context.md` section headers shed the `(aj-audit)` / `(aj-ci-audit)` / etc. parentheticals — those referenced project-local skill duplicates superseded by the techne plugin install (and rot every time the plugin renames). `ECOSYSTEM.md` retired two `aj-sisters` references in favour of capability descriptions. `.gitignore` comment updated to reflect canonical skills no longer live at `~/.claude/skills/`. Sister repos (phalanx-fl, vFL) have the same drift, queued for a follow-up sweep.
