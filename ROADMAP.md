@@ -998,6 +998,132 @@ file-of-origin.
   that wants to invoke them via the cross-platform CLI. Defer until
   the second caller exists.
 
+### Surfaced 2026-05-21 from audit-of-audits
+
+Items from the 2026-05-17 Copilot ecosystem audit that survived a current-state + 2026-05 web-search review. The source folder (`~/ajsoftworks/copilot-audit-ideas/`) was deleted after extraction; everything load-bearing lives here.
+
+- **Live affinity display in CLI.** The affinity mechanic is real and
+  exercised heavily across `tests/unit/test_relationship_math.py` +
+  10 other affinity tests; the VN renders an affinity HUD; the CLI
+  doesn't render any of it. The interesting design question (which
+  Copilot's spec under-addresses) is the high-vs-low-affinity
+  *personality shift* — high affinity → "I'd suggest we…" /
+  permission-seeking, low → "Let's just…" / directive. That's a
+  prompt-injection axis at the A2A layer, not a render-bar UI.
+  Persistence should go through the existing
+  `shared/src/kourai_common/player_context.py` rather than a
+  parallel `~/.kourai_khryseai/player/<id>/affinity.json` path.
+  Backward-compat default: existing sessions start at 5.0 across
+  all agents. Sized as a single milestone-grade slice; defer until
+  M6 + M20 cleanup ships.
+
+- **Persistent agent memory namespace on memory-mcp.** `memory-mcp`
+  exists as a Dockerized sidecar (`docker/memory-mcp-server.js`,
+  `MEMORY_MCP_URL` wired into every agent). Today it's an opaque
+  graph store. Adding a structured `patterns` namespace (user coding
+  patterns, codebase idioms, test prefs) gives Metis spec-time
+  grounding and Techne style-time grounding. The slash command
+  surface should include `/project forget_patterns` and visibility
+  for what was learned. Auto-decay old patterns past a threshold so
+  the graph doesn't grow unbounded.
+
+- **Cost dashboard in CLI + GUI.** LiteLLM already tracks tokens
+  per call; `docs/pricing.md` already documents tier pricing. Wiring
+  real-time cost-to-date display into CLI (`/cost` is already shipped
+  per the OSS-CC lift; expand to show session-and-monthly running
+  totals) and a subtle GUI panel is mechanical and is a high-trust
+  signal during long sessions. Tier-1 low-lift; defer the
+  "Techne proactively suggests cheaper tier" behavior to a follow-on
+  — ship visibility first, AI-driven cost optimization later.
+
+- **Streaming metrics to client per turn (`--stats`).** The Jaeger
+  span data per agent per turn is already there for engineers; piping
+  a player-facing summary (tokens, wall-time, confidence-where-
+  available) makes agent work legible to non-observers. Reuses the
+  existing OpenTelemetry instrumentation; the work is a renderer at
+  the CLI boundary, not new instrumentation.
+
+- **Forge session replay & branching.** Forge Transcript already
+  serializes every turn. Replay = stream stored messages back through
+  the same UI, pausing at decision points. Branch = roll back to
+  turn N and inject a different choice. This is the killer VN
+  mechanic and a real milestone-grade slice — file as a future M22
+  (or current next-available milestone number) when the M6/M20 work
+  clears.
+
+- **Skill-based agent leveling (narrative).** Stackable with affinity
+  (orthogonal axes); tracks Kallos accept-rate-per-Techne-diff,
+  Dokimasia coverage achieved, etc. — all already in
+  OpenTelemetry span data. Reinforces the "this is a game"
+  framing. Long-horizon narrative item; pairs with affinity work.
+
+- **Techne system-prompt tweak: auto-emit docstrings + module
+  overviews on new code.** Copilot's audit proposed a new "Sophia"
+  documentation agent (an 11th agent host); refined-down version
+  is much smaller — extend Techne's existing system prompt so its
+  diff output includes Google-style docstrings on new functions
+  and module-level overviews when scope is broad. Kallos already
+  reviews the diff, so docstring quality enters the existing
+  review loop without a new host. No new infrastructure, just a
+  prompt change. Tier 1 low-lift.
+
+### Surfaced 2026-05-21 from audit-of-audits — Cross-sister polish
+
+> Source: 2026-05-21 audit-of-audits review "Insights worth keeping". Mirror items live in the matching ROADMAP for the other active sisters.
+
+- **Add `## Sister ecosystem` block to README.** Name Phalanx-FL /
+  VelocityFL / ajbarea.github.io / techne with their roles
+  (research / performance / visibility / governance) and one-line
+  links. The LDQIS lab page already tells the ecosystem story
+  coherently; the sisters themselves do not.
+
+- **Cite Project Glasswing posture in README + `docs/security.md`.**
+  Anthropic's April 2026 trustworthy-software initiative
+  ([anthropic.com/glasswing](https://www.anthropic.com/glasswing))
+  is the 2026 frame for multi-agent systems handling sensitive
+  data — exactly Kourai's territory. One paragraph mention is
+  enough; don't over-claim with "only" / "first" / "best"
+  language per AJ's external-prose conventions.
+
+### Surfaced 2026-05-21 from audit-of-audits — Security posture documentation
+
+Copilot's audit included a "BONUS: Privacy-first multi-agent
+communication" item proposing custom E2E encryption at the MCP layer.
+That framing is wrong-shape per the 2026-05 MCP roadmap and the
+Security Boulevard 2026-05-13 guide to PQC + MCP: the canonical
+posture is TLS 1.3 + OAuth 2.0/OIDC + RBAC + AES-256 at rest, with
+PQC hybrid (ML-KEM / Kyber) as the forward-looking layer. A custom
+E2E protocol on top of MCP is not the call.
+
+What *is* worth filing:
+
+- **`docs/security.md` documenting Kourai's MCP transport posture.**
+  TLS 1.3 between agents and MCP servers, OAuth 2.0 / OIDC where
+  service-to-service auth applies (currently the MCP sidecars run
+  in the same docker network — document the implicit trust
+  boundary so it doesn't get extended to cross-network deploys
+  silently), per-resource access lists on MCP tools (which agent
+  can call which capability). The page exists as a doc surface
+  before the access-list code exists; treat it as a posture
+  statement that the implementation evolves toward, not a code-
+  generated artifact. Ref: [Security Boulevard 2026-05](https://securityboulevard.com/2026/05/the-2026-guide-to-post-quantum-ai-infrastructure-security-protecting-model-context-protocol-mcp/),
+  [MCP 2026 roadmap](https://blog.modelcontextprotocol.io/posts/2026-mcp-roadmap/).
+
+- **Per-resource access-list config on MCP tools.** Each MCP
+  capability declares which agents can call it (today: implicit
+  trust). Mechanical small slice once the security doc establishes
+  the model. The "credential tool that only Techne / Dokimasia
+  can decrypt" framing from Copilot becomes "the credential tool
+  is in the access list for exactly those two agents" — same
+  outcome, no custom encryption protocol.
+
+- **PQC hybrid (forward-looking, not 2026-Q2 work).** The MCP 2026
+  roadmap names PQC as a 2026 priority but the actual library
+  ecosystem (Rustls / OpenSSL hybrid Kyber backends) is still
+  maturing. Note as a watcher item; pick up when the
+  Rustls / Hyper stack offers a stable hybrid Kyber + X25519
+  configuration. Don't pre-empt with a hand-rolled PQC layer.
+
 ---
 
 ## Shipped
