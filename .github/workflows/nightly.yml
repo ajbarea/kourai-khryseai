@@ -58,7 +58,7 @@ jobs:
           retention-days: 30
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v6.0.0
+        uses: codecov/codecov-action@v6.0.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: ajbarea/kourai-khryseai
@@ -68,7 +68,7 @@ jobs:
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v6.0.0
+        uses: codecov/codecov-action@v6.0.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: ajbarea/kourai-khryseai
@@ -160,7 +160,7 @@ jobs:
           retention-days: 30
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v6.0.0
+        uses: codecov/codecov-action@v6.0.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: ajbarea/kourai-khryseai
@@ -170,7 +170,7 @@ jobs:
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v6.0.0
+        uses: codecov/codecov-action@v6.0.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: ajbarea/kourai-khryseai
