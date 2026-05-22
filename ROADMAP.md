@@ -1073,53 +1073,13 @@ tied to any single one. Update when an invariant changes.
 
 ## Future / unprioritized backlog
 
-Real items that aren't on a milestone yet. Lifted from the
-"M6 — Future / unprioritized" framing that hosted them before M6 got
-re-purposed for the ElevenLabs hybrid (2026-05-03). Many are tractable;
-pick by caller pain rather than file-of-origin.
+Real items not yet on a milestone. Many are tractable; pick by caller pain rather than file-of-origin.
 
 ### Surfaced 2026-04-26 from external research (OSS Claude Code clones, Typer, MCP/A2A specs)
 
-AJ asked for a sweep of the post-leak open-source Claude Code rewrites
-(ClawCode in Python+Rust, OpenCode, Cline, Aider, Plandex, Roo Code,
-Kilo, etc.) and Typer for CLI patterns we could lift, plus the latest
-Anthropic A2A/MCP spec primitives. Findings below — each is a candidate
-slash command, UX pattern, or architectural lift for the CLI host;
-sized for individual focused PRs, not bundled. The MCP/A2A bullets are
-captured in M2 and M7 above; the player-experience bullets live here.
+Sweep of post-leak OSS Claude Code rewrites (ClawCode, OpenCode, Cline, Aider, Plandex, Roo Code, Kilo) + Typer CLI patterns + current A2A/MCP specs. MCP/A2A bullets are captured in M2 and M7 above; player-experience bullets live here. Convergent finding: three-layer memory architecture (session persistence → in-session compaction → context discovery on resume); keep in mind when M15 logging lands.
 
-**Cross-cutting observations.**
-
-- **Three-layer memory architecture is the convergent pattern.** Every
-  serious clone organises persistence as three deliberate layers:
-  (1) session persistence to disk (we have `forge_sessions` SQLite
-  table — covered), (2) transcript compaction within a session
-  (we have within-loop caching from M4 but no compaction step —
-  the `/compact` bullet below), and (3) context discovery on resume
-  (we have project-root injection but no "what threads were open
-  last time we talked" surfacing — the `/session show` bullet
-  below). Worth keeping the three-layer framing in mind when M15
-  logging architecture lands so the layers don't drift apart again.
-- **SSE-only forecloses some integrations.** ClawCode supports six
-  MCP transports (Stdio, SSE, HTTP, WebSocket, SDK, ClaudeAiProxy).
-  We're SSE-only end-to-end. M2 should at minimum offer Stdio
-  alongside SSE so a future IDE-side integration (Cursor, VS Code,
-  Zed) can reach `kourai-forge-mcp` without standing up an HTTP
-  server. Already noted in M2 scope.
-
-**Open from the prioritized OSS-CC lift list.**
-
-Four of the five originally-prioritized items shipped on 2026-04-26
-(`/compact`, `/permissions` granular tool gating, `A2A-Version`
-header, `/cost` alias) — see Shipped log. One remains:
-
-- **MCP `roots` + `elicitation` declared at M2 init.** Design-time
-  work, near-zero cost if done while M2 is being scaffolded;
-  retrofitting later is much more painful.
-
-The remaining bullets (Plan Mode, autoDream, custom-agents-via-markdown,
-tree-sitter project map, LSP integration) are higher-effort
-architectural moves; valuable but not the first lift.
+- **MCP `roots` + `elicitation` declared at M2 init.** Design-time work, near-zero cost if done while M2 is scaffolded; retrofitting later is painful. Only remaining item from the prioritized OSS-CC lift list — `/compact`, `/permissions` granular tool gating, `A2A-Version` header, and `/cost` alias all shipped 2026-04-26.
 
 - **`/model` slash command — runtime tier switching without restart.**
   We have `KOURAI_MODEL_TIER` as an env var, but switching mid-session
@@ -1224,27 +1184,7 @@ architectural moves; valuable but not the first lift.
 - **Anthropic Agent SDK:** evaluate when it stabilises; could replace some
   REPL plumbing in `hosts/cli/__main__.py`.
 - **Sandbox container UID alignment** (M5 implementation choice).
-- **ElevenLabs SFX library regeneration:** when M6 lands the TTS
-  swap, also regenerate the `.ogg` library under `assets/audio/sfx/`
-  that `hosts/gui/emote_sfx.py` plays by emote-keyword lookup. Use
-  the Sound Effects API
-  (`client.text_to_sound_effects.convert` → `POST /v1/sound-generation`,
-  model `eleven_text_to_sound_v2`, 0.5–30 s clips). One-shot into the
-  asset tree (checked in or pulled from HF like the other voice
-  assets), **not** per-line at runtime — keeps request latency and
-  credit spend off the hot path. Tier strategy (verified 2026-04-23):
-  Free tier (10k credits/month) is non-commercial AND requires
-  `elevenlabs.io` in the title of any published content — fine for
-  casting inside `tools/voice-lab`, unusable for shipped assets.
-  Cheapest viable path is **Starter at $5/month**: commercial license,
-  30k credits, and audio generated during the paid month retains
-  commercial rights *perpetually* after cancellation, so a one-month
-  burn (generate the whole SFX library, then cancel) is the legitimate
-  pattern. Hygiene rule: never commit Free-tier-generated
-  `.mp3/.wav/.ogg` files anywhere; `.gitignore` doesn't block audio
-  today, so it's a discipline rule, not a tooling guard. (The M6 spec
-  in IMPL.md owns the per-line voice-line caching strategy; this
-  bullet is just the asset-regeneration peer.)
+- **ElevenLabs SFX library regeneration:** when M6 lands the TTS swap, regenerate the `.ogg` library under `assets/audio/sfx/` that `hosts/gui/emote_sfx.py` plays. Use Sound Effects API (`client.text_to_sound_effects.convert` → `POST /v1/sound-generation`, model `eleven_text_to_sound_v2`). One-shot into the asset tree, **not** per-line at runtime — keeps latency and credit spend off the hot path. Tier strategy: Starter at $5/month (commercial license + perpetual rights on audio generated during the paid month) is the legitimate one-month-burn-then-cancel pattern. Never commit Free-tier-generated audio (non-commercial + requires `elevenlabs.io` attribution in titles).
 - **Companion / spirit READMEs (Puck, Cupid, Aidos, Aletheia):** the
   6 main pipeline agents got READMEs on 2026-04-26 (see Shipped); the
   4 secondary agents are deferred until M6 voice-lab / gossip /
@@ -1516,28 +1456,28 @@ What *is* worth filing:
 One-line per item, newest first. Detail moves to git history when work
 lands — these docs are plans + scratchpad, not a historical archive.
 
-- 2026-05-21 — **M21 — Companion A2A routing (kill CHAT ventriloquy)** [#215]. `_delegate_chat_to_agent` in `agents/hephaestus/agent_executor.py` opens a real `RemoteAgentConnection` for `CHAT:<agent>:` routes (puck / cupid / aidos / aletheia + specialist single-chats), forwards the target's status + final result back through Hephaestus's updater, and falls back to a Hephaestus-voiced apology if the target is unreachable. Smoked end-to-end: aidos / puck / cupid / aletheia all reached their containers (visible in `docker logs`); negative test with aidos stopped emitted the explicit `"(aidos dropped the thread — let me cover.)"` prefix instead of silent ventriloquy. 5-case unit test covers happy path, URL targeting, unreachable, mid-stream error, INPUT_REQUIRED.
-- 2026-05-19 — **dev-runner-latest.log rename (M15 sub-task 4)** [#205]. Stable-path dev-runner log renamed from `logs/dev-latest.log` to `logs/dev-runner-latest.log` across `dev_log.py`, `dev_cli.py`, the Makefile `logs` / `logs-tail` targets, the five per-script error pointers, `.claude/skill-context.md`, and `SMOKE_TODO.md` Round 6 narrative notes. Name now reflects what the file actually holds (dev-runner wrapper output) instead of implying live agent traces. ROADMAP M15 status reframed; remaining M15 work — host bind-mounts, structured tool-event JSONL, session-id correlation — stays planned.
-- 2026-05-19 — **CLI + configuration docs drift (`/project delete` + 9 KOURAI_ env vars)** [#204]. `/techne:docsync`-equivalent cross-reference between `hosts/cli/completer.py:SLASH_COMMANDS` and `docs/cli.md` surfaced a missing `/project delete <name|id> [--purge] [--yes]` row plus three optional-args misdocumented as required (`/project accept`, `/project discard`, `/save`). `grep -rE 'os\.environ' shared/src/` against `docs/configuration.md` surfaced eight previously-undocumented user-facing knobs: `KOURAI_MODEL_OVERRIDE` plus a new Sandbox subsection (`KOURAI_SANDBOX{,_IMAGE,_TIMEOUT_S,_MEMORY,_CPUS,_PIDS}`) plus a new Host overrides subsection (`KOURAI_TTS`, `KOURAI_AUDIO_DEBUG`, `KOURAI_RENPY_EXE`). Internal-only demo vars (`KOURAI_DEMO_INSTANT/SLOW`, `KOURAI_POSTER_DEMO`) intentionally stay undocumented.
-- 2026-05-19 — **Skill-context section-label cleanup** [#203]. `.claude/skill-context.md` section headers shed the `(aj-audit)` / `(aj-ci-audit)` / etc. parentheticals — those referenced project-local skill duplicates superseded by the techne plugin install (and rot every time the plugin renames). `ECOSYSTEM.md` retired two `aj-sisters` references in favour of capability descriptions. `.gitignore` comment updated to reflect canonical skills no longer live at `~/.claude/skills/`. Sister repos (phalanx-fl, vFL) have the same drift, queued for a follow-up sweep.
-- 2026-05-19 — **Post-#201 docsync sweep + IMPL/ROADMAP refresh** [#202]. Three classes of drift surfaced by `/techne:sisters` + `/techne:docsync` after the 2026-05-16/18 wave. License propagation from #201 missed: `README.md` shield + footer, `CITATION.cff` metadata, `docs/gui.md` Kokoro (Apache-2.0) / RealtimeTTS (MIT, verified upstream) precision. CLI doc silence drift: `docs/cli.md` was missing `--voice/--no-voice` and `--demo` rows. M15 status reframed (LiteLLM-DEBUG-demote shipped via `litellm.suppress_debug_info = True`; OTel trace-ID injection shipped; bind-mounts + tool-event JSONL + session-id correlation + dev-latest rename still planned). Sisters audit ran clean — zero cross-repo drift.
-- 2026-05-18 — **License relicense Apache 2.0 → MIT** [#201]. Repo-wide license swap; `LICENSE` rewritten.
-- 2026-05-18 — **Dev-CLI demo target registration** [#200]. `cli-demo` / `gui-demo` / `vn-demo` now registered in `dev_cli.TASK_GROUPS` so `make help` surfaces them. Added `Task.env_extra` to wire `KOURAI_POSTER_DEMO` for vn-demo without a Makefile env-prefix hack.
-- 2026-05-18 — **CHAI 2026 poster title generalization** [#199]. Title broadened to "Multi-Agent Software Development"; docs-only.
-- 2026-05-17 — **Theoros autopilot (3-pane self-driving)** [#198]. `make theoros` now self-drives via a 3-pane tmux layout: REPL on top, autonomous `claude` CLI driving in the middle from `tests/fixtures/theoros_prompts.md`, docker logs on bottom. Manual driving available via `bash scripts/theoros.sh up --no-autopilot`.
-- 2026-05-17 — **Theoros observed live REPL session** [#196]. Initial spin-up of the `make theoros` 3-pane session — Claude drives `make cli`, AJ spectates via `tmux attach -t kourai-theoros -r`. Lays the foundation autopilot in #198 extends.
-- 2026-05-17 — **Few-shot voice examples per agent** [#197]. Each maiden now carries a distinctive-character few-shot block in its agent prompt — Hephaestus's deadpan, Kallos's teasing asides, Dokimasia's clinical dryness, etc. Voice character is system-prompt-load-bearing rather than purely TTS-engine-load-bearing.
-- 2026-05-17 — **May 2026 app-SDK freshness sweep** [#195]. Web-search-driven verification of every application-level Python SDK in `kourai_common` against PyPI primary sources. Seven safe bumps inside existing lower-bound ranges (no `pyproject.toml` edits): `a2a-sdk` 1.0.2 → 1.0.3, `huggingface-hub` 1.13.0 → 1.15.0, `litellm` 1.83.14 → 1.85.0 (cache-shape compat verified by passing all 31 `test_llm.py` cache tests; v1.84's Anthropic cache changes target Bedrock — our direct-API path unaffected), `mcp` 1.27.0 → 1.27.1, `numpy` 2.4.4 → 2.4.5, `pydantic` 2.12.5 → 2.13.4, `uvicorn` 0.46.0 → 0.47.0. **RealtimeTTS 0.6.1 → 0.7.1 deferred** (KokoroEngine→KokoroVoice breaking change; backlog entry under Future / unprioritized "Surfaced 2026-05-17"). Verified FRESH no-action: `httpx` 0.28.1, `opentelemetry-api` 1.41.1, `defusedxml` 0.7.1.
-- 2026-05-16 — **May 2026 infra freshness sweep** [#194]. Web-search-driven verification of every pinned tool surface against primary sources. Four mechanical bumps shipped: `uv` 0.10.10 → 0.11.14 (host.Dockerfile; documented breakers don't apply — only `uv sync` + `uv pip install` paths used, hatchling backend, single-index resolution); `@upstash/context7-mcp` 2.1.6 → 2.2.5 (SSE response streaming + per-request `McpServer` isolation + LLM argument-name compat); `dozzle` v10.5.0 → v10.5.3; `nodejs-22` → `nodejs-24` in sandbox (Active LTS through April 2028; npm v11 + stable native TS type-stripping, `research(2026-05)` note inline). All other pinned surfaces verified FRESH: jaeger 2.17.0, prometheus v3.11.3-distroless, server-memory 2026.1.26, supergateway 3.4.3, full GHA matrix (checkout v6.0.2, setup-python v6.2.0, setup-uv v8.1.0, codecov-action v6.0.0, build-push-action v7.1.0, setup-buildx-action v4.0.0, cache v5.0.5, upload-artifact v7.0.1, configure-pages v6.0.0, deploy-pages v5.0.0, upload-pages-artifact v5.0.0, cache-apt-pkgs-action v1.6.0), Python lower-bound ranges (pytest 9, ruff, ty, mcp, testcontainers, hypothesis, httpx — uv.lock pulls latest within ranges), `requires-python = ">=3.12,<3.14"` kept conservative (3.14.5 stable but 6-12mo ecosystem maturity recommend — revisit Q3 2026), Chainguard `wolfi-base:latest`/`node:latest-dev` daily-rebuilt.
-- 2026-05-16 — **May 2026 model/pricing verification sweep** [#192] [#193]. Migrated `MODELS_*_GOOGLE` from `gemini-2.0-flash` (deprecates 2026-06-01) to `gemini-2.5-flash-lite` — price-identical GA successor; legacy 2.0-flash entry retained in `GEMINI_PRICING` for historical `/usage` cost-resolution. Corrected Anthropic cache thresholds in `llm.py` (Sonnet 4.6: 2048 → 1024; added Haiku 4.5 = 4096). Freshened `pricing.py` date markers to research(2026-05) cites against primary sources and added Opus 4.7 tokenizer caveat (up to ~1.35× more tokens per same source text — accounting stays correct, projection from 4.6 baselines under-quotes by ~35%). Sibling docs in `docs/pricing.md` + `docs/configuration.md` propagated in #193.
-- 2026-05-15 — **Cross-host pipeline-status Phase 1** [#191]. `kourai_common.pipeline_status` (PipelineState frozen + PipelineTracker) replaces vn_bridge's bare `current_agent` string. GUI Phase 2 (GUIState agent-field refactor) deferred until a concrete caller lands; handoff-hooks API likewise deferred.
-- 2026-05-15 — **Host-area docstring deslop sweep** [#190]. Cleared `Manages/Handles/Provides` narrative WHAT-docstrings across `hosts/cli` + `hosts/gui`; 12 files, -152 lines, zero behavioral change. Closes the deferral from #184.
-- 2026-05-15 — **`speak_with_karaoke` helper extraction** [#189]. Two near-identical karaoke state machines in `__main__.py` (boot greeting) + `streaming.py` (in-session dialogue) consolidated into one shared helper with `on_no_words` / `on_no_audio` / `before_open` hooks. Six new unit tests pin all three outcome branches.
-- 2026-05-15 — **Karaoke boot-greeting empty-quote fix** [#185]. Kokoro CPU / muted-audio path opened the karaoke shell but never closed it with text — now slots the greeting inside the shell when no `on_word` callback fires. (Originally opened 2026-05-06; rebased + merged 2026-05-15.)
-- 2026-05-15 — **CI fast-lane restoration** [#188]. Reverted the matrix-theater + `|| true` ruff-silencing parts of #187; switched to `--output-format=github` for inline PR annotations + restored `integration-tests` to the PR lane. Cleaned up the 11 ruff violations that snuck through during the gating outage. Codecov slug fix kept.
-- 2026-05-15 — **M14 parallel timeout fix** [c46ce56] [f1481b8] [0d86fed]. Tuned aiohttp `TCPConnector` pool (limit_per_host=75 per LiteLLM docs) + disabled `request_timeout` for SSE streaming (Anthropic API guidance) so Metis + Hephaestus concurrent LLM calls no longer contend for pool slots. Diagnostic script + 170-line unit tests included.
-- 2026-05-15 — **Karaoke streaming Tier 2 fallback fix** [ce1e438]. Audio-only path (Kokoro CPU emits `on_audio_start` without `on_word`) previously rendered an empty `""` quote pair; now falls back to the static formatted box.
-- 2026-05-06 — **Pre-presentation polish bundle** [#184]. Slop sweep + first-impression CLI playthrough fixes for the NE Agents Day 2026 QR-code-clone audience. Five real bugs caught by playing through `make cli` as a first-time developer: Hephaestus contradicted himself on roster (said "four" / listed five / skipped four spirits — fixed with explicit 10-entity FULL ROSTER block); routing JSON `{"mode":"chat","target_agent":null}` leaked into every chat reply (added `include_data` flag to `extract_parts_text`/`extract_artifact_text`, CLI passes `False`); 47 KB of httpcore/PIL/HF/torch DEBUG flood on every boot (`setup_logging` now strips pre-existing root handlers + pins `logging.basicConfig` to no-op + `_RootDebugFilter` for bare `name="root"` records); TTS log lines landed inside speech-preview quotes (silenced `kourai_common.tts_realtime` INFO on console); torch FutureWarnings/UserWarning visible on every boot (scoped `module=torch\..*` filter before RealtimeTTS import). Plus: AGENTS.md (per arxiv 2511.12884v1), CITATION.cff + README BibTeX, MCC pillars in architecture docs, 10 broken GitHub URLs, 30+ deslop edits across agent prompts. Boot output went 47 KB → 5 useful lines.
+- 2026-05-21 — **M21 — Companion A2A routing (kill CHAT ventriloquy)** [#215]. `_delegate_chat_to_agent` opens a real `RemoteAgentConnection` for `CHAT:<agent>:` routes (puck/cupid/aidos/aletheia + specialist single-chats); unreachable target → explicit `"(aidos dropped the thread — let me cover.)"` Hephaestus fallback, no silent ventriloquy.
+- 2026-05-19 — **dev-runner-latest.log rename** [#205]. `logs/dev-latest.log` → `logs/dev-runner-latest.log` across dev_log/dev_cli/Makefile/skill-context. Name now reflects that the file holds dev-runner wrapper output, not live agent traces.
+- 2026-05-19 — **CLI + configuration docs drift** [#204]. Added `/project delete` row + 8 previously-undocumented `KOURAI_*` env vars (`KOURAI_MODEL_OVERRIDE`, `KOURAI_SANDBOX{,_IMAGE,_TIMEOUT_S,_MEMORY,_CPUS,_PIDS}`, `KOURAI_TTS`, `KOURAI_AUDIO_DEBUG`, `KOURAI_RENPY_EXE`).
+- 2026-05-19 — **Skill-context section-label cleanup** [#203]. Dropped `(aj-audit)` / `(aj-ci-audit)` parentheticals (techne-plugin install supersedes).
+- 2026-05-19 — **Post-#201 docsync sweep** [#202]. License propagation finished (README/CITATION.cff/docs/gui.md), `docs/cli.md` regained `--voice` / `--demo` rows, M15 status reframed.
+- 2026-05-18 — **License relicense Apache 2.0 → MIT** [#201].
+- 2026-05-18 — **Dev-CLI demo target registration** [#200]. `cli-demo` / `gui-demo` / `vn-demo` registered in `dev_cli.TASK_GROUPS`; added `Task.env_extra` for `KOURAI_POSTER_DEMO`.
+- 2026-05-18 — **CHAI 2026 poster title generalization** [#199].
+- 2026-05-17 — **Theoros autopilot (3-pane self-driving)** [#198]. `make theoros` 3-pane tmux: REPL top, autonomous claude CLI driving from `tests/fixtures/theoros_prompts.md`, docker logs bottom. `--no-autopilot` for manual driving.
+- 2026-05-17 — **Theoros observed live REPL session** [#196]. Foundation for #198.
+- 2026-05-17 — **Few-shot voice examples per agent** [#197]. Distinctive-character few-shot block per maiden prompt; voice character is system-prompt-load-bearing, not purely TTS-engine.
+- 2026-05-17 — **May 2026 app-SDK freshness sweep** [#195]. 7 safe bumps inside existing ranges (a2a-sdk, huggingface-hub, litellm 1.83→1.85, mcp, numpy, pydantic, uvicorn). RealtimeTTS 0.6→0.7 deferred (KokoroEngine→KokoroVoice breaking change).
+- 2026-05-16 — **May 2026 infra freshness sweep** [#194]. uv 0.10→0.11, context7-mcp 2.1→2.2, dozzle v10.5.0→v10.5.3, sandbox node 22→24. Python `>=3.12,<3.14` kept conservative; revisit Q3 2026.
+- 2026-05-16 — **May 2026 model/pricing verification sweep** [#192] [#193]. `gemini-2.0-flash` (deprecates 2026-06-01) → `gemini-2.5-flash-lite`. Corrected Anthropic cache thresholds (Sonnet 4.6: 2048→1024; added Haiku 4.5 = 4096). Opus 4.7 tokenizer ~1.35× heavier per same source text — projection caveat in `pricing.py`.
+- 2026-05-15 — **Cross-host pipeline-status Phase 1** [#191]. `kourai_common.pipeline_status` (PipelineState frozen + PipelineTracker) replaces vn_bridge's bare `current_agent` string.
+- 2026-05-15 — **Host-area docstring deslop sweep** [#190]. -152 lines of `Manages/Handles/Provides` WHAT-docstrings across hosts/cli + hosts/gui.
+- 2026-05-15 — **`speak_with_karaoke` helper extraction** [#189]. Two near-identical karaoke state machines consolidated; `on_no_words` / `on_no_audio` / `before_open` hooks.
+- 2026-05-15 — **Karaoke boot-greeting empty-quote fix** [#185]. Kokoro CPU / muted-audio path closes karaoke shell with greeting when no `on_word` fires.
+- 2026-05-15 — **CI fast-lane restoration** [#188]. Reverted `|| true` ruff-silencing from #187; `--output-format=github` for inline PR annotations.
+- 2026-05-15 — **M14 parallel timeout fix** [c46ce56] [f1481b8] [0d86fed]. aiohttp `TCPConnector(limit_per_host=75)` + disabled `request_timeout` for SSE streaming so Metis + Hephaestus concurrent LLM calls don't contend.
+- 2026-05-15 — **Karaoke streaming Tier 2 fallback fix** [ce1e438]. Audio-only path (Kokoro CPU emits `on_audio_start` without `on_word`) falls back to static formatted box instead of empty quote pair.
+- 2026-05-06 — **Pre-presentation polish bundle** [#184]. NE Agents Day 2026 prep: 5 first-impression CLI bugs fixed (Hephaestus roster contradiction, routing JSON leaking into chat, 47KB DEBUG flood per boot, TTS log lines inside quotes, torch FutureWarnings). Boot output 47 KB → 5 useful lines.
 - 2026-05-06 — **Docker runtime workspace pyproject** [#182]. Runtime stage missed the workspace `pyproject.toml`; `kourai_common.paths.find_project_root()` raised at import, crash-looping every Python agent.
 - 2026-05-06 — **Retry exponential-backoff jitter (±20%)** [#181].
 - 2026-05-06 — **Summarization cheap-tier pin** [#180].
