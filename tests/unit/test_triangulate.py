@@ -200,6 +200,7 @@ class TestTriangulate:
             primary, secondary, primary_source="s2", secondary_source="openalex"
         )
         assert result is None
+        assert conflict is not None
         assert any(f[0] == "title" for f in conflict.field_disagreements)
 
     def test_venue_alias_does_not_reject(self):
@@ -208,6 +209,7 @@ class TestTriangulate:
         result, _ = triangulate(
             primary, secondary, primary_source="s2", secondary_source="openalex"
         )
+        assert result is not None
         assert result.verified is True
         # No notes about venue since they're aliased
         assert not any("venue" in n for n in result.notes)
@@ -218,6 +220,7 @@ class TestTriangulate:
         result, _ = triangulate(
             primary, secondary, primary_source="s2", secondary_source="openalex"
         )
+        assert result is not None
         # Venue is non-decisive — still verified
         assert result.verified is True
         # But recorded as a note
@@ -226,6 +229,7 @@ class TestTriangulate:
     def test_single_source_no_secondary(self):
         primary = _meta()
         result, _ = triangulate(primary, None, primary_source="s2", secondary_source=None)
+        assert result is not None
         assert result.verified is True
         assert result.single_source_verified is True
         assert "no_secondary_source_available" in result.notes
