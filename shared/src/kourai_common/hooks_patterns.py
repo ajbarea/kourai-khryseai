@@ -1,8 +1,4 @@
-"""Behavioral pattern detection: time-of-day sessions and work habit analysis.
-
-Provides functions for recording, detecting, and summarizing player behavioral
-patterns to enable time-aware greetings and work-style personalization.
-"""
+"""Behavioral pattern detection for time-aware greetings and work-style personalization."""
 
 from __future__ import annotations
 

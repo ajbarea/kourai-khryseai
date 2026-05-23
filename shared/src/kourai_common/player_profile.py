@@ -1,8 +1,4 @@
-"""Player profile dataclass and multi-profile management.
-
-Split from player.py for focused responsibility. Handles identity, alignment
-gauges, serialization, and profile lifecycle (create/load/save/switch/delete).
-"""
+"""Player profile dataclass and multi-profile management."""
 
 from __future__ import annotations
 

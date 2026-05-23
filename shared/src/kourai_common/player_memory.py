@@ -1,8 +1,4 @@
-"""Player memory system — CRUD, retrieval scoring, gossip transfer, and decay.
-
-Split from player.py for focused responsibility. Manages the player_memories
-table in agent_memory.db with importance-weighted heuristic retrieval.
-"""
+"""Player memory system — CRUD, retrieval scoring, gossip transfer, and decay."""
 
 from __future__ import annotations
 

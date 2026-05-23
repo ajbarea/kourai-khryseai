@@ -78,11 +78,7 @@ def _resolve_bucket_id() -> str | None:
 
 
 class ArtifactStorage:
-    """Manages artifact persistence for agents with HuggingFace Bucket sync.
-
-    Local writes are always synchronous and fast. Cloud sync is explicit via
-    push() / pull(). If HF_TOKEN is not set, operates in local-only mode.
-    """
+    """Agent artifact storage with local/cloud sync via push() and pull()."""
 
     def __init__(self, agent_name: str):
         """Initialize artifact storage for an agent.
