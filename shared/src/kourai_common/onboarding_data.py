@@ -1,22 +1,14 @@
 """Shared onboarding option lists across CLI / GUI / VN hosts.
 
-Replaces the divergent per-host lists. Pre-this-module, CLI had four
-roles (``divine | mortal | master | casual``) with ``(id, description)``
-tuples while GUI + VN had five (``divine | mortal | hero | devoted |
-name_only``) with ``(id, label, description)`` triples — same player
-switching hosts saw different choices, sometimes incompatible IDs.
-
-The 5-role set wins because two of three hosts already use it. CLI
-gains ``hero``; legacy CLI IDs ``master`` / ``casual`` should be
-treated as aliases for ``devoted`` / ``name_only`` in any code that
-branches on persisted profile values (``hosts/cli/onboarding.py``'s
-Puck handoff line keeps both forms in its match set for backward
-compatibility).
+The canonical 5-role set is ``divine | mortal | hero | devoted | name_only``.
+Legacy CLI IDs ``master`` / ``devoted`` and ``casual`` / ``name_only``
+must be treated as aliases by any code that branches on persisted profile
+values (``hosts/cli/onboarding.py``'s Puck handoff keeps both forms in
+its match set for backward compatibility).
 
 Each ``OnboardingChoice`` carries both ``label`` (short button-friendly
 text the GUI uses) and ``description`` (longer prompt the CLI shows
-under each numbered choice). Hosts that only need one read whichever
-field fits their surface.
+under each numbered choice). Hosts read whichever field fits their surface.
 """
 
 from __future__ import annotations

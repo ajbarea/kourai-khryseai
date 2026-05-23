@@ -1,8 +1,4 @@
-"""Romance dialogue system — stage-based instructions and jealousy context.
-
-Split from player.py for focused responsibility. Generates romance-specific
-prompt injections with pet names, personality flavour, and jealousy triggers.
-"""
+"""Romance dialogue system — stage-based instructions, pet names, jealousy triggers."""
 
 from __future__ import annotations
 

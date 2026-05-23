@@ -1,22 +1,14 @@
 """Canonical CSV-export demo script — Hephaestus → Metis pause scene.
 
-Pre-this-module the same scripted scene was hand-coded three times:
-``hosts/cli/demo.py`` rendered ANSI ``_echo`` lines, ``hosts/gui/demo_client.py``
-pushed status events onto a recv-queue, and ``hosts/vn/kourai_vn/game/
-script_poster_demo.rpy`` ran Ren'Py labels — same beats, three encodings.
-This module owns the dialogue beats, choice keys, and answer responses;
-CLI and GUI iterate the shared lists and render in their own primitives.
-The Ren'Py file can't cleanly import Python at script-time, so it stays
-hand-coded with a header comment cross-referencing this file as the
-canonical source.
+Owns the dialogue beats, choice keys, and answer responses; CLI and GUI
+iterate the shared lists and render in their own primitives. The Ren'Py
+file can't cleanly import Python at script-time, so it stays hand-coded
+with a header comment cross-referencing this file as the canonical source.
 
 Schema: each ``DemoTurn`` carries WHO speaks (``speaker``), the INTENT
 of the line (``kind``), the canonical TEXT, and a ``pacing_ms`` hint.
-Hosts decide the rendering: CLI italicizes ``speech`` and dim-prefixes
-``action``; GUI routes through its emoji-prefix detector and dialogue
-panel. ``rationale`` continuation lines are sub-points the CLI shows
-beneath an ``input_required`` and the GUI bundles into the same status
-line.
+``rationale`` continuation lines are sub-points the CLI shows beneath an
+``input_required`` and the GUI bundles into the same status line.
 """
 
 from __future__ import annotations

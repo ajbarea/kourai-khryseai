@@ -1,8 +1,4 @@
-"""Player system constants — alignment, romance, affinity, and path config.
-
-Split from player.py for focused responsibility. All module-level constants
-and the _now_iso() utility live here.
-"""
+"""Player system constants — alignment, romance, affinity, paths, plus ``_now_iso()``."""
 
 from __future__ import annotations
 

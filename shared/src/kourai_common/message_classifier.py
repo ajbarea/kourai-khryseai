@@ -1,9 +1,7 @@
 """Classify incoming A2A messages into content tiers.
 
-Pure functions, no GUI state. Moved from ``hosts/gui/message_classifier.py``
-so CLI streaming and the VN bridge can route the same KIND_DIALOGUE-vs-
-status decision through one set of regexes — both already do this work
-inline today with overlapping patterns.
+Pure functions, no GUI state. Shared across CLI streaming, GUI, and the
+VN bridge so the KIND_DIALOGUE-vs-status decision uses one set of regexes.
 
 Tiers (matching the GUI dialogue panel's routing):
   * System status (Tier 3 pipeline chatter) → status bubbles / debug log

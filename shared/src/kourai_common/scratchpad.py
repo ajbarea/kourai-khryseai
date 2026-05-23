@@ -1,25 +1,19 @@
 """Cross-host scratchpad — agent chain-of-thought / TODO buffer.
 
-Pre-#173 this lived as a GUI overlay widget that was instantiated but
-never rendered; #173 pruned it and filed a cross-host rebuild in
-ROADMAP. This module is the rebuild's data layer: a per-agent ring
-buffer of recent ``ScratchpadEntry`` instances. Each host wires the
-shared ``kourai_common.message_classifier.is_scratchpad_content``
-classifier into ``Scratchpad.add()`` and renders entries in its own
-idiom (CLI slash command + ANSI block; future GUI overlay panel;
-future VN side parchment).
+Per-agent ring buffer of recent ``ScratchpadEntry`` instances. Each host
+wires ``kourai_common.message_classifier.is_scratchpad_content`` into
+``Scratchpad.add()`` and renders entries in its own idiom (CLI slash
+command + ANSI block; future GUI overlay panel; future VN parchment).
 
 `research(2026-05)`: the 2026 best practice for LLM scratchpad / CoT
-display is "render distinct from dialogue, prefer structured
-visibility, don't TTS the reasoning". The four documented visibility
-tiers are in-context visible, structured (JSON / YAML), tool traces,
-and hidden / private. Kourai routes classifier-shaped multi-line
-bullet / TODO / checkbox content into this buffer at the host
-boundary; renderers display newest-last per agent without piping
-through the synth path. Sources: ICLR 2026 "scratchpads + verifiers"
-paper (arxiv 2510.27246); Masood 2026-04 "Engineering Trustworthy
-LM Agents with Scratchpads and Verifiers"; Unite.AI "Scratchpad
-Technique" (2026).
+display is "render distinct from dialogue, prefer structured visibility,
+don't TTS the reasoning". Documented visibility tiers: in-context visible,
+structured (JSON / YAML), tool traces, hidden / private. Kourai routes
+classifier-shaped multi-line bullet / TODO / checkbox content into this
+buffer at the host boundary; renderers display newest-last per agent
+without piping through the synth path. Sources: ICLR 2026 "scratchpads +
+verifiers" (arxiv 2510.27246); Masood 2026-04 "Engineering Trustworthy LM
+Agents with Scratchpads and Verifiers"; Unite.AI "Scratchpad Technique" (2026).
 """
 
 from __future__ import annotations

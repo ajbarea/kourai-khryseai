@@ -1,9 +1,4 @@
-"""Prompt context builder hub — enriches agent system prompts with player state.
-
-Split from player.py for focused responsibility. Combines identity, memories,
-alignment, romance, personality adaptation, and virtue context into a single
-injectable prompt block.
-"""
+"""Prompt context builder — combines identity, memories, alignment, romance, personality, and virtue context into a single injectable prompt block."""
 
 from __future__ import annotations
 
