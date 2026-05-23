@@ -1,0 +1,11 @@
+# .pre-commit-config.yaml
+repos:
+  - repo: local
+    hooks:
+      - id: check-citations
+        name: check-citations
+        entry: uv run python scripts/check_citations.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
