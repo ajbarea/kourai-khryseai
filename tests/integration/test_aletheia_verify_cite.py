@@ -178,3 +178,58 @@ async def test_verify_and_cite_triangulation_reject_returns_conflict(
     assert isinstance(conflict, ConflictReport)
     assert conflict.kind == "triangulation_mismatch"
     assert any(f[0] == "first_author_surname" for f in conflict.field_disagreements)
+
+
+from agents.aletheia.agent import audit_existing_citations
+from kourai_common.citation_artifacts import PaperMetadata, TriangulationResult
+
+
+@pytest.mark.asyncio
+async def test_audit_existing_citations_detects_changed_first_author(
+    tmp_path: Path,
+    monkeypatch,
+):
+    """Artifact says first author = X; OpenAlex now says first author = Y."""
+    # Write an artifact claiming Zhang as first author
+    from kourai_common.citation_artifacts import write_citation_artifact
+
+    meta = PaperMetadata(
+        title="SoK: Benchmarking",
+        authors=["Heyi Zhang"],
+        year=2025,
+        urls={"abs": "https://arxiv.org/abs/2502.03801"},
+        arxiv_id="2502.03801",
+        doi="10.1234/x.5",
+    )
+    triangulation = TriangulationResult(
+        verified=True,
+        primary_source="semantic_scholar",
+        secondary_source="openalex",
+        decisive_fields_checked=["title", "first_author_surname", "year"],
+        decisive_fields_agreed=True,
+    )
+    write_citation_artifact(
+        meta=meta,
+        claim="test",
+        excerpts=[],
+        triangulation=triangulation,
+        abstract="test abstract",
+        project_root=tmp_path,
+    )
+
+    # Stub OpenAlex to now return a DIFFERENT first author for the same DOI
+    async def fake_openalex(doi):
+        return PaperMetadata(
+            title="SoK: Benchmarking",
+            authors=["Different Author"],
+            year=2025,
+            urls={"abs": "https://arxiv.org/abs/2502.03801"},
+            arxiv_id="2502.03801",
+            doi=doi,
+        )
+
+    monkeypatch.setattr("agents.aletheia.agent.lookup_openalex_by_doi", fake_openalex)
+
+    drift = await audit_existing_citations(project_root=tmp_path)
+    assert len(drift) == 1
+    assert "first_author" in drift[0].detail.lower()

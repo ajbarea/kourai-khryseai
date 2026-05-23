@@ -560,3 +560,67 @@ async def verify_and_cite(
         f"{primary.year})"
     )
     return citation, artifact_path
+
+
+async def audit_existing_citations(
+    *,
+    project_root,
+) -> list:
+    """Re-run triangulation on every artifact in docs/citations/.
+
+    Returns a list of ConflictReports for any artifact whose current
+    upstream metadata disagrees with what was recorded at write-time.
+    Empty list = no drift.
+    """
+    from pathlib import Path
+
+    from kourai_common.citation_artifacts import ConflictReport, read_citation_artifact
+    from kourai_common.triangulate import triangulate
+
+    project_root = Path(project_root)
+    citations_dir = project_root / "docs" / "citations"
+    if not citations_dir.exists():
+        return []
+
+    drift: list = []
+    for path in sorted(citations_dir.glob("*.md")):
+        try:
+            stored_meta, _ = read_citation_artifact(path)
+        except (ValueError, KeyError):
+            drift.append(
+                ConflictReport(
+                    kind="text_unavailable",
+                    detail=f"{path.name}: artifact file malformed",
+                )
+            )
+            continue
+
+        # Fetch current upstream metadata
+        current = None
+        if stored_meta.doi:
+            current = await lookup_openalex_by_doi(stored_meta.doi)
+        if current is None and stored_meta.arxiv_id:
+            current = await lookup_arxiv_metadata(stored_meta.arxiv_id)
+        if current is None:
+            drift.append(
+                ConflictReport(
+                    kind="text_unavailable",
+                    detail=f"{path.name}: no upstream source resolves the stored identifier",
+                )
+            )
+            continue
+
+        # Re-run the triangulation gate
+        _, conflict = triangulate(
+            stored_meta,
+            current,
+            primary_source="artifact",
+            secondary_source="upstream",
+        )
+        if conflict is not None:
+            field_names = ", ".join(f[0] for f in conflict.field_disagreements)
+            suffix = f" fields: {field_names}" if field_names else ""
+            conflict.detail = f"{path.name}: {conflict.detail or ''}{suffix}".strip()
+            drift.append(conflict)
+
+    return drift
