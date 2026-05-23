@@ -1,16 +1,13 @@
 """Pure-numpy audio DSP — normalization, fades, visualization, profiles.
 
-Moved from ``hosts/gui/audio_utils.py`` so any host with TTS playback
-(CLI's RealtimeTTS path could opt into per-personality normalization)
-can use the same per-agent loudness targets and DSP helpers without
-copying numpy code. Behavior is preserved exactly — no algorithm
-changes, just a relocation.
+Shared by any host with TTS playback for per-agent loudness targets and
+DSP helpers without copying numpy code.
 
 `research(2026-05)` follow-up filed in IMPL.md: ``AudioNormalizer``
 implements a hand-rolled LUFS approximation; ``pyloudnorm`` is the
-canonical ITU-R BS.1770-4 implementation. Migration is a behavior
-change (different LUFS readings, possibly different normalization
-adjustments) — separate PR when an audio-quality callback surfaces.
+canonical ITU-R BS.1770-4 implementation. Migration is a behavior change
+(different LUFS readings, possibly different normalization adjustments)
+— separate PR when an audio-quality callback surfaces.
 """
 
 from __future__ import annotations

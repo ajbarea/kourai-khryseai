@@ -1,8 +1,4 @@
-"""Alignment-gated dialogue instructions for agent system prompts.
-
-Split from player.py for focused responsibility. Generates alignment-based
-behaviour modifications (Sovereignty/Devotion gates) per agent personality.
-"""
+"""Alignment-gated dialogue instructions — Sovereignty/Devotion gates per agent personality."""
 
 from __future__ import annotations
 

@@ -1,9 +1,7 @@
 """Dialogue pacing controller — thinking pauses + per-mode response delays.
 
-Pure timing logic with no GUI state dependencies. Moved from
-``hosts/gui/dialogue_pacing.py`` so CLI streaming can adopt the same
-PacingMode contract for ``audio-led`` text reveal pacing in M20-adjacent
-work; existing GUI callers re-import from the GUI module unchanged.
+Pure timing logic with no GUI state dependencies; CLI and GUI share the
+same ``PacingMode`` contract via this module.
 """
 
 from __future__ import annotations

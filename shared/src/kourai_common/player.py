@@ -1,21 +1,10 @@
-"""Backwards-compatibility shim — imports from focused submodules.
+"""Backwards-compat shim re-exporting from the focused ``player_*`` submodules.
 
-The original god module has been split into:
-- player_constants: All module-level constants and _now_iso()
-- player_profile: PlayerProfile class + profile management
-- player_memory: Memory CRUD, retrieval scoring, gossip transfer, decay
-- player_affinity: Affinity tracking + romance progression
-- player_alignment: Alignment-gated dialogue instructions
-- player_romance: Romance dialogue system + jealousy context
-- player_context: Prompt builder hub (get_enriched_system_blocks, build_player_context)
-- player_io: Data import/export
-
-All public names are re-exported here so existing `from kourai_common.player import X`
-statements continue to work without modification.
-
-Test fixtures that monkeypatch attributes on this module (e.g.
-``monkeypatch.setattr(player_mod, "_get_player_db", ...)``) are forwarded
-to the real submodule via a custom ``__setattr__`` installed at import time.
+Existing ``from kourai_common.player import X`` continues to work. Test
+fixtures that monkeypatch attributes here (e.g. ``monkeypatch.setattr(
+player_mod, "_get_player_db", ...)``) are forwarded to the real submodule
+via a custom ``__setattr__`` installed at import time — needed because
+each function closes over its own module's globals, not this shim's.
 """
 
 from __future__ import annotations

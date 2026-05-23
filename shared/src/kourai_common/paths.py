@@ -1,16 +1,11 @@
-"""Project-root + asset-directory accessors.
-
-Single source of truth for paths into the kourai checkout. Replaces the
-~9 `Path(__file__).resolve().parents[N]` traversals previously scattered
-across hosts and shared (each fragile under any directory restructure).
+"""Project-root + asset-directory accessors — single source of truth for paths into the kourai checkout.
 
 `research(2026-05)`: `importlib.resources.files()` is the Python 2026
 best practice for installed-package data, but kourai's assets aren't
 packaged with the wheel — they live in the repo's top-level `assets/`
 next to `pyproject.toml`. Pathlib walk-up looking for `pyproject.toml`
-(the pattern already in `hosts/vn/.../bridge.py`) is the right fit;
-this module canonicalizes it. Source: pythontutorials.net "How to Get
-Project Root Path" (2026-04).
+is the right fit. Source: pythontutorials.net "How to Get Project Root
+Path" (2026-04).
 
 Note: VN's `bridge.py` deliberately keeps its own walk-up implementation
 because Ren'Py packages its own Python and importing kourai_common from
