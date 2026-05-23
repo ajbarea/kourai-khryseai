@@ -143,6 +143,7 @@ log_cli_level = "WARNING"
 markers = [
     "integration: mark test as requiring real external boundaries (containers/network/protocols)",
     "slow: mark test as slow / heavyweight (Kokoro inference, etc.) — skipped on the push/PR fast lane and run only by the nightly workflow",
+    "nightly: real-API or heavy-cassette tests skipped on the push/PR fast lane; nightly workflow runs them",
 ]
 filterwarnings = [
     "ignore::UserWarning:torch.nn.modules.rnn",
