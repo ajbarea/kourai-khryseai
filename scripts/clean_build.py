@@ -3,8 +3,9 @@
 Removes build artifacts, test caches, and temporary files to maintain a clean
 development environment. Supports selective cleanup via --cache-only and --tests-only.
 
-When invoked from a parent dev session (``KOURAI_DEV_SESSION=1``), the
-``logs/`` directory is preserved so the parent's open log handle survives.
+The ``logs/`` directory is never wiped wholesale — only ``dev-*-*.log``
+archives older than ``LOG_ARCHIVE_MAX_AGE_DAYS`` are pruned. ``dev-latest.log``
+(the active handle for the current run) is always preserved.
 
 Usage:
     python scripts/clean_build.py
@@ -15,20 +16,15 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import os
 import shutil
 import sys
+import time
 from pathlib import Path
 
-from kourai_common.dev_log import LOG, SESSION_ENV
+from kourai_common.dev_log import LOG
 
-
-def _filter_logs(dirs: list[str]) -> list[str]:
-    """Strip ``logs`` from the cleanup list when a parent session owns the file."""
-    if os.environ.get(SESSION_ENV) == "1" and "logs" in dirs:
-        LOG.event("INFO", "skipping logs/ — parent dev session owns the log file")
-        return [d for d in dirs if d != "logs"]
-    return dirs
+LOG_ARCHIVE_GLOB = "dev-*-*.log"
+LOG_ARCHIVE_MAX_AGE_DAYS = 30
 
 
 def clean_build(cache_only: bool = False, tests_only: bool = False) -> None:
@@ -50,7 +46,8 @@ def clean_build(cache_only: bool = False, tests_only: bool = False) -> None:
             root, [".pytest_cache", "__pycache__", ".hypothesis", "MagicMock"], skip_dirs
         )
         _clean_files(root, [".coverage"])
-        _clean_dirs(root, _filter_logs(["logs", "htmlcov"]))
+        _clean_dirs(root, ["htmlcov"])
+        _prune_log_archives(root, ["logs"])
         _print_done()
         return
 
@@ -61,25 +58,23 @@ def clean_build(cache_only: bool = False, tests_only: bool = False) -> None:
 
     _clean_dirs(
         root,
-        _filter_logs(
-            [
-                "logs",
-                ".pytest_cache",
-                ".ty_cache",
-                ".mypy_cache",
-                ".ruff_cache",
-                ".hypothesis",
-                ".playwright-mcp",
-                "site",
-                "dist",
-                "build",
-                "htmlcov",
-            ]
-        ),
+        [
+            ".pytest_cache",
+            ".ty_cache",
+            ".mypy_cache",
+            ".ruff_cache",
+            ".hypothesis",
+            ".playwright-mcp",
+            "site",
+            "dist",
+            "build",
+            "htmlcov",
+        ],
     )
     _clean_patterns(root, ["__pycache__", ".egg-info", "MagicMock"], skip_dirs)
     _clean_files(root, [".coverage", "docker-debug.log"])
     _clean_globs(root, [".coverage.*", "uv.lock.backup.*"])
+    _prune_log_archives(root, ["logs"])
 
     _print_done()
 
@@ -134,6 +129,32 @@ def _clean_files(root: Path, files: list[str]) -> None:
         print("\n  Removing files...")
         for f in removed:
             print(f"  + Removed {f}")
+
+
+def _prune_log_archives(root: Path, log_dirs: list[str]) -> None:
+    """Delete dev-runner archives older than the retention window.
+
+    Skips any *-latest.log file (the active handle for the current run), so
+    naming conventions like dev-latest.log or dev-runner-latest.log are both safe.
+    """
+    cutoff = time.time() - LOG_ARCHIVE_MAX_AGE_DAYS * 86400
+    pruned = 0
+    for dirname in log_dirs:
+        d = root / dirname
+        if not d.is_dir():
+            continue
+        for log_file in d.glob(LOG_ARCHIVE_GLOB):
+            if log_file.name.endswith("-latest.log"):
+                continue
+            try:
+                if log_file.stat().st_mtime < cutoff:
+                    log_file.unlink()
+                    pruned += 1
+            except (PermissionError, FileNotFoundError):
+                pass
+    if pruned:
+        print("\n  Pruning stale log archives...")
+        print(f"  + Pruned {pruned} archive(s) older than {LOG_ARCHIVE_MAX_AGE_DAYS} days")
 
 
 def _clean_globs(root: Path, patterns: list[str]) -> None:
