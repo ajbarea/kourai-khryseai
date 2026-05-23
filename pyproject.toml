@@ -191,4 +191,21 @@ replace-imports-with-any = [
     "kokoro.**",
 ]
 # Allow unresolved imports in test files (Ren'Py bridge and other test-only imports)
-allowed-unresolved-imports = ["bridge", "test.**"]
+# Aletheia v2 optional deps: not installed under default `uv sync --all-packages --dev`
+# (they live in the `aletheia-v2` extra). Production code that imports them is
+# tested in CI jobs that install the extra; ty sees the imports as unresolved
+# in the default lint job and would error without this allowlist.
+allowed-unresolved-imports = [
+    "bridge",
+    "test.**",
+    "rapidfuzz",
+    "rapidfuzz.**",
+    "httpx",
+    "httpx.**",
+    "tenacity",
+    "tenacity.**",
+    "docling",
+    "docling.**",
+    "vcr",
+    "vcr.**",
+]
