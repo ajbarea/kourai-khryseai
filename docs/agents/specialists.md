@@ -288,3 +288,6 @@ Validates citations, claims, and factual assertions in agent output. Uses regex-
 **Output:** TextPart + DataPart with `{claims_found: int, verified: bool}`.
 
 `agent.py` carries claim detection, citation validation, and LLM verification.
+
+For the new academic-citation verification capability, see
+[aletheia.md](aletheia.md).

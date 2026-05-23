@@ -43,6 +43,57 @@ ALIE [Baruch et al. 2019][^alie] perturbs honest updates.
     assert ("1902.06156-baruch-alie.md", src) in [(p, s) for p, s in links]
 
 
+def test_md_fenced_code_block_citations_are_ignored(tmp_path: Path):
+    """Illustrative citation paths inside ```fenced``` blocks are documentation,
+    not real references; user-facing docs (e.g. docs/agents/aletheia.md) carry
+    examples that would otherwise trigger spurious missing-artifact errors.
+    """
+    src = _write(
+        tmp_path / "docs.md",
+        """
+# Using citations
+
+Real claim: see [docs/citations/real-paper.md] for the verified source.
+
+Here's how to add one in code:
+
+```python
+# see docs/citations/example-paper.md
+def foo():
+    pass
+```
+
+And in markdown:
+
+```markdown
+[^x]: See [docs/citations/another-example.md] for details.
+```
+""".strip(),
+    )
+    found = sorted({p for p, _ in find_citation_links([src])})
+    assert "real-paper.md" in found
+    assert "example-paper.md" not in found
+    assert "another-example.md" not in found
+
+
+def test_md_python_files_still_match_inside_comments(tmp_path: Path):
+    """Python files have no fence-stripping; citation comments in real code
+    must keep matching even if their syntax superficially resembles a fence
+    boundary (this guards against accidental over-stripping)."""
+    src = _write(
+        tmp_path / "real.py",
+        """
+\"\"\"Module docstring with backticks like `foo` inline.\"\"\"
+
+# research(2026-05): see docs/citations/real-comment.md
+def cited():
+    pass
+""".strip(),
+    )
+    found = sorted({p for p, _ in find_citation_links([src])})
+    assert "real-comment.md" in found
+
+
 def test_check_project_passes_when_artifact_exists(tmp_path: Path):
     _write(tmp_path / "src/foo.py", "# see docs/citations/1902.06156-baruch-alie.md\n")
     _write(

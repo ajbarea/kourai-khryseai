@@ -25,6 +25,26 @@ if TYPE_CHECKING:
 _PY_CITE_RE = re.compile(r"docs/citations/([a-zA-Z0-9._-]+\.md)")
 _MD_FOOTNOTE_RE = re.compile(r"\[docs/citations/([a-zA-Z0-9._-]+\.md)\]")
 
+
+def _strip_md_code_fences(text: str) -> str:
+    """Drop fenced code blocks from markdown text before citation scanning.
+
+    Illustrative citation examples inside ```fenced``` blocks (the "here's
+    how to add a Research: comment" code samples in user-facing docs) are
+    documentation, not real citation references. Stripping them keeps the
+    docs surface honest while letting prose references stay enforced.
+    """
+    lines: list[str] = []
+    in_fence = False
+    for line in text.splitlines(keepends=True):
+        if line.lstrip().startswith("```"):
+            in_fence = not in_fence
+            continue
+        if not in_fence:
+            lines.append(line)
+    return "".join(lines)
+
+
 _REQUIRED_FRONTMATTER_KEYS = {
     "title",
     "authors",
@@ -76,6 +96,8 @@ def find_citation_links(files: Iterable[Path]) -> Iterator[tuple[str, Path]]:
             text = src.read_text(encoding="utf-8")
         except (UnicodeDecodeError, PermissionError):
             continue
+        if src.suffix == ".md":
+            text = _strip_md_code_fences(text)
         for m in _PY_CITE_RE.finditer(text):
             yield m.group(1), src
         for m in _MD_FOOTNOTE_RE.finditer(text):
