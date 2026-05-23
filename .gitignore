@@ -88,3 +88,4 @@ inspiration/
 
 # Windows mark-of-the-web alternate data streams from cross-mounted files
 *:Zone.Identifier
+tests/cassettes/test_fetch_paper_pdf_via_docling.yaml

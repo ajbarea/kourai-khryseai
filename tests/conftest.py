@@ -101,3 +101,21 @@ def make_stream_response(event: object) -> MagicMock:
     if is_artifact:
         sr.artifact_update = event
     return sr
+
+
+@pytest.fixture(scope="module")
+def vcr_config() -> dict[str, object]:
+    """vcrpy / pytest-recording cassette config -- scrub auth headers."""
+    import pathlib
+
+    return {
+        "filter_headers": [
+            ("authorization", "REDACTED"),
+            ("api-key", "REDACTED"),
+            ("x-api-key", "REDACTED"),
+        ],
+        # record_mode intentionally absent -- CLI --record-mode flag controls
+        # it; addopts in pyproject.toml sets the default of "none" for CI.
+        # Single cassette store for all integration tests.
+        "cassette_library_dir": str(pathlib.Path(__file__).parent / "cassettes"),
+    }
