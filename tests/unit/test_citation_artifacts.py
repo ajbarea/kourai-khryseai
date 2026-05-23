@@ -92,10 +92,15 @@ class TestNormalizeDoi:
         assert normalize_doi("10.1109/TSP.2022.3153135") == "10.1109/tsp.2022.3153135"
 
     def test_strips_url_prefix(self):
-        assert normalize_doi("https://doi.org/10.1109/TSP.2022.3153135") == "10.1109/tsp.2022.3153135"
+        assert (
+            normalize_doi("https://doi.org/10.1109/TSP.2022.3153135") == "10.1109/tsp.2022.3153135"
+        )
 
     def test_strips_http_prefix(self):
-        assert normalize_doi("http://dx.doi.org/10.1109/TSP.2022.3153135") == "10.1109/tsp.2022.3153135"
+        assert (
+            normalize_doi("http://dx.doi.org/10.1109/TSP.2022.3153135")
+            == "10.1109/tsp.2022.3153135"
+        )
 
     def test_idempotent(self):
         once = normalize_doi("https://doi.org/10.1109/TSP.2022.3153135")
@@ -241,11 +246,12 @@ class TestSlugForPaper:
         assert all(c.isalnum() or c in "_-." for c in slug), f"slug contains unsafe char: {slug!r}"
 
 
-import datetime as dt
-from pathlib import Path
+from typing import TYPE_CHECKING
 
-from hypothesis import given, settings, strategies as st
-from hypothesis import HealthCheck
+from hypothesis import HealthCheck, given, settings, strategies as st
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 from kourai_common.citation_artifacts import (
     read_citation_artifact,
@@ -304,8 +310,22 @@ def paper_metadata_strategy(draw):
     if arxiv_id is None and doi is None:
         arxiv_id = "2502.03801"  # force at least one identifier
     return PaperMetadata(
-        title=draw(st.text(min_size=3, max_size=80, alphabet=st.characters(min_codepoint=32, max_codepoint=126))),
-        authors=draw(st.lists(st.text(min_size=2, max_size=40, alphabet=st.characters(min_codepoint=32, max_codepoint=126)), min_size=1, max_size=10)),
+        title=draw(
+            st.text(
+                min_size=3, max_size=80, alphabet=st.characters(min_codepoint=32, max_codepoint=126)
+            )
+        ),
+        authors=draw(
+            st.lists(
+                st.text(
+                    min_size=2,
+                    max_size=40,
+                    alphabet=st.characters(min_codepoint=32, max_codepoint=126),
+                ),
+                min_size=1,
+                max_size=10,
+            )
+        ),
         year=draw(st.integers(min_value=1900, max_value=2100)),
         urls={"abs": "https://example.com/paper"},
         arxiv_id=arxiv_id,

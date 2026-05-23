@@ -11,11 +11,14 @@ from __future__ import annotations
 import datetime as dt
 import re
 import unicodedata
-from pathlib import Path
-from typing import Any, Iterable
+from typing import TYPE_CHECKING, Any
 
 import yaml
 from pydantic import BaseModel, Field, model_validator
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+    from pathlib import Path
 
 
 class PaperMetadata(BaseModel):
@@ -37,9 +40,7 @@ class PaperMetadata(BaseModel):
     @model_validator(mode="after")
     def _at_least_one_identifier(self) -> PaperMetadata:
         if not self.arxiv_id and not self.doi:
-            raise ValueError(
-                "PaperMetadata requires at least one of arxiv_id or doi"
-            )
+            raise ValueError("PaperMetadata requires at least one of arxiv_id or doi")
         return self
 
 
@@ -67,9 +68,7 @@ class ConflictReport(BaseModel):
 
 _DOI_URL_PREFIX_RE = re.compile(r"^https?://(?:dx\.)?doi\.org/", re.IGNORECASE)
 _ARXIV_VERSION_RE = re.compile(r"v\d+$")
-_AUTHOR_SUFFIX_RE = re.compile(
-    r"\s+(?:jr\.?|sr\.?|iii|iv|ii)$", re.IGNORECASE
-)
+_AUTHOR_SUFFIX_RE = re.compile(r"\s+(?:jr\.?|sr\.?|iii|iv|ii)$", re.IGNORECASE)
 
 
 def normalize_doi(doi: str | None) -> str | None:
@@ -110,9 +109,7 @@ def normalize_surname(surname: str) -> str:
     return no_accents.lower().replace("-", "").strip()
 
 
-_TITLE_STOPWORDS = frozenset(
-    {"a", "an", "the", "of", "in", "on", "for", "to", "and", "or", "with"}
-)
+_TITLE_STOPWORDS = frozenset({"a", "an", "the", "of", "in", "on", "for", "to", "and", "or", "with"})
 
 _SLUG_SAFE_RE = re.compile(r"[^a-z0-9_-]")
 
@@ -120,7 +117,7 @@ _SLUG_SAFE_RE = re.compile(r"[^a-z0-9_-]")
 def _filesystem_safe(s: str, fallback: str) -> str:
     """Filter string to filesystem-safe chars [a-z0-9_-], fallback if empty."""
     cleaned = _SLUG_SAFE_RE.sub("", s)
-    return cleaned if cleaned else fallback
+    return cleaned or fallback
 
 
 def _first_significant_word(title: str) -> str:
@@ -264,8 +261,7 @@ def write_citation_artifact(
     ]
     if excerpts:
         for quote, ref in excerpts:
-            for line in quote.splitlines() or [quote]:
-                body_parts.append(f"> {line}")
+            body_parts.extend(f"> {line}" for line in quote.splitlines() or [quote])
             body_parts.append(f"> ({ref})")
             body_parts.append("")
     else:
