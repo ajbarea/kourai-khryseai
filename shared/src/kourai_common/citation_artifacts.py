@@ -114,13 +114,21 @@ _TITLE_STOPWORDS = frozenset(
     {"a", "an", "the", "of", "in", "on", "for", "to", "and", "or", "with"}
 )
 
+_SLUG_SAFE_RE = re.compile(r"[^a-z0-9_-]")
+
+
+def _filesystem_safe(s: str, fallback: str) -> str:
+    """Filter string to filesystem-safe chars [a-z0-9_-], fallback if empty."""
+    cleaned = _SLUG_SAFE_RE.sub("", s)
+    return cleaned if cleaned else fallback
+
 
 def _first_significant_word(title: str) -> str:
     """Heuristic first-meaningful-word extraction: skip common stopwords."""
     normalized = normalize_title(title)
     for word in normalized.split():
         if word and word not in _TITLE_STOPWORDS:
-            return word
+            return _filesystem_safe(word, "untitled")
     return "untitled"
 
 
@@ -131,7 +139,8 @@ def _last_name(author: str) -> str:
     parts = no_suffix.split()
     if not parts:
         return "unknown"
-    return normalize_surname(parts[-1])
+    normalized = normalize_surname(parts[-1])
+    return _filesystem_safe(normalized, "unknown")
 
 
 def slug_for_paper(meta: PaperMetadata) -> str:

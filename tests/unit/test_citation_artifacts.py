@@ -217,6 +217,29 @@ class TestSlugForPaper:
         )
         assert slug_for_paper(meta) == slug_for_paper(meta)
 
+    def test_filesystem_safe_under_slash_in_author(self):
+        meta = PaperMetadata(
+            title="Sample Paper",
+            authors=["Author/Slash"],
+            year=2025,
+            urls={"abs": "https://example.com"},
+            arxiv_id="2502.03801",
+        )
+        slug = slug_for_paper(meta)
+        assert "/" not in slug, f"slug contains path separator: {slug!r}"
+
+    def test_filesystem_safe_under_weird_chars_in_title(self):
+        meta = PaperMetadata(
+            title="@#$% Weird Title",
+            authors=["Normal Author"],
+            year=2025,
+            urls={"abs": "https://example.com"},
+            arxiv_id="2502.03801",
+        )
+        slug = slug_for_paper(meta)
+        # No filesystem-hostile chars
+        assert all(c.isalnum() or c in "_-." for c in slug), f"slug contains unsafe char: {slug!r}"
+
 
 import datetime as dt
 from pathlib import Path
