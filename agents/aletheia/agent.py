@@ -270,10 +270,8 @@ async def aletheia_extract_claim(
     *,
     llm=None,
 ) -> str:
-    """Distill the assertion in `text` that needs grounding.
-
-    `llm` defaults to kourai_common.llm.chat; pass a FakeLLM for tests.
-    """
+    """Distill `text` to the assertion the citation must support.
+    Pass a FakeLLM via `llm=` to short-circuit the network call in tests."""
     if llm is None:
         from kourai_common.llm import chat as default_chat
 
@@ -337,24 +335,17 @@ def aletheia_match_evidence(
     candidate_excerpts: list[tuple[str, str]],
     paper_text: str,
 ) -> list[tuple[str, str]]:
-    """Filter candidate excerpts to verbatim substrings (whitespace-tolerant).
-
-    `candidate_excerpts` come from an LLM extraction step elsewhere; this
-    function is purely mechanical (no LLM call) — substring check on the
-    whitespace-normalized form.
-    """
+    """Filter excerpts to whitespace-normalized verbatim substrings of
+    `paper_text`. No LLM — this is the load-bearing anti-hallucination gate."""
     normalized_paper = _norm_ws(paper_text)
     return [
         (quote, ref) for quote, ref in candidate_excerpts if _norm_ws(quote) in normalized_paper
     ]
 
 
-# research(2026-05): deferred import for aletheia-v2 extras. Module-level
-# binding so tests can monkeypatch `agents.aletheia.agent.lookup_openalex_by_doi`
-# and `lookup_arxiv_metadata` without httpx at module load time. When the
-# extra is absent (unit tests, agent_executor), the suppress silently skips and
-# verify_and_cite is unavailable — acceptable because those callers never
-# invoke it.
+# Module-level binding (not function-local) so tests can monkeypatch
+# `agents.aletheia.agent.lookup_*`. Suppress is for the unit-test path where
+# the aletheia-v2 extra is absent — verify_and_cite isn't called there.
 with contextlib.suppress(ImportError):
     from kourai_common.academic_search import (
         lookup_arxiv_metadata,
