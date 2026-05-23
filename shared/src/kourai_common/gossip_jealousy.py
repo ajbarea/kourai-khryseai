@@ -1,8 +1,4 @@
-"""Jealousy confrontation subsystem for the gossip minigame.
-
-Handles detection of jealousy triggers, confrontation text generation,
-alignment-gated response options, and resolution with affinity effects.
-"""
+"""Jealousy confrontation subsystem for the gossip minigame."""
 
 from __future__ import annotations
 

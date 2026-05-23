@@ -29,11 +29,7 @@ log = logging.getLogger(__name__)
 class BaseAgentExecutor(AgentExecutor, ABC):
     """Base class for all Kourai agent executors with shared A2A lifecycle.
 
-    Handles common A2A protocol concerns:
-    - Task creation from message
-    - Empty input validation → input_required status
-
-    Subclasses implement only agent-specific logic via execute_agent_logic().
+    Subclasses implement agent-specific logic via execute_agent_logic().
     Use @executor_error_handler decorator on execute() for error handling.
     """
 

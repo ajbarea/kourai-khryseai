@@ -1,9 +1,4 @@
-"""Affinity tracking and romance progression system.
-
-Split from player.py for focused responsibility. Manages the agent_affinity
-table — affinity scores, tier mapping, romance stage advancement, and
-eligibility checking.
-"""
+"""Affinity tracking and romance progression system."""
 
 from __future__ import annotations
 

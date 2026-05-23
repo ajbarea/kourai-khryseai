@@ -1,8 +1,4 @@
-"""Player data import/export for portability and backup.
-
-Split from player.py for focused responsibility. Handles serialization of
-complete player state (profile + memories + affinities) to/from JSON bundles.
-"""
+"""Player data import/export for portability and backup."""
 
 from __future__ import annotations
 

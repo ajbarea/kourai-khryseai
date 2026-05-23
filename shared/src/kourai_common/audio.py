@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 
 class AudioManager:
-    """Manages all game audio: music, ambient, voice, and SFX."""
+    """Singleton for game audio playback (music, ambient, voice, SFX)."""
 
     _instance = None
 
