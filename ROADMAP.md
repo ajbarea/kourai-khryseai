@@ -1456,6 +1456,13 @@ What *is* worth filing:
 One-line per item, newest first. Detail moves to git history when work
 lands — these docs are plans + scratchpad, not a historical archive.
 
+- 2026-05-23 — **Aletheia v2 Phase 1.7: CI job exercises `--extra aletheia-v2`** [#228]. Third `tests.yml` job installs the optional extra and runs `test_triangulate.py` / `test_citation_artifacts.py` / `test_academic_search.py` (non-nightly slice) for real, instead of `importorskip` silently skipping them.
+- 2026-05-23 — **Aletheia v2 PR 3: `academic_search` HTTP layer + cassette tests** [#227]. httpx + tenacity clients for Semantic Scholar / arXiv / OpenAlex; 6 cassette tests replaying real-API responses; docling-PDF marked nightly to keep git slim.
+- 2026-05-23 — **Aletheia v2 handoff doc after PRs 1+2** [#226]. Stacked-PR rebase recipe, cassette size budget, CI/extras gotcha, and the PR 4 (Aletheia integration) dispatch plan for a fresh session.
+- 2026-05-23 — **Aletheia v2 PR 2: `triangulate` module + unit tests** [#225]. rapidfuzz cross-source agreement scoring with import-skip + ty allowlist so CI stays green without the optional extra.
+- 2026-05-23 — **Aletheia v2 PR 1: `citation_artifacts` module + unit tests** [#224]. PaperMetadata / ConflictReport / TriangulationResult Pydantic dataclasses + JSON round-trip + slug helper.
+- 2026-05-23 — **Aletheia v2 implementation plan** [#223]. 6-PR TDD plan with the citation-verification stack split into independent landable chunks.
+- 2026-05-23 — **Aletheia v2 design spec** [#222]. Citation-verification agent: triangulation gate (S2 + arXiv + OpenAlex), retrieval-then-verify with conflict reports.
 - 2026-05-21 — **M21 — Companion A2A routing (kill CHAT ventriloquy)** [#215]. `_delegate_chat_to_agent` opens a real `RemoteAgentConnection` for `CHAT:<agent>:` routes (puck/cupid/aidos/aletheia + specialist single-chats); unreachable target → explicit `"(aidos dropped the thread — let me cover.)"` Hephaestus fallback, no silent ventriloquy.
 - 2026-05-19 — **dev-runner-latest.log rename** [#205]. `logs/dev-latest.log` → `logs/dev-runner-latest.log` across dev_log/dev_cli/Makefile/skill-context. Name now reflects that the file holds dev-runner wrapper output, not live agent traces.
 - 2026-05-19 — **CLI + configuration docs drift** [#204]. Added `/project delete` row + 8 previously-undocumented `KOURAI_*` env vars (`KOURAI_MODEL_OVERRIDE`, `KOURAI_SANDBOX{,_IMAGE,_TIMEOUT_S,_MEMORY,_CPUS,_PIDS}`, `KOURAI_TTS`, `KOURAI_AUDIO_DEBUG`, `KOURAI_RENPY_EXE`).
