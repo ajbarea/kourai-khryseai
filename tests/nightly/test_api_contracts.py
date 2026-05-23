@@ -1,13 +1,7 @@
-"""Nightly: one real API call per source to detect upstream schema drift.
-
-These tests hit Semantic Scholar / OpenAlex / arXiv live and assert the
-fields we depend on are still present and in the expected shape. Schema
-breakage upstream surfaces here as a red nightly run, hours before it
-takes down the cassette-replay tests in `tests/integration/`.
-
-Skipped on the push/PR fast lane via `pytest.mark.nightly`; nightly.yml's
-`aletheia-v2-contracts` job is the only thing that runs them.
-"""
+"""Nightly: one real API call per source (S2 / OpenAlex / arXiv) to surface
+upstream schema drift before it breaks the cassette-replay path in
+`tests/integration/`. Push/PR lane skips via `pytest.mark.nightly`; only
+`nightly.yml`'s `aletheia-v2-contracts` job runs these."""
 
 from __future__ import annotations
 
@@ -28,11 +22,8 @@ pytestmark = pytest.mark.nightly
 
 @pytest.mark.asyncio
 async def test_s2_api_contract():
-    """Semantic Scholar still returns title/authors/year for a known paper.
-
-    Skipped unless ``S2_API_KEY`` is set — unauthenticated S2 rate-limits
-    too aggressively for a 3-test nightly run to land cleanly.
-    """
+    """S2 still returns title/authors/year. Needs `S2_API_KEY` — unauthenticated
+    S2 rate-limits too hard for a 3-test run."""
     if not os.environ.get("S2_API_KEY"):
         pytest.skip("S2_API_KEY not set; unauthenticated S2 rate-limits hard")
     candidates = await search_semantic_scholar("FedAvg federated learning", limit=1)

@@ -27,13 +27,8 @@ _MD_FOOTNOTE_RE = re.compile(r"\[docs/citations/([a-zA-Z0-9._-]+\.md)\]")
 
 
 def _strip_md_code_fences(text: str) -> str:
-    """Drop fenced code blocks from markdown text before citation scanning.
-
-    Illustrative citation examples inside ```fenced``` blocks (the "here's
-    how to add a Research: comment" code samples in user-facing docs) are
-    documentation, not real citation references. Stripping them keeps the
-    docs surface honest while letting prose references stay enforced.
-    """
+    """Drop ```fenced``` blocks; illustrative example slugs in user-facing
+    docs are documentation, not real citation references."""
     lines: list[str] = []
     in_fence = False
     for line in text.splitlines(keepends=True):
@@ -59,12 +54,9 @@ _STALE_DAYS = 365
 
 
 def _iter_source_files(root: Path) -> Iterator[Path]:
-    """Yield .py, .md, .yml, .yaml files under root.
-
-    Excluded directories: virtual envs, build artifacts, architecture/planning docs
-    (which contain example citation slugs in code blocks), and test fixtures
-    (which embed citation paths as string literals to exercise this checker).
-    """
+    """Yield .py / .md / .yml / .yaml files outside vendored, generated, or
+    fixture paths. `architecture/` + `tests/` carry illustrative slugs that
+    would false-positive against the live `docs/citations/` directory."""
     exclude_dirs = {
         ".venv",
         "node_modules",
@@ -73,10 +65,6 @@ def _iter_source_files(root: Path) -> Iterator[Path]:
         ".git",
         "__pycache__",
         "site",
-        # research(2026-05): architecture docs + tests contain citation path patterns
-        # as code-block examples and string-literal fixtures respectively; scanning
-        # them produces false-positives against the live docs/citations/ directory.
-        # The checker targets production source + user-facing docs only.
         "tests",
         "architecture",
     }
