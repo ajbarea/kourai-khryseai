@@ -105,3 +105,46 @@ def normalize_surname(surname: str) -> str:
     nfkd = unicodedata.normalize("NFKD", no_suffix)
     no_accents = "".join(c for c in nfkd if not unicodedata.combining(c))
     return no_accents.lower().replace("-", "").strip()
+
+
+_TITLE_STOPWORDS = frozenset(
+    {"a", "an", "the", "of", "in", "on", "for", "to", "and", "or", "with"}
+)
+
+
+def _first_significant_word(title: str) -> str:
+    """Heuristic first-meaningful-word extraction: skip common stopwords."""
+    normalized = normalize_title(title)
+    for word in normalized.split():
+        if word and word not in _TITLE_STOPWORDS:
+            return word
+    return "untitled"
+
+
+def _last_name(author: str) -> str:
+    """Heuristic last-name extraction: rightmost whitespace-split token after
+    suffix removal. Handles 'First Last', 'First Middle Last', 'El Mhamdi'."""
+    no_suffix = _AUTHOR_SUFFIX_RE.sub("", author.strip())
+    parts = no_suffix.split()
+    if not parts:
+        return "unknown"
+    return normalize_surname(parts[-1])
+
+
+def slug_for_paper(meta: PaperMetadata) -> str:
+    """Deterministic filesystem-safe slug.
+
+    Format: {paper_id}-{first_author_last_name}-{first_significant_title_word}
+
+    paper_id is arxiv_id (preferred) or doi (slashes → underscores, lowercased).
+    """
+    if meta.arxiv_id:
+        paper_id = normalize_arxiv_id(meta.arxiv_id) or "noid"
+    elif meta.doi:
+        paper_id = (normalize_doi(meta.doi) or "noid").replace("/", "_")
+    else:
+        paper_id = "noid"  # validator should prevent this, but be defensive
+
+    surname = _last_name(meta.authors[0])
+    keyword = _first_significant_word(meta.title)
+    return f"{paper_id}-{surname}-{keyword}"

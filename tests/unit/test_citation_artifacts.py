@@ -159,3 +159,60 @@ class TestNormalizeSurname:
 
     def test_strip_leading_trailing_whitespace(self):
         assert normalize_surname("  Zhang  ") == "zhang"
+
+
+from kourai_common.citation_artifacts import slug_for_paper
+
+
+class TestSlugForPaper:
+    def test_arxiv_id_slug(self):
+        meta = PaperMetadata(
+            title="SoK: Benchmarking Poisoning Attacks in FL",
+            authors=["Heyi Zhang"],
+            year=2025,
+            urls={"abs": "https://arxiv.org/abs/2502.03801"},
+            arxiv_id="2502.03801",
+        )
+        assert slug_for_paper(meta) == "2502.03801-zhang-sok"
+
+    def test_doi_slug_with_slash_to_underscore(self):
+        meta = PaperMetadata(
+            title="Robust Aggregation for Federated Learning",
+            authors=["Krishna Pillutla"],
+            year=2022,
+            urls={"abs": "https://doi.org/10.1109/TSP.2022.3153135"},
+            doi="10.1109/TSP.2022.3153135",
+        )
+        # DOI slash → underscore, lowercase
+        assert slug_for_paper(meta) == "10.1109_tsp.2022.3153135-pillutla-robust"
+
+    def test_skips_articles_in_title_keyword(self):
+        # "A", "The", "An" should not be the title keyword
+        meta = PaperMetadata(
+            title="The Hidden Vulnerability of Distributed Learning",
+            authors=["El Mhamdi"],
+            year=2018,
+            urls={"abs": "https://arxiv.org/abs/1802.07927"},
+            arxiv_id="1802.07927",
+        )
+        assert slug_for_paper(meta) == "1802.07927-mhamdi-hidden"
+
+    def test_uses_last_name_when_full_name_provided(self):
+        meta = PaperMetadata(
+            title="Krum",
+            authors=["Peva Blanchard", "El Mahdi El Mhamdi"],
+            year=2017,
+            urls={"abs": "https://papers.nips.cc/paper/6617"},
+            arxiv_id="1703.02757",
+        )
+        assert slug_for_paper(meta) == "1703.02757-blanchard-krum"
+
+    def test_deterministic(self):
+        meta = PaperMetadata(
+            title="Same Paper",
+            authors=["First Author"],
+            year=2025,
+            urls={"abs": "https://arxiv.org/abs/2025.0001"},
+            arxiv_id="2025.0001",
+        )
+        assert slug_for_paper(meta) == slug_for_paper(meta)
