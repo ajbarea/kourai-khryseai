@@ -2,6 +2,15 @@
 
 from __future__ import annotations
 
+import pytest
+
+# triangulate depends on rapidfuzz (aletheia-v2 extra). Skip the whole module
+# when the extra isn't installed (default CI: uv sync --all-packages --dev
+# does not pull optional-dependencies). Real validation runs in a CI job
+# that installs `--extra aletheia-v2` — tracked as a follow-up workflow
+# change.
+pytest.importorskip("rapidfuzz")
+
 from kourai_common.triangulate import (
     compare_arxiv_ids,
     compare_dois,
