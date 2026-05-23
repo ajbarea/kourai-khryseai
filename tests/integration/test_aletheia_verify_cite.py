@@ -87,3 +87,94 @@ def test_match_evidence_whitespace_tolerant():
     # Whitespace-normalized match should accept the candidate despite
     # the line breaks in the source.
     assert len(verified) == 1
+
+
+from pathlib import Path
+
+from agents.aletheia.agent import verify_and_cite
+from kourai_common.citation_artifacts import ConflictReport
+
+
+@pytest.mark.asyncio
+@pytest.mark.vcr
+async def test_verify_and_cite_happy_path(tmp_path: Path, fake_llm):
+    # Script the LLM: extract claim, pick the first S2 candidate, return excerpts
+    fake_llm.queue("ALIE perturbs within statistical envelope (Baruch 2019)")
+    fake_llm.queue("0")  # "pick first candidate by index"
+    fake_llm.queue('[{"quote": "We propose a novel attack", "ref": "Abstract"}]')
+
+    cite, artifact_or_conflict = await verify_and_cite(
+        claim="ALIE perturbs honest updates within statistical bounds",
+        project_root=tmp_path,
+        llm=fake_llm,
+    )
+
+    assert cite is not None
+    assert isinstance(artifact_or_conflict, Path)
+    assert artifact_or_conflict.exists()
+    assert "baruch" in artifact_or_conflict.name.lower()
+
+
+@pytest.mark.asyncio
+async def test_verify_and_cite_triangulation_reject_returns_conflict(
+    tmp_path: Path,
+    fake_llm,
+    monkeypatch,
+):
+    """Force a first-author mismatch and verify the citation is refused."""
+    from kourai_common.citation_artifacts import PaperMetadata
+
+    fake_llm.queue("ALIE perturbation")
+    fake_llm.queue("0")
+    fake_llm.queue('[{"quote": "We propose ALIE", "ref": "Abstract"}]')
+
+    async def fake_s2(*args, **kwargs):
+        return [
+            PaperMetadata(
+                title="A Little Is Enough",
+                authors=["Wrong Author"],  # deliberate mismatch
+                year=2019,
+                urls={"abs": "https://arxiv.org/abs/1902.06156"},
+                arxiv_id="1902.06156",
+            )
+        ]
+
+    async def fake_openalex(doi):
+        return PaperMetadata(
+            title="A Little Is Enough",
+            authors=["Gilad Baruch"],
+            year=2019,
+            urls={"abs": "https://arxiv.org/abs/1902.06156"},
+            arxiv_id="1902.06156",
+            doi=doi,
+        )
+
+    async def fake_arxiv_meta(arxiv_id):
+        return PaperMetadata(
+            title="A Little Is Enough",
+            authors=["Gilad Baruch"],  # OpenAlex/arxiv agree on Baruch
+            year=2019,
+            urls={"abs": f"https://arxiv.org/abs/{arxiv_id}"},
+            arxiv_id=arxiv_id,
+        )
+
+    async def fake_html(arxiv_id):
+        return "We propose ALIE: A Little Is Enough"
+
+    monkeypatch.setattr("agents.aletheia.agent.aletheia_search_papers", fake_s2)
+    monkeypatch.setattr("agents.aletheia.agent.lookup_openalex_by_doi", fake_openalex)
+    monkeypatch.setattr("agents.aletheia.agent.lookup_arxiv_metadata", fake_arxiv_meta)
+    monkeypatch.setattr(
+        "agents.aletheia.agent.aletheia_fetch_paper_text",
+        lambda **kw: fake_html(kw.get("arxiv_id", "")),
+    )
+
+    cite, conflict = await verify_and_cite(
+        claim="ALIE perturbs honest updates",
+        project_root=tmp_path,
+        llm=fake_llm,
+    )
+    assert cite is None
+    assert isinstance(conflict, ConflictReport)
+    assert conflict.kind == "triangulation_mismatch"
+    assert any(f[0] == "first_author_surname" for f in conflict.field_disagreements)
