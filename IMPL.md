@@ -10,20 +10,12 @@ crept in — extract it back to ROADMAP.
 
 ## In flight
 
-_Nothing currently open. Aletheia v2 PR 4 (`verify_and_cite` +
-`audit_existing_citations`, plus the five tool implementations and the
-FakeLLM fixture) shipped 2026-05-23 [#230] — see ROADMAP `## Shipped`._
+_Nothing currently open. The full Aletheia v2 6-PR plan closed
+2026-05-23 [#222 → #234]; see ROADMAP `## Shipped` for the arc._
 
-Next natural pickups from the Aletheia v2 6-PR plan:
-
-- **PR 5 — `check_citations.py` CI gate.** Independent of PR 4; could
-  have been done in parallel. Mechanical CI check that every claim
-  carrying a `Research:` line in production code points to a real
-  artifact under `docs/citations/`. Wires into pre-commit + CI.
-- **PR 6 — `docs/agents/aletheia.md`.** Depends on PR 4 (now shipped).
-  Documents the citation-verification surface and the two-mode shape
-  (generic claim validation v1 + academic citation verification v2).
-- **Task 4.6 — Nightly API-contract tests.** Tiny follow-up to PR 4:
-  3 real API calls per night to detect upstream schema drift. Plan
-  carries the literal code at lines 2730-2812 of the implementation
-  plan doc; ship as its own micro-PR.
+Natural next pickup is **M6 — ElevenLabs hybrid (pre-player-release
+blocker)**. Sub-task 2 (audio cache layer) is the next slice per
+ROADMAP line 11. Aletheia v2 Phase 2 (proactive inline guard — Techne
+/ Kallos call Aletheia when emitting citations) is unblocked but
+explicitly **un-prioritized** pending real-usage data on how often
+`verify_and_cite` is invoked manually in practice.
