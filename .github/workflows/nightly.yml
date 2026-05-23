@@ -178,3 +178,33 @@ jobs:
           flags: integration
           report_type: test_results
           fail_ci_if_error: false
+
+  aletheia-v2-contracts:
+    name: Aletheia v2 API Contracts (Nightly)
+    # Three real-API calls per source (Semantic Scholar / OpenAlex / arXiv) —
+    # surfaces upstream schema drift hours before it breaks the cassette-replay
+    # path. Independent of integration-tests; runs even if Docker setup fails.
+    runs-on: ubuntu-latest
+    env:
+      # S2 unauthenticated rate-limits aggressively; the test skips cleanly
+      # when this is unset. Setting the secret turns the S2 contract check on.
+      S2_API_KEY: ${{ secrets.S2_API_KEY }}
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v6.2.0
+        with:
+          python-version-file: "pyproject.toml"
+
+      - name: Install dependencies with aletheia-v2 extra
+        run: uv sync --all-packages --extra aletheia-v2 --dev --frozen
+
+      - name: Run nightly API-contract tests
+        run: uv run pytest tests/nightly/test_api_contracts.py -v --tb=short -m nightly
