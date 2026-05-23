@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
-# academic_search / triangulate depend on httpx + tenacity + rapidfuzz,
-# all in the aletheia-v2 optional extra. CI's default `uv sync --all-packages
-# --dev --frozen` does not install the extra; skip the whole module to keep
-# CI green. The aletheia-v2 CI job installs the extra and runs these.
+# aletheia-v2 extras (httpx / tenacity / rapidfuzz) are optional in CI's
+# default `uv sync --all-packages --dev --frozen`; the aletheia-v2-tests
+# job installs the extra and runs this file. importorskip keeps the
+# default lane green.
 pytest.importorskip("httpx")
 pytest.importorskip("tenacity")
 pytest.importorskip("rapidfuzz")
@@ -16,7 +18,17 @@ pytestmark = pytest.mark.integration
 
 from agents.aletheia.agent import (
     aletheia_extract_claim,
+    aletheia_fetch_paper_text,
+    aletheia_match_evidence,
     aletheia_search_papers,
+    audit_existing_citations,
+    verify_and_cite,
+)
+from kourai_common.citation_artifacts import (
+    ConflictReport,
+    PaperMetadata,
+    TriangulationResult,
+    write_citation_artifact,
 )
 
 
@@ -40,12 +52,6 @@ async def test_search_papers_returns_candidates():
     )
     assert len(candidates) >= 1
     assert "baruch" in candidates[0].authors[0].lower()
-
-
-from agents.aletheia.agent import (
-    aletheia_fetch_paper_text,
-    aletheia_match_evidence,
-)
 
 
 @pytest.mark.asyncio
@@ -84,23 +90,14 @@ def test_match_evidence_whitespace_tolerant():
         candidate_excerpts=candidate_excerpts,
         paper_text=paper_text,
     )
-    # Whitespace-normalized match should accept the candidate despite
-    # the line breaks in the source.
     assert len(verified) == 1
-
-
-from pathlib import Path
-
-from agents.aletheia.agent import verify_and_cite
-from kourai_common.citation_artifacts import ConflictReport
 
 
 @pytest.mark.asyncio
 @pytest.mark.vcr
 async def test_verify_and_cite_happy_path(tmp_path: Path, fake_llm):
-    # Script the LLM: extract claim, pick the first S2 candidate, return excerpts
     fake_llm.queue("ALIE perturbs within statistical envelope (Baruch 2019)")
-    fake_llm.queue("0")  # "pick first candidate by index"
+    fake_llm.queue("0")  # pick first candidate
     fake_llm.queue('[{"quote": "We propose a novel attack", "ref": "Abstract"}]')
 
     cite, artifact_or_conflict = await verify_and_cite(
@@ -122,8 +119,6 @@ async def test_verify_and_cite_triangulation_reject_returns_conflict(
     monkeypatch,
 ):
     """Force a first-author mismatch and verify the citation is refused."""
-    from kourai_common.citation_artifacts import PaperMetadata
-
     fake_llm.queue("ALIE perturbation")
     fake_llm.queue("0")
     fake_llm.queue('[{"quote": "We propose ALIE", "ref": "Abstract"}]')
@@ -180,19 +175,12 @@ async def test_verify_and_cite_triangulation_reject_returns_conflict(
     assert any(f[0] == "first_author_surname" for f in conflict.field_disagreements)
 
 
-from agents.aletheia.agent import audit_existing_citations
-from kourai_common.citation_artifacts import PaperMetadata, TriangulationResult
-
-
 @pytest.mark.asyncio
 async def test_audit_existing_citations_detects_changed_first_author(
     tmp_path: Path,
     monkeypatch,
 ):
     """Artifact says first author = X; OpenAlex now says first author = Y."""
-    # Write an artifact claiming Zhang as first author
-    from kourai_common.citation_artifacts import write_citation_artifact
-
     meta = PaperMetadata(
         title="SoK: Benchmarking",
         authors=["Heyi Zhang"],
