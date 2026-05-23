@@ -327,3 +327,53 @@ def memory_mcp_container(shared_network: Network) -> Generator[DockerContainer, 
 
         register_container("memory-mcp", container)
         yield container
+
+
+class FakeLLM:
+    """Deterministic stand-in for kourai_common.llm.chat / chat_with_tools.
+
+    Scripted responses queued by the test; each call pops the next one.
+    Anthropic-guidance pattern (May 2026): mock the LLM, run real tool
+    paths, get fast/cheap/deterministic agent tests.
+    """
+
+    def __init__(self) -> None:
+        self.responses: list[str | dict] = []
+        self.calls: list[dict] = []
+
+    def queue(self, response: str | dict) -> None:
+        self.responses.append(response)
+
+    async def chat(self, _agent: str, messages: list[dict], **kwargs) -> str:
+        self.calls.append({"messages": messages, "kwargs": kwargs})
+        if not self.responses:
+            raise AssertionError("FakeLLM exhausted (no queued response)")
+        nxt = self.responses.pop(0)
+        return nxt if isinstance(nxt, str) else str(nxt)
+
+    async def chat_with_tools(
+        self,
+        agent: str,
+        messages: list[dict],
+        tools: list[dict],
+        tool_handlers: dict,
+        **kwargs,
+    ) -> tuple[str, list[dict]]:
+        """Sequential tool-call playback: each queued response is either
+        a string (final answer) or a dict (tool call with name + args).
+        """
+        log: list[dict] = []
+        while self.responses:
+            nxt = self.responses.pop(0)
+            if isinstance(nxt, str):
+                return nxt, log
+            tool_name = nxt["tool"]
+            tool_args = nxt.get("args", {})
+            result = await tool_handlers[tool_name](**tool_args)
+            log.append({"tool": tool_name, "args": tool_args, "result": result})
+        raise AssertionError("FakeLLM exhausted before producing a final response")
+
+
+@pytest.fixture
+def fake_llm() -> FakeLLM:
+    return FakeLLM()
