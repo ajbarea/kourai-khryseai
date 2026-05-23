@@ -228,3 +228,81 @@ jobs:
           flags: integration
           report_type: test_results
           fail_ci_if_error: false
+
+  aletheia-v2-tests:
+    name: Aletheia v2 Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    # The default unit-tests / integration-tests jobs use
+    # `uv sync --all-packages --dev --frozen` (no `--extra aletheia-v2`),
+    # so tests guarded by `pytest.importorskip("rapidfuzz" / "httpx" /
+    # "tenacity" / "docling")` silently skip. This job installs the extra
+    # and runs the same tests for real, so regressions in the aletheia-v2
+    # citation-verification stack actually gate the build.
+    # research(2026-05): keeping this as a separate job (not matrix) — only
+    # one optional extra to exercise, no Python-version sweep, fail-fast
+    # default is fine. Revisit if a second extra appears.
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v6.2.0
+        with:
+          python-version-file: "pyproject.toml"
+
+      - name: Install system audio dependencies
+        # Same PortAudio constraint as the other jobs; see the lint job for
+        # the research(2026-05) note on why we shell out to apt-get
+        # directly instead of using cache-apt-pkgs-action.
+        run: sudo apt-get install -y portaudio19-dev
+
+      - name: Install dependencies (with aletheia-v2 extra)
+        run: uv sync --all-packages --extra aletheia-v2 --group dev --frozen
+
+      - name: Create logs directory
+        run: mkdir -p logs
+
+      - name: Run aletheia-v2 unit tests
+        # tests/unit/test_triangulate.py + tests/unit/test_citation_artifacts.py
+        # are the unit-tier aletheia-v2 surface. test_triangulate gates on
+        # rapidfuzz via importorskip; test_citation_artifacts has no extras.
+        run: uv run pytest -n auto tests/unit/test_triangulate.py tests/unit/test_citation_artifacts.py -v --tb=short --cov=shared/src/kourai_common --cov-report=xml:logs/coverage.xml --cov-report=term-missing --junitxml=logs/junit.xml
+
+      - name: Run aletheia-v2 integration tests
+        # Cassette-replay tests for academic search (S2 / arXiv / OpenAlex).
+        # The docling-via-PDF test is `-m nightly` so it's excluded here.
+        run: uv run pytest tests/integration/test_academic_search.py -v --tb=short -m "not nightly" --cov=shared/src/kourai_common --cov-append --cov-report=xml:logs/coverage.xml --cov-report=term-missing --junitxml=logs/junit-integration.xml
+
+      - name: Upload test results as artifacts
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: aletheia-v2-test-results
+          path: logs/
+          retention-days: 30
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v6.0.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: ajbarea/kourai-khryseai
+          files: logs/coverage.xml
+          flags: aletheia-v2
+          fail_ci_if_error: false
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v6.0.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: ajbarea/kourai-khryseai
+          files: logs/junit.xml,logs/junit-integration.xml
+          flags: aletheia-v2
+          report_type: test_results
+          fail_ci_if_error: false
