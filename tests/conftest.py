@@ -101,3 +101,16 @@ def make_stream_response(event: object) -> MagicMock:
     if is_artifact:
         sr.artifact_update = event
     return sr
+
+
+@pytest.fixture(scope="module")
+def vcr_config() -> dict[str, object]:
+    """vcrpy / pytest-recording cassette config — scrub auth headers."""
+    return {
+        "filter_headers": [
+            ("authorization", "REDACTED"),
+            ("api-key", "REDACTED"),
+            ("x-api-key", "REDACTED"),
+        ],
+        "record_mode": "none",
+    }
