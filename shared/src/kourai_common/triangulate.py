@@ -12,6 +12,9 @@ import re
 from rapidfuzz import fuzz
 
 from kourai_common.citation_artifacts import (
+    ConflictReport,
+    PaperMetadata,
+    TriangulationResult,
     normalize_arxiv_id,
     normalize_doi,
     normalize_surname,
@@ -125,3 +128,92 @@ def venues_equivalent(a: str | None, b: str | None) -> bool:
         if in_a and in_b:
             return True
     return False
+
+
+def triangulate(
+    primary: PaperMetadata,
+    secondary: PaperMetadata | None,
+    *,
+    primary_source: str,
+    secondary_source: str | None,
+) -> tuple[TriangulationResult | None, ConflictReport | None]:
+    """Cross-check primary against secondary on the decisive fields.
+
+    Returns `(TriangulationResult, None)` on agreement, or
+    `(None, ConflictReport)` on any decisive-field mismatch.
+    """
+    if secondary is None:
+        return (
+            TriangulationResult(
+                verified=True,
+                primary_source=primary_source,
+                secondary_source=None,
+                decisive_fields_checked=[],
+                decisive_fields_agreed=True,
+                notes=["no_secondary_source_available"],
+                single_source_verified=True,
+            ),
+            None,
+        )
+
+    disagreements: list[tuple[str, object, object]] = []
+    fields_checked: list[str] = []
+    notes: list[str] = []
+
+    # DOI (when both have it)
+    doi_match = compare_dois(primary.doi, secondary.doi)
+    if doi_match is not None:
+        fields_checked.append("doi")
+        if not doi_match:
+            disagreements.append(("doi", primary.doi, secondary.doi))
+
+    # arXiv ID (when both have it)
+    arxiv_match = compare_arxiv_ids(primary.arxiv_id, secondary.arxiv_id)
+    if arxiv_match is not None:
+        fields_checked.append("arxiv_id")
+        if not arxiv_match:
+            disagreements.append(("arxiv_id", primary.arxiv_id, secondary.arxiv_id))
+
+    # Title (always checked)
+    fields_checked.append("title")
+    if not compare_titles(primary.title, secondary.title):
+        disagreements.append(("title", primary.title, secondary.title))
+
+    # First-author surname (always checked)
+    fields_checked.append("first_author_surname")
+    if not compare_first_author_surname(primary.authors[0], secondary.authors[0]):
+        disagreements.append(("first_author_surname", primary.authors[0], secondary.authors[0]))
+
+    # Year (always checked)
+    fields_checked.append("year")
+    if not compare_years(primary.year, secondary.year):
+        disagreements.append(("year", primary.year, secondary.year))
+
+    # Venue (non-decisive, but record disagreements as notes)
+    if not venues_equivalent(primary.venue, secondary.venue):
+        notes.append(f"venue_aliases: '{primary.venue}' vs '{secondary.venue}' (non-decisive)")
+
+    if disagreements:
+        return (
+            None,
+            ConflictReport(
+                kind="triangulation_mismatch",
+                field_disagreements=disagreements,
+                primary_meta_summary=f"{primary.authors[0]}, {primary.year}",
+                secondary_meta_summary=f"{secondary.authors[0]}, {secondary.year}",
+                detail=f"Decisive-field disagreement between {primary_source} and {secondary_source}.",
+            ),
+        )
+
+    return (
+        TriangulationResult(
+            verified=True,
+            primary_source=primary_source,
+            secondary_source=secondary_source,
+            decisive_fields_checked=fields_checked,
+            decisive_fields_agreed=True,
+            notes=notes,
+            single_source_verified=False,
+        ),
+        None,
+    )

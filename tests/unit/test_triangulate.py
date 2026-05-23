@@ -114,3 +114,118 @@ class TestVenuesEquivalent:
         # Missing venue is non-decisive — never rejects
         assert venues_equivalent(None, "NeurIPS 2019") is True
         assert venues_equivalent("NeurIPS 2019", None) is True
+
+
+from kourai_common.citation_artifacts import PaperMetadata
+from kourai_common.triangulate import triangulate
+
+
+def _meta(
+    *,
+    title="Sample Title",
+    authors=("First Author",),
+    year=2025,
+    arxiv_id="2025.0001",
+    doi=None,
+    venue=None,
+) -> PaperMetadata:
+    return PaperMetadata(
+        title=title,
+        authors=list(authors),
+        year=year,
+        venue=venue,
+        urls={"abs": "https://example.com"},
+        arxiv_id=arxiv_id,
+        doi=doi,
+    )
+
+
+class TestTriangulate:
+    def test_all_decisive_agree(self):
+        primary = _meta()
+        secondary = _meta()
+        result, conflict = triangulate(
+            primary, secondary, primary_source="s2", secondary_source="openalex"
+        )
+        assert result is not None
+        assert conflict is None
+        assert result.verified is True
+        assert result.decisive_fields_agreed is True
+
+    def test_first_author_mismatch_rejects(self):
+        primary = _meta(authors=("Heyi Zhang",))
+        secondary = _meta(authors=("Yifei Liu",))
+        result, conflict = triangulate(
+            primary, secondary, primary_source="s2", secondary_source="openalex"
+        )
+        assert result is None
+        assert conflict is not None
+        assert conflict.kind == "triangulation_mismatch"
+        assert any(f[0] == "first_author_surname" for f in conflict.field_disagreements)
+
+    def test_year_mismatch_rejects(self):
+        primary = _meta(year=2025)
+        secondary = _meta(year=2024)
+        result, conflict = triangulate(
+            primary, secondary, primary_source="s2", secondary_source="openalex"
+        )
+        assert result is None
+        assert conflict is not None
+        assert any(f[0] == "year" for f in conflict.field_disagreements)
+
+    def test_arxiv_id_mismatch_rejects(self):
+        primary = _meta(arxiv_id="2502.03801")
+        secondary = _meta(arxiv_id="1902.06156")
+        result, conflict = triangulate(
+            primary, secondary, primary_source="s2", secondary_source="openalex"
+        )
+        assert result is None
+        assert conflict is not None
+        assert any(f[0] == "arxiv_id" for f in conflict.field_disagreements)
+
+    def test_title_well_above_threshold_accepts(self):
+        primary = _meta(title="SoK: Benchmarking Poisoning Attacks")
+        # Trivial punctuation difference
+        secondary = _meta(title="SoK Benchmarking Poisoning Attacks")
+        result, _ = triangulate(
+            primary, secondary, primary_source="s2", secondary_source="openalex"
+        )
+        assert result is not None
+        assert result.verified is True
+
+    def test_title_well_below_threshold_rejects(self):
+        primary = _meta(title="SoK: Benchmarking Poisoning Attacks")
+        secondary = _meta(title="A Different Paper Entirely")
+        result, conflict = triangulate(
+            primary, secondary, primary_source="s2", secondary_source="openalex"
+        )
+        assert result is None
+        assert any(f[0] == "title" for f in conflict.field_disagreements)
+
+    def test_venue_alias_does_not_reject(self):
+        primary = _meta(venue="NeurIPS 2019")
+        secondary = _meta(venue="NIPS 2019")
+        result, _ = triangulate(
+            primary, secondary, primary_source="s2", secondary_source="openalex"
+        )
+        assert result.verified is True
+        # No notes about venue since they're aliased
+        assert not any("venue" in n for n in result.notes)
+
+    def test_venue_non_alias_recorded_as_note(self):
+        primary = _meta(venue="NeurIPS 2019")
+        secondary = _meta(venue="ICML 2019")
+        result, _ = triangulate(
+            primary, secondary, primary_source="s2", secondary_source="openalex"
+        )
+        # Venue is non-decisive — still verified
+        assert result.verified is True
+        # But recorded as a note
+        assert any("venue" in n.lower() for n in result.notes)
+
+    def test_single_source_no_secondary(self):
+        primary = _meta()
+        result, _ = triangulate(primary, None, primary_source="s2", secondary_source=None)
+        assert result.verified is True
+        assert result.single_source_verified is True
+        assert "no_secondary_source_available" in result.notes
