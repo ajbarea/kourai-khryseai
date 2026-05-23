@@ -26,6 +26,7 @@ nav = [
   { "Agents" = [
       { "Overview" = "agents/index.md" },
       { "Reference" = "agents/specialists.md" },
+      { "Aletheia" = "agents/aletheia.md" },
   ]},
   { "Architecture" = [
       { "Overview" = "architecture/index.md" },
