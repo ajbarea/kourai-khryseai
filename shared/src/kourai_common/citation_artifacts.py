@@ -8,10 +8,13 @@ them verbatim from PaperMetadata into the artifact YAML.
 
 from __future__ import annotations
 
+import datetime as dt
 import re
 import unicodedata
-from typing import Any
+from pathlib import Path
+from typing import Any, Iterable
 
+import yaml
 from pydantic import BaseModel, Field, model_validator
 
 
@@ -148,3 +151,159 @@ def slug_for_paper(meta: PaperMetadata) -> str:
     surname = _last_name(meta.authors[0])
     keyword = _first_significant_word(meta.title)
     return f"{paper_id}-{surname}-{keyword}"
+
+
+def _bibtex_for(meta: PaperMetadata) -> str:
+    """Generate a minimal BibTeX entry for the artifact body."""
+    surname = _last_name(meta.authors[0])
+    keyword = _first_significant_word(meta.title)
+    bib_key = f"{surname}{meta.year}{keyword}"
+    authors_and = " and ".join(meta.authors)
+    if meta.arxiv_id:
+        return (
+            f"@article{{{bib_key},\n"
+            f"  title={{{meta.title}}},\n"
+            f"  author={{{authors_and}}},\n"
+            f"  journal={{arXiv preprint arXiv:{meta.arxiv_id}}},\n"
+            f"  year={{{meta.year}}}\n"
+            f"}}"
+        )
+    return (
+        f"@article{{{bib_key},\n"
+        f"  title={{{meta.title}}},\n"
+        f"  author={{{authors_and}}},\n"
+        f"  year={{{meta.year}}},\n"
+        f"  doi={{{meta.doi}}}\n"
+        f"}}"
+    )
+
+
+def _citation_snippet(meta: PaperMetadata) -> str:
+    authors_str = ", ".join(meta.authors)
+    if meta.arxiv_id:
+        suffix = f"arXiv:{meta.arxiv_id} ({meta.year})."
+    else:
+        suffix = f"DOI {meta.doi} ({meta.year})."
+    return f"{authors_str}. *{meta.title}*. {suffix}"
+
+
+def write_citation_artifact(
+    *,
+    meta: PaperMetadata,
+    claim: str,
+    excerpts: Iterable[tuple[str, str]],  # (quote, location_ref)
+    triangulation: TriangulationResult,
+    abstract: str,
+    project_root: Path,
+    verified_at: dt.datetime | None = None,
+    human_overridden: bool = False,
+    override_reason: str | None = None,
+    verification_version: str = "1.0",
+) -> Path:
+    """Write `docs/citations/{slug}.md` under project_root.
+
+    Frontmatter fields title/authors/year/arxiv_id/doi/urls come VERBATIM
+    from `meta` (which the caller must have populated from API JSON).
+    """
+    slug = slug_for_paper(meta)
+    artifact_dir = project_root / "docs" / "citations"
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    artifact_path = artifact_dir / f"{slug}.md"
+
+    verified_at = verified_at or dt.datetime.now(dt.UTC)
+    sources = [triangulation.primary_source]
+    if triangulation.secondary_source:
+        sources.append(triangulation.secondary_source)
+
+    frontmatter: dict[str, object] = {
+        "title": meta.title,
+        "authors": list(meta.authors),
+        "year": meta.year,
+        "venue": meta.venue,
+        "venue_full": meta.venue_full,
+        "arxiv_id": meta.arxiv_id,
+        "doi": meta.doi,
+        "urls": dict(meta.urls),
+        "sources_consulted": sources,
+        "triangulation": {
+            "primary_source": triangulation.primary_source,
+            "secondary_source": triangulation.secondary_source,
+            "decisive_fields_agreed": triangulation.decisive_fields_agreed,
+            "decisive_fields_checked": list(triangulation.decisive_fields_checked),
+            "notes": list(triangulation.notes),
+        },
+        "single_source_verified": triangulation.single_source_verified,
+        "verified_by": "aletheia",
+        "verified_at": verified_at.isoformat(),
+        "verification_version": verification_version,
+        "human_overridden": human_overridden,
+        "override_reason": override_reason,
+        "claim_supported": claim,
+    }
+
+    body_parts = [
+        "---",
+        yaml.safe_dump(frontmatter, sort_keys=False, allow_unicode=True).rstrip(),
+        "---",
+        "",
+        "## Abstract",
+        "",
+        abstract or "_(abstract unavailable)_",
+        "",
+        "## Excerpts supporting the claim",
+        "",
+    ]
+    if excerpts:
+        for quote, ref in excerpts:
+            for line in quote.splitlines() or [quote]:
+                body_parts.append(f"> {line}")
+            body_parts.append(f"> ({ref})")
+            body_parts.append("")
+    else:
+        body_parts.append("_(no verbatim excerpts captured; see triangulation status)_")
+        body_parts.append("")
+    body_parts.append("## Citation snippet")
+    body_parts.append("")
+    body_parts.append(_citation_snippet(meta))
+    body_parts.append("")
+    body_parts.append("## BibTeX")
+    body_parts.append("")
+    body_parts.append("```bibtex")
+    body_parts.append(_bibtex_for(meta))
+    body_parts.append("```")
+
+    artifact_path.write_text("\n".join(body_parts), encoding="utf-8")
+    return artifact_path
+
+
+def read_citation_artifact(path: Path) -> tuple[PaperMetadata, TriangulationResult]:
+    """Parse the frontmatter back into PaperMetadata + TriangulationResult."""
+    text = path.read_text(encoding="utf-8")
+    if not text.startswith("---\n"):
+        raise ValueError(f"{path}: missing YAML frontmatter")
+    end = text.find("\n---\n", 4)
+    if end == -1:
+        raise ValueError(f"{path}: unterminated YAML frontmatter")
+    fm = yaml.safe_load(text[4:end])
+
+    meta = PaperMetadata(
+        title=fm["title"],
+        authors=list(fm["authors"]),
+        year=fm["year"],
+        venue=fm.get("venue"),
+        venue_full=fm.get("venue_full"),
+        arxiv_id=fm.get("arxiv_id"),
+        doi=fm.get("doi"),
+        urls=dict(fm["urls"]),
+    )
+    t = fm["triangulation"]
+    triang = TriangulationResult(
+        verified=t["decisive_fields_agreed"],
+        primary_source=t["primary_source"],
+        secondary_source=t.get("secondary_source"),
+        decisive_fields_checked=list(t.get("decisive_fields_checked", [])),
+        decisive_fields_agreed=t["decisive_fields_agreed"],
+        notes=list(t.get("notes", [])),
+        single_source_verified=fm.get("single_source_verified", False),
+    )
+    return meta, triang

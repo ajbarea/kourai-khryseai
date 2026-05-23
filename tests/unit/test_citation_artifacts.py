@@ -216,3 +216,102 @@ class TestSlugForPaper:
             arxiv_id="2025.0001",
         )
         assert slug_for_paper(meta) == slug_for_paper(meta)
+
+
+import datetime as dt
+from pathlib import Path
+
+from hypothesis import given, settings, strategies as st
+from hypothesis import HealthCheck
+
+from kourai_common.citation_artifacts import (
+    read_citation_artifact,
+    write_citation_artifact,
+)
+
+
+class TestWriteReadRoundTrip:
+    def test_round_trip_arxiv_paper(self, tmp_path: Path):
+        meta = PaperMetadata(
+            title="SoK: Benchmarking Poisoning Attacks",
+            authors=["Heyi Zhang", "Yule Liu", "Xinlei He"],
+            year=2025,
+            venue="arXiv preprint",
+            urls={
+                "abs": "https://arxiv.org/abs/2502.03801",
+                "pdf": "https://arxiv.org/pdf/2502.03801",
+            },
+            arxiv_id="2502.03801",
+        )
+        triangulation = TriangulationResult(
+            verified=True,
+            primary_source="semantic_scholar",
+            secondary_source="openalex",
+            decisive_fields_checked=["title", "first_author_surname", "year", "arxiv_id"],
+            decisive_fields_agreed=True,
+        )
+        path = write_citation_artifact(
+            meta=meta,
+            claim="FLPoison includes ALIE and Fang attacks",
+            excerpts=[("We evaluate 15 representative attacks", "Abstract")],
+            triangulation=triangulation,
+            abstract="This survey benchmarks 15 representative attacks...",
+            project_root=tmp_path,
+        )
+
+        assert path.exists()
+        assert path.parent.name == "citations"
+        assert "2502.03801-zhang-sok" in path.name
+
+        loaded_meta, loaded_triang = read_citation_artifact(path)
+        assert loaded_meta.title == meta.title
+        assert loaded_meta.authors == meta.authors
+        assert loaded_meta.year == meta.year
+        assert loaded_meta.arxiv_id == meta.arxiv_id
+        assert loaded_triang.verified is True
+        assert loaded_triang.decisive_fields_agreed is True
+
+
+# Property-based: any valid PaperMetadata round-trips
+@st.composite
+def paper_metadata_strategy(draw):
+    arxiv_id = draw(st.sampled_from(["2502.03801", "1902.06156", None]))
+    doi = draw(st.sampled_from(["10.1109/TSP.2022.3153135", None]))
+    # Reject the None+None case (validator would raise)
+    if arxiv_id is None and doi is None:
+        arxiv_id = "2502.03801"  # force at least one identifier
+    return PaperMetadata(
+        title=draw(st.text(min_size=3, max_size=80, alphabet=st.characters(min_codepoint=32, max_codepoint=126))),
+        authors=draw(st.lists(st.text(min_size=2, max_size=40, alphabet=st.characters(min_codepoint=32, max_codepoint=126)), min_size=1, max_size=10)),
+        year=draw(st.integers(min_value=1900, max_value=2100)),
+        urls={"abs": "https://example.com/paper"},
+        arxiv_id=arxiv_id,
+        doi=doi,
+    )
+
+
+@given(meta=paper_metadata_strategy())
+@settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
+def test_round_trip_property(meta: PaperMetadata, tmp_path: Path):
+    triangulation = TriangulationResult(
+        verified=True,
+        primary_source="semantic_scholar",
+        secondary_source=None,
+        decisive_fields_checked=[],
+        decisive_fields_agreed=True,
+        single_source_verified=True,
+    )
+    path = write_citation_artifact(
+        meta=meta,
+        claim="property test",
+        excerpts=[],
+        triangulation=triangulation,
+        abstract="prop abstract",
+        project_root=tmp_path,
+    )
+    loaded_meta, _ = read_citation_artifact(path)
+    assert loaded_meta.title == meta.title
+    assert loaded_meta.authors == meta.authors
+    assert loaded_meta.year == meta.year
+    assert loaded_meta.arxiv_id == meta.arxiv_id
+    assert loaded_meta.doi == meta.doi
