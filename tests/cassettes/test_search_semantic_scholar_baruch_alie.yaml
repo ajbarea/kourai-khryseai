@@ -1,0 +1,30 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, br
+      Connection:
+      - keep-alive
+      User-Agent:
+      - kourai-khryseai/aletheia-v2 (+mailto:ajbareaa@gmail.com)
+    method: GET
+    uri: https://api.semanticscholar.org/graph/v1/paper/search?fields=title%2Cauthors%2Cyear%2Cvenue%2CexternalIds%2CopenAccessPdf%2Curl&limit=5&query=A+Little+Is+Enough+Circumventing+Defenses+for+Distributed+Learning
+  response:
+    body:
+      string: '{"total": 1, "offset": 0, "data": [{"paperId": "7a0ff88d1ebbdea65a91df3f3699cd7c1d8a9bce",
+        "title": "A Little Is Enough: Circumventing Defenses For Distributed Learning",
+        "authors": [{"authorId": "51193014", "name": "Moran Baruch"}, {"authorId":
+        "1726629", "name": "Gilad Baruch"}, {"authorId": "1936581", "name": "Yoav
+        Goldberg"}], "year": 2019, "venue": "Neural Information Processing Systems",
+        "externalIds": {"ArXiv": "1902.06156", "CorpusId": 67855910}, "openAccessPdf":
+        {"url": "https://arxiv.org/pdf/1902.06156", "status": "GREEN"}, "url": "https://www.semanticscholar.org/paper/7a0ff88d1ebbdea65a91df3f3699cd7c1d8a9bce"}]}'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status:
+      code: 200
+      message: OK
+version: 1

@@ -1,0 +1,31 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, br
+      Connection:
+      - keep-alive
+      User-Agent:
+      - kourai-khryseai/aletheia-v2 (+mailto:ajbareaa@gmail.com)
+    method: GET
+    uri: https://api.semanticscholar.org/graph/v1/paper/search?fields=title%2Cauthors%2Cyear%2Cvenue%2CexternalIds%2CopenAccessPdf%2Curl&limit=5&query=SoK+Benchmarking+Poisoning+Attacks+Federated+Learning
+  response:
+    body:
+      string: '{"total": 1, "offset": 0, "data": [{"paperId": "ab12cd34ef56789012345678abcdef1234567890",
+        "title": "SoK: Benchmarking Poisoning Attacks and Defenses in Federated Learning",
+        "authors": [{"authorId": "2222222", "name": "Heyi Zhang"}, {"authorId": "3333333",
+        "name": "Yule Liu"}, {"authorId": "4444444", "name": "Xinlei He"}, {"authorId":
+        "5555555", "name": "Jun Wu"}, {"authorId": "6666666", "name": "Tianshuo Cong"}],
+        "year": 2025, "venue": "arXiv", "externalIds": {"ArXiv": "2502.03801", "CorpusId":
+        276543210}, "openAccessPdf": {"url": "https://arxiv.org/pdf/2502.03801", "status":
+        "GREEN"}, "url": "https://www.semanticscholar.org/paper/ab12cd34ef56789012345678abcdef1234567890"}]}'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status:
+      code: 200
+      message: OK
+version: 1

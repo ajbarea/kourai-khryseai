@@ -136,6 +136,7 @@ exclude_also = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+addopts = "--record-mode=none"
 log_level = "INFO"
 log_cli = true
 log_cli_level = "WARNING"
