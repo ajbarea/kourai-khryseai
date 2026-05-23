@@ -1,0 +1,34 @@
+interactions:
+- request:
+    body: ''
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Host:
+      - arxiv.org
+      User-Agent:
+      - kourai-khryseai/aletheia-v2 (+mailto:ajbareaa@gmail.com)
+    method: GET
+    uri: https://arxiv.org/html/1902.06156
+  response:
+    body:
+      string: "<!DOCTYPE html><html lang=\"en\"><head><title>A Little Is Enough:
+        Circumventing Defenses For Distributed Learning</title></head><body><article>
+        <h1>A Little Is Enough: Circumventing Defenses For Distributed Learning</h1>
+        <p>We propose a novel Byzantine attack on distributed learning. The attack
+        exploits the statistical properties of gradient aggregation. Byzantine participants
+        perturb updates within the statistical envelope of honest gradients, making
+        the attack undetectable by existing defenses.</p><p>Our method demonstrates
+        that small but well-crafted changes are sufficient to circumvent Byzantine-tolerant
+        aggregation rules.</p></article></body></html>"
+    headers:
+      Content-Type:
+      - text/html; charset=utf-8
+    status:
+      code: 200
+      message: OK
+version: 1

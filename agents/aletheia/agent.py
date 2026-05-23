@@ -275,6 +275,7 @@ async def aletheia_extract_claim(
     """
     if llm is None:
         from kourai_common.llm import chat as default_chat
+
         chat_fn = default_chat
     else:
         chat_fn = llm.chat
@@ -302,4 +303,46 @@ async def aletheia_search_papers(
 ) -> list:
     """Thin wrapper around academic_search.search_semantic_scholar."""
     from kourai_common.academic_search import search_semantic_scholar
+
     return await search_semantic_scholar(query, limit=limit, year_hint=year_hint)
+
+
+_WS_RE = re.compile(r"\s+")
+
+
+def _norm_ws(s: str) -> str:
+    return _WS_RE.sub(" ", s).strip()
+
+
+async def aletheia_fetch_paper_text(
+    *,
+    arxiv_id: str | None = None,
+    pdf_url: str | None = None,
+) -> str | None:
+    """Fetch full paper text. arXiv HTML5 preferred; PDF fallback via Docling."""
+    from kourai_common.academic_search import fetch_arxiv_html, fetch_paper_pdf_text
+
+    if arxiv_id:
+        text = await fetch_arxiv_html(arxiv_id)
+        if text:
+            return text
+    if pdf_url:
+        return await fetch_paper_pdf_text(pdf_url)
+    return None
+
+
+def aletheia_match_evidence(
+    *,
+    candidate_excerpts: list[tuple[str, str]],
+    paper_text: str,
+) -> list[tuple[str, str]]:
+    """Filter candidate excerpts to verbatim substrings (whitespace-tolerant).
+
+    `candidate_excerpts` come from an LLM extraction step elsewhere; this
+    function is purely mechanical (no LLM call) — substring check on the
+    whitespace-normalized form.
+    """
+    normalized_paper = _norm_ws(paper_text)
+    return [
+        (quote, ref) for quote, ref in candidate_excerpts if _norm_ws(quote) in normalized_paper
+    ]
