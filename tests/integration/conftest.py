@@ -330,12 +330,9 @@ def memory_mcp_container(shared_network: Network) -> Generator[DockerContainer, 
 
 
 class FakeLLM:
-    """Deterministic stand-in for kourai_common.llm.chat / chat_with_tools.
-
-    Scripted responses queued by the test; each call pops the next one.
-    Anthropic-guidance pattern (May 2026): mock the LLM, run real tool
-    paths, get fast/cheap/deterministic agent tests.
-    """
+    """Deterministic stand-in for `kourai_common.llm.chat` / `chat_with_tools`.
+    Tests queue scripted responses; each call pops the next one. Mocks the
+    LLM but exercises the real tool path."""
 
     def __init__(self) -> None:
         self.responses: list[str | dict] = []

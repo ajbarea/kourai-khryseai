@@ -130,8 +130,8 @@ def _first_significant_word(title: str) -> str:
 
 
 def _last_name(author: str) -> str:
-    """Heuristic last-name extraction: rightmost whitespace-split token after
-    suffix removal. Handles 'First Last', 'First Middle Last', 'El Mhamdi'."""
+    """Last whitespace-split token after suffix removal — works for
+    'First Last', 'First Middle Last', and 'El Mhamdi'-style prefixes."""
     no_suffix = _AUTHOR_SUFFIX_RE.sub("", author.strip())
     parts = no_suffix.split()
     if not parts:
