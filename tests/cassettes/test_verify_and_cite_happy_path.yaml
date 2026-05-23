@@ -1,0 +1,93 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, br
+      Connection:
+      - keep-alive
+      User-Agent:
+      - kourai-khryseai/aletheia-v2 (+mailto:ajbareaa@gmail.com)
+    method: GET
+    uri: https://api.semanticscholar.org/graph/v1/paper/search?fields=title%2Cauthors%2Cyear%2Cvenue%2CexternalIds%2CopenAccessPdf%2Curl&limit=5&query=ALIE+perturbs+within+statistical+envelope+%28Baruch+2019%29
+  response:
+    body:
+      string: '{"total": 1, "offset": 0, "data": [{"paperId": "7a0ff88d1ebbdea65a91df3f3699cd7c1d8a9bce",
+        "title": "A Little Is Enough: Circumventing Defenses For Distributed Learning",
+        "authors": [{"authorId": "51193014", "name": "Moran Baruch"}, {"authorId":
+        "1726629", "name": "Gilad Baruch"}, {"authorId": "1936581", "name": "Yoav
+        Goldberg"}], "year": 2019, "venue": "Neural Information Processing Systems",
+        "externalIds": {"ArXiv": "1902.06156", "CorpusId": 67855910}, "openAccessPdf":
+        {"url": "https://arxiv.org/pdf/1902.06156", "status": "GREEN"}, "url": "https://www.semanticscholar.org/paper/7a0ff88d1ebbdea65a91df3f3699cd7c1d8a9bce"}]}'
+    headers:
+      Content-Type:
+      - application/json; charset=utf-8
+    status:
+      code: 200
+      message: OK
+- request:
+    body: ''
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Host:
+      - arxiv.org
+      User-Agent:
+      - kourai-khryseai/aletheia-v2 (+mailto:ajbareaa@gmail.com)
+    method: GET
+    uri: https://arxiv.org/html/1902.06156
+  response:
+    body:
+      string: "<!DOCTYPE html><html lang=\"en\"><head><title>A Little Is Enough:
+        Circumventing Defenses For Distributed Learning</title></head><body><article>
+        <h1>A Little Is Enough: Circumventing Defenses For Distributed Learning</h1>
+        <p>We propose a novel attack: A Little Is Enough. It perturbs honest updates
+        within statistical bounds. Byzantine participants can circumvent existing
+        defenses by keeping perturbations within the statistical envelope of honest
+        gradient updates.</p></article></body></html>"
+    headers:
+      Content-Type:
+      - text/html; charset=utf-8
+    status:
+      code: 200
+      message: OK
+- request:
+    body: ''
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Host:
+      - export.arxiv.org
+      User-Agent:
+      - kourai-khryseai/aletheia-v2 (+mailto:ajbareaa@gmail.com)
+    method: GET
+    uri: https://export.arxiv.org/api/query?id_list=1902.06156&max_results=1
+  response:
+    body:
+      string: "<?xml version='1.0' encoding='UTF-8'?>\n<feed xmlns:opensearch=\"http://a9.com/-/spec/opensearch/1.1/\"\
+        \ xmlns:arxiv=\"http://arxiv.org/schemas/atom\" xmlns=\"http://www.w3.org/2005/Atom\"\
+        >\n  <entry>\n    <id>http://arxiv.org/abs/1902.06156v1</id>\n    <title>A\
+        \ Little Is Enough: Circumventing Defenses For Distributed Learning</title>\n\
+        \    <updated>2019-02-16T21:05:29Z</updated>\n    <summary>Distributed learning\
+        \ is central for large-scale training. Byzantine participants can interrupt\
+        \ or control the learning process.</summary>\n    <published>2019-02-16T21:05:29Z</published>\n\
+        \    <author><name>Moran Baruch</name></author>\n    <author><name>Gilad\
+        \ Baruch</name></author>\n    <author><name>Yoav Goldberg</name></author>\n\
+        \  </entry>\n</feed>\n"
+    headers:
+      content-type:
+      - application/atom+xml; charset=utf-8
+    status:
+      code: 200
+      message: OK
+version: 1

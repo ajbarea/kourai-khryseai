@@ -275,9 +275,10 @@ jobs:
         run: uv run pytest -n auto tests/unit/test_triangulate.py tests/unit/test_citation_artifacts.py -v --tb=short --cov=shared/src/kourai_common --cov-report=xml:logs/coverage.xml --cov-report=term-missing --junitxml=logs/junit.xml
 
       - name: Run aletheia-v2 integration tests
-        # Cassette-replay tests for academic search (S2 / arXiv / OpenAlex).
+        # Cassette-replay tests for academic search (S2 / arXiv / OpenAlex)
+        # and agent verify_and_cite / audit_existing_citations end-to-end tests.
         # The docling-via-PDF test is `-m nightly` so it's excluded here.
-        run: uv run pytest tests/integration/test_academic_search.py -v --tb=short -m "not nightly" --cov=shared/src/kourai_common --cov-append --cov-report=xml:logs/coverage.xml --cov-report=term-missing --junitxml=logs/junit-integration.xml
+        run: uv run pytest tests/integration/test_academic_search.py tests/integration/test_aletheia_verify_cite.py -v --tb=short -m "not nightly" --cov=shared/src/kourai_common --cov=agents/aletheia --cov-append --cov-report=xml:logs/coverage.xml --cov-report=term-missing --junitxml=logs/junit-integration.xml
 
       - name: Upload test results as artifacts
         if: always()
