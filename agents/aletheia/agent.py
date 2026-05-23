@@ -262,3 +262,44 @@ async def verify_claim_with_search(
     except Exception as e:
         log.error("Claim verification LLM failed: %s", e)
         return "UNVERIFIED — verification system error"
+
+
+async def aletheia_extract_claim(
+    text: str,
+    *,
+    llm=None,
+) -> str:
+    """Distill the assertion in `text` that needs grounding.
+
+    `llm` defaults to kourai_common.llm.chat; pass a FakeLLM for tests.
+    """
+    if llm is None:
+        from kourai_common.llm import chat as default_chat
+        chat_fn = default_chat
+    else:
+        chat_fn = llm.chat
+
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are Aletheia's Claim Extractor. Given a passage that "
+                "needs a citation, return ONE short sentence stating the "
+                "specific assertion the citation must support. No markup, "
+                "no quotation, just the assertion."
+            ),
+        },
+        {"role": "user", "content": text},
+    ]
+    return (await chat_fn("aletheia", messages, temperature=0.1, max_tokens=120)).strip()
+
+
+async def aletheia_search_papers(
+    query: str,
+    *,
+    year_hint: int | None = None,
+    limit: int = 5,
+) -> list:
+    """Thin wrapper around academic_search.search_semantic_scholar."""
+    from kourai_common.academic_search import search_semantic_scholar
+    return await search_semantic_scholar(query, limit=limit, year_hint=year_hint)
