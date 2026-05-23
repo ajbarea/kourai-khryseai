@@ -5,6 +5,16 @@ description = "Multi-agent A2A development system — Golden Maidens of Hephaest
 requires-python = ">=3.12,<3.14"
 dependencies = []
 
+[project.optional-dependencies]
+aletheia-v2 = [
+    "httpx>=0.28",
+    "tenacity>=9.0",
+    "rapidfuzz>=3.10",
+    "docling>=2.10",
+    "pyyaml>=6.0",
+    "pydantic>=2.0,<3.0",
+]
+
 [dependency-groups]
 dev = [
     "pytest>=9.0.3",
