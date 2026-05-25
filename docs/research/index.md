@@ -40,6 +40,6 @@ Poster on narrative interfaces for agentic systems — how embodiment, voice, an
 
 **Design spec** · early draft, under active iteration
 
-A research direction connecting Kourai Khryseai to VelocityFL through a principled shared/personal parameter decomposition for multi-agent LLM systems with humans on the loop. Each forge runs council adapters that federate across deployments and bond adapters that never leave the player's machine. Federation is staged as gameplay — Sovereignty Moments, Council of Sisters scenes, Whisper Limit privacy budgets, and rogue-forge exile narratives. Cupid is bond-only by construction.
+A research direction connecting Kourai Khryseai to Velocity-FL through a principled shared/personal parameter decomposition for multi-agent LLM systems with humans on the loop. Each forge runs council adapters that federate across deployments and bond adapters that never leave the player's machine. Federation is staged as gameplay — Sovereignty Moments, Council of Sisters scenes, Whisper Limit privacy budgets, and rogue-forge exile narratives. Cupid is bond-only by construction.
 
 [Read the spec →](federated-forge/index.md)
