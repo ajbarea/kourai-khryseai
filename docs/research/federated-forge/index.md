@@ -6,7 +6,7 @@
 
 A research direction and engineering design for connecting Kourai Khryseai
 (multi-agent software development with three player-facing interfaces) to
-VelocityFL (the project's federated learning framework). The contribution is
+Velocity-FL (the project's federated learning framework). The contribution is
 not "Kourai gets federated learning bolted on." It is a principled
 **shared / personal parameter decomposition** for multi-agent LLM systems
 where humans-on-the-loop generate the labels, where some knowledge belongs to
@@ -53,7 +53,7 @@ every interaction with a player is a one-off. The OpenTelemetry traces
 already emitted for every agent hop describe a rich `(features, action,
 outcome)` tuple but are not consumed by anything other than Jaeger.
 
-VelocityFL today has the server-side machinery to aggregate model updates
+Velocity-FL today has the server-side machinery to aggregate model updates
 across distributed clients, with paper-cited Byzantine defenses and an
 attack-simulation suite — but no real-world client downstream of it with a
 genuine non-IID, human-labeled, multi-agent training signal.
