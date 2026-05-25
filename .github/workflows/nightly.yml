@@ -120,13 +120,13 @@ jobs:
 
       - name: Set up Docker Buildx
         # Required for GHA layer caching (cache-from/cache-to type=gha).
-        uses: docker/setup-buildx-action@v4.0.0
+        uses: docker/setup-buildx-action@v4.1.0
 
       - name: Build context7-mcp sidecar image with GHA caching
         # mode=max caches intermediate layers — matters here because the
         # npm install is its own layer and we want it back across runs.
         # load=true makes the image visible to the integration tests below.
-        uses: docker/build-push-action@v7.1.0
+        uses: docker/build-push-action@v7.2.0
         with:
           context: .
           file: docker/context7-mcp.Dockerfile
@@ -136,7 +136,7 @@ jobs:
           load: true
 
       - name: Build memory-mcp sidecar image with GHA caching
-        uses: docker/build-push-action@v7.1.0
+        uses: docker/build-push-action@v7.2.0
         with:
           context: .
           file: docker/memory-mcp.Dockerfile
