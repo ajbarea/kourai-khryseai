@@ -221,13 +221,14 @@ async def lookup_openalex_by_doi(doi: str) -> PaperMetadata | None:
     """
     api_key = os.environ.get("OPENALEX_API_KEY")
     headers = {"User-Agent": _KOURAI_UA}
-    if api_key:
-        headers["api_key"] = api_key
+    # research(2026-05): OpenAlex authenticates via an `api_key` query param,
+    # not a header; the keyless "polite pool" was retired 2026-02.
+    params = {"api_key": api_key} if api_key else None
 
     async with httpx.AsyncClient(
         headers=headers, timeout=httpx.Timeout(15.0), follow_redirects=True
     ) as client:
-        r = await client.get(f"https://api.openalex.org/works/doi:{doi}")
+        r = await client.get(f"https://api.openalex.org/works/doi:{doi}", params=params)
         if r.status_code == 404:
             return None
         r.raise_for_status()

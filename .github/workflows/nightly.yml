@@ -189,6 +189,9 @@ jobs:
       # S2 unauthenticated rate-limits aggressively; the test skips cleanly
       # when this is unset. Setting the secret turns the S2 contract check on.
       S2_API_KEY: ${{ secrets.S2_API_KEY }}
+      # OpenAlex requires a key as of 2026 (keyless pool retired); without it
+      # the OpenAlex contract call 4xxes instead of skipping.
+      OPENALEX_API_KEY: ${{ secrets.OPENALEX_API_KEY }}
     steps:
       - uses: actions/checkout@v6.0.2
 
