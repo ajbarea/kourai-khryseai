@@ -151,6 +151,9 @@ async def lookup_arxiv_metadata(arxiv_id: str) -> PaperMetadata | None:
         r = await client.get(
             "https://export.arxiv.org/api/query",
             params={"id_list": arxiv_id, "max_results": 1},
+            # research(2026-05): arXiv's 2025-11 API rebuild 406s without an
+            # explicit Atom Accept header (verified 200-vs-406 by hand).
+            headers={"Accept": "application/atom+xml"},
         )
         r.raise_for_status()
         root = ET.fromstring(r.text)  # noqa: S314 -- arXiv Atom feed is trusted academic API

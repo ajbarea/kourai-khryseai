@@ -6,10 +6,11 @@ upstream schema drift before it breaks the cassette-replay path in
 from __future__ import annotations
 
 import os
+from contextlib import contextmanager
 
 import pytest
 
-pytest.importorskip("httpx")
+httpx = pytest.importorskip("httpx")
 
 from kourai_common.academic_search import (
     lookup_arxiv_metadata,
@@ -19,6 +20,23 @@ from kourai_common.academic_search import (
 
 pytestmark = pytest.mark.nightly
 
+# Throttling / brief outages are the provider's problem, not schema drift — skip
+# (don't fail) so a bad day upstream can't red the nightly. A real schema break
+# still fails, because the request returns 200 and the asserts below run.
+_TRANSIENT_STATUS = {429, 500, 502, 503, 504}
+
+
+@contextmanager
+def _tolerate_transient(source: str):
+    try:
+        yield
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code in _TRANSIENT_STATUS:
+            pytest.skip(f"{source} transient {e.response.status_code}")
+        raise
+    except httpx.TransportError as e:  # timeouts, connection resets, DNS, etc.
+        pytest.skip(f"{source} transient network error: {type(e).__name__}")
+
 
 @pytest.mark.asyncio
 async def test_s2_api_contract():
@@ -26,7 +44,8 @@ async def test_s2_api_contract():
     S2 rate-limits too hard for a 3-test run."""
     if not os.environ.get("S2_API_KEY"):
         pytest.skip("S2_API_KEY not set; unauthenticated S2 rate-limits hard")
-    candidates = await search_semantic_scholar("FedAvg federated learning", limit=1)
+    with _tolerate_transient("s2"):
+        candidates = await search_semantic_scholar("FedAvg federated learning", limit=1)
     assert len(candidates) >= 1
     first = candidates[0]
     assert first.title
@@ -37,7 +56,8 @@ async def test_s2_api_contract():
 @pytest.mark.asyncio
 async def test_openalex_api_contract():
     """OpenAlex DOI lookup still works on a stable paper."""
-    meta = await lookup_openalex_by_doi("10.1109/TSP.2022.3153135")
+    with _tolerate_transient("openalex"):
+        meta = await lookup_openalex_by_doi("10.1109/TSP.2022.3153135")
     assert meta is not None
     assert meta.year == 2022
     assert "pillutla" in meta.authors[0].lower()
@@ -46,7 +66,8 @@ async def test_openalex_api_contract():
 @pytest.mark.asyncio
 async def test_arxiv_api_contract():
     """arXiv API still returns metadata for the ALIE paper (Baruch et al., 2019)."""
-    meta = await lookup_arxiv_metadata("1902.06156")
+    with _tolerate_transient("arxiv"):
+        meta = await lookup_arxiv_metadata("1902.06156")
     assert meta is not None
     assert meta.year == 2019
     assert "baruch" in meta.authors[0].lower()
