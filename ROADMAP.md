@@ -7,9 +7,11 @@ matching milestone here collapses to a single line under "Shipped".
 
 Last reviewed: 2026-05-21 (post-#215, post-platform-reliability sweep).
 **NE AI Agents Day 2026 poster session shipped 2026-05-10** (NYC, Jane Street; QR-code demo live).
-Polish phase complete. Now resuming full-speed development with **M6
-ElevenLabs hybrid** as the next priority (sub-task 2 audio cache layer
-shipped [#174]; sub-tasks 1/3/4/5 still gate on M20 + VN smoke). See
+Polish phase complete. **M6 (ElevenLabs hybrid) is deferred post-funding**
+(decided 2026-05-24): Kokoro ships as the TTS engine for the foreseeable
+future, and the premium-voice expansion waits until funding plus a re-survey
+of the fast-churning TTS landscape. Sub-task 2 (audio cache) already shipped
+[#174]; M6 is no longer a pre-player-release blocker. See
 [IMPL.md](./IMPL.md) for the live blocker list, open invariants, and
 priority-ordered "Up next".
 Pre-release perfection stance unchanged: current best practice no
@@ -81,10 +83,13 @@ suppresses one symptom. The real fix is one of:
 Option 1 is cleanest if it doesn't break agent-internal deps that assume UID 1000.
 
 ---
-## M6 — ElevenLabs hybrid (pre-player-release blocker)
+## M6 — ElevenLabs hybrid (deferred — post-funding)
 
-> Status: spec'd 2026-05-05 · Implementation queued · Gated on M20
-> audio-led reveal + VN smoke landing first
+> Status: spec'd 2026-05-05 · **Deferred 2026-05-24 — ship Kokoro-only until
+> funding** · Spec preserved below for the eventual revisit. Re-survey the
+> TTS landscape first (it churns yearly); ElevenLabs is the confirmed quality
+> target (by ear + TTS Arena #1), with Gemini 3.1 Flash TTS a ~4x-cheaper
+> middle option worth a bake-off.
 
 Promoted from "future-future" 2026-05-03 after strategic review of the
 character-voice-quality gap between Kokoro (current) and ElevenLabs.

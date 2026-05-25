@@ -13,14 +13,13 @@ crept in — extract it back to ROADMAP.
 _Nothing currently open. The full Aletheia v2 6-PR plan closed
 2026-05-23 [#222 → #234]; see ROADMAP `## Shipped` for the arc._
 
-**M6 status (corrected 2026-05-23):** sub-task 2 (audio cache layer)
-**already shipped** 2026-05-06 [#174]. Remaining M6 sub-tasks (1, 3,
-4, 5) are **gated on Live VN smoke** (AJ-at-the-keyboard step under
-ROADMAP "Live-smoke gated"). Don't start them until the VN smoke
-exercises the vn_bridge `/tts` → `RealtimeTTSEngine.synthesize_to_wav`
-path end-to-end with M20 sub-task 2/4 cps verification — that smoke is
-the prerequisite signal that the synth + indicator stack is ready for
-production swap.
+**M6 status (deferred 2026-05-24):** kourai ships **Kokoro-only** for now;
+the premium-voice expansion is parked until funding. Rationale: pre-funding,
+M6 was gated on the VN smoke + M20 regardless, and the TTS landscape churns
+yearly so a specific integration built now would rot. Don't build any
+premium-engine integration until AJ revisits post-funding. Sub-task 2 (audio
+cache layer) already shipped 2026-05-06 [#174]. Quality context for the
+revisit lives in ROADMAP M6 + memory `project_kourai_m6_tts_engine_decision`.
 
 Aletheia v2 Phase 2 (proactive inline guard — Techne / Kallos call
 Aletheia when emitting citations) is unblocked but explicitly
