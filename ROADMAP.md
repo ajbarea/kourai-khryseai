@@ -1459,3 +1459,5 @@ What *is* worth filing:
 ## Shipped
 
 Detail lives in git history (`git log`), the agent code, and `docs/`. This log is pruned once work is durably shipped — these docs are plans + scratchpad, not a historical archive.
+
+- 2026-05-25 — **GitHub Actions SHA-pinned (supply-chain hardening).** All `uses:` refs across the 7 workflows (incl. the `docker/*` build actions) pinned to full commit SHAs (`# vX.Y.Z` comment kept); Dependabot `github-actions` gains a 7-day cooldown, freshness via the existing version updates. Fleet convention + rationale in techne `docs/conventions.md`. research(2026-05): GitHub "Secure use reference"; CNCF GH-Actions CI-deps recipe.

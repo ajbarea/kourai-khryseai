@@ -21,16 +21,16 @@ jobs:
     name: Performance Tests (Nightly)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v8.1.0
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           version: "latest"
           enable-cache: true
 
       - name: Set up Python
-        uses: actions/setup-python@v6.2.0
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version-file: "pyproject.toml"
 
@@ -51,14 +51,14 @@ jobs:
 
       - name: Upload test results as artifacts
         if: always()
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: perf-test-results
           path: logs/
           retention-days: 30
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v6.0.1
+        uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354 # v6.0.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: ajbarea/kourai-khryseai
@@ -68,7 +68,7 @@ jobs:
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v6.0.1
+        uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354 # v6.0.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: ajbarea/kourai-khryseai
@@ -84,16 +84,16 @@ jobs:
       DOCKER_HUB_USERNAME: ajb6289
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v8.1.0
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           version: "latest"
           enable-cache: true
 
       - name: Set up Python
-        uses: actions/setup-python@v6.2.0
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version-file: "pyproject.toml"
 
@@ -120,13 +120,13 @@ jobs:
 
       - name: Set up Docker Buildx
         # Required for GHA layer caching (cache-from/cache-to type=gha).
-        uses: docker/setup-buildx-action@v4.1.0
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
 
       - name: Build context7-mcp sidecar image with GHA caching
         # mode=max caches intermediate layers — matters here because the
         # npm install is its own layer and we want it back across runs.
         # load=true makes the image visible to the integration tests below.
-        uses: docker/build-push-action@v7.2.0
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
         with:
           context: .
           file: docker/context7-mcp.Dockerfile
@@ -136,7 +136,7 @@ jobs:
           load: true
 
       - name: Build memory-mcp sidecar image with GHA caching
-        uses: docker/build-push-action@v7.2.0
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
         with:
           context: .
           file: docker/memory-mcp.Dockerfile
@@ -153,14 +153,14 @@ jobs:
 
       - name: Upload test results as artifacts
         if: always()
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: nightly-integration-test-results
           path: logs/
           retention-days: 30
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v6.0.1
+        uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354 # v6.0.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: ajbarea/kourai-khryseai
@@ -170,7 +170,7 @@ jobs:
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v6.0.1
+        uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354 # v6.0.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: ajbarea/kourai-khryseai
@@ -193,16 +193,16 @@ jobs:
       # the OpenAlex contract call 4xxes instead of skipping.
       OPENALEX_API_KEY: ${{ secrets.OPENALEX_API_KEY }}
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v8.1.0
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           version: "latest"
           enable-cache: true
 
       - name: Set up Python
-        uses: actions/setup-python@v6.2.0
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version-file: "pyproject.toml"
 

@@ -39,16 +39,16 @@ jobs:
     name: Watch protocol drift
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - uses: actions/setup-python@v6.2.0
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: "3.12"
 
       - name: Restore prior snapshot
         # restore-keys does prefix-match so we always pick up the most
         # recent saved state regardless of run-id suffix.
-        uses: actions/cache@v5.0.5
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: .cache/spec-watch
           key: spec-watch-state-${{ github.run_id }}
@@ -72,7 +72,7 @@ jobs:
         # the script already carries forward unchanged entries on fetch
         # error, so a bad week doesn't wipe the baseline.
         if: always()
-        uses: actions/cache/save@v5.0.5
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: .cache/spec-watch
           key: spec-watch-state-${{ github.run_id }}
