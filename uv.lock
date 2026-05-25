@@ -1618,6 +1618,7 @@ source = { virtual = "." }
 aletheia-v2 = [
     { name = "docling" },
     { name = "httpx" },
+    { name = "kourai-common" },
     { name = "pydantic" },
     { name = "pyyaml" },
     { name = "rapidfuzz" },
@@ -1644,6 +1645,7 @@ dev = [
 requires-dist = [
     { name = "docling", marker = "extra == 'aletheia-v2'", specifier = ">=2.10" },
     { name = "httpx", marker = "extra == 'aletheia-v2'", specifier = ">=0.28" },
+    { name = "kourai-common", marker = "extra == 'aletheia-v2'", editable = "shared" },
     { name = "pydantic", marker = "extra == 'aletheia-v2'", specifier = ">=2.0,<3.0" },
     { name = "pyyaml", marker = "extra == 'aletheia-v2'", specifier = ">=6.0" },
     { name = "rapidfuzz", marker = "extra == 'aletheia-v2'", specifier = ">=3.10" },
