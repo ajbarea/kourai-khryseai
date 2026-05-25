@@ -1191,7 +1191,7 @@ Sweep of post-leak OSS Claude Code rewrites (ClawCode, OpenCode, Cline, Aider, P
 - **Sandbox container UID alignment** (M5 implementation choice).
 - **ElevenLabs SFX library regeneration:** when M6 lands the TTS swap, regenerate the `.ogg` library under `assets/audio/sfx/` that `hosts/gui/emote_sfx.py` plays. Use Sound Effects API (`client.text_to_sound_effects.convert` → `POST /v1/sound-generation`, model `eleven_text_to_sound_v2`). One-shot into the asset tree, **not** per-line at runtime — keeps latency and credit spend off the hot path. Tier strategy: Starter at $5/month (commercial license + perpetual rights on audio generated during the paid month) is the legitimate one-month-burn-then-cancel pattern. Never commit Free-tier-generated audio (non-commercial + requires `elevenlabs.io` attribution in titles).
 - **Companion / spirit READMEs (Puck, Cupid, Aidos, Aletheia):** the
-  6 main pipeline agents got READMEs on 2026-04-26 (see Shipped); the
+  6 main pipeline agents got READMEs on 2026-04-26; the
   4 secondary agents are deferred until M6 voice-lab / gossip /
   romance work crystallises so we don't document an in-flight design
   twice.
