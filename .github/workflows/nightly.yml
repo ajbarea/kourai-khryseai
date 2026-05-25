@@ -207,7 +207,10 @@ jobs:
           python-version-file: "pyproject.toml"
 
       - name: Install dependencies with aletheia-v2 extra
-        run: uv sync --all-packages --extra aletheia-v2 --dev --frozen
+        # Scoped to the aletheia-v2 slice (kourai-common + academic-search deps),
+        # NOT --all-packages: the latter builds the VN/GUI realtimetts -> pyaudio
+        # stack, which needs portaudio headers this job doesn't install.
+        run: uv sync --extra aletheia-v2 --dev --frozen
 
       - name: Run nightly API-contract tests
         run: uv run pytest tests/nightly/test_api_contracts.py -v --tb=short -m nightly
