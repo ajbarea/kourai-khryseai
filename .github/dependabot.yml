@@ -1,0 +1,25 @@
+# Canonical config: techne templates/dependabot.yml.example. /techne:sisters
+# audits drift. kourai: github-actions only for now.
+#
+# research(2026-05): uv ecosystem DEFERRED — kourai is an 18-member uv
+# workspace and dependabot-core#14004 (open) mis-targets workspace members as
+# dependencies, producing broken PRs. docker SKIPPED — the docker/*.Dockerfile
+# custom names aren't auto-detected (dependabot/feedback#145). Re-enable uv once
+# #14004 closes; see techne ROADMAP "Renovate revisit trigger".
+version: 2
+
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    labels: ["dependencies"]
+    commit-message:
+      prefix: "ci(deps)"
+      include: "scope"
+    groups:
+      github-actions:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
