@@ -460,6 +460,10 @@ homepage.
 
 ---
 
+## Why "Kourai Khryseai"
+
+Greek Κοῦραι Χρύσεαι, the Golden Maidens of *Iliad* 18: automatons of living gold that Hephaestus forged to think, speak, and work beside him in the divine workshop. This is that forge — ten specialist agents, each named for its craft, that reason in the open and build alongside you, not instead of you.
+
 ## License
 
 [MIT](LICENSE)
