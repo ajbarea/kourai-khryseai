@@ -196,3 +196,13 @@ body.hero-page .md-header {
     font-size: 0.75rem;
   }
 }
+/* Brand mark in the footer copyright (inverted to light on the dark footer) */
+.md-copyright .brand-mark,
+.landing-footer .brand-mark {
+  height: 1em;
+  width: auto;
+  vertical-align: -0.18em;
+  margin: 0 0.15rem;
+  opacity: 0.75;
+  filter: invert(1);
+}
