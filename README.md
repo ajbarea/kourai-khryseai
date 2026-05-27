@@ -216,7 +216,7 @@ Projects live under `~/.kourai_khryseai/projects/<player_id>/`. Templates: `empt
 **Sandboxed execution (opt-in):** route every agent-issued command through a locked-down container.
 
 ```bash
-uv run kourai-dev sandbox-image                  # one-time: build the kourai-sandbox image
+make sandbox-image                  # one-time: build the kourai-sandbox image
 KOURAI_SANDBOX=container uv run kourai-dev cli   # pytest, ruff, etc. now run in --network=none containers
 ```
 

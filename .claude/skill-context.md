@@ -7,7 +7,7 @@ toolchain / path / tooling changes.
 ## repo
 
 - name: kourai-khryseai
-- package_root: multi-module — `agents/` (`dokimasia`, `hephaestus`, `kallos`, `techne`), `hosts/cli/`, `hosts/gui/`, `mcp_servers/`, `shared/src/`, `scripts/`
+- package_root: multi-module — `agents/` (10 agent dirs + `vn_bridge/`), `hosts/cli/`, `hosts/gui/`, `mcp_servers/`, `shared/src/`, `scripts/`
 - language: Python
 - cli_entrypoint: `kourai-dev` (invokes make/dev targets)
 - runner_module: `kourai-dev` session logger (writes `logs/dev-<ts>-<cmd>.log`)
