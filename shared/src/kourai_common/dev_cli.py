@@ -40,11 +40,6 @@ DEFAULT_ENV = {
     "LANG": "en_US.UTF-8",
 }
 
-# Commands where the user's intent is "wipe logs/". Purged by the parent session
-# before LOG.open() so the child clean_build.py's _filter_logs guard (which keeps
-# it from deleting the parent's live log file) doesn't make logs/ un-cleanable.
-LOG_PURGING_COMMANDS = frozenset({"clean", "clean-tests", "yolo"})
-
 CommandFactory = Callable[[], list[str]]
 
 
@@ -704,9 +699,6 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Unknown command: {parsed.command}", file=sys.stderr)
         print_help()
         return 2
-
-    if parsed.command in LOG_PURGING_COMMANDS:
-        shutil.rmtree(PROJECT_ROOT / "logs", ignore_errors=True)
 
     # Open one DevLog session for the whole orchestration. Child scripts see
     # KOURAI_DEV_SESSION=1 in their env (set by build_env) and short-circuit.
