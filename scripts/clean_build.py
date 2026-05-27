@@ -71,7 +71,7 @@ def clean_build(cache_only: bool = False, tests_only: bool = False) -> None:
             "htmlcov",
         ],
     )
-    _clean_patterns(root, ["__pycache__", ".egg-info", "MagicMock"], skip_dirs)
+    _clean_patterns(root, ["__pycache__", "*.egg-info", "MagicMock"], skip_dirs)
     _clean_files(root, [".coverage", "docker-debug.log"])
     _clean_globs(root, [".coverage.*", "uv.lock.backup.*"])
     _prune_log_archives(root, ["logs"])
