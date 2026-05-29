@@ -394,6 +394,14 @@ Hosts route by metadata, not by parsing text or emoji-prefix
 detection. Sibling fields (priority, subkind, ssml_version) live
 under the same URI without colliding with other extensions.
 
+`research(2026-05)`: A2A spec endorses URI-namespaced `Message.metadata`
+keys — its own extension examples prefix keys with the full extension URI
+(e.g. `https://example.com/ext/konami-code/v1/code`), the exact shape used
+here; custom bindings SHOULD be URI-identified for global uniqueness and
+unrecognized fields SHOULD be ignored (forward-compat), which is why an
+untagged message degrades to not-dialogue rather than a text-parse guess.
+Source: a2a-protocol.org Extensions topic + specification.
+
 ---
 
 ## M20 — Audio-text synchronization across CLI / GUI / VN
@@ -451,6 +459,14 @@ timestamp, the visual layer reveals each word as it's spoken
 to professional subtitle workflows. RealtimeTTS exposes this
 natively for Kokoro English voices via the engine's word-timing
 callbacks (Phase 1 of M19 unlocks the API).
+
+`research(2026-05)`: RealtimeTTS confirms the word-timing API — its
+`TextToAudioStream` `on_word` callback fires per spoken word with a
+`TimingInfo(word, start_time, end_time)`, supported for AzureEngine and
+**English** KokoroEngine voices (hence the Tier 1 English-only / Tier 2
+hold-until-first-chunk split); Kokoro emits per-token start_ts/end_ts that
+RealtimeTTS rebuilds into word spans. Source: RealtimeTTS issue #278
+(KoljaB/RealtimeTTS) + tests/kokoro_test.py.
 
 ### Scope
 
