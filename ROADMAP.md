@@ -939,6 +939,32 @@ no auto-action.
 
 ---
 
+## Federated Forge — personalized multi-agent FL (research arc)
+
+A major research direction: the agents *federate* — each player's forge trains
+personal (bond) + shared (council) LoRA adapters, with privacy anchored to the
+player. A novel intersection of personalized FL, narrative consent ("privacy as
+gameplay"), and gamified participation — poster + multi-paper material (FL-systems;
+HCI/consent). Full design + phasing: [`docs/research/federated-forge/`](docs/research/federated-forge/index.md).
+**Phase 1 in progress** (`shared/src/kourai_common/federation/memoir.py` + schema +
+host_helpers landed).
+
+- **Build in place, not a fork** (decided 2026-05-30) — vFL gains general FL
+  capabilities (LoRA-FAIR, multi-tensor named aggregation); kourai gains the
+  `federation/` module + host changes; the spec coordinates across both. A fork
+  would diverge from two live repos, and the "commons" principle (shared gains flow
+  to every forge, solo included) argues against it.
+- **vFL is the FL backend** — see velocity-fl ROADMAP → "Federated Forge bridge" for
+  the vFL-side items. The evaluation substrate already shipped there: the pareto
+  cost-axis registry + per-(dataset × attack) slicer give FF its multi-tradeoff,
+  **no-global-leaderboard** "commons" evaluation (the Foldit helical-bundle anti-pattern
+  the spec guards against); **privacy-ε** registers as one cost axis once
+  `federation/privacy.py` (DP clipping + budget accounting) lands.
+- **Ground before build** — the spec is intentionally research-light (time). Web-search
+  -ground the DP method (personalized adaptive clipping, PAC-DP > fixed-threshold), the
+  split's formal privacy guarantee, and the eval framing (CMOFL / RPFed) before
+  implementing — the same discipline that saved velocity-fl revertable work.
+
 ## Next up — priority order
 
 Pre-release perfection stance: no workarounds, web-search current best
