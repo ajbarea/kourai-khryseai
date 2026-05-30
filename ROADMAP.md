@@ -5,7 +5,7 @@ A public, living plan for where the forge is heading. Items here are either
 *currently working on* lives in [IMPL.md](./IMPL.md) — when it lands, the
 matching milestone here collapses to a single line under "Shipped".
 
-Last reviewed: 2026-05-30 (ROADMAP grounding pass — M8 + M18 re-verified against May-2026 upstream reality).
+Last reviewed: 2026-05-30 (ROADMAP grounding — M8/M18 upstream, M6 TTS re-survey, MCP/A2A protocol baseline; all re-verified against May-2026 reality).
 **NE AI Agents Day 2026 poster session shipped 2026-05-10** (NYC, Jane Street; QR-code demo live).
 Polish phase complete. **M6 (ElevenLabs hybrid) is deferred post-funding**
 (decided 2026-05-24): Kokoro ships as the TTS engine for the foreseeable
@@ -86,10 +86,41 @@ Option 1 is cleanest if it doesn't break agent-internal deps that assume UID 100
 ## M6 — ElevenLabs hybrid (deferred — post-funding)
 
 > Status: spec'd 2026-05-05 · **Deferred 2026-05-24 — ship Kokoro-only until
-> funding** · Spec preserved below for the eventual revisit. Re-survey the
-> TTS landscape first (it churns yearly); ElevenLabs is the confirmed quality
-> target (by ear + TTS Arena #1), with Gemini 3.1 Flash TTS a ~4x-cheaper
-> middle option worth a bake-off.
+> funding** · Spec preserved below for the eventual revisit. **Re-surveyed
+> 2026-05-30 (below) — the landscape moved**: ElevenLabs v3 is now TTS Arena
+> #3 (not #1), and local/open expressive engines may now reach the per-character
+> goal without the funding gate. The engine choice stays AJ's call.
+
+### TTS-landscape re-survey (2026-05-30)
+
+The spec's premise — "Kokoro can't do per-character emotion, so the upgrade is
+paid ElevenLabs, gated on funding" — is now contestable. Two May-2026 shifts:
+
+- **The quality ranking moved.** ElevenLabs v3 is no longer #1: TTS Arena
+  (May 2026) puts **Inworld Realtime TTS 1.5 Max** at #1 and **Google Gemini 3.1
+  Flash TTS** at #2 (the "cheaper middle option" the spec named is now near-best
+  on quality), with **ElevenLabs v3 at #3**. And v3 **can't synthesize in real
+  time** — a hard mismatch with the live-dialogue + M20 word-timing path (which
+  already scoped v3 to non-real-time "key lines" only).
+- **Local/open expressive TTS caught up — the premise-changer.** Engines that do
+  *per-character emotional control* now run locally, offline, real-time, at $0:
+  **Chatterbox** (Resemble AI — emotion-exaggeration control, ~63.75% blind-pref
+  vs ElevenLabs; English-only Turbo today), **OpenAudio S1 / Fish** (inline
+  emotional markers: angry/excited, whisper/shout, laugh/sob), **Qwen3-TTS**
+  (real-time + prosody control, 10 languages), **VoxCPM** (content-inferred
+  emotion). Any could deliver M6's *core* goal — per-maiden emotional delivery —
+  **without the funding gate**, keeping kourai local-first and zero-API-cost.
+
+So the revisit is no longer "wait for funding → ElevenLabs." It's a three-way
+call for AJ: **(a)** a local expressive engine now (Chatterbox / OpenAudio S1 /
+Qwen3-TTS) for per-character emotion at $0, gated on RealtimeTTS integration +
+M20 word-timing support; **(b)** Gemini 3.1 Flash TTS as the cloud option (top-2
+quality, ~4× cheaper than v3, real-time-capable); **(c)** the original ElevenLabs
+v3 path for non-real-time hero lines only. `research(2026-05)`: TTS Arena May-2026
+rankings; ElevenLabs v3 GA real-time limitation; Chatterbox / OpenAudio S1 /
+Qwen3-TTS / VoxCPM open-model capabilities.
+
+---
 
 Promoted from "future-future" 2026-05-03 after strategic review of the
 character-voice-quality gap between Kokoro (current) and ElevenLabs.
@@ -220,6 +251,29 @@ what #915 reports failing, so it isn't yet the unblock. Concrete watch-target:
 `ClientSessionGroup` clean teardown + the #915 / PR #2711 fix landing.
 `research(2026-05)`: modelcontextprotocol/python-sdk #521 / #577 / #915 / #922
 (open dupes of the same cancel-scope bug).
+
+---
+
+## Protocol baseline — MCP + A2A (re-verified 2026-05-30)
+
+Both wire protocols kourai rides on are current; this pins where they stand and
+what's coming, so the M8 / M18 / M24 assumptions don't silently age.
+
+- **A2A — on the current stable.** kourai runs `a2a-sdk 1.0.3` = **A2A 1.0**
+  (Linux Foundation; spec last updated 2026-03-10; 150+ orgs). The M18
+  URI-namespaced `Message.metadata` extension pattern is still the 1.0-endorsed
+  shape — no migration owed.
+- **MCP — current SDK, one revision of headroom.** kourai runs `mcp 1.27.1`
+  against the **2025-11-25** spec (current stable). The next revision is in
+  release-candidate (final targeted mid-2026) and three of its SEPs touch
+  kourai's scaffolding: **SEP-414** documents **W3C Trace Context in `_meta`**
+  (traceparent / tracestate / baggage) — when it lands, MCP tool-call spans
+  correlate with kourai's OTel `traceparent` natively, folding into **M24**; the
+  **stateless protocol core** is the upstream shape that could eventually relieve
+  the **M8** session-pooling pain (no per-session state left to pool); and
+  **SEP-2133**'s reverse-DNS **extensions framework** mirrors the URI-namespaced
+  pattern M18 already uses on the A2A side. `research(2026-05)`: MCP 2026 roadmap
+  + the 2025-11-25 spec + the 2026-revision RC notes; A2A 1.0 spec (a2a-protocol.org).
 
 ---
 
