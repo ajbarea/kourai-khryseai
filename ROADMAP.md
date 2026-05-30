@@ -83,13 +83,16 @@ suppresses one symptom. The real fix is one of:
 Option 1 is cleanest if it doesn't break agent-internal deps that assume UID 1000.
 
 ---
-## M6 — ElevenLabs hybrid (deferred — post-funding)
+## M6 — Per-character voice (local-expressive; was "ElevenLabs hybrid, post-funding")
 
-> Status: spec'd 2026-05-05 · **Deferred 2026-05-24 — ship Kokoro-only until
-> funding** · Spec preserved below for the eventual revisit. **Re-surveyed
-> 2026-05-30 (below) — the landscape moved**: ElevenLabs v3 is now TTS Arena
-> #3 (not #1), and local/open expressive engines may now reach the per-character
-> goal without the funding gate. The engine choice stays AJ's call.
+> Status: **UN-DEFERRED 2026-05-30.** The post-funding-ElevenLabs gate is gone —
+> the re-survey (below) found local, $0, real-time engines that do per-character
+> emotion. **Decision: go local-expressive** (AJ's call on the re-survey),
+> **Chatterbox-first** for the first cut (delegated to my judgment). Orpheus is
+> the max-quality upgrade if a model server is run; ElevenLabs v3 is off the path
+> (#3 now, can't do real-time). Build-ready plan below; the build + by-ear A/B
+> happen at AJ's GPU rig. The original ElevenLabs spec is preserved further down
+> for history.
 
 ### TTS-landscape re-survey (2026-05-30)
 
@@ -119,6 +122,42 @@ quality, ~4× cheaper than v3, real-time-capable); **(c)** the original ElevenLa
 v3 path for non-real-time hero lines only. `research(2026-05)`: TTS Arena May-2026
 rankings; ElevenLabs v3 GA real-time limitation; Chatterbox / OpenAudio S1 /
 Qwen3-TTS / VoxCPM open-model capabilities.
+
+### Build plan — Chatterbox-first (2026-05-30, build-ready)
+
+**Engine call.** Chatterbox over Orpheus for the first cut: it's a native
+RealtimeTTS engine, **self-contained** (Resemble AI, MIT, 0.5B params — no
+external model server), with single-param **emotion-exaggeration control** and
+5-second zero-shot voice cloning. Orpheus is richer (Llama-3B emotional
+understanding + emotion tags, 25–50 ms streaming) but its RealtimeTTS engine needs
+an **LM Studio / llama.cpp server hosting the 3B GGUF + a real GPU** — too heavy
+for the first swap; keep it as the documented upgrade. Gemini 3.1 Flash stays the
+cloud fallback. `research(2026-05)`: RealtimeTTS engine matrix (Chatterbox + Orpheus
+both native, May-10 release); Chatterbox 0.5B self-contained + emotion-exaggeration;
+Orpheus needs LM-Studio/llama.cpp + GPU.
+
+**The swap is localized.** `kourai_common.tts_realtime.RealtimeTTSEngine` hardcodes
+`_KokoroEngine(...)` at one point in `__init__` (the docstring already calls this
+the M6 swap seam). Scope:
+1. **Engine seam.** Make the engine pluggable via `KOURAI_TTS_ENGINE=kokoro|chatterbox`
+   (default `kokoro`, zero behavior change). The two Kokoro-specific prewarm methods
+   (`_prewarm_agent_languages` / `_prewarm_agent_voices`, both `KPipeline`-bound) become
+   engine-conditional — Chatterbox has no `KPipeline`, so it gets its own (or no)
+   prewarm. TDD the factory hermetically (mock engines, as `test_tts_realtime.py`
+   already does); existing Kokoro tests stay green.
+2. **Voice mapping.** `AGENT_VOICE_MAP` carries Kokoro voice_ids (`af_heart`, …); add a
+   per-maiden Chatterbox cast (5 s reference clips or its presets). Extend
+   `tools/voice-lab/VOICE_CASTING_PLAN.md` (where the ElevenLabs cast already lives).
+3. **Emotion adapter.** Map each maiden's emotional intent to Chatterbox's exaggeration
+   param (Kallos higher for teasing; Aidos/Aletheia low for clinical validation) — the
+   local equivalent of the M6 per-engine markup adapter. Pure logic, TDD-able, no audio.
+4. **Verify (AJ's rig, by ear).** (a) per-maiden emotion reads distinctly; (b) the **M20
+   word-timing gate** — confirm RealtimeTTS fires `on_word` for Chatterbox (it does for
+   Kokoro-English; Chatterbox is the open question). If not, M20 falls back to its Tier-2
+   hold-until-first-chunk reveal for Chatterbox. A/B two maidens against Kokoro before
+   cutting the roster over.
+
+Default stays Kokoro until the by-ear A/B passes — **the seam ships dark.**
 
 ---
 

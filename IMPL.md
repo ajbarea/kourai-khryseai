@@ -12,13 +12,14 @@ crept in — extract it back to ROADMAP.
 
 _Nothing currently open._
 
-**M6 status (deferred 2026-05-24):** kourai ships **Kokoro-only** for now;
-the premium-voice expansion is parked until funding. Rationale: pre-funding,
-M6 was gated on the VN smoke + M20 regardless, and the TTS landscape churns
-yearly so a specific integration built now would rot. Don't build any
-premium-engine integration until AJ revisits post-funding. Sub-task 2 (audio
-cache layer) already shipped 2026-05-06 [#174]. Quality context for the
-revisit lives in ROADMAP M6 + memory `project_kourai_m6_tts_engine_decision`.
+**M6 status (UN-DEFERRED 2026-05-30):** the post-funding gate is gone — the TTS
+re-survey found local, $0, real-time engines that do per-character emotion.
+Decision: **Chatterbox-first local-expressive** (full rationale + build-ready
+plan in ROADMAP M6). Next action: the engine-seam refactor + Chatterbox wiring,
+built and A/B'd **at AJ's GPU rig** — voice quality + the M20 word-timing gate
+are by-ear, on-hardware checks I can't run in CI/WSL. Default stays Kokoro until
+the A/B passes; the seam ships dark. Sub-task 2 (audio cache) shipped 2026-05-06
+[#174].
 
 Aletheia v2 Phase 2 (proactive inline guard — Techne / Kallos call
 Aletheia when emitting citations) is unblocked but explicitly
