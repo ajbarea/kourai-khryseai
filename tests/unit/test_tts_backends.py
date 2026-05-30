@@ -11,9 +11,11 @@ from kourai_common.tts_backend import (
     _DEFAULT_EXPRESSION,
     AGENT_EXPRESSION_MAP,
     AGENT_VOICE_MAP,
+    AGENT_VOICE_REF_MAP,
     ChatterboxExpression,
     TTSVoiceConfig,
     get_expression_for_agent,
+    get_voice_ref_for_agent,
 )
 
 
@@ -143,3 +145,17 @@ class TestChatterboxExpression:
             ChatterboxExpression(exaggeration=2.5, cfg_weight=0.5)
         with pytest.raises(ValueError, match="cfg_weight"):
             ChatterboxExpression(exaggeration=0.5, cfg_weight=1.5)
+
+
+class TestVoiceRefMapping:
+    """Chatterbox reference-clip resolution (M6 step 4 audition populates the map)."""
+
+    def test_unmapped_agent_returns_none(self):
+        # Map ships empty until the audition casts each maiden -> built-in voice.
+        assert get_voice_ref_for_agent("metis") is None
+        assert get_voice_ref_for_agent(None) is None
+
+    def test_resolves_a_cast_ref_case_insensitively(self, monkeypatch):
+        monkeypatch.setitem(AGENT_VOICE_REF_MAP, "techne", "/refs/techne.wav")
+        assert get_voice_ref_for_agent("TECHNE") == "/refs/techne.wav"
+        assert get_voice_ref_for_agent("unknown") is None

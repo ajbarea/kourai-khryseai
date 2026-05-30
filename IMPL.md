@@ -8,40 +8,32 @@ cross-cutting invariants, and "next up" ordering live in
 If this file is more than ~50 lines, something queued or referential has
 crept in — extract it back to ROADMAP.
 
-## In flight — M6 step 2: Chatterbox integration + voice audition
+## In flight — M6 step 4: Chatterbox voice audition
 
-**Approved by ear 2026-05-30 (AJ): Chatterbox wins decisively** over Kokoro on the
-emotion-range A/B (clinical→excited, same voice). Build it. Steps 1 (seam) + 3
-(`AGENT_EXPRESSION_MAP` emotion adapter) already shipped; the expression map is
-engine-agnostic and rides on whatever voice lands. Architecture decided: **isolate
-Chatterbox** (the in-process `RealtimeTTS ChatterboxEngine` is rejected — `chatterbox-tts`
-pins `torch==2.6.0`, which would downgrade the shipping Kokoro stack; `research(2026-05)`:
-isolate a conflicting-torch model behind a local service, don't downgrade the host).
+**Approved by ear 2026-05-30 (AJ): Chatterbox wins decisively** on the emotion-range A/B.
+The integration is built + live-validated on GPU; what's left is casting each maiden's voice.
 
-**Build plan:**
-1. ✅ **Chatterbox service** (`services/chatterbox/`) — isolated torch-2.6 uv project,
-   excluded from the workspace (`services/*`) so it can't downgrade the main torch-2.11
-   lock. Loads `ChatterboxTTS` once on GPU; `GET /health` (503 while loading), `POST
-   /synthesize` `{text, voice_ref?, exaggeration, cfg_weight} → audio/wav`. perth resolved
-   properly: `setuptools<81` restores the `pkg_resources` the real `PerthImplicitWatermarker`
-   needs (81+ removed it) — real watermark, not the dummy. GPU-validated end-to-end.
-2. ✅ **HTTP client** (`kourai_common.chatterbox_client`) — async `ChatterboxClient`
-   (`synthesize` / `health`), `KOURAI_CHATTERBOX_URL` env, raises `ChatterboxUnavailable`
-   so the seam can fall back to Kokoro. 10 hermetic tests (httpx.MockTransport).
-3. **Seam wiring (next)** — `KOURAI_TTS_ENGINE=chatterbox` routes `synthesize_to_wav`
-   through the client (maiden voice_ref + `AGENT_EXPRESSION_MAP`), Kokoro fallback on
-   `ChatterboxUnavailable`. REPLACES the superseded in-process
-   `_load_chatterbox_engine_cls`/`set_voice_parameters` path (broken on RealtimeTTS 0.6.1 +
-   wrong per the isolate decision); rewrite its seam tests. Add `AGENT_VOICE_REF_MAP` (empty
-   until the audition). Kokoro path byte-for-byte untouched.
-4. **Voice audition** — candidate female ref clips per maiden (fresh, NOT the unvalidated
-   Kokoro `AGENT_VOICE_MAP`; respect gender — hephaestus/puck male); generate; AJ picks;
-   chosen clips recorded in `VOICE_CASTING_PLAN.md` + wired into `AGENT_VOICE_REF_MAP`.
+**Shipped (steps 1–3):** isolated torch-2.6 Chatterbox service (`services/chatterbox/`,
+out-of-workspace via `services/*` exclude; real perth watermark via `setuptools<81`, which
+restores the `pkg_resources` setuptools 81+ dropped). `kourai_common.chatterbox_client` —
+async, raises `ChatterboxUnavailable`. The `KOURAI_TTS_ENGINE=chatterbox` seam routes BOTH
+`synthesize_to_wav` (cached, chatterbox-keyed) and `speak()` (synth → PyAudio WAV playback,
+Tier-2 on_audio_start; no word timing) through the client with Kokoro fallback; the
+superseded in-process path is gone and Kokoro is always the in-process engine + fallback.
+Live happy-path + service-down fallback both verified; `make lint` + TTS units green.
 
-**DoD:** service runs + kourai synths through it on the GPU; per-maiden voices AJ-approved;
-Kokoro path unaffected; tests green; M20 word-timing stays Tier-2 (Chatterbox has no
-`on_word`). Rig confirmed: RTX 3060 Ti + isolated torch-2.6 venv at `/tmp/cbsmoke` work;
-samples in `~/Downloads/kourai-m6-samples`.
+**Next — the audition:**
+- Source candidate female reference clips per maiden — fresh, NOT the unvalidated Kokoro
+  `AGENT_VOICE_MAP`. Respect each maiden's gender (hephaestus / puck are male); fit each
+  register (`tools/voice-lab/VOICE_CASTING_PLAN.md`).
+- Generate per-candidate samples via the service (expression already in `AGENT_EXPRESSION_MAP`);
+  AJ picks. Record chosen clips in `VOICE_CASTING_PLAN.md` + wire into `AGENT_VOICE_REF_MAP`
+  (seam reads it; empty today → built-in voice).
+- **Open question for AJ (only creative input needed):** I generate candidate options per
+  maiden for you to pick, or you supply specific voices/clips?
+
+**DoD:** per-maiden voices AJ-approved + wired; Kokoro path unaffected; tests green.
+Rig: RTX 3060 Ti; service env at `services/chatterbox/.venv`; samples in `~/Downloads/kourai-m6-samples`.
 
 Aletheia v2 Phase 2 (proactive inline guard — Techne / Kallos call
 Aletheia when emitting citations) is unblocked but explicitly

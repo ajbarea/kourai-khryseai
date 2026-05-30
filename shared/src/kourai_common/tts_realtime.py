@@ -15,9 +15,11 @@ Two public surfaces:
   ``KokoroEngine.get_stream_info()``.
 
 The synthesis engine is selected at construction by ``KOURAI_TTS_ENGINE``
-(``kokoro`` default; ``chatterbox`` opt-in for M6 per-character emotion) —
-see ``_build_engine``. The seam ships dark: Kokoro stays the default until
-the Chatterbox voice cast + by-ear A/B land (ROADMAP M6).
+(``kokoro`` default; ``chatterbox`` opt-in for M6 expressive voice). Chatterbox
+runs out-of-process in its own torch-2.6 service (``services/chatterbox``) and
+is reached over HTTP via ``ChatterboxClient``; Kokoro is always the in-process
+engine and the Chatterbox fallback. The seam ships dark: Kokoro stays the
+default until each maiden's voice is auditioned + cast (ROADMAP M6 step 4).
 """
 
 from __future__ import annotations
@@ -50,6 +52,7 @@ warnings.filterwarnings("ignore", category=UserWarning, module=r"torch\.nn\.modu
 # requires portaudio19-dev on Linux (CI installs it via ed4d560).
 # E402 is intentional — the warnings.filterwarnings call above must run
 # before the RealtimeTTS import that triggers torch's lazy load.
+import numpy as np  # noqa: E402
 import pyaudio  # noqa: E402
 from RealtimeTTS import (  # noqa: E402
     KokoroEngine as _KokoroEngine,
@@ -61,13 +64,14 @@ from kourai_common.audio_env import (  # noqa: E402
     silence_alsa_lib_errors,
     silence_audio_init_noise,
 )
+from kourai_common.chatterbox_client import ChatterboxClient, ChatterboxUnavailable  # noqa: E402
 from kourai_common.ssml import strip_ssml  # noqa: E402
 from kourai_common.tts_backend import (  # noqa: E402
     AGENT_VOICE_MAP,
-    ChatterboxExpression,
     TTSVoiceConfig,
     get_expression_for_agent,
     get_voice_for_agent,
+    get_voice_ref_for_agent,
 )
 from kourai_common.tts_cache import cached_synthesize  # noqa: E402
 
@@ -145,19 +149,6 @@ def _resolve_engine_name() -> str:
     return raw
 
 
-def _load_chatterbox_engine_cls():
-    """Lazily import RealtimeTTS's ``ChatterboxEngine``.
-
-    Kept out of the module-level import block so Kokoro-only installs (the
-    CI / WSL default) never pull Chatterbox's torch-CUDA stack. RealtimeTTS
-    lazy-loads the engine via ``__getattr__``, so this stays cheap until the
-    chatterbox backend is actually constructed.
-    """
-    from RealtimeTTS import ChatterboxEngine
-
-    return ChatterboxEngine
-
-
 class RealtimeTTSEngine:
     """TTS engine wrapping RealtimeTTS's KokoroEngine + TextToAudioStream.
 
@@ -191,12 +182,14 @@ class RealtimeTTSEngine:
         # Install before engine init so misaki's first phonemize() call
         # (which can happen during KokoroEngine warmup) is already filtered.
         _install_phonemizer_word_count_filter()
+        self._muted = muted
         self._engine_name = _resolve_engine_name()
+        # Kokoro is always the in-process engine: the default synth path AND the
+        # fallback when Chatterbox is selected but its service is unreachable.
         self._engine = self._build_engine()
-        # Chatterbox per-maiden expression is applied per-utterance; track the
-        # last one so a maiden speaking consecutive lines doesn't trigger a
-        # needless voice re-prepare (setting exaggeration re-encodes the voice).
-        self._last_chatterbox_expr: ChatterboxExpression | None = None
+        # Chatterbox (M6) runs out-of-process; the client is created only when
+        # selected. None for Kokoro-only installs (CI / WSL default).
+        self._chatterbox_client = ChatterboxClient() if self._engine_name == "chatterbox" else None
         # M20 sub-task 2: per-call audio-start (Tier 2) + on_word (Tier 1)
         # callbacks dispatched via stable trampolines. RealtimeTTS only
         # accepts these handlers at TextToAudioStream construction; each
@@ -245,49 +238,92 @@ class RealtimeTTSEngine:
         )
 
     def _build_engine(self):
-        """Construct the synthesis engine named by ``KOURAI_TTS_ENGINE``.
+        """Construct the underlying RealtimeTTS engine — always ``KokoroEngine``.
 
-        Kokoro is the default and ships dark. Chatterbox (M6) is opt-in: lazily
-        imported, GPU-backed, built with an expressive baseline
-        (``exaggeration=0.5``, Resemble's natural default); the per-maiden voice
-        cast + emotion mapping are the M6 step-2/3 follow-ups.
-        ``research(2026-05)``: RealtimeTTS ``ChatterboxEngine`` — ``voice=None``
-        uses its built-in voice, ``device`` defaults to ``"cuda"``.
+        Kokoro backs both the default path and the Chatterbox fallback; the
+        expressive engine runs out-of-process (see ``_chatterbox_client``).
         """
-        if self._engine_name == "chatterbox":
-            try:
-                engine_cls = _load_chatterbox_engine_cls()
-            except ImportError as exc:
-                raise RuntimeError(
-                    "KOURAI_TTS_ENGINE=chatterbox needs the Chatterbox extra: "
-                    "pip install 'RealtimeTTS[chatterbox]' (GPU recommended)."
-                ) from exc
-            return engine_cls(exaggeration=0.5)
         return _KokoroEngine(voice="af_heart", default_speed=1.0, debug=False)
 
-    def _apply_voice(
-        self, voice_cfg: TTSVoiceConfig, effective_speed: float, agent_name: str | None = None
-    ) -> None:
-        """Push the resolved voice (+ speed / expression) onto the active engine.
+    def _apply_voice(self, voice_cfg: TTSVoiceConfig, effective_speed: float) -> None:
+        """Push the resolved Kokoro voice + speed onto the engine.
 
-        Kokoro takes a voice_id and a speed directly. Chatterbox has no
-        Kokoro-style speed; instead each maiden's per-character expression
-        (exaggeration + cfg_weight, M6 step 3) is applied per-utterance via
-        ``set_voice_parameters``. The call is skipped when the expression is
-        unchanged from the previous utterance, because setting ``exaggeration``
-        re-prepares the voice. ``research(2026-05)``: RealtimeTTS
-        ``ChatterboxEngine.set_voice_parameters`` (added in 0.7.x).
+        Chatterbox doesn't route through here — its per-maiden expression
+        (exaggeration / cfg_weight) is sent per-request to the out-of-process
+        service (see ``_chatterbox_client_synth``).
         """
-        if self._engine_name == "kokoro":
-            self._engine.set_voice(voice_cfg.voice_id)
-            self._engine.set_speed(effective_speed)
-        elif self._engine_name == "chatterbox":
-            expr = get_expression_for_agent(agent_name)
-            if expr != self._last_chatterbox_expr:
-                self._engine.set_voice_parameters(
-                    exaggeration=expr.exaggeration, cfg_weight=expr.cfg_weight
-                )
-                self._last_chatterbox_expr = expr
+        self._engine.set_voice(voice_cfg.voice_id)
+        self._engine.set_speed(effective_speed)
+
+    async def _chatterbox_client_synth(self, text: str, agent_name: str | None) -> bytes:
+        """Synthesize one line via the out-of-process Chatterbox service.
+
+        Sends the maiden's expression (``AGENT_EXPRESSION_MAP``) + her reference
+        clip (``AGENT_VOICE_REF_MAP``, empty until the audition → built-in voice).
+        Raises :class:`ChatterboxUnavailable` so callers can fall back to Kokoro.
+        """
+        client = self._chatterbox_client
+        if client is None:  # defensive: only reached in chatterbox mode
+            raise ChatterboxUnavailable("Chatterbox client not initialized")
+        expr = get_expression_for_agent(agent_name)
+        return await client.synthesize(
+            text,
+            voice_ref=get_voice_ref_for_agent(agent_name),
+            exaggeration=expr.exaggeration,
+            cfg_weight=expr.cfg_weight,
+        )
+
+    async def _try_speak_chatterbox(self, text: str, agent_name: str | None) -> bool:
+        """Synthesize via Chatterbox and play the WAV. Returns ``False`` (caller
+        falls back to the Kokoro stream) when the service is unavailable.
+
+        Chatterbox has no word timing, so only the Tier-2 ``on_audio_start``
+        callback fires (as playback begins); ``on_word`` (Tier-1 karaoke reveal)
+        stays Kokoro-only.
+        """
+        try:
+            wav = await self._chatterbox_client_synth(text, agent_name)
+        except ChatterboxUnavailable as exc:
+            logger.warning("Chatterbox unavailable; Kokoro fallback for speak (%s)", exc)
+            return False
+        self.is_playing = True
+        self._dispatch_audio_start()
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, lambda: self._play_wav_bytes(wav))
+        return True
+
+    def _play_wav_bytes(self, wav_bytes: bytes) -> None:
+        """Play WAV bytes through PyAudio at the engine's effective volume.
+
+        Used for Chatterbox output (a complete WAV from the service), which
+        doesn't flow through RealtimeTTS's text-fed stream. No-op when muted.
+        """
+        if self._muted:
+            return
+        with wave.open(io.BytesIO(wav_bytes), "rb") as wf:
+            width = wf.getsampwidth()
+            channels = wf.getnchannels()
+            rate = wf.getframerate()
+            frames = wf.readframes(wf.getnframes())
+        vol = self._effective_volume()
+        if vol < 1.0 and width == 2:
+            scaled = np.frombuffer(frames, dtype=np.int16).astype(np.float32) * vol
+            frames = np.clip(scaled, -32768, 32767).astype(np.int16).tobytes()
+        pa = pyaudio.PyAudio()
+        try:
+            stream = pa.open(
+                format=pa.get_format_from_width(width),
+                channels=channels,
+                rate=rate,
+                output=True,
+            )
+            try:
+                stream.write(frames)
+            finally:
+                stream.stop_stream()
+                stream.close()
+        finally:
+            pa.terminate()
 
     def _prewarm_agent_languages(self) -> None:
         """Build a KPipeline for every unique ``AGENT_VOICE_MAP`` lang_code.
@@ -457,6 +493,13 @@ class RealtimeTTSEngine:
 
         t_start = time.monotonic()
         try:
+            # Chatterbox: synth out-of-process + play the WAV (Tier-2
+            # on_audio_start only). Returns False → fall through to Kokoro.
+            if self._engine_name == "chatterbox" and await self._try_speak_chatterbox(
+                text, agent_name
+            ):
+                return
+
             logger.info(
                 "TTS: starting RealtimeTTS speech — agent=%s, voice=%s, speed=%.2f, text=%r",
                 agent_name,
@@ -465,7 +508,7 @@ class RealtimeTTSEngine:
                 text,
             )
 
-            self._apply_voice(voice_cfg, effective_speed, agent_name)
+            self._apply_voice(voice_cfg, effective_speed)
 
             self.is_playing = True
             self._stream.feed(text)
@@ -576,14 +619,52 @@ class RealtimeTTSEngine:
             voice_cfg = get_voice_for_agent(agent_name)
         effective_speed = speed if speed is not None else voice_cfg.speed
 
+        # Chatterbox (M6): synth out-of-process. On service failure fall through
+        # to Kokoro — cached_synthesize writes only after a successful fetch, so
+        # the fallback is never cached under a Chatterbox key.
+        if self._engine_name == "chatterbox":
+            try:
+                return await self._chatterbox_synthesize_to_wav(text, agent_name)
+            except ChatterboxUnavailable as exc:
+                logger.warning("Chatterbox unavailable; Kokoro fallback for synth (%s)", exc)
+
+        return await self._kokoro_synthesize_to_wav_cached(
+            text, voice_cfg, effective_speed, agent_name
+        )
+
+    async def _chatterbox_synthesize_to_wav(self, text: str, agent_name: str | None) -> bytes:
+        """Cached Chatterbox synth (M6). Cache key = chatterbox model + the
+        maiden's voice_ref + expression, so it never collides with Kokoro's.
+        Raises :class:`ChatterboxUnavailable` (caller falls back to Kokoro).
+        """
         if self._cache_dir is None:
-            return await self._uncached_synthesize_to_wav(
+            return await self._chatterbox_client_synth(text, agent_name)
+        expr = get_expression_for_agent(agent_name)
+        voice_ref = get_voice_ref_for_agent(agent_name)
+        return await cached_synthesize(
+            text=text,
+            voice_id=voice_ref or "_builtin",
+            model_id="chatterbox",
+            voice_settings={"exaggeration": expr.exaggeration, "cfg_weight": expr.cfg_weight},
+            fetch=lambda: self._chatterbox_client_synth(text, agent_name),
+            cache_dir=self._cache_dir,
+            extension="wav",
+        )
+
+    async def _kokoro_synthesize_to_wav_cached(
+        self,
+        text: str,
+        voice_cfg: TTSVoiceConfig,
+        effective_speed: float,
+        agent_name: str | None,
+    ) -> bytes:
+        """Kokoro synth with the optional disk cache — the default + fallback path."""
+        if self._cache_dir is None:
+            return await self._kokoro_synthesize_to_wav(
                 text, voice_cfg, effective_speed, agent_name
             )
-
         # voice_settings keyed on the surface that actually shapes Kokoro
-        # output. lang_code is part of voice resolution upstream but
-        # locked per voice_id, so it would be redundant in the hash.
+        # output. lang_code is locked per voice_id, so it's redundant in the hash.
         return await cached_synthesize(
             text=text,
             voice_id=voice_cfg.voice_id,
@@ -592,14 +673,14 @@ class RealtimeTTSEngine:
                 "speed": effective_speed,
                 "pitch": voice_cfg.pitch,
             },
-            fetch=lambda: self._uncached_synthesize_to_wav(
+            fetch=lambda: self._kokoro_synthesize_to_wav(
                 text, voice_cfg, effective_speed, agent_name
             ),
             cache_dir=self._cache_dir,
             extension="wav",
         )
 
-    async def _uncached_synthesize_to_wav(
+    async def _kokoro_synthesize_to_wav(
         self,
         text: str,
         voice_cfg: TTSVoiceConfig,

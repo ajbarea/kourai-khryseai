@@ -950,16 +950,17 @@ class TestEngineSeam:
     """
 
     @staticmethod
-    def _mock_chatterbox(monkeypatch):
-        """Install a fake Chatterbox engine class behind the lazy loader and
-        return (class_mock, instance_mock)."""
-        instance = MagicMock(name="ChatterboxInstance")
-        cls = MagicMock(name="ChatterboxClass", return_value=instance)
+    def _mock_chatterbox_client(monkeypatch):
+        """Patch ChatterboxClient so chatterbox mode never hits the network.
+        Returns the mock client (synthesize / health are AsyncMocks)."""
+        client = MagicMock(name="ChatterboxClientInstance")
+        client.synthesize = AsyncMock(return_value=b"CBWAV")
+        client.health = AsyncMock(return_value=True)
         monkeypatch.setattr(
-            "kourai_common.tts_realtime._load_chatterbox_engine_cls",
-            lambda: cls,
+            "kourai_common.tts_realtime.ChatterboxClient",
+            MagicMock(return_value=client),
         )
-        return cls, instance
+        return client
 
     def test_default_engine_is_kokoro(self, mock_realtimetts, monkeypatch):
         monkeypatch.delenv("KOURAI_TTS_ENGINE", raising=False)
@@ -978,18 +979,21 @@ class TestEngineSeam:
         RealtimeTTSEngine()
         mock_kokoro_cls.assert_called_once()
 
-    def test_chatterbox_env_builds_chatterbox_and_wires_stream(self, mock_realtimetts, monkeypatch):
-        mock_kokoro_cls, _, mock_stream_cls, _ = mock_realtimetts
-        cls, instance = self._mock_chatterbox(monkeypatch)
+    def test_chatterbox_env_builds_kokoro_engine_plus_client(self, mock_realtimetts, monkeypatch):
+        """Chatterbox runs out-of-process: the in-process engine is still Kokoro
+        (default path + fallback), and a ChatterboxClient is created alongside.
+        """
+        mock_kokoro_cls, mock_kokoro, mock_stream_cls, _ = mock_realtimetts
+        client = self._mock_chatterbox_client(monkeypatch)
         monkeypatch.setenv("KOURAI_TTS_ENGINE", "chatterbox")
         from kourai_common.tts_realtime import RealtimeTTSEngine
 
         engine = RealtimeTTSEngine()
         assert engine._engine_name == "chatterbox"
-        cls.assert_called_once()
-        mock_kokoro_cls.assert_not_called()
-        # The Chatterbox instance is the engine handed to TextToAudioStream.
-        assert mock_stream_cls.call_args.kwargs["engine"] is instance
+        assert engine._chatterbox_client is client
+        # Kokoro is still the in-process engine wired into the stream.
+        mock_kokoro_cls.assert_called_once()
+        assert mock_stream_cls.call_args.kwargs["engine"] is mock_kokoro
 
     def test_unknown_engine_falls_back_to_kokoro_with_warning(
         self, mock_realtimetts, monkeypatch, caplog
@@ -1005,77 +1009,167 @@ class TestEngineSeam:
         assert "bogus" in caplog.text.lower()
 
     def test_engine_name_is_case_insensitive(self, mock_realtimetts, monkeypatch):
-        self._mock_chatterbox(monkeypatch)
+        self._mock_chatterbox_client(monkeypatch)
         monkeypatch.setenv("KOURAI_TTS_ENGINE", "  ChatterBox  ")
         from kourai_common.tts_realtime import RealtimeTTSEngine
 
         engine = RealtimeTTSEngine()
         assert engine._engine_name == "chatterbox"
 
-    def test_chatterbox_skips_kokoro_kpipeline_prewarm(self, mock_realtimetts, monkeypatch):
-        _, instance = self._mock_chatterbox(monkeypatch)
+    def test_chatterbox_mode_skips_kokoro_prewarm(self, mock_realtimetts, monkeypatch):
+        _, mock_kokoro, _, _ = mock_realtimetts
+        self._mock_chatterbox_client(monkeypatch)
         monkeypatch.setenv("KOURAI_TTS_ENGINE", "chatterbox")
         from kourai_common.tts_realtime import RealtimeTTSEngine
 
         RealtimeTTSEngine()
-        # The KPipeline pre-warm is Kokoro-only — Chatterbox has no _get_pipeline.
-        instance._get_pipeline.assert_not_called()
+        # The fallback Kokoro engine stays lazy in chatterbox mode — no prewarm.
+        mock_kokoro._get_pipeline.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_chatterbox_speak_uses_engine_default_voice(self, mock_realtimetts, monkeypatch):
-        """Until the M6 step-2 Chatterbox voice cast lands, speak() must not
-        push Kokoro voice_ids / speed onto a non-Kokoro engine — Chatterbox
-        speaks with its constructed default voice.
+    async def test_chatterbox_speak_routes_to_client_and_plays(self, mock_realtimetts, monkeypatch):
+        """speak() in chatterbox mode synthesizes via the client (maiden
+        expression + voice ref) and plays the WAV — never pushing Kokoro
+        voice_ids onto the in-process engine.
         """
-        _, instance = self._mock_chatterbox(monkeypatch)
-        monkeypatch.setenv("KOURAI_TTS_ENGINE", "chatterbox")
-        from kourai_common.tts_realtime import RealtimeTTSEngine
-
-        engine = RealtimeTTSEngine()
-        await engine.speak("hello", agent_name="metis")
-        instance.set_voice.assert_not_called()
-        instance.set_speed.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_chatterbox_speak_applies_per_maiden_expression(
-        self, mock_realtimetts, monkeypatch
-    ):
-        """M6 step 3: each maiden's expression (exaggeration + cfg_weight) is
-        pushed to Chatterbox per-utterance via set_voice_parameters, and an
-        unchanged maiden doesn't re-apply (skips a needless voice re-prepare).
-        """
-        from kourai_common.tts_backend import get_expression_for_agent
-
-        _, instance = self._mock_chatterbox(monkeypatch)
-        monkeypatch.setenv("KOURAI_TTS_ENGINE", "chatterbox")
-        from kourai_common.tts_realtime import RealtimeTTSEngine
-
-        engine = RealtimeTTSEngine()
-        await engine.speak("hello", agent_name="kallos")
-        kallos = get_expression_for_agent("kallos")
-        instance.set_voice_parameters.assert_called_once_with(
-            exaggeration=kallos.exaggeration, cfg_weight=kallos.cfg_weight
+        from kourai_common.tts_backend import (
+            get_expression_for_agent,
+            get_voice_ref_for_agent,
         )
-        # Same maiden again → guard skips the re-apply.
-        await engine.speak("again", agent_name="kallos")
-        instance.set_voice_parameters.assert_called_once()
-        # Different maiden → expression re-applied.
-        await engine.speak("hi", agent_name="aidos")
-        assert instance.set_voice_parameters.call_count == 2
 
-    def test_chatterbox_missing_dependency_raises_helpful_error(
-        self, mock_realtimetts, monkeypatch
-    ):
-        """Opting into Chatterbox without the extra installed must fail with a
-        clear, actionable message — not a bare ImportError from deep in the stack.
-        """
-
-        def _boom():
-            raise ImportError("No module named 'chatterbox'")
-
-        monkeypatch.setattr("kourai_common.tts_realtime._load_chatterbox_engine_cls", _boom)
+        _, mock_kokoro, _, mock_stream = mock_realtimetts
+        client = self._mock_chatterbox_client(monkeypatch)
         monkeypatch.setenv("KOURAI_TTS_ENGINE", "chatterbox")
         from kourai_common.tts_realtime import RealtimeTTSEngine
 
-        with pytest.raises(RuntimeError, match=r"RealtimeTTS\[chatterbox\]"):
-            RealtimeTTSEngine()
+        engine = RealtimeTTSEngine()
+        played = MagicMock(name="_play_wav_bytes")
+        monkeypatch.setattr(engine, "_play_wav_bytes", played)
+
+        await engine.speak("hello", agent_name="kallos")
+
+        expr = get_expression_for_agent("kallos")
+        client.synthesize.assert_awaited_once_with(
+            "hello",
+            voice_ref=get_voice_ref_for_agent("kallos"),
+            exaggeration=expr.exaggeration,
+            cfg_weight=expr.cfg_weight,
+        )
+        played.assert_called_once_with(b"CBWAV")
+        mock_kokoro.set_voice.assert_not_called()
+        mock_stream.feed.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_chatterbox_speak_falls_back_to_kokoro_when_unavailable(
+        self, mock_realtimetts, monkeypatch
+    ):
+        from kourai_common.chatterbox_client import ChatterboxUnavailable
+
+        _, mock_kokoro, _, mock_stream = mock_realtimetts
+        client = self._mock_chatterbox_client(monkeypatch)
+        client.synthesize.side_effect = ChatterboxUnavailable("service down")
+        monkeypatch.setenv("KOURAI_TTS_ENGINE", "chatterbox")
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        engine = RealtimeTTSEngine()
+        played = MagicMock(name="_play_wav_bytes")
+        monkeypatch.setattr(engine, "_play_wav_bytes", played)
+
+        await engine.speak("hi", agent_name="metis")
+
+        # Fell through to the Kokoro stream; no Chatterbox playback.
+        played.assert_not_called()
+        mock_kokoro.set_voice.assert_called_once()
+        mock_stream.feed.assert_called_once_with("hi")
+
+    @pytest.mark.asyncio
+    async def test_chatterbox_synthesize_to_wav_routes_to_client(
+        self, mock_realtimetts, monkeypatch
+    ):
+        from kourai_common.tts_backend import (
+            get_expression_for_agent,
+            get_voice_ref_for_agent,
+        )
+
+        client = self._mock_chatterbox_client(monkeypatch)
+        monkeypatch.setenv("KOURAI_TTS_ENGINE", "chatterbox")
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        engine = RealtimeTTSEngine()
+        out = await engine.synthesize_to_wav("hello", agent_name="aidos")
+
+        assert out == b"CBWAV"
+        expr = get_expression_for_agent("aidos")
+        client.synthesize.assert_awaited_once_with(
+            "hello",
+            voice_ref=get_voice_ref_for_agent("aidos"),
+            exaggeration=expr.exaggeration,
+            cfg_weight=expr.cfg_weight,
+        )
+
+    @pytest.mark.asyncio
+    async def test_chatterbox_synthesize_to_wav_falls_back_to_kokoro(
+        self, mock_realtimetts, monkeypatch
+    ):
+        from kourai_common.chatterbox_client import ChatterboxUnavailable
+
+        _, _, _, mock_stream = mock_realtimetts
+        client = self._mock_chatterbox_client(monkeypatch)
+        client.synthesize.side_effect = ChatterboxUnavailable("down")
+        monkeypatch.setenv("KOURAI_TTS_ENGINE", "chatterbox")
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        engine = RealtimeTTSEngine()
+        await engine.synthesize_to_wav("hello", agent_name="aidos")
+
+        # Fell through to the Kokoro synth (drives the muted stream).
+        client.synthesize.assert_awaited_once()
+        mock_stream.play.assert_called_once()
+
+
+class TestPlayWavBytes:
+    """_play_wav_bytes — PyAudio playback of complete WAVs (Chatterbox output)."""
+
+    @staticmethod
+    def _tiny_wav() -> bytes:
+        import io
+        import wave
+
+        buf = io.BytesIO()
+        with wave.open(buf, "wb") as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(24000)
+            w.writeframes(b"\x00\x10" * 100)
+        return buf.getvalue()
+
+    def test_plays_through_pyaudio(self, mock_realtimetts, monkeypatch):
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        engine = RealtimeTTSEngine(muted=False)
+        mock_stream = MagicMock(name="pyaudio_stream")
+        mock_pa = MagicMock(name="PyAudioInstance")
+        mock_pa.open.return_value = mock_stream
+        monkeypatch.setattr(
+            "kourai_common.tts_realtime.pyaudio.PyAudio", MagicMock(return_value=mock_pa)
+        )
+
+        engine._play_wav_bytes(self._tiny_wav())
+
+        mock_pa.open.assert_called_once()
+        assert mock_pa.open.call_args.kwargs["rate"] == 24000
+        assert mock_pa.open.call_args.kwargs["channels"] == 1
+        mock_stream.write.assert_called_once()
+        mock_stream.stop_stream.assert_called_once()
+        mock_stream.close.assert_called_once()
+        mock_pa.terminate.assert_called_once()
+
+    def test_noop_when_muted(self, mock_realtimetts, monkeypatch):
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        engine = RealtimeTTSEngine(muted=True)
+        pa_cls = MagicMock(name="PyAudioClass")
+        monkeypatch.setattr("kourai_common.tts_realtime.pyaudio.PyAudio", pa_cls)
+
+        engine._play_wav_bytes(self._tiny_wav())
+        pa_cls.assert_not_called()

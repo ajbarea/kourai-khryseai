@@ -118,3 +118,18 @@ def get_expression_for_agent(agent_name: str | None) -> ChatterboxExpression:
     if agent_name is None:
         return _DEFAULT_EXPRESSION
     return AGENT_EXPRESSION_MAP.get(agent_name.lower(), _DEFAULT_EXPRESSION)
+
+
+# Per-maiden Chatterbox reference clips for zero-shot voice cloning (M6 step 4).
+# agent -> path (resolved on the Chatterbox SERVICE host) to a clean reference
+# WAV. Empty until the audition picks each maiden's voice; an unmapped maiden
+# synthesizes with Chatterbox's built-in voice (None). Respect each maiden's
+# gender when casting — hephaestus / puck are male.
+AGENT_VOICE_REF_MAP: dict[str, str] = {}
+
+
+def get_voice_ref_for_agent(agent_name: str | None) -> str | None:
+    """Resolve an agent to its Chatterbox reference-clip path, or None (built-in voice)."""
+    if agent_name is None:
+        return None
+    return AGENT_VOICE_REF_MAP.get(agent_name.lower())
