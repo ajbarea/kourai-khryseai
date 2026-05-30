@@ -5,15 +5,15 @@ A public, living plan for where the forge is heading. Items here are either
 *currently working on* lives in [IMPL.md](./IMPL.md) — when it lands, the
 matching milestone here collapses to a single line under "Shipped".
 
-Last reviewed: 2026-05-30 (ROADMAP grounding — M8/M18 upstream, M6 TTS re-survey, MCP/A2A protocol baseline; all re-verified against May-2026 reality).
+Last reviewed: 2026-05-30 (M6 engine seam shipped — `KOURAI_TTS_ENGINE` selects Kokoro|Chatterbox; earlier same-day: ROADMAP grounding of M8/M18 upstream + TTS re-survey + MCP/A2A baseline, all re-verified against May-2026 reality).
 **NE AI Agents Day 2026 poster session shipped 2026-05-10** (NYC, Jane Street; QR-code demo live).
-Polish phase complete. **M6 (ElevenLabs hybrid) is deferred post-funding**
-(decided 2026-05-24): Kokoro ships as the TTS engine for the foreseeable
-future, and the premium-voice expansion waits until funding plus a re-survey
-of the fast-churning TTS landscape. Sub-task 2 (audio cache) already shipped
-[#174]; M6 is no longer a pre-player-release blocker. See
-[IMPL.md](./IMPL.md) for the live blocker list, open invariants, and
-priority-ordered "Up next".
+Polish phase complete. **M6 (per-character voice) is UN-DEFERRED (2026-05-30):**
+the re-survey found local, $0, real-time engines that do per-character emotion, so
+the post-funding-ElevenLabs gate is gone. Kokoro stays the shipping default; the
+Chatterbox engine seam ships dark behind `KOURAI_TTS_ENGINE` (step 1 done), with the
+voice cast + emotion adapter + by-ear A/B left for AJ's GPU rig. Sub-task 2 (audio
+cache) already shipped [#174]. See [IMPL.md](./IMPL.md) for the live blocker list,
+open invariants, and priority-ordered "Up next".
 Pre-release perfection stance unchanged: current best practice no
 matter the cost, **web-search the SPECIFIC target's primary docs at the
 planning step**, architectural fix over expedient patch. Sister-repo
@@ -90,9 +90,9 @@ Option 1 is cleanest if it doesn't break agent-internal deps that assume UID 100
 > emotion. **Decision: go local-expressive** (AJ's call on the re-survey),
 > **Chatterbox-first** for the first cut (delegated to my judgment). Orpheus is
 > the max-quality upgrade if a model server is run; ElevenLabs v3 is off the path
-> (#3 now, can't do real-time). Build-ready plan below; the build + by-ear A/B
-> happen at AJ's GPU rig. The original ElevenLabs spec is preserved further down
-> for history.
+> (#3 now, can't do real-time). **Step 1 (the engine seam) shipped 2026-05-30 — the
+> rest (voice cast, emotion adapter, by-ear A/B) is rig-bound.** The original
+> ElevenLabs spec is preserved further down for history.
 
 ### TTS-landscape re-survey (2026-05-30)
 
@@ -139,12 +139,16 @@ Orpheus needs LM-Studio/llama.cpp + GPU.
 **The swap is localized.** `kourai_common.tts_realtime.RealtimeTTSEngine` hardcodes
 `_KokoroEngine(...)` at one point in `__init__` (the docstring already calls this
 the M6 swap seam). Scope:
-1. **Engine seam.** Make the engine pluggable via `KOURAI_TTS_ENGINE=kokoro|chatterbox`
-   (default `kokoro`, zero behavior change). The two Kokoro-specific prewarm methods
-   (`_prewarm_agent_languages` / `_prewarm_agent_voices`, both `KPipeline`-bound) become
-   engine-conditional — Chatterbox has no `KPipeline`, so it gets its own (or no)
-   prewarm. TDD the factory hermetically (mock engines, as `test_tts_realtime.py`
-   already does); existing Kokoro tests stay green.
+1. **Engine seam. — SHIPPED 2026-05-30.** `KOURAI_TTS_ENGINE=kokoro|chatterbox`
+   selects the engine at construction (`_build_engine`); default `kokoro`, zero
+   behavior change. Chatterbox is lazily imported (`_load_chatterbox_engine_cls`) so
+   Kokoro-only installs never pull the torch-CUDA stack, constructed with an
+   expressive `exaggeration=0.5` baseline, and `device` defaults to `"cuda"`. The
+   two `KPipeline`-bound prewarm methods are now Kokoro-gated; `_apply_voice` gates
+   the per-utterance `set_voice`/`set_speed` so Chatterbox speaks with its built-in
+   voice until step 2. Unknown engine names warn + fall back to Kokoro; a missing
+   `RealtimeTTS[chatterbox]` extra raises an actionable error. TDD'd hermetically
+   (8 new `TestEngineSeam` tests); all existing Kokoro tests stay green.
 2. **Voice mapping.** `AGENT_VOICE_MAP` carries Kokoro voice_ids (`af_heart`, …); add a
    per-maiden Chatterbox cast (5 s reference clips or its presets). Extend
    `tools/voice-lab/VOICE_CASTING_PLAN.md` (where the ElevenLabs cast already lives).
@@ -152,10 +156,12 @@ the M6 swap seam). Scope:
    param (Kallos higher for teasing; Aidos/Aletheia low for clinical validation) — the
    local equivalent of the M6 per-engine markup adapter. Pure logic, TDD-able, no audio.
 4. **Verify (AJ's rig, by ear).** (a) per-maiden emotion reads distinctly; (b) the **M20
-   word-timing gate** — confirm RealtimeTTS fires `on_word` for Chatterbox (it does for
-   Kokoro-English; Chatterbox is the open question). If not, M20 falls back to its Tier-2
-   hold-until-first-chunk reveal for Chatterbox. A/B two maidens against Kokoro before
-   cutting the roster over.
+   word-timing gate is now RESOLVED on the design side** — RealtimeTTS exposes `on_word`
+   only for AzureEngine + English KokoroEngine (`research(2026-05)`: RealtimeTTS engine
+   matrix / TextToAudioStream `on_word` docs + issue #278), so **Chatterbox has no
+   word-timing** and M20 *must* use its Tier-2 hold-until-first-chunk reveal for the
+   Chatterbox path. The seam already degrades safely (the per-call `on_word` trampoline
+   simply never fires). A/B two maidens against Kokoro before cutting the roster over.
 
 Default stays Kokoro until the by-ear A/B passes — **the seam ships dark.**
 

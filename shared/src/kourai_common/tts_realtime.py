@@ -14,8 +14,10 @@ Two public surfaces:
   collector, then wraps the int16 PCM in one WAV header sized from
   ``KokoroEngine.get_stream_info()``.
 
-Future ElevenLabs swap (M6) becomes a one-line engine change inside
-``__init__``.
+The synthesis engine is selected at construction by ``KOURAI_TTS_ENGINE``
+(``kokoro`` default; ``chatterbox`` opt-in for M6 per-character emotion) —
+see ``_build_engine``. The seam ships dark: Kokoro stays the default until
+the Chatterbox voice cast + by-ear A/B land (ROADMAP M6).
 """
 
 from __future__ import annotations
@@ -23,6 +25,7 @@ from __future__ import annotations
 import asyncio
 import io
 import logging
+import os
 import time
 import warnings
 import wave
@@ -120,6 +123,39 @@ def _pcm_to_wav(pcm: bytes, *, channels: int, sample_rate: int, sample_width: in
     return buf.getvalue()
 
 
+_DEFAULT_TTS_ENGINE = "kokoro"
+_SUPPORTED_TTS_ENGINES = frozenset({"kokoro", "chatterbox"})
+
+
+def _resolve_engine_name() -> str:
+    """Read ``KOURAI_TTS_ENGINE`` (default ``kokoro``). Unknown values fall
+    back to ``kokoro`` with a warning so a typo never strands a host silent.
+    """
+    raw = os.environ.get("KOURAI_TTS_ENGINE", _DEFAULT_TTS_ENGINE).strip().lower()
+    if raw not in _SUPPORTED_TTS_ENGINES:
+        logger.warning(
+            "Unknown KOURAI_TTS_ENGINE=%r; falling back to %s. Supported: %s",
+            raw,
+            _DEFAULT_TTS_ENGINE,
+            ", ".join(sorted(_SUPPORTED_TTS_ENGINES)),
+        )
+        return _DEFAULT_TTS_ENGINE
+    return raw
+
+
+def _load_chatterbox_engine_cls():
+    """Lazily import RealtimeTTS's ``ChatterboxEngine``.
+
+    Kept out of the module-level import block so Kokoro-only installs (the
+    CI / WSL default) never pull Chatterbox's torch-CUDA stack. RealtimeTTS
+    lazy-loads the engine via ``__getattr__``, so this stays cheap until the
+    chatterbox backend is actually constructed.
+    """
+    from RealtimeTTS import ChatterboxEngine
+
+    return ChatterboxEngine
+
+
 class RealtimeTTSEngine:
     """TTS engine wrapping RealtimeTTS's KokoroEngine + TextToAudioStream.
 
@@ -153,7 +189,8 @@ class RealtimeTTSEngine:
         # Install before engine init so misaki's first phonemize() call
         # (which can happen during KokoroEngine warmup) is already filtered.
         _install_phonemizer_word_count_filter()
-        self._engine = _KokoroEngine(voice="af_heart", default_speed=1.0, debug=False)
+        self._engine_name = _resolve_engine_name()
+        self._engine = self._build_engine()
         # M20 sub-task 2: per-call audio-start (Tier 2) + on_word (Tier 1)
         # callbacks dispatched via stable trampolines. RealtimeTTS only
         # accepts these handlers at TextToAudioStream construction; each
@@ -187,16 +224,52 @@ class RealtimeTTSEngine:
 
         self._stream.set_volume(self._effective_volume())
 
-        # Eat the Kokoro cold-start window upfront: pipelines per
-        # language (#23), then voice tensors per agent (M20 sub-task 1).
-        self._prewarm_agent_languages()
-        self._prewarm_agent_voices()
+        # Eat the Kokoro cold-start window upfront: pipelines per language
+        # (#23), then voice tensors per agent (M20 sub-task 1). Kokoro-only —
+        # Chatterbox has no KPipeline; its warmup is an M6 step-2 concern.
+        if self._engine_name == "kokoro":
+            self._prewarm_agent_languages()
+            self._prewarm_agent_voices()
 
         logger.info(
-            "RealtimeTTSEngine initialized: voice=af_heart, volume=%s, effects=%s",
+            "RealtimeTTSEngine initialized: engine=%s, volume=%s, effects=%s",
+            self._engine_name,
             self.master_volume,
             self.enable_effects,
         )
+
+    def _build_engine(self):
+        """Construct the synthesis engine named by ``KOURAI_TTS_ENGINE``.
+
+        Kokoro is the default and ships dark. Chatterbox (M6) is opt-in: lazily
+        imported, GPU-backed, built with an expressive baseline
+        (``exaggeration=0.5``, Resemble's natural default); the per-maiden voice
+        cast + emotion mapping are the M6 step-2/3 follow-ups.
+        ``research(2026-05)``: RealtimeTTS ``ChatterboxEngine`` — ``voice=None``
+        uses its built-in voice, ``device`` defaults to ``"cuda"``.
+        """
+        if self._engine_name == "chatterbox":
+            try:
+                engine_cls = _load_chatterbox_engine_cls()
+            except ImportError as exc:
+                raise RuntimeError(
+                    "KOURAI_TTS_ENGINE=chatterbox needs the Chatterbox extra: "
+                    "pip install 'RealtimeTTS[chatterbox]' (GPU recommended)."
+                ) from exc
+            return engine_cls(exaggeration=0.5)
+        return _KokoroEngine(voice="af_heart", default_speed=1.0, debug=False)
+
+    def _apply_voice(self, voice_cfg: TTSVoiceConfig, effective_speed: float) -> None:
+        """Push the resolved voice + speed onto the active engine.
+
+        Kokoro takes a voice_id and a speed directly. Chatterbox speaks with
+        the default voice it was constructed with (its per-maiden cast +
+        exaggeration mapping are M6 step-2/3) and has no Kokoro-style speed
+        control — so this is a no-op for non-Kokoro engines.
+        """
+        if self._engine_name == "kokoro":
+            self._engine.set_voice(voice_cfg.voice_id)
+            self._engine.set_speed(effective_speed)
 
     def _prewarm_agent_languages(self) -> None:
         """Build a KPipeline for every unique ``AGENT_VOICE_MAP`` lang_code.
@@ -374,8 +447,7 @@ class RealtimeTTSEngine:
                 text,
             )
 
-            self._engine.set_voice(voice_cfg.voice_id)
-            self._engine.set_speed(effective_speed)
+            self._apply_voice(voice_cfg, effective_speed)
 
             self.is_playing = True
             self._stream.feed(text)
@@ -523,8 +595,7 @@ class RealtimeTTSEngine:
         chunks: list[bytes] = []
         t_start = time.monotonic()
 
-        self._engine.set_voice(voice_cfg.voice_id)
-        self._engine.set_speed(effective_speed)
+        self._apply_voice(voice_cfg, effective_speed)
         self._stream.feed(text)
 
         loop = asyncio.get_event_loop()

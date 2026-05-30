@@ -15,11 +15,12 @@ _Nothing currently open._
 **M6 status (UN-DEFERRED 2026-05-30):** the post-funding gate is gone — the TTS
 re-survey found local, $0, real-time engines that do per-character emotion.
 Decision: **Chatterbox-first local-expressive** (full rationale + build-ready
-plan in ROADMAP M6). Next action: the engine-seam refactor + Chatterbox wiring,
-built and A/B'd **at AJ's GPU rig** — voice quality + the M20 word-timing gate
-are by-ear, on-hardware checks I can't run in CI/WSL. Default stays Kokoro until
-the A/B passes; the seam ships dark. Sub-task 2 (audio cache) shipped 2026-05-06
-[#174].
+plan in ROADMAP M6). **Step 1 (engine seam) shipped 2026-05-30** —
+`KOURAI_TTS_ENGINE=kokoro|chatterbox`; default Kokoro, seam ships dark. Remaining
+work is **rig-bound** (AJ's GPU): per-maiden Chatterbox voice cast, emotion
+adapter, by-ear A/B — voice quality is a by-ear check I can't run in CI/WSL. The
+M20 word-timing gate is design-resolved: Chatterbox has no `on_word`, so it falls
+to M20's Tier-2 reveal. Sub-task 2 (audio cache) shipped 2026-05-06 [#174].
 
 Aletheia v2 Phase 2 (proactive inline guard — Techne / Kallos call
 Aletheia when emitting citations) is unblocked but explicitly
