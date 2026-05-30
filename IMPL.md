@@ -8,41 +8,36 @@ cross-cutting invariants, and "next up" ordering live in
 If this file is more than ~50 lines, something queued or referential has
 crept in — extract it back to ROADMAP.
 
-## In flight
+## In flight — M6 step 2: Chatterbox integration + voice audition
 
-_Nothing currently open._
+**Approved by ear 2026-05-30 (AJ): Chatterbox wins decisively** over Kokoro on the
+emotion-range A/B (clinical→excited, same voice). Build it. Steps 1 (seam) + 3
+(`AGENT_EXPRESSION_MAP` emotion adapter) already shipped; the expression map is
+engine-agnostic and rides on whatever voice lands. Architecture decided: **isolate
+Chatterbox** (the in-process `RealtimeTTS ChatterboxEngine` is rejected — `chatterbox-tts`
+pins `torch==2.6.0`, which would downgrade the shipping Kokoro stack; `research(2026-05)`:
+isolate a conflicting-torch model behind a local service, don't downgrade the host).
 
-**M6 status (UN-DEFERRED 2026-05-30):** Chatterbox-first local-expressive (build-ready
-plan in ROADMAP M6). **Steps 1 + 3 shipped:** the engine seam (`KOURAI_TTS_ENGINE`,
-dark) and the **per-maiden emotion adapter** (2026-05-30) — `AGENT_EXPRESSION_MAP` in
-`tts_backend.py` casts each maiden's `exaggeration` + `cfg_weight` (derived from her
-`VOICE_CASTING_PLAN` style + Kokoro speed; Kallos/Puck/Cupid expressive, Aidos/Aletheia
-clinical), applied per-utterance in `_apply_voice` via `set_voice_parameters` (skips the
-re-apply when unchanged, since setting exaggeration re-prepares the voice). Hermetically
-TDD'd, mirroring step 1; the seam stays dark.
+**Build plan:**
+1. **Chatterbox service** — a minimal local HTTP service in its own torch-2.6 uv env
+   (e.g. `services/chatterbox/`), loads `ChatterboxTTS` once on GPU, `POST /synthesize`
+   `{text, voice_ref, exaggeration, cfg_weight} → wav`. Resolve perth properly (not the
+   smoke `DummyWatermarker`). `research(2026-05)`: devnen/Chatterbox-TTS-Server is a ready
+   reference for the FastAPI/OpenAI-compatible shape.
+2. **Client engine in the seam** — `KOURAI_TTS_ENGINE=chatterbox` becomes a thin HTTP
+   client to the service (NOT in-process), feeding the maiden's `AGENT_EXPRESSION_MAP`
+   exaggeration/cfg_weight + her voice ref per request. Graceful fallback to Kokoro if the
+   service is down. Hermetic tests (mock the client); the live Kokoro path stays untouched.
+3. **Hybrid wiring** — Kokoro default (fast); maidens route to Chatterbox. (Per-line
+   emotion modulation is a later refinement.)
+4. **Voice audition** — source candidate female reference clips per maiden (fitting each
+   character — fresh, NOT the unvalidated Kokoro `AGENT_VOICE_MAP`); generate samples;
+   AJ picks. Chosen clips = the cast, recorded in `VOICE_CASTING_PLAN.md`.
 
-**Integration decided (2026-05-30): isolate Chatterbox, do NOT downgrade in-process.** The
-in-process `RealtimeTTS ChatterboxEngine` path is rejected — it needs `realtimetts>=0.7.3`
-and `chatterbox-tts` hard-pins `torch==2.6.0`, which would downgrade torch **2.11→2.6** +
-transformers **5.7→5.2** across the shipping **Kokoro** stack. `research(2026-05)`: best
-practice for a conflicting-torch model is to isolate it (own env / local inference server),
-not downgrade the host — matches kourai's architectural-fix rule. kourai stays on torch
-2.11; Chatterbox runs out-of-process behind a thin client engine (design TBD). The step-3
-adapter is engine-agnostic, so it stands. **Validated on the rig 2026-05-30:** Chatterbox loads + synthesizes on the RTX 3060 Ti
-(isolated torch-2.6 venv); an emotion-range smoke (one neutral placeholder voice, lines from
-clinical→excited with matched exaggeration) confirms the expression mechanism reads, pending
-AJ's ear (`~/Downloads/kourai-m6-samples`).
-
-**Voice casting is OPEN (reframed 2026-05-30).** The Kokoro `AGENT_VOICE_MAP` per-maiden
-assignments were never auditioned — a skeleton, not a baseline — so Chatterbox must NOT clone
-from them. The per-maiden cast (a fit reference clip each) is a fresh creative audition (AJ's
-call); the step-3 expression map is voice-agnostic and rides on whatever voices land.
-
-**Rig-bound remainder (AJ):** the by-ear A/B on the samples (is Chatterbox worth the
-isolation build?); the out-of-process integration design (client engine → local Chatterbox
-service); the step-2 per-maiden voice-clip cast (5 s reference clips — a creative call);
-expression value tuning (the cast numbers are starting points). M20 word-timing: Chatterbox
-has no `on_word` → M20 Tier-2 reveal (design-resolved). Audio cache shipped [#174].
+**DoD:** service runs + kourai synths through it on the GPU; per-maiden voices AJ-approved;
+Kokoro path unaffected; tests green; M20 word-timing stays Tier-2 (Chatterbox has no
+`on_word`). Rig confirmed: RTX 3060 Ti + isolated torch-2.6 venv at `/tmp/cbsmoke` work;
+samples in `~/Downloads/kourai-m6-samples`.
 
 Aletheia v2 Phase 2 (proactive inline guard — Techne / Kallos call
 Aletheia when emitting citations) is unblocked but explicitly
