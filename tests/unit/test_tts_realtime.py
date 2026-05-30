@@ -936,3 +936,119 @@ class TestRealtimeTTSEngineCacheWiring:
         wav_files = list(tmp_path.rglob("*.wav"))
         assert len(wav_files) == 1
         assert wav_files[0].parent.name == wav_files[0].stem[:2]
+
+
+# ===================================================================
+# Engine seam — KOURAI_TTS_ENGINE selects the synthesis engine (M6 step 1)
+# ===================================================================
+
+
+class TestEngineSeam:
+    """KOURAI_TTS_ENGINE picks the synthesis engine; default stays Kokoro so
+    the seam ships dark. Chatterbox is opt-in and lazily loaded so Kokoro-only
+    installs (CI / WSL) never import the GPU stack.
+    """
+
+    @staticmethod
+    def _mock_chatterbox(monkeypatch):
+        """Install a fake Chatterbox engine class behind the lazy loader and
+        return (class_mock, instance_mock)."""
+        instance = MagicMock(name="ChatterboxInstance")
+        cls = MagicMock(name="ChatterboxClass", return_value=instance)
+        monkeypatch.setattr(
+            "kourai_common.tts_realtime._load_chatterbox_engine_cls",
+            lambda: cls,
+        )
+        return cls, instance
+
+    def test_default_engine_is_kokoro(self, mock_realtimetts, monkeypatch):
+        monkeypatch.delenv("KOURAI_TTS_ENGINE", raising=False)
+        mock_kokoro_cls, _, _, _ = mock_realtimetts
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        engine = RealtimeTTSEngine()
+        assert engine._engine_name == "kokoro"
+        mock_kokoro_cls.assert_called_once()
+
+    def test_explicit_kokoro_env_builds_kokoro(self, mock_realtimetts, monkeypatch):
+        monkeypatch.setenv("KOURAI_TTS_ENGINE", "kokoro")
+        mock_kokoro_cls, _, _, _ = mock_realtimetts
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        RealtimeTTSEngine()
+        mock_kokoro_cls.assert_called_once()
+
+    def test_chatterbox_env_builds_chatterbox_and_wires_stream(self, mock_realtimetts, monkeypatch):
+        mock_kokoro_cls, _, mock_stream_cls, _ = mock_realtimetts
+        cls, instance = self._mock_chatterbox(monkeypatch)
+        monkeypatch.setenv("KOURAI_TTS_ENGINE", "chatterbox")
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        engine = RealtimeTTSEngine()
+        assert engine._engine_name == "chatterbox"
+        cls.assert_called_once()
+        mock_kokoro_cls.assert_not_called()
+        # The Chatterbox instance is the engine handed to TextToAudioStream.
+        assert mock_stream_cls.call_args.kwargs["engine"] is instance
+
+    def test_unknown_engine_falls_back_to_kokoro_with_warning(
+        self, mock_realtimetts, monkeypatch, caplog
+    ):
+        monkeypatch.setenv("KOURAI_TTS_ENGINE", "bogus")
+        mock_kokoro_cls, _, _, _ = mock_realtimetts
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        with caplog.at_level("WARNING"):
+            engine = RealtimeTTSEngine()
+        assert engine._engine_name == "kokoro"
+        mock_kokoro_cls.assert_called_once()
+        assert "bogus" in caplog.text.lower()
+
+    def test_engine_name_is_case_insensitive(self, mock_realtimetts, monkeypatch):
+        self._mock_chatterbox(monkeypatch)
+        monkeypatch.setenv("KOURAI_TTS_ENGINE", "  ChatterBox  ")
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        engine = RealtimeTTSEngine()
+        assert engine._engine_name == "chatterbox"
+
+    def test_chatterbox_skips_kokoro_kpipeline_prewarm(self, mock_realtimetts, monkeypatch):
+        _, instance = self._mock_chatterbox(monkeypatch)
+        monkeypatch.setenv("KOURAI_TTS_ENGINE", "chatterbox")
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        RealtimeTTSEngine()
+        # The KPipeline pre-warm is Kokoro-only — Chatterbox has no _get_pipeline.
+        instance._get_pipeline.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_chatterbox_speak_uses_engine_default_voice(self, mock_realtimetts, monkeypatch):
+        """Until the M6 step-2 Chatterbox voice cast lands, speak() must not
+        push Kokoro voice_ids / speed onto a non-Kokoro engine — Chatterbox
+        speaks with its constructed default voice.
+        """
+        _, instance = self._mock_chatterbox(monkeypatch)
+        monkeypatch.setenv("KOURAI_TTS_ENGINE", "chatterbox")
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        engine = RealtimeTTSEngine()
+        await engine.speak("hello", agent_name="metis")
+        instance.set_voice.assert_not_called()
+        instance.set_speed.assert_not_called()
+
+    def test_chatterbox_missing_dependency_raises_helpful_error(
+        self, mock_realtimetts, monkeypatch
+    ):
+        """Opting into Chatterbox without the extra installed must fail with a
+        clear, actionable message — not a bare ImportError from deep in the stack.
+        """
+
+        def _boom():
+            raise ImportError("No module named 'chatterbox'")
+
+        monkeypatch.setattr("kourai_common.tts_realtime._load_chatterbox_engine_cls", _boom)
+        monkeypatch.setenv("KOURAI_TTS_ENGINE", "chatterbox")
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        with pytest.raises(RuntimeError, match=r"RealtimeTTS\[chatterbox\]"):
+            RealtimeTTSEngine()
