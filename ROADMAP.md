@@ -149,13 +149,20 @@ the M6 swap seam). Scope:
    voice until step 2. Unknown engine names warn + fall back to Kokoro; a missing
    `RealtimeTTS[chatterbox]` extra raises an actionable error. TDD'd hermetically
    (8 new `TestEngineSeam` tests); all existing Kokoro tests stay green.
-2. **Voice mapping + dep upgrade.** `AGENT_VOICE_MAP` carries Kokoro voice_ids (`af_heart`,
-   …); add a per-maiden Chatterbox cast (5 s reference clips or its presets) in
-   `tools/voice-lab/VOICE_CASTING_PLAN.md` (where the ElevenLabs cast lives). **Blocker
-   (found 2026-05-30):** the pinned `realtimetts==0.6.1` has **no `ChatterboxEngine`** — it
-   landed in 0.7.x (latest 0.7.3 ships the `chatterbox` extra). Needs `realtimetts>=0.7.3` +
-   the extra; that bump touches the shipping Kokoro path, so it's a deliberate upgrade +
-   Kokoro-regression check (AJ's rig). GPU + CUDA torch are confirmed live (RTX 3060 Ti).
+2. **Integration — isolate Chatterbox (decided 2026-05-30; do NOT downgrade in-process).**
+   The in-process `RealtimeTTS ChatterboxEngine` path is **rejected**: it needs
+   `realtimetts>=0.7.3` and `chatterbox-tts` hard-pins `torch==2.6.0`
+   (resemble-ai/chatterbox#116), forcing torch **2.11→2.6** + transformers **5.7→5.2** across
+   the shipping **Kokoro** stack. `research(2026-05)`: best practice for a conflicting-torch
+   model is to **isolate it** (own env / local inference server — e.g. the devnen
+   Chatterbox-TTS-Server pattern), not downgrade the host (uv conflicting-deps docs;
+   ML-runtimes-2026) — which also matches kourai's "architectural fix over expedient patch"
+   rule. So kourai stays on torch 2.11 and Chatterbox runs out-of-process behind a thin
+   client engine (design TBD). The step-3 adapter below is engine-agnostic. **Validated
+   2026-05-30 (AJ's rig):** Chatterbox loads + synthesizes on the RTX 3060 Ti (isolated
+   torch-2.6 venv); per-maiden expression samples generated for the by-ear A/B
+   (kallos/aidos/metis/cupid, shared base voice). Still AJ's: the by-ear A/B (is Chatterbox
+   worth the isolation build?) and the per-maiden voice-clip cast (5 s reference clips).
 3. **Emotion adapter. — SHIPPED 2026-05-30.** `AGENT_EXPRESSION_MAP` (`tts_backend.py`)
    casts each maiden's `exaggeration` (from her `VOICE_CASTING_PLAN` style, → [0.35, 0.70])
    + `cfg_weight` (from her Kokoro speed, → [0.40, 0.60] pacing; Chatterbox has no speed

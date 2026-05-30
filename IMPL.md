@@ -21,17 +21,22 @@ clinical), applied per-utterance in `_apply_voice` via `set_voice_parameters` (s
 re-apply when unchanged, since setting exaggeration re-prepares the voice). Hermetically
 TDD'd, mirroring step 1; the seam stays dark.
 
-**Blocker found — RealtimeTTS upgrade (AJ's call).** The pinned **RealtimeTTS 0.6.1 has no
-`ChatterboxEngine`** — it landed in 0.7.x (latest 0.7.3 ships the `chatterbox` extra), so
-the chatterbox path can't construct on current deps; only the hermetic mocks exercise it.
-M6 needs `realtimetts>=0.7.3` + the `chatterbox` extra. That bump touches the **shipping
-Kokoro path**, so it's a deliberate upgrade + Kokoro-regression check, not a cold-session
-bump — left to AJ. GPU + CUDA torch are confirmed live in this env (RTX 3060 Ti).
+**Integration decided (2026-05-30): isolate Chatterbox, do NOT downgrade in-process.** The
+in-process `RealtimeTTS ChatterboxEngine` path is rejected — it needs `realtimetts>=0.7.3`
+and `chatterbox-tts` hard-pins `torch==2.6.0`, which would downgrade torch **2.11→2.6** +
+transformers **5.7→5.2** across the shipping **Kokoro** stack. `research(2026-05)`: best
+practice for a conflicting-torch model is to isolate it (own env / local inference server),
+not downgrade the host — matches kourai's architectural-fix rule. kourai stays on torch
+2.11; Chatterbox runs out-of-process behind a thin client engine (design TBD). The step-3
+adapter is engine-agnostic, so it stands. **Validated on the rig 2026-05-30:** Chatterbox
+loads + synthesizes on the RTX 3060 Ti (isolated torch-2.6 venv); per-maiden expression
+samples generated for the by-ear A/B (`~/Downloads/kourai-m6-samples`).
 
-**Rig-bound remainder (AJ):** the RealtimeTTS upgrade above; step-2 voice-clip cast (5 s
-reference clips per maiden — a creative call); by-ear A/B + value tuning (the cast numbers
-are starting points). M20 word-timing: Chatterbox has no `on_word` → M20 Tier-2 reveal
-(design-resolved). Audio cache shipped 2026-05-06 [#174].
+**Rig-bound remainder (AJ):** the by-ear A/B on the samples (is Chatterbox worth the
+isolation build?); the out-of-process integration design (client engine → local Chatterbox
+service); the step-2 per-maiden voice-clip cast (5 s reference clips — a creative call);
+expression value tuning (the cast numbers are starting points). M20 word-timing: Chatterbox
+has no `on_word` → M20 Tier-2 reveal (design-resolved). Audio cache shipped [#174].
 
 Aletheia v2 Phase 2 (proactive inline guard — Techne / Kallos call
 Aletheia when emitting citations) is unblocked but explicitly
