@@ -5,7 +5,7 @@ A public, living plan for where the forge is heading. Items here are either
 *currently working on* lives in [IMPL.md](./IMPL.md) — when it lands, the
 matching milestone here collapses to a single line under "Shipped".
 
-Last reviewed: 2026-05-21 (post-#215, post-platform-reliability sweep).
+Last reviewed: 2026-05-30 (ROADMAP grounding pass — M8 + M18 re-verified against May-2026 upstream reality).
 **NE AI Agents Day 2026 poster session shipped 2026-05-10** (NYC, Jane Street; QR-code demo live).
 Polish phase complete. **M6 (ElevenLabs hybrid) is deferred post-funding**
 (decided 2026-05-24): Kokoro ships as the TTS engine for the foreseeable
@@ -212,6 +212,15 @@ This is upstream — see
 Meanwhile OTEL spans around each call give us per-tool latency visibility
 (landed 2026-04-23), which was the other half of the win.
 
+**Re-verified 2026-05-30 — still blocked.** #915 stays open (P1, "ready for
+work"; linked PR #2711 unmerged) and the cancel-scope teardown bug is now
+confirmed ecosystem-wide (litellm #26700, pydantic-ai #2818, semantic-kernel
+#12627). The SDK's own multi-session primitive `ClientSessionGroup` is itself
+what #915 reports failing, so it isn't yet the unblock. Concrete watch-target:
+`ClientSessionGroup` clean teardown + the #915 / PR #2711 fix landing.
+`research(2026-05)`: modelcontextprotocol/python-sdk #521 / #577 / #915 / #922
+(open dupes of the same cancel-scope bug).
+
 ---
 
 ## M12 — Dynamic sizing across the GUI
@@ -361,8 +370,9 @@ actually did.
 
 ## M18 — Structured streaming with content-kind metadata
 
-> Status: Phase 1 + Phase 3 Part A shipped · Phase 2 (SSML) active in
-> [IMPL.md](./IMPL.md) · Phase 3 Part B (KIND_CODE/SPEC render paths)
+> Status: Phase 1 + Phase 3 Part A shipped · Phase 2 (producer-side SSML)
+> **walked back 2026-05** — only the defensive `strip_ssml` layer remains
+> (see `kourai_common.ssml`) · Phase 3 Part B (KIND_CODE/SPEC render paths)
 > deferred until a producer emits either kind
 
 URI-namespaced extension key
@@ -376,16 +386,21 @@ the CLI; vn_bridge mirrors the same predicate for Ren'Py routing.
 Untagged messages (`kind is None`) no longer fall back to a prose-
 keyword guess — they're treated as not-dialogue, so any future
 producer that forgets to tag will silently miss TTS rather than
-mask the bug. Phase 2 (SSML inside dialogue bodies — strip-then-
-synthesize for Kokoro, full subset for Azure/Google/non-v3-
-ElevenLabs downstream) is the next architectural work; see
-IMPL.md for the live spec.
+mask the bug.
+
+**Phase 2 (producer-side SSML) was walked back (2026-05)** — verified
+wrong against the actual engines (Eleven v3 takes `[bracket]` audio tags,
+not SSML break tags; Eleven Flash V2.5 supports breaks but warns against
+them; Kokoro has zero native SSML, `hexgrad/kokoro#36`), so PRs #149/#150
+were reverted in favor of plain text with rich punctuation. What remains is
+the defensive `kourai_common.ssml.strip_ssml` layer (full rationale in its
+module docstring); no producer emits SSML and none is planned.
 
 ### Content-kind taxonomy
 
 | `content_kind` | Render path | TTS-eligible | Gate next event |
 |---|---|---|---|
-| `dialogue` | comms-window italic | yes (post-SSML) | yes |
+| `dialogue` | comms-window italic | yes (post-strip) | yes |
 | `status` | comms-window plain | no | no (fire-and-forget) |
 | `code` | comms-window monospace | no | no |
 | `spec` | wide markdown render | no | no |
