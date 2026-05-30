@@ -19,20 +19,24 @@ pins `torch==2.6.0`, which would downgrade the shipping Kokoro stack; `research(
 isolate a conflicting-torch model behind a local service, don't downgrade the host).
 
 **Build plan:**
-1. **Chatterbox service** — a minimal local HTTP service in its own torch-2.6 uv env
-   (e.g. `services/chatterbox/`), loads `ChatterboxTTS` once on GPU, `POST /synthesize`
-   `{text, voice_ref, exaggeration, cfg_weight} → wav`. Resolve perth properly (not the
-   smoke `DummyWatermarker`). `research(2026-05)`: devnen/Chatterbox-TTS-Server is a ready
-   reference for the FastAPI/OpenAI-compatible shape.
-2. **Client engine in the seam** — `KOURAI_TTS_ENGINE=chatterbox` becomes a thin HTTP
-   client to the service (NOT in-process), feeding the maiden's `AGENT_EXPRESSION_MAP`
-   exaggeration/cfg_weight + her voice ref per request. Graceful fallback to Kokoro if the
-   service is down. Hermetic tests (mock the client); the live Kokoro path stays untouched.
-3. **Hybrid wiring** — Kokoro default (fast); maidens route to Chatterbox. (Per-line
-   emotion modulation is a later refinement.)
-4. **Voice audition** — source candidate female reference clips per maiden (fitting each
-   character — fresh, NOT the unvalidated Kokoro `AGENT_VOICE_MAP`); generate samples;
-   AJ picks. Chosen clips = the cast, recorded in `VOICE_CASTING_PLAN.md`.
+1. ✅ **Chatterbox service** (`services/chatterbox/`) — isolated torch-2.6 uv project,
+   excluded from the workspace (`services/*`) so it can't downgrade the main torch-2.11
+   lock. Loads `ChatterboxTTS` once on GPU; `GET /health` (503 while loading), `POST
+   /synthesize` `{text, voice_ref?, exaggeration, cfg_weight} → audio/wav`. perth resolved
+   properly: `setuptools<81` restores the `pkg_resources` the real `PerthImplicitWatermarker`
+   needs (81+ removed it) — real watermark, not the dummy. GPU-validated end-to-end.
+2. ✅ **HTTP client** (`kourai_common.chatterbox_client`) — async `ChatterboxClient`
+   (`synthesize` / `health`), `KOURAI_CHATTERBOX_URL` env, raises `ChatterboxUnavailable`
+   so the seam can fall back to Kokoro. 10 hermetic tests (httpx.MockTransport).
+3. **Seam wiring (next)** — `KOURAI_TTS_ENGINE=chatterbox` routes `synthesize_to_wav`
+   through the client (maiden voice_ref + `AGENT_EXPRESSION_MAP`), Kokoro fallback on
+   `ChatterboxUnavailable`. REPLACES the superseded in-process
+   `_load_chatterbox_engine_cls`/`set_voice_parameters` path (broken on RealtimeTTS 0.6.1 +
+   wrong per the isolate decision); rewrite its seam tests. Add `AGENT_VOICE_REF_MAP` (empty
+   until the audition). Kokoro path byte-for-byte untouched.
+4. **Voice audition** — candidate female ref clips per maiden (fresh, NOT the unvalidated
+   Kokoro `AGENT_VOICE_MAP`; respect gender — hephaestus/puck male); generate; AJ picks;
+   chosen clips recorded in `VOICE_CASTING_PLAN.md` + wired into `AGENT_VOICE_REF_MAP`.
 
 **DoD:** service runs + kourai synths through it on the GPU; per-maiden voices AJ-approved;
 Kokoro path unaffected; tests green; M20 word-timing stays Tier-2 (Chatterbox has no

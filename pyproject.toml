@@ -61,7 +61,12 @@ members = [
     "hosts/gui",
     "mcp_servers/*",
 ]
-exclude = ["**/__pycache__"]
+# services/* are deliberately NOT workspace members: services/chatterbox ships
+# torch==2.6.0 (chatterbox-tts pin), which would downgrade the main torch-2.11
+# stack if it shared this resolution. It's an independent uv project reached
+# over HTTP. research(2026-05): uv docs — workspaces are "not suited for cases
+# in which members have conflicting requirements"; use a separate project.
+exclude = ["**/__pycache__", "services/*"]
 
 [tool.uv.sources]
 kourai-common = { workspace = true }

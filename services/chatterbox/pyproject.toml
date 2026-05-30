@@ -1,0 +1,26 @@
+[project]
+name = "kourai-chatterbox-service"
+version = "0.1.0"
+description = "Isolated Chatterbox TTS HTTP service (torch 2.6) for kourai M6 expressive voice"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    # chatterbox-tts hard-pins torch==2.6.0; the linux default wheel is the
+    # +cu124 CUDA build (verified GPU on an RTX 3060 Ti), so no explicit index
+    # is needed. This is WHY the service is isolated from the main workspace
+    # (which ships torch 2.11) — see server.py docstring + README.
+    "chatterbox-tts==0.1.7",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    # perth (chatterbox's watermarker) imports `pkg_resources`, which setuptools
+    # 81+ removed (deprecated; dropped ~2025-11-30). Without it,
+    # PerthImplicitWatermarker resolves to None and ChatterboxTTS.from_pretrained
+    # raises `'NoneType' object is not callable`. Pin <81 so the REAL watermarker
+    # loads (the responsible default for AI-generated voices), not the dummy.
+    # research(2026-05): verified setuptools 82 -> import error; 80.x -> works.
+    "setuptools<81",
+]
+
+# Not a workspace member: the root pyproject excludes `services/*` so this
+# torch-2.6 resolution never contaminates the main torch-2.11 lock.
+[tool.uv]
+package = false
