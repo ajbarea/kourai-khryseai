@@ -153,7 +153,34 @@ Chatterbox has two generation knobs (no Kokoro-style speed):
 | aidos | 0.35 | 0.58 | minimal affect, observant |
 
 **These are by-ear-tunable starting points.** They encode the casting principle
-(expressive Kallos/Puck/Cupid, clinical Aidos/Aletheia) and pin it in tests, but the
-exact numbers want an A/B pass on the rig. Still open (AJ): upgrade `realtimetts>=0.7.3`
-+ the `chatterbox` extra (0.6.1 has no `ChatterboxEngine`); the step-2 voice-clip cast
-(5 s reference clips per maiden); and the by-ear A/B.
+(expressive Kallos/Puck/Cupid, clinical Aidos/Aletheia) and pin it in tests.
+
+**Update 2026-05-30:** the by-ear A/B happened — Chatterbox won decisively. The
+in-process `ChatterboxEngine` plan was dropped for an isolated `services/chatterbox`
+HTTP service (no `realtimetts` upgrade needed); see `tts_realtime.py` + ROADMAP M6.
+
+## Chatterbox voice audition — validated recipes (2026-05-30, by ear with AJ)
+
+The voice **clone + processing** pipeline (separate from the expression map above):
+render a Kokoro voice as a ~12 s reference seed → clone via the isolated Chatterbox
+service with the maiden's expression → optional DSP. Scores are AJ's /10.
+
+**Maiden recipe (sexy/sultry):** warm Kokoro seed + **slow, breathy, intimate
+delivery** (`exaggeration=0.4, cfg_weight=0.3`) — performance is the core lever, not
+pitch. Optional **clean deepening** via pyworld formant-preserving **F0 ×0.85 +
+breathiness ×1.35**. Avoid: librosa phase-vocoder pitch-shift (warbles "underwater",
+0/10 on women) and pyworld ×0.90 + breath ×1.30 (buzzy/robotic, 5/10).
+- **af_bella** + delivery only → **9/10**
+- **af_nicole** + delivery + pyworld deep (×0.85) → **9/10**; delivery only → 8/10
+
+**Hephaestus (forge god):** am_michael seed + clone (0.48/0.52) + **librosa pitch
+−3 st + tanh grit (drive 4.0, mix 0.5)** → **8/10 "sounds like Poseidon."** The
+phase-vocoder "underwater" artifact reads as *divine* on a deep male voice — the
+opposite of its effect on women. Do NOT push to −4 / add cathedral echo (gruff4
+overcooked → 2/10). **Per-character philosophy:** women = clean formant-preserving
+DSP + sultry delivery; gods = the dramatic phase-vocoder FX.
+
+**Casting in progress:** AJ assigns a voice per maiden portrait from the casting set
+(`~/Downloads/kourai-m6-audition/CASTING/`); chosen seed + recipe per maiden lands in
+`AGENT_VOICE_REF_MAP` (`tts_backend.py`) with a per-maiden DSP note. Audition tooling:
+`/tmp/audition*.py` (seed render + clone) + `/tmp/audition*_dsp.py` (pyworld/librosa).

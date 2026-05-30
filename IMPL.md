@@ -22,18 +22,20 @@ Tier-2 on_audio_start; no word timing) through the client with Kokoro fallback; 
 superseded in-process path is gone and Kokoro is always the in-process engine + fallback.
 Live happy-path + service-down fallback both verified; `make lint` + TTS units green.
 
-**Next — the audition:**
-- Source candidate female reference clips per maiden — fresh, NOT the unvalidated Kokoro
-  `AGENT_VOICE_MAP`. Respect each maiden's gender (hephaestus / puck are male); fit each
-  register (`tools/voice-lab/VOICE_CASTING_PLAN.md`).
-- Generate per-candidate samples via the service (expression already in `AGENT_EXPRESSION_MAP`);
-  AJ picks. Record chosen clips in `VOICE_CASTING_PLAN.md` + wire into `AGENT_VOICE_REF_MAP`
-  (seam reads it; empty today → built-in voice).
-- **Open question for AJ (only creative input needed):** I generate candidate options per
-  maiden for you to pick, or you supply specific voices/clips?
+**Audition (in progress, GPU-blocked):** recipe DIALED IN by ear over 5 rounds — see
+the "validated recipes" section of `tools/voice-lab/VOICE_CASTING_PLAN.md`. Maidens =
+warm Kokoro seed + slow/breathy/intimate delivery (`exag 0.4, cfg 0.3`) + optional clean
+pyworld deepen (F0 ×0.85, breath ×1.35); the librosa phase-vocoder warbles "underwater"
+(avoid). Hephaestus CAST (gruff3: am_michael + librosa pitch −3 + grit, "Poseidon"; don't
+overcook). Winners: af_bella 9/10, af_nicole-deep 9/10. **PAUSED 2026-05-30** — AJ
+traveling (NC / SCADS residency), rig disassembled; GPU generation resumes when it's back.
+
+**Next:** AJ assigns a voice per maiden portrait (`assets/avatars/vn/`) → lock
+`AGENT_VOICE_REF_MAP` (`tts_backend.py`) with each maiden's seed + recipe + per-maiden DSP
+note. Locking assignments is laptop-OK (no GPU); regenerating/tuning needs the rig + the
+service (`cd services/chatterbox && uv run python server.py`). All voices still want tuning.
 
 **DoD:** per-maiden voices AJ-approved + wired; Kokoro path unaffected; tests green.
-Rig: RTX 3060 Ti; service env at `services/chatterbox/.venv`; samples in `~/Downloads/kourai-m6-samples`.
 
 Aletheia v2 Phase 2 (proactive inline guard — Techne / Kallos call
 Aletheia when emitting citations) is unblocked but explicitly
