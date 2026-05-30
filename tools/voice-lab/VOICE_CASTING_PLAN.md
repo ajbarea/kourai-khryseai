@@ -121,3 +121,39 @@ Store final mapping as a single agent_voice_map config object with:
 - voice settings
 - playback speed multiplier
 - fallback voice id
+
+---
+
+## Chatterbox expression cast (M6 local-expressive path — SHIPPED 2026-05-30)
+
+M6 went **local-expressive (Chatterbox)** instead of ElevenLabs (see ROADMAP M6).
+The ElevenLabs cast above is preserved for history; this is the live cast for the
+`KOURAI_TTS_ENGINE=chatterbox` path. It lives in code as `AGENT_EXPRESSION_MAP` in
+`shared/src/kourai_common/tts_backend.py` and is applied per-utterance.
+
+Chatterbox has two generation knobs (no Kokoro-style speed):
+- **`exaggeration`** (0.25–2.0) — emotion intensity. Derived from each maiden's
+  ElevenLabs `style` above (0.10 → 0.50) mapped into a natural **[0.35, 0.70]** band
+  ("avoid cartoon extremes").
+- **`cfg_weight`** (0.0–1.0) — pacing (lower = quicker). Derived inversely from each
+  maiden's Kokoro `speed` into **[0.40, 0.60]**, so the deliberate/animated cadence
+  survives the engine switch.
+
+| Maiden | exaggeration | cfg_weight | register |
+| --- | --- | --- | --- |
+| cupid | 0.70 | 0.52 | warm, emotionally rich |
+| puck | 0.68 | 0.40 | playful, energetic |
+| kallos | 0.66 | 0.40 | lyrical, affectionate |
+| metis | 0.53 | 0.58 | calm, lightly teasing |
+| techne | 0.51 | 0.54 | practical, focused |
+| hephaestus | 0.48 | 0.52 | grounded, dry |
+| dokimasia | 0.46 | 0.60 | stern, deliberate |
+| mneme | 0.44 | 0.55 | reflective, archival |
+| aletheia | 0.39 | 0.54 | measured, evidence-first |
+| aidos | 0.35 | 0.58 | minimal affect, observant |
+
+**These are by-ear-tunable starting points.** They encode the casting principle
+(expressive Kallos/Puck/Cupid, clinical Aidos/Aletheia) and pin it in tests, but the
+exact numbers want an A/B pass on the rig. Still open (AJ): upgrade `realtimetts>=0.7.3`
++ the `chatterbox` extra (0.6.1 has no `ChatterboxEngine`); the step-2 voice-clip cast
+(5 s reference clips per maiden); and the by-ear A/B.

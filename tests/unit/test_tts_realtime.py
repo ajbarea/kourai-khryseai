@@ -1036,6 +1036,33 @@ class TestEngineSeam:
         instance.set_voice.assert_not_called()
         instance.set_speed.assert_not_called()
 
+    @pytest.mark.asyncio
+    async def test_chatterbox_speak_applies_per_maiden_expression(
+        self, mock_realtimetts, monkeypatch
+    ):
+        """M6 step 3: each maiden's expression (exaggeration + cfg_weight) is
+        pushed to Chatterbox per-utterance via set_voice_parameters, and an
+        unchanged maiden doesn't re-apply (skips a needless voice re-prepare).
+        """
+        from kourai_common.tts_backend import get_expression_for_agent
+
+        _, instance = self._mock_chatterbox(monkeypatch)
+        monkeypatch.setenv("KOURAI_TTS_ENGINE", "chatterbox")
+        from kourai_common.tts_realtime import RealtimeTTSEngine
+
+        engine = RealtimeTTSEngine()
+        await engine.speak("hello", agent_name="kallos")
+        kallos = get_expression_for_agent("kallos")
+        instance.set_voice_parameters.assert_called_once_with(
+            exaggeration=kallos.exaggeration, cfg_weight=kallos.cfg_weight
+        )
+        # Same maiden again → guard skips the re-apply.
+        await engine.speak("again", agent_name="kallos")
+        instance.set_voice_parameters.assert_called_once()
+        # Different maiden → expression re-applied.
+        await engine.speak("hi", agent_name="aidos")
+        assert instance.set_voice_parameters.call_count == 2
+
     def test_chatterbox_missing_dependency_raises_helpful_error(
         self, mock_realtimetts, monkeypatch
     ):

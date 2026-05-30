@@ -64,7 +64,9 @@ from kourai_common.audio_env import (  # noqa: E402
 from kourai_common.ssml import strip_ssml  # noqa: E402
 from kourai_common.tts_backend import (  # noqa: E402
     AGENT_VOICE_MAP,
+    ChatterboxExpression,
     TTSVoiceConfig,
+    get_expression_for_agent,
     get_voice_for_agent,
 )
 from kourai_common.tts_cache import cached_synthesize  # noqa: E402
@@ -191,6 +193,10 @@ class RealtimeTTSEngine:
         _install_phonemizer_word_count_filter()
         self._engine_name = _resolve_engine_name()
         self._engine = self._build_engine()
+        # Chatterbox per-maiden expression is applied per-utterance; track the
+        # last one so a maiden speaking consecutive lines doesn't trigger a
+        # needless voice re-prepare (setting exaggeration re-encodes the voice).
+        self._last_chatterbox_expr: ChatterboxExpression | None = None
         # M20 sub-task 2: per-call audio-start (Tier 2) + on_word (Tier 1)
         # callbacks dispatched via stable trampolines. RealtimeTTS only
         # accepts these handlers at TextToAudioStream construction; each
@@ -259,17 +265,29 @@ class RealtimeTTSEngine:
             return engine_cls(exaggeration=0.5)
         return _KokoroEngine(voice="af_heart", default_speed=1.0, debug=False)
 
-    def _apply_voice(self, voice_cfg: TTSVoiceConfig, effective_speed: float) -> None:
-        """Push the resolved voice + speed onto the active engine.
+    def _apply_voice(
+        self, voice_cfg: TTSVoiceConfig, effective_speed: float, agent_name: str | None = None
+    ) -> None:
+        """Push the resolved voice (+ speed / expression) onto the active engine.
 
-        Kokoro takes a voice_id and a speed directly. Chatterbox speaks with
-        the default voice it was constructed with (its per-maiden cast +
-        exaggeration mapping are M6 step-2/3) and has no Kokoro-style speed
-        control — so this is a no-op for non-Kokoro engines.
+        Kokoro takes a voice_id and a speed directly. Chatterbox has no
+        Kokoro-style speed; instead each maiden's per-character expression
+        (exaggeration + cfg_weight, M6 step 3) is applied per-utterance via
+        ``set_voice_parameters``. The call is skipped when the expression is
+        unchanged from the previous utterance, because setting ``exaggeration``
+        re-prepares the voice. ``research(2026-05)``: RealtimeTTS
+        ``ChatterboxEngine.set_voice_parameters`` (added in 0.7.x).
         """
         if self._engine_name == "kokoro":
             self._engine.set_voice(voice_cfg.voice_id)
             self._engine.set_speed(effective_speed)
+        elif self._engine_name == "chatterbox":
+            expr = get_expression_for_agent(agent_name)
+            if expr != self._last_chatterbox_expr:
+                self._engine.set_voice_parameters(
+                    exaggeration=expr.exaggeration, cfg_weight=expr.cfg_weight
+                )
+                self._last_chatterbox_expr = expr
 
     def _prewarm_agent_languages(self) -> None:
         """Build a KPipeline for every unique ``AGENT_VOICE_MAP`` lang_code.
@@ -447,7 +465,7 @@ class RealtimeTTSEngine:
                 text,
             )
 
-            self._apply_voice(voice_cfg, effective_speed)
+            self._apply_voice(voice_cfg, effective_speed, agent_name)
 
             self.is_playing = True
             self._stream.feed(text)

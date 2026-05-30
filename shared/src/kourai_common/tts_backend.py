@@ -65,3 +65,56 @@ def get_voice_for_agent(agent_name: str | None) -> TTSVoiceConfig:
     if agent_name is None:
         return _DEFAULT_VOICE
     return AGENT_VOICE_MAP.get(agent_name.lower(), _DEFAULT_VOICE)
+
+
+@dataclass(frozen=True)
+class ChatterboxExpression:
+    """Per-maiden Chatterbox generation params (M6 step 3).
+
+    ``exaggeration`` is Chatterbox's emotion-intensity control (valid 0.25-2.0;
+    0.5 is its natural default); ``cfg_weight`` is the classifier-free-guidance
+    weight (0.0-1.0), which doubles as the pacing lever now that the engine has
+    no Kokoro-style speed knob — lower is quicker, higher more deliberate.
+    ``research(2026-05)``: Chatterbox / RealtimeTTS generation params + ranges.
+    """
+
+    exaggeration: float
+    cfg_weight: float
+
+    def __post_init__(self) -> None:
+        if not 0.25 <= self.exaggeration <= 2.0:
+            raise ValueError(f"exaggeration must be between 0.25 and 2.0, got {self.exaggeration}")
+        if not 0.0 <= self.cfg_weight <= 1.0:
+            raise ValueError(f"cfg_weight must be between 0.0 and 1.0, got {self.cfg_weight}")
+
+
+# Per-maiden Chatterbox expression cast (M6 step 3); the dark ``chatterbox``
+# engine seam consumes it. Derived from each maiden's documented register in
+# ``tools/voice-lab/VOICE_CASTING_PLAN.md``: the ElevenLabs ``style`` (0.10 Aidos
+# → 0.50 Cupid) maps to ``exaggeration`` in [0.35, 0.70] — expressive but inside
+# the plan's "avoid cartoon extremes" band — and each maiden's Kokoro ``speed``
+# (AGENT_VOICE_MAP) maps inversely to ``cfg_weight`` in [0.40, 0.60] so the
+# deliberate/animated pacing survives the switch from Kokoro (speed knob) to
+# Chatterbox (none). Starting points: tune by ear, then A/B before the seam lights.
+AGENT_EXPRESSION_MAP: dict[str, ChatterboxExpression] = {
+    "hephaestus": ChatterboxExpression(exaggeration=0.48, cfg_weight=0.52),
+    "metis": ChatterboxExpression(exaggeration=0.53, cfg_weight=0.58),
+    "kallos": ChatterboxExpression(exaggeration=0.66, cfg_weight=0.40),
+    "mneme": ChatterboxExpression(exaggeration=0.44, cfg_weight=0.55),
+    "techne": ChatterboxExpression(exaggeration=0.51, cfg_weight=0.54),
+    "dokimasia": ChatterboxExpression(exaggeration=0.46, cfg_weight=0.60),
+    "puck": ChatterboxExpression(exaggeration=0.68, cfg_weight=0.40),
+    "cupid": ChatterboxExpression(exaggeration=0.70, cfg_weight=0.52),
+    "aidos": ChatterboxExpression(exaggeration=0.35, cfg_weight=0.58),
+    "aletheia": ChatterboxExpression(exaggeration=0.39, cfg_weight=0.54),
+}
+
+# Chatterbox's documented natural default — the fallback for an unknown agent.
+_DEFAULT_EXPRESSION = ChatterboxExpression(exaggeration=0.5, cfg_weight=0.5)
+
+
+def get_expression_for_agent(agent_name: str | None) -> ChatterboxExpression:
+    """Resolve an agent name to its Chatterbox expression, default if unknown."""
+    if agent_name is None:
+        return _DEFAULT_EXPRESSION
+    return AGENT_EXPRESSION_MAP.get(agent_name.lower(), _DEFAULT_EXPRESSION)

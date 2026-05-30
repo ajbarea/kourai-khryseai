@@ -149,12 +149,19 @@ the M6 swap seam). Scope:
    voice until step 2. Unknown engine names warn + fall back to Kokoro; a missing
    `RealtimeTTS[chatterbox]` extra raises an actionable error. TDD'd hermetically
    (8 new `TestEngineSeam` tests); all existing Kokoro tests stay green.
-2. **Voice mapping.** `AGENT_VOICE_MAP` carries Kokoro voice_ids (`af_heart`, …); add a
-   per-maiden Chatterbox cast (5 s reference clips or its presets). Extend
-   `tools/voice-lab/VOICE_CASTING_PLAN.md` (where the ElevenLabs cast already lives).
-3. **Emotion adapter.** Map each maiden's emotional intent to Chatterbox's exaggeration
-   param (Kallos higher for teasing; Aidos/Aletheia low for clinical validation) — the
-   local equivalent of the M6 per-engine markup adapter. Pure logic, TDD-able, no audio.
+2. **Voice mapping + dep upgrade.** `AGENT_VOICE_MAP` carries Kokoro voice_ids (`af_heart`,
+   …); add a per-maiden Chatterbox cast (5 s reference clips or its presets) in
+   `tools/voice-lab/VOICE_CASTING_PLAN.md` (where the ElevenLabs cast lives). **Blocker
+   (found 2026-05-30):** the pinned `realtimetts==0.6.1` has **no `ChatterboxEngine`** — it
+   landed in 0.7.x (latest 0.7.3 ships the `chatterbox` extra). Needs `realtimetts>=0.7.3` +
+   the extra; that bump touches the shipping Kokoro path, so it's a deliberate upgrade +
+   Kokoro-regression check (AJ's rig). GPU + CUDA torch are confirmed live (RTX 3060 Ti).
+3. **Emotion adapter. — SHIPPED 2026-05-30.** `AGENT_EXPRESSION_MAP` (`tts_backend.py`)
+   casts each maiden's `exaggeration` (from her `VOICE_CASTING_PLAN` style, → [0.35, 0.70])
+   + `cfg_weight` (from her Kokoro speed, → [0.40, 0.60] pacing; Chatterbox has no speed
+   knob): Kallos/Puck/Cupid expressive, Aidos/Aletheia clinical. Applied per-utterance in
+   `_apply_voice` via `set_voice_parameters` (skips re-apply when unchanged). Hermetically
+   TDD'd (mirrors step 1). Pure logic, no audio — the by-ear value tuning is step 4.
 4. **Verify (AJ's rig, by ear).** (a) per-maiden emotion reads distinctly; (b) the **M20
    word-timing gate is now RESOLVED on the design side** — RealtimeTTS exposes `on_word`
    only for AzureEngine + English KokoroEngine (`research(2026-05)`: RealtimeTTS engine
