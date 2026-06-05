@@ -81,8 +81,8 @@ each fix loop hit the cache for the `[system + tools + initial-user]` prefix
 — typically 2K–10K tokens of file contents and git context.
 
 Cross-call caching of just the agent system prompt does **not** pay today
-(the prompts are below Anthropic's 1024-token Sonnet 4.6 and 4096-token
-Haiku 4.5 / Opus 4.7 thresholds, [verified May 2026](https://platform.claude.com/docs/en/build-with-claude/prompt-caching));
+(the prompts are below Anthropic's 2048-token Sonnet 4.6 and 4096-token
+Haiku 4.5 / Opus 4.7 minimum-cacheable thresholds, [verified June 2026](https://platform.claude.com/docs/en/build-with-claude/prompt-caching));
 within-loop is the actual win.
 
 ## In-session usage tracking

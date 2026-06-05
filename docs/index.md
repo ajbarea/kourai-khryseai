@@ -51,7 +51,7 @@ hide:
   <div class="section-inner">
     <h2 class="section-title">The Forge</h2>
     <div class="agent-grid">
-      <a href="agents/#hephaestus-orchestrator" class="agent-card agent-card--hephaestus">
+      <a href="agents/specialists/#hephaestus-orchestrator" class="agent-card agent-card--hephaestus">
         <img src="assets/avatars/hephaestus_neutral.png" class="agent-avatar" alt="Hephaestus" width="96" height="96" loading="lazy" decoding="async">
         <div class="agent-name">Hephaestus</div>
         <div class="agent-epithet">Master of the Forge</div>

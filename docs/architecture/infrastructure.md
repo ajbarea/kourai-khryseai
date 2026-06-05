@@ -18,10 +18,10 @@ The full mental model, triage runbook, and current coverage gaps live on the ded
 
 ### Docker
 
-A single generic `Dockerfile` at `docker/agent.Dockerfile` builds any agent via the `AGENT_NAME` build arg:
+A single generic `Dockerfile` at `docker/host.Dockerfile` builds any agent via the `HOST_TYPE` and `PACKAGE_NAME` build args:
 
 ```bash title="Build a single agent"
-docker build --build-arg AGENT_NAME=mneme -f docker/agent.Dockerfile -t kourai-mneme .
+docker build --build-arg HOST_TYPE=agent --build-arg PACKAGE_NAME=mneme -f docker/host.Dockerfile -t kourai-mneme .
 ```
 
 Multi-stage build: builder installs deps with `uv`, runtime copies only the venv. Each container has a health check against `/.well-known/agent-card.json`.
@@ -52,7 +52,7 @@ Multi-stage build: builder installs deps with `uv`, runtime copies only the venv
 
 ### A2A Protocol
 
-- [A2A Protocol Spec (v0.4.0)](https://a2a-protocol.org/latest)
+- [A2A Protocol Spec (v1.0)](https://a2a-protocol.org/latest)
 - [A2A GitHub](https://github.com/a2aproject/A2A)
 - [A2A Python Samples](https://github.com/a2aproject/a2a-samples)
 - [A2A SDK (PyPI)](https://pypi.org/project/a2a-sdk/)

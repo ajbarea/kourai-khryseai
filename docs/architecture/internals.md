@@ -204,7 +204,11 @@ The database implements A2A Memory (Hierarchical State Management) with two prim
 - **`messages`**: Episodic/working memory. Stores every single message exchanged, tracking the `context_id` (thread), `agent_name`, `role`, and the raw `content`.
 - **`agent_states`**: Semantic memory. Stores structured state objects (goal hierarchies, checkpoints, summaries) for each agent and thread.
 
-The CLI `/session` slash command surfaces this layer to the player: `/session list` enumerates known context IDs via `list_known_contexts()` (busiest first; the table has no timestamp column today, so message count is the recency proxy), `/session fork` clones the entire `messages` + `agent_states` row set for a context via `clone_context(src, dst)` so branching exploration ("what if I asked Metis differently?") doesn't lose the original transcript, and `/session resume <id-prefix>` switches the active `context_id` to a prior one.
+The CLI `/session` slash command surfaces this layer to the player:
+
+- `/session list` enumerates known context IDs via `list_known_contexts()` (busiest first; the table has no timestamp column today, so message count is the recency proxy).
+- `/session fork` clones the entire `messages` + `agent_states` row set for a context via `clone_context(src, dst)`, so branching exploration ("what if I asked Metis differently?") doesn't lose the original transcript.
+- `/session resume <id-prefix>` switches the active `context_id` to a prior one.
 
 !!! tip "Visualizing the Database"
     Use a modern database UI like **Beekeeper Studio**, or the **SQLite Viewer** extension in VS Code/Cursor. Alternatively, use the CLI:

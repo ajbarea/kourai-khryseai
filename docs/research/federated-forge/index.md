@@ -567,6 +567,11 @@ in the references section.
 > complete · no marker = planned (the default; an unmarked phase has
 > not been started). Convention reused by other spec docs in this site.
 
+Task-by-task implementation plans for the first phases:
+
+- [Sub-Plan 01 — Memoir Foundation](plan-01-memoir-foundation.md) (the `kourai_common.federation` library; Phase 1)
+- [Sub-Plan 02 — CLI Host Integration](plan-02-cli-host-integration.md) (CLI write paths into the Memoir; Phase 1 → 2)
+
 1. ⏳ **Forge Memoir replaces OpenTelemetry as training source.** Schema
    landed in `shared/src/kourai_common/federation/memoir.py` +
    `memoir_schema.py` + `host_helpers.py` (per the `feat/memoir` work

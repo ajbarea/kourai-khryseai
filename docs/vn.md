@@ -28,7 +28,7 @@ drops you into the forge. The bridge must be running via `make up`.
 ```
 ┌─────────────────────┐    HTTP (urllib)     ┌──────────────────────┐
 │     Ren'Py VN       │ ──── :10010 ──────►  │  vn-bridge (Docker)  │
-│  script.rpy         │                       │  agents/vn_bridge.py │
+│  script.rpy         │                       │  agents/vn_bridge/   │
 │  screens.rpy        │  ◄── NDJSON ────────  │                      │
 │  libs/bridge.py     │                       │  ┌─ A2A client       │
 │                     │                       │  └─► Hephaestus      │

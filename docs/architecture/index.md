@@ -128,7 +128,9 @@ flowchart TD
 
 ### User ↔ Hephaestus: Streaming (SSE)
 
-All three hosts (CLI, Pygame GUI, Ren'Py VN) connect to Hephaestus using A2A `message/stream` with Server-Sent Events. This means you see real-time progress as each agent reports status — not a single response after everything finishes. The VN connects through a dedicated **vn-bridge** Docker service (`:10010`) that translates between HTTP/NDJSON and the A2A protocol. Ren'Py sends requests via `urllib` to the bridge, which streams A2A events from Hephaestus and returns them as newline-delimited JSON.
+All three hosts (CLI, Pygame GUI, Ren'Py VN) connect to Hephaestus using A2A `message/stream` with Server-Sent Events. You see real-time progress as each agent reports status, not a single response after everything finishes.
+
+The VN connects through a dedicated **vn-bridge** Docker service (`:10010`) that translates between HTTP/NDJSON and the A2A protocol. Ren'Py sends requests via `urllib` to the bridge, which streams A2A events from Hephaestus and returns them as newline-delimited JSON.
 
 ```python
 # CLI sends a streaming request

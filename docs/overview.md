@@ -28,7 +28,11 @@ Per-agent detail lives in the **[Agents Overview](agents/index.md)** and **[Agen
 
 ## 🔄 How a request actually flows
 
-Hephaestus is a **Forge Master**, not a switchboard. It maintains a running **Forge Transcript** of the whole exchange and broadcasts the *full transcript* to every specialist it calls. Each specialist sees the complete prior reasoning — Techne reads Metis's spec, Kallos reads everything Techne wrote, etc. — so no agent works blind from a decontextualized stub. Between steps, Hephaestus emits an in-character narration line that streams to the host immediately so the forge feels alive while specialists generate.
+Hephaestus is a **Forge Master**, not a switchboard. It maintains a running **Forge Transcript** of the whole exchange and broadcasts the *full transcript* to every specialist it calls.
+
+Each specialist sees the complete prior reasoning (Techne reads Metis's spec, Kallos reads everything Techne wrote, and so on), so no agent works blind from a decontextualized stub.
+
+Between steps, Hephaestus emits an in-character narration line that streams to the host immediately so the forge feels alive while specialists generate.
 
 ??? info "Sequence diagram + a real dialogue excerpt"
 
@@ -55,7 +59,7 @@ Hephaestus is a **Forge Master**, not a switchboard. It maintains a running **Fo
             UI-->>You: Live updates
         end
 
-        Note over Spec: Kallos finds issues → Techne fixes → Kallos re-checks (max 3×)
+        Note over Spec: Kallos finds issues → Techne fixes → Kallos re-checks (up to MAX_ITERATIONS, default 5)
         Hep-->>UI: Final summary
         UI-->>You: Done
     ```

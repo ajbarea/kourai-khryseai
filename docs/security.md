@@ -20,7 +20,7 @@ The canonical 2026 posture for MCP transport (per the [2026 MCP roadmap](https:/
 
 What Kourai does today, against that baseline:
 
-- The MCP sidecars (`mcp_servers/shell/`, `mcp_servers/repo/`, etc.) run inside the same Docker network as the orchestrator and specialists. The trust boundary is the Docker network; intra-network calls are unauthenticated. This is acceptable for the current single-host single-developer deploy shape, but it is an implicit trust boundary that should not silently extend to cross-network or multi-tenant deploys.
+- The MCP sidecars (`mcp_servers/forge/`, `mcp_servers/shell/`) run inside the same Docker network as the orchestrator and specialists. The trust boundary is the Docker network; intra-network calls are unauthenticated. This is acceptable for the current single-host single-developer deploy shape, but it is an implicit trust boundary that should not silently extend to cross-network or multi-tenant deploys.
 - A2A hops between agents likewise rely on the Docker network as the trust boundary. The A2A protocol does not yet impose its own auth; Kourai inherits the network-level posture.
 - No OAuth resource-server wrapping is in place today. Adding it is gated on a real cross-network deploy use case; until then the work is speculative scaffolding (cf. the `YAGNI-refactored` invariant in `ROADMAP.md`).
 

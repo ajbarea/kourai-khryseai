@@ -99,10 +99,11 @@ ten-agent roster.
 
 ### Avatar Assets
 
-Avatars live in `assets/avatars/anime/{agent}.png` (one PNG per agent, all
-ten covered). PNG with transparency renders best; JPG / JPEG / WebP are
-also accepted. The renderer downscales with Lanczos resampling, so the
-source image can be any resolution.
+Avatars live in `assets/avatars/anime/{agent}.png` (one PNG per agent;
+the six core specialists are covered today, matching the panels the GUI
+renders). PNG with transparency renders best; JPG / JPEG / WebP are also
+accepted. The renderer downscales with Lanczos resampling, so the source
+image can be any resolution.
 
 ---
 
