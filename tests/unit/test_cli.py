@@ -835,6 +835,13 @@ class TestApplyAudioSettingsMusicOff:
     surfaced 2026-04-27.
     """
 
+    @pytest.fixture(autouse=True)
+    def _stub_tts_engine(self, monkeypatch):
+        # Hermetic: a real RealtimeTTSEngine() loads Kokoro-82M from HuggingFace
+        # (live fetch -> flaky 429s in CI). These tests exercise audio-settings
+        # ordering, not TTS, so stub the engine constructor.
+        monkeypatch.setattr("hosts.cli.__main__.RealtimeTTSEngine", MagicMock)
+
     def test_music_off_stops_playlist_before_stop_music(self, tmp_path, monkeypatch):
         from hosts.cli.__main__ import _apply_audio_settings
 
