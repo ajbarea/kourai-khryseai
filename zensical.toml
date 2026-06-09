@@ -9,7 +9,6 @@ copyright = "AJ Barea"
 extra_css = [
   "stylesheets/variables.css",
   "stylesheets/base.css",
-  "stylesheets/mermaid.css",
   "stylesheets/components/hero.css",
   "stylesheets/components/landing.css",
   "stylesheets/components/lightbox.css",

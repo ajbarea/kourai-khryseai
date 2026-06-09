@@ -145,3 +145,80 @@
   color: var(--gold-light);
 }
 .korch-loop-note::before { content: "\21BA\00a0"; } /* loop arrow */
+
+/* Interaction timeline — the sequence-diagram idiom as message rows (from -> to
+   + message), a loop frame, and a note. Keeps the temporal/directional reading
+   without a full lifeline grid. */
+.md-typeset .kseq {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 2rem 0 2.4rem;
+  padding: 1.2rem 1.1rem;
+  border: 1px solid var(--glass-border);
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--obsidian) 45%, transparent);
+}
+
+.md-typeset .kseq-step {
+  display: flex;
+  gap: 0.7rem;
+  align-items: baseline;
+  padding: 0.3rem 0.45rem;
+  border-radius: 0.4rem;
+  font-size: 0.82rem;
+}
+
+.md-typeset .kseq-step:hover {
+  background: color-mix(in srgb, var(--gold-metallic) 7%, transparent);
+}
+
+.kseq-route {
+  flex: 0 0 10rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--gold-mid);
+  white-space: nowrap;
+}
+
+.kseq-step.kseq-self .kseq-route {
+  color: color-mix(in srgb, var(--gold-light) 55%, transparent);
+  font-style: italic;
+}
+
+.kseq-msg { opacity: 0.9; }
+
+.md-typeset .kseq-loop {
+  margin: 0.4rem 0;
+  padding: 0.5rem 0.6rem 0.6rem;
+  border: 1px dashed color-mix(in srgb, var(--gold-mid) 42%, transparent);
+  border-radius: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.kseq-loop-h {
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gold-mid);
+}
+.kseq-loop-h::before { content: "\21BB\00a0"; } /* clockwise loop */
+
+.md-typeset .kseq-note {
+  margin-top: 0.45rem;
+  padding: 0.5rem 0.75rem;
+  border-left: 3px solid var(--gold-mid);
+  border-radius: 0 0.4rem 0.4rem 0;
+  background: color-mix(in srgb, var(--gold-metallic) 8%, transparent);
+  font-size: 0.76rem;
+  opacity: 0.92;
+}
+.kseq-note::before { content: "✎\00a0"; opacity: 0.7; }
+
+@media (max-width: 640px) {
+  .kseq-route { flex-basis: 7rem; white-space: normal; }
+}

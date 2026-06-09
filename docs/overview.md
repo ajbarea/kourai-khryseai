@@ -36,33 +36,24 @@ Between steps, Hephaestus emits an in-character narration line that streams to t
 
 ??? info "Sequence diagram + a real dialogue excerpt"
 
-    ```mermaid
-    sequenceDiagram
-        actor You
-        participant UI as CLI / GUI / VN
-        participant Hep as 🔥 Hephaestus<br/>(Forge Master)
-        participant Spec as Specialists
-
-        You->>UI: "add user authentication"
-        UI->>Hep: A2A stream (SSE)
-        Hep->>Hep: CONFIRM_ORDER read-back
-        Hep-->>UI: "Forge will plan + scaffold + test. Light it?"
-        You->>UI: yes
-        Hep->>Hep: Select pipeline · init transcript
-
-        loop Each specialist in sequence
-            Hep->>Hep: Append [Hephaestus] narration
-            Hep-->>UI: Forge narration (streamed)
-            Hep->>Spec: Full transcript → next agent
-            Spec-->>UI: Status + findings (streamed)
-            Hep->>Hep: Append [Agent] output to transcript
-            UI-->>You: Live updates
-        end
-
-        Note over Spec: Kallos finds issues → Techne fixes → Kallos re-checks (up to MAX_ITERATIONS, default 5)
-        Hep-->>UI: Final summary
-        UI-->>You: Done
-    ```
+    <div class="kseq" markdown="0">
+      <div class="kseq-step"><span class="kseq-route">You → UI</span><span class="kseq-msg">"add user authentication"</span></div>
+      <div class="kseq-step"><span class="kseq-route">UI → Hephaestus</span><span class="kseq-msg">A2A stream (SSE)</span></div>
+      <div class="kseq-step kseq-self"><span class="kseq-route">Hephaestus</span><span class="kseq-msg">CONFIRM_ORDER read-back</span></div>
+      <div class="kseq-step"><span class="kseq-route">Hephaestus → UI</span><span class="kseq-msg">"Forge will plan + scaffold + test. Light it?"</span></div>
+      <div class="kseq-step"><span class="kseq-route">You → UI</span><span class="kseq-msg">yes</span></div>
+      <div class="kseq-step kseq-self"><span class="kseq-route">Hephaestus</span><span class="kseq-msg">select pipeline · init transcript</span></div>
+      <div class="kseq-loop">
+        <div class="kseq-loop-h">loop · each specialist in sequence</div>
+        <div class="kseq-step"><span class="kseq-route">Hephaestus → UI</span><span class="kseq-msg">Forge narration (streamed)</span></div>
+        <div class="kseq-step"><span class="kseq-route">Hephaestus → Specialist</span><span class="kseq-msg">full transcript → next agent</span></div>
+        <div class="kseq-step"><span class="kseq-route">Specialist → UI</span><span class="kseq-msg">status + findings (streamed)</span></div>
+        <div class="kseq-step"><span class="kseq-route">UI → You</span><span class="kseq-msg">live updates</span></div>
+      </div>
+      <div class="kseq-note">Kallos finds issues → Techne fixes → Kallos re-checks (up to MAX_ITERATIONS, default 5)</div>
+      <div class="kseq-step"><span class="kseq-route">Hephaestus → UI</span><span class="kseq-msg">final summary</span></div>
+      <div class="kseq-step"><span class="kseq-route">UI → You</span><span class="kseq-msg">Done</span></div>
+    </div>
 
     A trimmed real example:
 
