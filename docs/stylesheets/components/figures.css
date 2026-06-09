@@ -1,0 +1,107 @@
+/* Bespoke CSS architecture figures — Zensical's mermaid driver renders blank
+   (confirmed on the live site), so diagrams are built in CSS instead. Themed to
+   kourai's gold/obsidian brand and the per-agent --agent-accent identity colors. */
+
+.md-typeset .korch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  margin: 2rem 0 2.4rem;
+  padding: 1.6rem 1rem;
+  border: 1px solid var(--glass-border);
+  border-radius: 1rem;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% 0%,
+      color-mix(in srgb, var(--gold-metallic) 8%, transparent), transparent 70%),
+    color-mix(in srgb, var(--obsidian) 45%, transparent);
+}
+
+.korch-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: stretch;
+  gap: 0.7rem;
+  width: 100%;
+}
+
+.korch-flow {
+  margin: 0.55rem 0;
+  font-size: 0.68rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  text-align: center;
+  color: color-mix(in srgb, var(--gold-light) 72%, transparent);
+}
+
+.korch-flow::before { content: "\2193\00a0"; } /* down arrow */
+
+.md-typeset .kagent {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 6.6rem;
+  padding: 0.5rem 0.8rem;
+  text-align: center;
+  border-radius: 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--agent-accent, var(--gold-mid)) 45%, transparent);
+  border-top: 2px solid var(--agent-accent, var(--gold-mid));
+  background: color-mix(in srgb, var(--agent-accent, var(--gold-mid)) 12%, transparent);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.md-typeset .kagent:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--agent-accent, var(--gold-mid)) 25%, transparent);
+}
+
+.kagent b {
+  color: var(--gold-light);
+  font-size: 0.84rem;
+}
+
+.kagent span {
+  font-size: 0.64rem;
+  line-height: 1.3;
+  opacity: 0.78;
+}
+
+/* HEPHAESTUS — the orchestrator hub, deliberately prominent. */
+.md-typeset .kagent.khub {
+  min-width: 15rem;
+  padding: 0.75rem 1.4rem;
+  border-width: 1px;
+  border-top-width: 3px;
+  background: color-mix(in srgb, var(--agent-accent) 18%, transparent);
+}
+
+.kagent.khub b { font-size: 1.05rem; }
+
+/* Agent group cluster (Core Specialists / Companion Spirits / Quality Validators). */
+.md-typeset .kgroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.7rem 0.7rem 0.8rem;
+  border-radius: 0.7rem;
+  border: 1px dashed color-mix(in srgb, var(--gold-mid) 38%, transparent);
+  background: color-mix(in srgb, var(--obsidian) 35%, transparent);
+}
+
+.kgroup-h {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--gold-mid);
+}
+
+.kgroup .korch-row { gap: 0.4rem; }
+.kgroup .kagent { min-width: 6rem; }
+
+@media (max-width: 720px) {
+  .md-typeset .kagent.khub { min-width: 12rem; }
+  .kgroup .kagent { min-width: 5.4rem; }
+}

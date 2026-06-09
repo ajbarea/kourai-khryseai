@@ -12,7 +12,8 @@ extra_css = [
   "stylesheets/mermaid.css",
   "stylesheets/components/hero.css",
   "stylesheets/components/landing.css",
-  "stylesheets/components/lightbox.css"
+  "stylesheets/components/lightbox.css",
+  "stylesheets/components/figures.css"
 ]
 extra_javascript = ["javascripts/particles.js"]
 

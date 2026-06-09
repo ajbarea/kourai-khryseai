@@ -76,51 +76,49 @@ through Jaeger.
 
 ## 🗺️ System Diagram
 
-```mermaid
-flowchart TD
-    CLI["🖥️ <b>CLI REPL</b><br/><code>make cli</code>"]
-    GUI["🎮 <b>Pygame GUI</b><br/><code>make gui</code>"]
-    VN["📖 <b>Ren'Py VN</b><br/>Visual Novel"]
-    HEP["🔥 <b>HEPHAESTUS</b><br/>Orchestrator · :10000<br/><i>LLM routing · pipeline · context</i>"]
-
-    subgraph core ["Core Specialists"]
-        MET["📐 <b>METIS</b><br/>Planner · :10001"]
-        TEC["⚙️ <b>TECHNE</b><br/>Coder · :10002"]
-        DOK["🧪 <b>DOKIMASIA</b><br/>Tester · :10003"]
-        KAL["✨ <b>KALLOS</b><br/>Stylist · :10004"]
-        MNE["📜 <b>MNEME</b><br/>Scribe · :10005"]
-    end
-
-    subgraph spirits ["Companion Spirits"]
-        PUC["🎭 <b>PUCK</b><br/>Guide · :10006"]
-        CUP["💘 <b>CUPID</b><br/>Romance · :10007"]
-    end
-
-    subgraph validators ["Quality Validators"]
-        AID["🪞 <b>AIDOS</b><br/>Anti-Slop · :10008"]
-        ALE["📚 <b>ALETHEIA</b><br/>Research · :10009"]
-    end
-
-    JAE["🔍 <b>JAEGER</b><br/>:16686 UI · :4318 OTLP"]
-    PRO["📊 <b>PROMETHEUS</b><br/>:9090 UI · Metrics"]
-
-    CLI -->|"A2A message/stream (SSE)"| HEP
-    GUI -->|"A2A message/stream (SSE)"| HEP
-    VNB["🌉 <b>VN-BRIDGE</b><br/>HTTP · :10010<br/><i>NDJSON streaming</i>"]
-    VN -->|"HTTP (urllib)"| VNB
-    VNB -->|"A2A message/stream"| HEP
-    HEP -->|"A2A blocking"| MET
-    HEP -->|"A2A blocking"| TEC
-    HEP -->|"A2A blocking"| DOK
-    HEP -->|"A2A blocking"| KAL
-    HEP -->|"A2A blocking"| MNE
-    HEP -->|"A2A on-demand"| PUC
-    HEP -->|"A2A on-demand"| CUP
-    HEP -->|"A2A on-demand"| AID
-    HEP -->|"A2A on-demand"| ALE
-    HEP -.->|"OTLP traces"| JAE
-    JAE <-->|"RED metrics (SPM)"| PRO
-```
+<div class="korch" markdown="0">
+  <div class="korch-row">
+    <div class="kagent"><b>🖥️ CLI REPL</b><span>make cli</span></div>
+    <div class="kagent"><b>🎮 Pygame GUI</b><span>make gui</span></div>
+    <div class="kagent"><b>📖 Ren'Py VN</b><span>via 🌉 VN-Bridge · :10010 · NDJSON</span></div>
+  </div>
+  <div class="korch-flow">A2A message / stream (SSE)</div>
+  <div class="korch-row">
+    <div class="kagent khub agent-card--hephaestus"><b>🔥 HEPHAESTUS</b><span>Orchestrator · :10000 · LLM routing · pipeline · context</span></div>
+  </div>
+  <div class="korch-flow">A2A blocking · on-demand</div>
+  <div class="korch-row">
+    <div class="kgroup">
+      <div class="kgroup-h">Core Specialists</div>
+      <div class="korch-row">
+        <div class="kagent agent-card--metis"><b>📐 METIS</b><span>Planner · :10001</span></div>
+        <div class="kagent agent-card--techne"><b>⚙️ TECHNE</b><span>Coder · :10002</span></div>
+        <div class="kagent agent-card--dokimasia"><b>🧪 DOKIMASIA</b><span>Tester · :10003</span></div>
+        <div class="kagent agent-card--kallos"><b>✨ KALLOS</b><span>Stylist · :10004</span></div>
+        <div class="kagent agent-card--mneme"><b>📜 MNEME</b><span>Scribe · :10005</span></div>
+      </div>
+    </div>
+    <div class="kgroup">
+      <div class="kgroup-h">Companion Spirits</div>
+      <div class="korch-row">
+        <div class="kagent agent-card--puck"><b>🎭 PUCK</b><span>Guide · :10006</span></div>
+        <div class="kagent agent-card--cupid"><b>💘 CUPID</b><span>Romance · :10007</span></div>
+      </div>
+    </div>
+    <div class="kgroup">
+      <div class="kgroup-h">Quality Validators</div>
+      <div class="korch-row">
+        <div class="kagent agent-card--aidos"><b>🪞 AIDOS</b><span>Anti-Slop · :10008</span></div>
+        <div class="kagent agent-card--aletheia"><b>📚 ALETHEIA</b><span>Research · :10009</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="korch-flow">OTLP traces · RED metrics</div>
+  <div class="korch-row">
+    <div class="kagent"><b>🔍 Jaeger</b><span>:16686 UI · :4318 OTLP</span></div>
+    <div class="kagent"><b>📊 Prometheus</b><span>:9090 · metrics (SPM)</span></div>
+  </div>
+</div>
 
 ---
 
