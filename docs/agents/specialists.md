@@ -157,18 +157,18 @@ Runs linters, cleans up comments, and enforces the project's style guide. Uses `
 
 When Hephaestus detects that Kallos still found issues and Techne is in the pipeline, it automatically triggers broader fix iterations:
 
-```mermaid
-flowchart LR
-    KAL["✨ Kallos<br/>Analyze"]
-    DEC{"Issues<br/>found?"}
-    TEC["⚙️ Techne<br/>Fix"]
-    DONE["✅ All Clean"]
-
-    KAL --> DEC
-    DEC -->|"Yes (≤5 iterations)"| TEC
-    TEC --> KAL
-    DEC -->|"No"| DONE
-```
+<div class="korch korch--row" markdown="0">
+  <div class="korch-row">
+    <div class="kagent agent-card--kallos"><b>✨ Kallos</b><span>Analyze</span></div>
+    <span class="korch-arrow">→</span>
+    <div class="kdecision"><span>Issues found?</span></div>
+    <span class="korch-arrow">yes →</span>
+    <div class="kagent agent-card--techne"><b>⚙️ Techne</b><span>Fix</span></div>
+    <span class="korch-arrow">no →</span>
+    <div class="kagent kdone"><b>✅ All Clean</b></div>
+  </div>
+  <div class="korch-loop-note">Techne loops back to Kallos to re-analyze · ≤5 iterations</div>
+</div>
 
 `agent.py` carries `run_make_lint()`, `fix_lint_issues()`, and `run_style_check()`.
 

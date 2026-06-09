@@ -4,15 +4,13 @@
 
 Every agent follows the same internal structure. No exceptions.
 
-```mermaid
-flowchart TD
-    MAIN["<b>__main__.py</b><br/>Server Entry<br/><i>AgentCard · A2AStarletteApplication · uvicorn</i>"]
-    EXEC["<b>agent_executor.py</b><br/>A2A Bridge<br/><i>AgentExecutor subclass · OTEL spans · event queue</i>"]
-    AGENT["<b>agent.py</b><br/>Domain Logic<br/><i>Pure business logic · no A2A types · testable in isolation</i>"]
-
-    MAIN --> EXEC
-    EXEC --> AGENT
-```
+<div class="korch" markdown="0">
+  <div class="korch-row"><div class="kagent"><b>__main__.py</b><span>Server Entry · AgentCard · A2AStarletteApplication · uvicorn</span></div></div>
+  <div class="korch-flow">creates</div>
+  <div class="korch-row"><div class="kagent"><b>agent_executor.py</b><span>A2A Bridge · AgentExecutor subclass · OTEL spans · event queue</span></div></div>
+  <div class="korch-flow">delegates to</div>
+  <div class="korch-row"><div class="kagent"><b>agent.py</b><span>Domain Logic · pure business logic, no A2A types, testable in isolation</span></div></div>
+</div>
 
 | Layer | File | Responsibility |
 |---|---|---|

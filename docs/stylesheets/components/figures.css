@@ -105,3 +105,43 @@
   .md-typeset .kagent.khub { min-width: 12rem; }
   .kgroup .kagent { min-width: 5.4rem; }
 }
+
+/* Horizontal process row (refine loops, decision flows). */
+.md-typeset .korch--row .korch-row { align-items: center; gap: 0.55rem; }
+
+.korch-arrow {
+  align-self: center;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: color-mix(in srgb, var(--gold-light) 60%, transparent);
+}
+
+.md-typeset .kdecision {
+  align-self: center;
+  padding: 0.5rem 0.9rem;
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--gold-light);
+  border: 1px solid color-mix(in srgb, var(--gold-mid) 55%, transparent);
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--gold-mid) 14%, transparent);
+  transform: skewX(-8deg);
+}
+.kdecision > * { display: inline-block; transform: skewX(8deg); }
+
+.md-typeset .kagent.kdone {
+  border-color: color-mix(in srgb, #7fbc8c 55%, transparent);
+  border-top-color: #7fbc8c;
+  background: color-mix(in srgb, #7fbc8c 12%, transparent);
+}
+
+.korch-loop-note {
+  margin-top: 0.5rem;
+  text-align: center;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  opacity: 0.72;
+  color: var(--gold-light);
+}
+.korch-loop-note::before { content: "\21BA\00a0"; } /* loop arrow */
