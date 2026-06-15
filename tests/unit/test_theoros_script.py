@@ -12,6 +12,12 @@ import pytest
 if shutil.which("tmux") is None:
     pytest.skip("tmux not available", allow_module_level=True)
 
+# These tests share two machine-global resources — the `kourai-theoros` tmux
+# session and the /tmp/kourai-theoros.state file. Under `pytest -n auto` they
+# must run on one worker, or one worker's autouse cleanup unlinks state another
+# worker just wrote. xdist_group + `--dist loadgroup` (addopts) serializes them.
+pytestmark = pytest.mark.xdist_group("theoros")
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "scripts" / "theoros.sh"
 STATE_FILE = Path("/tmp/kourai-theoros.state")
