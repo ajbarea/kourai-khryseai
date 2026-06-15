@@ -82,7 +82,7 @@ To keep the VN and web in lockstep, factor the A2A→event translation through t
 
 ## 6. Frontend (vanilla + lit, buildless)
 
-**Stack.** lit Web Components, ES modules, no framework runtime. **Buildless by default** to match periplus: a dev import-map pulls lit from a CDN; for offline/prod we vendor lit's ESM as a single file (`web/vendor/lit.js`). An optional `esbuild` one-liner can bundle/minify later — not required to ship.
+**Stack.** lit Web Components, ES modules, no framework runtime. **Buildless by default** to match periplus: an import-map resolves `lit` to **vendored, offline ESM** under `web/vendor/lit/` (no CDN at runtime). Shipped 2026-06-15 via `web/scripts/vendor-lit.sh` — an `esbuild` split-bundle (not the single file first sketched here) so the `lit` core and the `lit/directives/repeat.js` subpath share one lit-html copy; separate bundles would duplicate lit-html and break directive recognition.
 
 **Reuse what's built.** The (A) demo's forge theme (gold/charcoal CSS variables), the streaming/typewriter feel, the pipeline rail, the affinity HUD, and the real portraits (`docs/assets/avatars/*_neutral.png`) all carry straight over — the demo was effectively the visual prototype for this host.
 
