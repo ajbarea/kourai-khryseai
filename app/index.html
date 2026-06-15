@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="en" data-theme="forge">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>The Forge — Kourai Khryseai (live demo)</title>
+<meta name="description" content="A scripted replay of a Kourai Khryseai forge: ten Golden Maidens plan, code, test, and commit alongside you over the A2A protocol." />
+<meta name="theme-color" content="#15110d" />
+<meta name="color-scheme" content="dark" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
+<link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png" />
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png" />
+<meta property="og:title" content="The Forge — Kourai Khryseai" />
+<meta property="og:description" content="Watch the Golden Maidens forge a feature: plan, code, test, review, commit — you guide each step." />
+<meta property="og:type" content="website" />
+<style>
+  :root {
+    --bg: #15110d; --bg-2: #1d1813; --panel: #221c15; --panel-2: #2a2218; --line: #3a2f22;
+    --ink: #f3e9d2; --ink-dim: #c8b89a; --ink-faint: #8d7d63;
+    --gold: #e9b949; --gold-soft: #f0c869; --ember: #e2562b;
+    --radius: 14px; --radius-sm: 10px; --maxw: 880px;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --c-hephaestus: #e2562b; --c-metis: #5b9bff; --c-techne: #e0962f;
+    --c-dokimasia: #46b977; --c-kallos: #cf86ec; --c-mneme: #4ec5c5;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    font-family: var(--sans); color: var(--ink);
+    background: radial-gradient(1200px 600px at 50% -10%, #2a2014 0%, transparent 60%),
+                radial-gradient(800px 500px at 90% 0%, #241a10 0%, transparent 55%), var(--bg);
+    line-height: 1.55; -webkit-font-smoothing: antialiased; min-height: 100dvh;
+  }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: clamp(14px, 3vw, 28px); }
+
+  header.app { text-align: center; padding-top: 6px; }
+  .brand {
+    font-size: clamp(1.6rem, 4.5vw, 2.4rem); margin: 0; letter-spacing: .5px; font-weight: 800;
+    background: linear-gradient(180deg, var(--gold-soft), var(--gold) 60%, #b8862a);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .sub { color: var(--ink-dim); margin: 6px 0 2px; font-size: .98rem; }
+  .sub b { color: var(--ink); font-weight: 600; }
+  .tagline { color: var(--ink-faint); font-style: italic; font-size: .85rem; margin: 2px 0 0; }
+
+  .rail {
+    display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px;
+    margin: 18px auto 8px; padding: 10px;
+    background: linear-gradient(180deg, var(--panel), var(--bg-2)); border: 1px solid var(--line); border-radius: var(--radius);
+  }
+  .node { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 64px; padding: 6px 4px; border-radius: var(--radius-sm); }
+  .node .disc {
+    width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-size: 20px; position: relative; overflow: hidden;
+    background: radial-gradient(circle at 30% 25%, #2f2718, #1b160f); border: 2px solid var(--line);
+    transition: border-color .35s ease, box-shadow .35s ease, filter .35s ease; filter: grayscale(.55) opacity(.65);
+  }
+  .node .disc img.por { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .node .nm { font-size: .68rem; color: var(--ink-faint); letter-spacing: .3px; }
+  .node[data-state="active"] .disc {
+    border-color: var(--accent, var(--gold)); filter: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, var(--gold)) 25%, transparent),
+                0 0 22px color-mix(in srgb, var(--accent, var(--gold)) 55%, transparent);
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  .node[data-state="done"] .disc { border-color: color-mix(in srgb, var(--accent,var(--gold)) 60%, var(--line)); filter: none; }
+  .node[data-state="done"] .disc::after {
+    content: "✓"; position: absolute; right: -1px; bottom: -1px; width: 16px; height: 16px; border-radius: 50%;
+    background: var(--c-dokimasia); color: #10110a; font-size: 11px; font-weight: 700; display: grid; place-items: center; border: 2px solid var(--bg-2);
+  }
+  .node[data-state="active"] .nm, .node[data-state="done"] .nm { color: var(--ink-dim); }
+  @keyframes pulse { 0%,100%{ transform: translateY(0);} 50%{ transform: translateY(-2px);} }
+  .arrow { color: var(--ink-faint); font-size: .8rem; opacity: .6; }
+
+  .controls { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; margin: 6px 0 14px; }
+  button.ctl, .seg button {
+    font-family: var(--sans); font-size: .85rem; color: var(--ink);
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 999px; padding: 8px 14px; cursor: pointer;
+    transition: border-color .2s, background .2s, transform .05s;
+  }
+  button.ctl:hover, .seg button:hover { border-color: var(--gold); }
+  button.ctl:active { transform: translateY(1px); }
+  button.ctl.primary { background: linear-gradient(180deg, var(--gold-soft), var(--gold)); color: #2a1d05; border-color: var(--gold); font-weight: 700; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+  .seg button { border: none; border-radius: 0; background: var(--panel); padding: 8px 12px; }
+  .seg button[aria-pressed="true"] { background: color-mix(in srgb, var(--gold) 22%, var(--panel)); color: var(--gold-soft); font-weight: 700; }
+
+  /* terminal: fixed-height window, only the body scrolls */
+  .terminal { display: flex; flex-direction: column; height: clamp(360px, 62vh, 600px);
+    background: linear-gradient(180deg, var(--bg-2), var(--bg)); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+  .term-bar { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .term-bar .dots { display: inline-flex; gap: 6px; }
+  .term-bar .dots i { width: 11px; height: 11px; border-radius: 50%; display: block; }
+  .term-bar .dots i:nth-child(1){ background: #e2562b; }
+  .term-bar .dots i:nth-child(2){ background: #e9b949; }
+  .term-bar .dots i:nth-child(3){ background: #46b977; }
+  .term-title { font-family: var(--mono); font-size: .78rem; color: var(--ink-faint); }
+  .term-prompt { margin-left: auto; font-size: .78rem; color: var(--ink-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .term-prompt .you { color: var(--gold-soft); font-weight: 700; }
+  .term-prompt code { font-family: var(--mono); color: var(--ink); background: var(--bg-2); padding: 1px 6px; border-radius: 6px; border: 1px solid var(--line); }
+  .term-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: clamp(12px, 2.5vw, 18px); }
+
+  .msg { display: flex; gap: 12px; margin: 14px 0; align-items: flex-start; }
+  .msg:first-child { margin-top: 0; }
+  .msg .av {
+    flex: 0 0 auto; width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; font-size: 21px; overflow: hidden;
+    background: radial-gradient(circle at 30% 25%, color-mix(in srgb, var(--accent) 45%, #221b12), #181309);
+    border: 2px solid var(--accent); box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 40%, transparent);
+  }
+  .msg .av img.por { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .msg .body { flex: 1 1 auto; min-width: 0; }
+  .msg .who { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+  .msg .who .name { color: var(--accent); font-weight: 700; font-size: .92rem; letter-spacing: .2px; }
+  .msg .who .role { color: var(--ink-faint); font-size: .72rem; text-transform: uppercase; letter-spacing: .6px; }
+  .msg .who .kind { margin-left: auto; font-size: .66rem; color: var(--ink-faint); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; }
+  .msg .text { color: var(--ink); font-size: .98rem; }
+  .msg.narration .text { font-style: italic; color: var(--ink-dim); }
+  .msg .text .caret { display: inline-block; width: .55ch; background: var(--accent); margin-left: 1px; animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  pre.block {
+    font-family: var(--mono); font-size: .82rem; line-height: 1.5; background: #110d08; border: 1px solid var(--line);
+    border-radius: var(--radius-sm); padding: 12px 14px; margin: 8px 0 0; overflow-x: auto; color: var(--ink-dim);
+    white-space: pre-wrap; word-break: break-word;
+  }
+  pre.block .add { color: #7fd6a0; }
+  pre.block .del { color: #e58b7b; }
+  pre.block .meta { color: var(--ink-faint); }
+  pre.block .pass { color: #7fd6a0; font-weight: 700; }
+
+  .choice { margin: 6px 0 2px; display: flex; flex-direction: column; gap: 8px; }
+  .choice .q { color: var(--gold-soft); font-weight: 600; }
+  .choice .opts { display: flex; gap: 10px; flex-wrap: wrap; }
+  .choice .opts button {
+    flex: 1 1 200px; text-align: left; background: var(--panel-2); color: var(--ink); border: 1px solid var(--line);
+    border-radius: var(--radius-sm); padding: 12px 14px; cursor: pointer; transition: border-color .2s, background .2s, transform .05s;
+  }
+  .choice .opts button:hover { border-color: var(--gold); background: color-mix(in srgb, var(--gold) 10%, var(--panel-2)); }
+  .choice .opts button:active { transform: translateY(1px); }
+  .choice .opts button .lab { font-weight: 700; color: var(--gold-soft); display: block; }
+  .choice .opts button .hint { font-size: .8rem; color: var(--ink-faint); }
+  .you-pick { text-align: right; color: var(--gold-soft); font-size: .9rem; margin: 10px 0 2px; }
+  .you-pick .bub { background: linear-gradient(180deg, var(--gold-soft), var(--gold)); color: #2a1d05; padding: 6px 12px; border-radius: 999px; font-weight: 700; display: inline-block; }
+
+  .sys { text-align: center; margin: 16px 0 6px; }
+  .sys span { display: inline-block; color: var(--ink-dim); font-size: .82rem; background: var(--panel); border: 1px dashed var(--line); border-radius: 999px; padding: 5px 14px; }
+
+  .hud { margin-top: 16px; }
+  .hud h2 { font-size: .72rem; text-transform: uppercase; letter-spacing: 1px; color: var(--ink-faint); text-align: center; margin: 0 0 8px; font-weight: 600; }
+  .meters { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
+  .meter { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 8px 10px; }
+  .meter .top { display: flex; align-items: center; gap: 6px; font-size: .8rem; }
+  .meter .top .g { font-size: 15px; }
+  .meter .top .n { color: var(--ink-dim); }
+  .meter .top .h { margin-left: auto; font-size: .72rem; color: var(--accent); }
+  .meter .bar { height: 6px; background: #100c07; border-radius: 999px; margin-top: 6px; overflow: hidden; }
+  .meter .bar i { display: block; height: 100%; width: 0%; background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 60%, #000), var(--accent)); border-radius: 999px; transition: width .6s ease; }
+
+  footer.app { text-align: center; color: var(--ink-faint); font-size: .82rem; margin: 22px 0 8px; }
+  footer.app a { color: var(--gold); text-decoration: none; }
+  footer.app a:hover { text-decoration: underline; }
+  #status { display: none; color: var(--c-dokimasia); font-size: .8rem; margin-top: 8px; }
+  #install { display: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+    .msg .text .caret { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="app">
+    <h1 class="brand">🏛️ Kourai Khryseai</h1>
+    <p class="sub"><b>The Forge</b> — ten Golden Maidens plan, code, test &amp; commit <b>with</b> you, over the A2A protocol.</p>
+    <p class="tagline">Collaborate, don't automate. See your agents think. Guide them in real time.</p>
+  </header>
+
+  <nav class="rail" id="rail" aria-label="Forge pipeline"></nav>
+
+  <div class="controls">
+    <button class="ctl primary" id="play" aria-label="Play or pause">▶ Begin the forge</button>
+    <button class="ctl" id="restart" aria-label="Restart">↺ Restart</button>
+    <span class="seg" role="group" aria-label="Playback speed">
+      <button data-speed="1" aria-pressed="true">1×</button>
+      <button data-speed="2" aria-pressed="false">2×</button>
+      <button data-speed="4" aria-pressed="false">4×</button>
+    </span>
+    <button class="ctl" id="install">⬇ Install</button>
+  </div>
+
+  <main class="terminal" id="terminal">
+    <div class="term-bar">
+      <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span class="term-title">kourai — forge · A2A</span>
+      <span class="term-prompt"><span class="you">You ❯</span> <code>add user authentication</code></span>
+    </div>
+    <div class="term-body" id="termbody">
+      <div id="transcript" aria-live="polite" aria-atomic="false"></div>
+    </div>
+  </main>
+
+  <section class="hud" aria-label="Affinity">
+    <h2>Affinity · the maidens warm to good work</h2>
+    <div class="meters" id="meters"></div>
+  </section>
+
+  <footer class="app">
+    <p>A scripted replay. The real system runs ten agents locally over
+       <a href="https://a2a-protocol.org" rel="noopener">A2A</a> — CLI, GUI, or Ren'Py visual novel.</p>
+    <p><a href="https://github.com/ajbarea/kourai-khryseai" rel="noopener">GitHub</a> ·
+       <a href="https://ajbarea.github.io/kourai-khryseai/" rel="noopener">Docs</a></p>
+    <p id="status" role="status"></p>
+  </footer>
+</div>
+
+<script>
+"use strict";
+(() => {
+  const AGENTS = {
+    hephaestus: { name: "Hephaestus", role: "Forge Master", glyph: "🔥", v: "--c-hephaestus", pipeline: false },
+    metis:      { name: "Metis",      role: "Planner",      glyph: "📐", v: "--c-metis",      pipeline: true },
+    techne:     { name: "Techne",     role: "Coder",        glyph: "⚙️", v: "--c-techne",     pipeline: true },
+    dokimasia:  { name: "Dokimasia",  role: "Tester",       glyph: "🧪", v: "--c-dokimasia",  pipeline: true },
+    kallos:     { name: "Kallos",     role: "Stylist",      glyph: "✨", v: "--c-kallos",     pipeline: true },
+    mneme:      { name: "Mneme",      role: "Scribe",       glyph: "📜", v: "--c-mneme",      pipeline: true },
+  };
+  const PIPELINE = ["metis", "techne", "dokimasia", "kallos", "mneme"];
+
+  const INTRO = [
+    { agent: "hephaestus", kind: "narration", text: "Forge's lit. Metis — lay the path. What does this one need?" },
+    { agent: "metis", kind: "say", text: "Authentication. The door everyone forgets to lock. Two ways in, and they're not the same animal." },
+    { agent: "metis", kind: "ask", text: "Which world are we in?",
+      choices: [
+        { key: "jwt", lab: "JWT + refresh tokens", hint: "Stateless, scales wide, rotation for free." },
+        { key: "sessions", lab: "Server sessions", hint: "Simpler to revoke — kill the row, kill the login." },
+      ] },
+  ];
+  const BRANCH = {
+    jwt: [
+      { agent: "metis", kind: "say", text: "JWT it is. Stateless, scales to gigs of traffic. Spec — 8 steps: 15-minute access token, rotating refresh, httpOnly cookie, replay detection on reuse. Edge cases noted: clock skew, revoke-list, logout-everywhere." },
+      { agent: "hephaestus", kind: "narration", text: "Well forged, Metis. Techne — take what she built and make it real." },
+      { agent: "techne", kind: "code", text:
+"+ src/auth/tokens.py        (mint + rotate)\n+ src/auth/middleware.py    (verify, refresh)\n+ tests/test_auth.py\n\n@@ src/auth/tokens.py @@\n+ def mint(user_id: str) -> TokenPair:\n+     access  = _sign(user_id, ttl=ACCESS_TTL)   # 15 min\n+     refresh = _sign(user_id, ttl=REFRESH_TTL, rotate=True)\n+     return TokenPair(access, refresh)" },
+      { agent: "techne", kind: "say", text: "Done. Access + refresh, rotation on, reuse detected. Parameterized the TTLs so you're not hunting magic numbers in six months." },
+    ],
+    sessions: [
+      { agent: "metis", kind: "say", text: "Sessions. Honest and revocable. Spec — 8 steps: signed session cookie, server-side store, sliding expiry, CSRF token on every mutation. Edge cases: fixation on login, concurrent logouts, store eviction." },
+      { agent: "hephaestus", kind: "narration", text: "Well forged, Metis. Techne — take what she built and make it real." },
+      { agent: "techne", kind: "code", text:
+"+ src/auth/session.py       (create + rotate)\n+ src/auth/middleware.py    (load, csrf)\n+ tests/test_auth.py\n\n@@ src/auth/session.py @@\n+ def create(user_id: str) -> Session:\n+     sid = secrets.token_urlsafe(32)\n+     STORE.put(sid, user_id, ttl=SLIDING_TTL)\n+     return Session(sid, csrf=secrets.token_urlsafe(16))" },
+      { agent: "techne", kind: "say", text: "Done. Signed cookie, rotates on privilege change, CSRF double-submit. Clean." },
+    ],
+  };
+  const TAIL = [
+    { agent: "hephaestus", kind: "narration", text: "Dokimasia — put it through the fire." },
+    { agent: "dokimasia", kind: "say", text: "On it. I'm checking expired tokens, tampered signatures, replay, concurrent logout, and the boundary nobody tests — what happens when the clock skews. Better me than a stranger at 3am." },
+    { agent: "dokimasia", kind: "test", text:
+"$ uv run kourai-dev test auth\n  test_expired_rejected ......... ok\n  test_tampered_signature ....... ok\n  test_replay_detected .......... ok\n  test_clock_skew_grace ......... ok\n  test_logout_everywhere ........ ok\n<pass>14 passed in 1.92s — incl. 3 nasty ones I added</pass>" },
+    { agent: "hephaestus", kind: "narration", text: "Kallos. Standards." },
+    { agent: "kallos", kind: "review", text: "Reading it. Two functions doing three jobs — split them. One docstring writing a novel — trim to a line; Args and Returns can carry the rest. Otherwise clean." },
+    { agent: "hephaestus", kind: "narration", text: "Techne — Kallos found two. Fix and back. (they iterate, up to 5 rounds — tunable)" },
+    { agent: "techne", kind: "say", text: "Already done. Split the token mint from the cookie set. Linter's quiet." },
+    { agent: "kallos", kind: "review", text: "Re-read. Beauty earned. No issues." },
+    { agent: "hephaestus", kind: "narration", text: "Mneme — seal the work." },
+    { agent: "mneme", kind: "commit", text:
+"feat(auth): {APPROACH} authentication with rotation\ntest(auth): expiry, replay, skew, concurrent logout\ndocs(api): document the auth flow + revoke path" },
+    { agent: "mneme", kind: "say", text: "Three commits, conventional. Future-you reading this log in six months will know exactly which line guards the door." },
+    { agent: "hephaestus", kind: "narration", text: "Done. Cooling on the bench. Tell them they did well — they'll preen, but they earned it." },
+    { agent: "system", kind: "system", text: "Forge complete · {APPROACH} authentication · 14/14 tests green · 3 commits ready" },
+  ];
+  const APPROACH_LABEL = { jwt: "JWT", sessions: "session-based" };
+
+  const $ = (sel) => document.querySelector(sel);
+  const cssVar = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  const el = (tag, cls, html) => { const n = document.createElement(tag); if (cls) n.className = cls; if (html != null) n.innerHTML = html; return n; };
+  const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  const reduceMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch { return d; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+  };
+
+  /* portrait avatar with emoji-glyph fallback if the PNG isn't present */
+  function portrait(id) {
+    const a = AGENTS[id];
+    const img = document.createElement("img");
+    img.className = "por"; img.src = "assets/avatars/" + id + "_neutral.png"; img.alt = a.name; img.loading = "lazy"; img.decoding = "async";
+    img.addEventListener("error", () => { const p = img.parentElement; if (p) { p.textContent = a.glyph; } }, { once: true });
+    return img;
+  }
+
+  const transcript = $("#transcript");
+  const termbody = $("#termbody");
+  const playBtn = $("#play");
+  let queue = [], pos = 0, playing = false, finished = false;
+  let speed = parseFloat(store.get("kk-speed", "1")) || 1;
+  let gen = 0, activeGen = null, approach = null;
+  const affinity = {};
+  let waiters = [], resumeResolvers = [];
+
+  const waitWhilePaused = () => (playing ? Promise.resolve() : new Promise((res) => resumeResolvers.push(res)));
+  function sleep(ms) { return new Promise((res) => { const t = setTimeout(res, ms / speed); waiters.push({ res, t }); }); }
+  function flushWaiters() { waiters.forEach((w) => clearTimeout(w.t)); waiters.forEach((w) => w.res()); waiters = []; const r = resumeResolvers; resumeResolvers = []; r.forEach((f) => f()); }
+
+  function buildRail() {
+    const rail = $("#rail"); rail.innerHTML = "";
+    const heph = railNode("hephaestus"); heph.style.setProperty("--accent", cssVar(AGENTS.hephaestus.v));
+    rail.append(heph, el("span", "arrow", "⟶"));
+    PIPELINE.forEach((id, i) => {
+      const n = railNode(id); n.style.setProperty("--accent", cssVar(AGENTS[id].v));
+      rail.append(n);
+      if (i < PIPELINE.length - 1) rail.append(el("span", "arrow", "→"));
+    });
+  }
+  function railNode(id) {
+    const a = AGENTS[id]; const n = el("div", "node"); n.id = "node-" + id; n.dataset.state = "idle";
+    const disc = el("div", "disc"); disc.appendChild(portrait(id));
+    n.append(disc, el("div", "nm", a.name)); return n;
+  }
+  function setNode(id, state) { const n = $("#node-" + id); if (n) n.dataset.state = state; }
+  function activate(id) {
+    if (!AGENTS[id] || !AGENTS[id].pipeline) return;
+    PIPELINE.forEach((p) => {
+      if (p === id) setNode(p, "active");
+      else if ($("#node-" + p).dataset.state === "active") setNode(p, "done");
+    });
+  }
+  function buildHUD() {
+    const m = $("#meters"); m.innerHTML = "";
+    Object.keys(AGENTS).forEach((id) => {
+      affinity[id] = 0; const a = AGENTS[id];
+      const card = el("div", "meter"); card.style.setProperty("--accent", cssVar(a.v));
+      card.innerHTML =
+        `<div class="top"><span class="g">${a.glyph}</span><span class="n">${a.name}</span><span class="h" id="h-${id}">♡ 0</span></div>` +
+        `<div class="bar"><i id="bar-${id}"></i></div>`;
+      m.append(card);
+    });
+  }
+  function bumpAffinity(id, amt) {
+    if (affinity[id] == null) return;
+    affinity[id] = Math.min(100, affinity[id] + amt);
+    const bar = $("#bar-" + id), h = $("#h-" + id);
+    if (bar) bar.style.width = affinity[id] + "%";
+    if (h) h.textContent = (affinity[id] >= 70 ? "♥ " : "♡ ") + affinity[id];
+  }
+
+  const KIND_LABEL = { narration: "forge", say: "", ask: "decision", code: "diff", test: "tests", review: "review", commit: "commit" };
+  const sub = (t) => String(t).replace(/\{APPROACH\}/g, approach ? APPROACH_LABEL[approach] : "");
+
+  async function renderMessage(step, myGen) {
+    if (step.kind === "system") { const s = el("div", "sys"); s.append(el("span", null, esc(sub(step.text)))); transcript.append(s); scroll(); return; }
+    const a = AGENTS[step.agent];
+    const wrap = el("div", "msg" + (step.kind === "narration" ? " narration" : ""));
+    wrap.style.setProperty("--accent", cssVar(a.v));
+    const av = el("div", "av"); av.appendChild(portrait(step.agent)); wrap.append(av);
+    const body = el("div", "body");
+    const who = el("div", "who");
+    who.append(el("span", "name", esc(a.name)), el("span", "role", esc(a.role)));
+    if (KIND_LABEL[step.kind]) who.append(el("span", "kind", KIND_LABEL[step.kind]));
+    body.append(who); wrap.append(body); transcript.append(wrap);
+    if (step.kind === "code" || step.kind === "test" || step.kind === "commit") {
+      const pre = el("pre", "block"); body.append(pre); scroll();
+      await streamPre(pre, sub(step.text), step.kind, myGen);
+    } else {
+      const text = el("div", "text"); body.append(text); scroll();
+      await streamText(text, sub(step.text), myGen);
+    }
+  }
+  async function streamText(node, txt, myGen) {
+    if (reduceMotion()) { node.textContent = txt; scroll(); return; }
+    const caret = el("span", "caret", "&nbsp;"); node.textContent = ""; node.append(caret);
+    for (let i = 0; i < txt.length; i += 2) {
+      if (!playing) await waitWhilePaused();
+      if (myGen !== gen) return;
+      node.textContent = txt.slice(0, i + 2); node.append(caret); scroll();
+      await sleep(14);
+      if (myGen !== gen) return;
+    }
+    node.textContent = txt;
+  }
+  async function streamPre(pre, txt, kind, myGen) {
+    const full = formatBlock(txt, kind);
+    if (reduceMotion()) { pre.innerHTML = full; scroll(); return; }
+    const lines = txt.split("\n");
+    for (let i = 1; i <= lines.length; i++) {
+      if (!playing) await waitWhilePaused();
+      if (myGen !== gen) return;
+      pre.innerHTML = formatBlock(lines.slice(0, i).join("\n"), kind); scroll();
+      await sleep(90);
+      if (myGen !== gen) return;
+    }
+    pre.innerHTML = full;
+  }
+  function formatBlock(txt, kind) {
+    return esc(txt)
+      .replace(/&lt;pass&gt;([\s\S]*?)&lt;\/pass&gt;/g, '<span class="pass">$1 ✅</span>')
+      .split("\n").map((ln) => {
+        if (/^\+/.test(ln)) return '<span class="add">' + ln + "</span>";
+        if (/^-/.test(ln)) return '<span class="del">' + ln + "</span>";
+        if (/^@@|^\$ |^feat|^test|^docs|^chore/.test(ln)) return '<span class="meta">' + ln + "</span>";
+        return ln;
+      }).join("\n");
+  }
+  /* scroll the terminal body — never the page, so the layout can't grow or jump */
+  const scroll = () => { termbody.scrollTo({ top: termbody.scrollHeight, behavior: reduceMotion() ? "auto" : "smooth" }); };
+
+  function renderChoice(step) {
+    return new Promise((resolve) => {
+      const box = el("div", "choice");
+      box.append(el("div", "q", esc(step.text)));
+      const opts = el("div", "opts");
+      step.choices.forEach((c) => {
+        const b = el("button", null, `<span class="lab">${esc(c.lab)}</span><span class="hint">${esc(c.hint)}</span>`);
+        b.addEventListener("click", () => {
+          approach = c.key; box.remove();
+          const pick = el("div", "you-pick"); pick.innerHTML = `<span class="bub">You ❯ ${esc(c.lab)}</span>`;
+          transcript.append(pick);
+          queue.splice(pos, 0, ...BRANCH[c.key], ...TAIL);
+          scroll(); resolve();
+        }, { once: true });
+        opts.append(b);
+      });
+      box.append(opts); transcript.append(box); scroll();
+    });
+  }
+
+  function withVT(fn) { if (document.startViewTransition && !reduceMotion()) document.startViewTransition(fn); else fn(); }
+
+  async function advance() {
+    if (activeGen === gen) return;
+    activeGen = gen; const myGen = gen;
+    while (pos < queue.length) {
+      if (!playing) await waitWhilePaused();
+      if (myGen !== gen) return;
+      const step = queue[pos++];
+      if (step.agent && AGENTS[step.agent]?.pipeline) withVT(() => activate(step.agent));
+      if (step.kind === "ask") { await renderChoice(step); if (myGen !== gen) return; continue; }
+      await renderMessage(step, myGen);
+      if (myGen !== gen) return;
+      if (step.agent && step.agent !== "system") bumpAffinity(step.agent, step.kind === "narration" ? 4 : 12);
+      await sleep(step.kind === "narration" ? 360 : 620);
+      if (myGen !== gen) return;
+    }
+    PIPELINE.forEach((p) => { if ($("#node-" + p).dataset.state === "active") setNode(p, "done"); });
+    finished = true; playing = false; activeGen = null;
+    playBtn.textContent = "✓ Forged — replay?";
+  }
+
+  function setPlay(on) {
+    playing = on;
+    if (!finished) playBtn.textContent = on ? "⏸ Pause" : (pos === 0 ? "▶ Begin the forge" : "▶ Resume");
+    if (on) { const r = resumeResolvers; resumeResolvers = []; r.forEach((f) => f()); advance(); }
+  }
+
+  playBtn.addEventListener("click", () => { if (finished) { reset(); setPlay(true); return; } setPlay(!playing); });
+  $("#restart").addEventListener("click", () => reset());
+  document.querySelectorAll(".seg button").forEach((b) => {
+    b.addEventListener("click", () => {
+      speed = parseFloat(b.dataset.speed); store.set("kk-speed", String(speed));
+      document.querySelectorAll(".seg button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    });
+  });
+
+  function reset() {
+    gen++; activeGen = null; playing = false; finished = false; pos = 0; approach = null;
+    flushWaiters();
+    queue = INTRO.slice();
+    transcript.innerHTML = ""; termbody.scrollTop = 0;
+    buildRail(); buildHUD();
+    playBtn.textContent = "▶ Begin the forge";
+  }
+
+  /* install prompt — only shown when the browser says it's actually installable */
+  let deferredPrompt = null;
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault(); deferredPrompt = e;
+    const b = $("#install"); b.style.display = "inline-block";
+    b.onclick = async () => { b.style.display = "none"; try { deferredPrompt.prompt(); } catch {} deferredPrompt = null; };
+  });
+
+  /* offline status — claim it ONLY once the service worker actually controls the page */
+  function markOfflineReady() { const s = $("#status"); if (s) { s.textContent = "✓ Cached on this device — opens offline"; s.style.display = "block"; } }
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").then(() => {
+        if (navigator.serviceWorker.controller) markOfflineReady();
+        navigator.serviceWorker.addEventListener("controllerchange", markOfflineReady);
+      }).catch(() => {});
+    });
+  }
+
+  document.querySelectorAll(".seg button").forEach((x) => x.setAttribute("aria-pressed", String(parseFloat(x.dataset.speed) === speed)));
+  reset();
+})();
+</script>
+</body>
+</html>

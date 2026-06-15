@@ -6,16 +6,19 @@ Exposes five endpoints:
   POST /message - streaming NDJSON: user message or choice to agent stream
   POST /tts     - text-to-speech: {text, agent} → MP3 audio bytes
   POST /gossip  - live agent gossip: {agent, player_id, affinity} → {hint, line}
+  GET  /*       - static web GUI bundle (Host B), served when KOURAI_WEB_DIR exists
 """
 
 import contextlib
 import io
 import json
 import logging
+import os
 import re
 import sys
 import wave
 from collections.abc import AsyncGenerator
+from pathlib import Path
 from typing import TYPE_CHECKING, cast
 from uuid import uuid4
 
@@ -23,12 +26,16 @@ from a2a.client import A2ACardResolver, ClientConfig, create_client
 from a2a.types import (
     Message,
     TaskArtifactUpdateEvent,
+    TaskState,
     TaskStatusUpdateEvent,
 )
 from starlette.applications import Starlette
+from starlette.middleware import Middleware
+from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response, StreamingResponse
-from starlette.routing import Route
+from starlette.routing import Mount, Route
+from starlette.staticfiles import StaticFiles
 
 from kourai_common.a2a_events import (
     extract_artifact_text,
@@ -269,6 +276,27 @@ async def health(request: Request) -> JSONResponse:
     )
 
 
+def _project_json(p) -> dict:
+    return {
+        "project_id": p.project_id,
+        "name": p.name,
+        "template": p.template,
+        "path": str(p.path),
+        "created_at": p.created_at,
+    }
+
+
+def _session_json(s) -> dict:
+    return {
+        "session_id": s.session_id,
+        "project_id": s.project_id,
+        "branch": s.branch,
+        "status": s.status,
+        "started_at": s.started_at,
+        "workdir": str(s.workdir),
+    }
+
+
 async def handle_action(request: Request) -> JSONResponse:
     data: dict = await request.json()
     action = data.get("action", "")
@@ -324,6 +352,71 @@ async def handle_action(request: Request) -> JSONResponse:
             }
         )
 
+    # ── Host B: projects + forge sessions (wrap existing managers) ──
+    if action == "list_projects":
+        from kourai_common.player import PlayerProfile
+        from kourai_common.projects import ProjectManager
+
+        profile = PlayerProfile.load()
+        if profile is None:
+            return JSONResponse(
+                {"action": "projects_result", "projects": [], "error": "no_profile"}
+            )
+        projects = ProjectManager.list_for_player(profile.player_id)
+        return JSONResponse(
+            {"action": "projects_result", "projects": [_project_json(p) for p in projects]}
+        )
+
+    if action == "new_project":
+        from kourai_common.player import PlayerProfile
+        from kourai_common.projects import ProjectError, ProjectManager
+
+        profile = PlayerProfile.load()
+        if profile is None:
+            return JSONResponse(
+                {"action": "error", "message": "No active player profile."}, status_code=200
+            )
+        name = (data.get("name") or "").strip()
+        template = (data.get("template") or "empty").strip() or "empty"
+        if not name:
+            return JSONResponse(
+                {"action": "error", "message": "Project name required."}, status_code=200
+            )
+        try:
+            project = ProjectManager.create(profile.player_id, name, template)
+        except ProjectError as e:
+            return JSONResponse({"action": "error", "message": str(e)}, status_code=200)
+        return JSONResponse({"action": "project_created", "project": _project_json(project)})
+
+    if action == "list_sessions":
+        from kourai_common.forge_session import list_active_sessions
+
+        project_id = (data.get("project_id") or "").strip()
+        sessions = list_active_sessions(project_id) if project_id else []
+        return JSONResponse(
+            {"action": "sessions_result", "sessions": [_session_json(s) for s in sessions]}
+        )
+
+    if action in ("accept_session", "discard_session"):
+        from kourai_common.forge_session import ForgeSessionError, get_session
+
+        session_id = (data.get("session_id") or "").strip()
+        session = get_session(session_id) if session_id else None
+        if session is None:
+            return JSONResponse(
+                {"action": "error", "message": "Session not found."}, status_code=200
+            )
+        try:
+            if action == "accept_session":
+                session.accept()
+                result = "accepted"
+            else:
+                session.discard()
+                result = "discarded"
+        except ForgeSessionError as e:
+            return JSONResponse({"action": "error", "message": str(e)}, status_code=200)
+        return JSONResponse({"action": "session_done", "session_id": session_id, "result": result})
+
     return JSONResponse({"error": f"Unknown action: {action}"}, status_code=400)
 
 
@@ -351,7 +444,22 @@ async def handle_message(request: Request) -> StreamingResponse:
     user_text = data.get("choice", "") if action == "choice" else data.get("text", "")
 
     forge_metadata: dict = {}
-    if project_path:
+    project_id = (data.get("project_id") or "").strip()
+    if project_id:
+        # Web GUI: start a forge worktree for the active project (the CLI host
+        # does this per turn) and run the forge inside it.
+        try:
+            from kourai_common.forge_session import ForgeSession
+            from kourai_common.projects import ProjectManager, derive_project_id
+
+            project = ProjectManager.get(project_id)
+            if project is not None:
+                session = ForgeSession.start(project, label=(user_text or "forge")[:24])
+                forge_metadata["project_root"] = str(session.workdir)
+                forge_metadata["project_id"] = derive_project_id(project.path)
+        except Exception as e:
+            log.error(f"Forge session start failed: {e}")
+    elif project_path:
         forge_metadata["project_root"] = project_path
 
     # Forward the affinity snapshot so Hephaestus can calibrate
@@ -361,6 +469,17 @@ async def handle_message(request: Request) -> StreamingResponse:
     if tiers:
         forge_metadata["relationship_tiers"] = tiers
 
+    # Host B: forward the confirm-gate bypass flags when the web GUI sets them.
+    if data.get("yolo"):
+        forge_metadata["yolo"] = True
+    if data.get("auto_approve_reads"):
+        forge_metadata["auto_approve_reads"] = True
+
+    # Resume turns: relay the real ask so the router doesn't re-route on "yes".
+    original_request = (data.get("original_request") or "").strip()
+    if original_request:
+        forge_metadata["original_request"] = original_request
+
     if not user_text:
 
         async def empty() -> AsyncGenerator[str, None]:
@@ -369,15 +488,20 @@ async def handle_message(request: Request) -> StreamingResponse:
         return StreamingResponse(empty(), media_type="application/x-ndjson")
 
     log.info(f"Message ({action}, ctx={context_id[:8]}): {user_text[:80]}")
+    req_task_id = (data.get("task_id") or "").strip() or None
     message = user_message(
         user_text,
         context_id=context_id,
+        task_id=req_task_id,
         metadata=forge_metadata or None,
     )
 
     async def stream_response() -> AsyncGenerator[str, None]:
         tracker = PipelineTracker(initial_agent="hephaestus")
         found_artifact = False
+        final_state = None
+        last_task_id = ""
+        input_prompt = ""
         try:
             async for response in client.send_message(send_request(message)):
                 event = stream_event(response)
@@ -399,9 +523,14 @@ async def handle_message(request: Request) -> StreamingResponse:
                         found_artifact = True
                     continue
                 if isinstance(event, TaskStatusUpdateEvent):
+                    final_state = event.status.state
+                    if event.task_id:
+                        last_task_id = event.task_id
                     status_msg = extract_status_text(event)
                     if not status_msg:
                         continue
+                    if final_state == TaskState.TASK_STATE_INPUT_REQUIRED:
+                        input_prompt = status_msg
                     lower = status_msg.lower()
                     for name in AGENT_NAMES:
                         if name in lower:
@@ -433,6 +562,8 @@ async def handle_message(request: Request) -> StreamingResponse:
                     else:
                         yield (json.dumps({"action": "status", "message": status_msg[:120]}) + "\n")
                 elif isinstance(event, TaskArtifactUpdateEvent):
+                    if event.task_id:
+                        last_task_id = event.task_id
                     if event.artifact and event.artifact.parts:
                         # Extract jealousy_trigger from DataPart before processing text.
                         for p in event.artifact.parts:
@@ -473,6 +604,16 @@ async def handle_message(request: Request) -> StreamingResponse:
             log.error(f"Stream error: {e}", exc_info=True)
             yield json.dumps({"agent": "system", "message": f"Processing error: {e}"}) + "\n"
             return
+        if final_state == TaskState.TASK_STATE_INPUT_REQUIRED:
+            prompt = strip_ssml(input_prompt or "Hephaestus needs your confirmation.")[:400]
+            payload: dict = {"action": "input_required", "prompt": prompt}
+            if last_task_id:
+                payload["task_id"] = last_task_id
+            root = forge_metadata.get("project_root")
+            if root:
+                payload["project_root"] = root
+            yield json.dumps(payload) + "\n"
+            return
         if not found_artifact:
             log.warning("Pipeline finished without artifact.")
             yield (
@@ -488,13 +629,53 @@ async def handle_message(request: Request) -> StreamingResponse:
     return StreamingResponse(stream_response(), media_type="application/x-ndjson")
 
 
-app = Starlette(
-    routes=[
+def _cors_origins() -> list[str]:
+    """Dev CORS allow-list. Same-origin (served by the gateway) needs none;
+    this only matters when the SPA runs from a separate dev server."""
+    raw = os.environ.get("KOURAI_WEB_ORIGINS", "")
+    if raw.strip():
+        return [o.strip() for o in raw.split(",") if o.strip()]
+    return ["http://localhost:5173", "http://127.0.0.1:5173"]
+
+
+def _build_routes() -> list:
+    routes: list = [
         Route("/health", health),
         Route("/action", handle_action, methods=["POST"]),
         Route("/message", handle_message, methods=["POST"]),
         Route("/tts", handle_tts, methods=["POST"]),
         Route("/gossip", handle_gossip, methods=["POST"]),
+    ]
+    # Host B: serve the web GUI bundle same-origin. Mounted LAST so the API
+    # routes above always take precedence. Skipped when the dir is absent
+    # (e.g. a VN-only deploy), so this never affects the Ren'Py path.
+    repo_root = Path(__file__).resolve().parents[2]
+    # Agent portraits — single source of truth is docs/assets/avatars. Mounted
+    # before the "/" catch-all so /avatars/<id>_neutral.png resolves first.
+    avatars_dir = Path(
+        os.environ.get("KOURAI_AVATARS_DIR") or (repo_root / "docs" / "assets" / "avatars")
+    )
+    if avatars_dir.is_dir():
+        routes.append(Mount("/avatars", app=StaticFiles(directory=str(avatars_dir))))
+        log.info(f"Serving avatars from {avatars_dir}")
+    web_dir = Path(os.environ.get("KOURAI_WEB_DIR") or (repo_root / "web"))
+    if web_dir.is_dir():
+        routes.append(Mount("/", app=StaticFiles(directory=str(web_dir), html=True)))
+        log.info(f"Serving web GUI from {web_dir}")
+    else:
+        log.info(f"Web GUI dir not found at {web_dir}; static serving disabled")
+    return routes
+
+
+app = Starlette(
+    routes=_build_routes(),
+    middleware=[
+        Middleware(
+            CORSMiddleware,
+            allow_origins=_cors_origins(),
+            allow_methods=["GET", "POST", "OPTIONS"],
+            allow_headers=["*"],
+        ),
     ],
     lifespan=lifespan,
 )

@@ -1,0 +1,22 @@
+{
+  "id": "./",
+  "name": "Kourai Khryseai — The Forge",
+  "short_name": "The Forge",
+  "description": "An offline-ready replay of a Kourai Khryseai forge: ten Golden Maidens plan, code, test, and commit alongside you over the A2A protocol.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#15110d",
+  "theme_color": "#15110d",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["developer", "productivity", "education"],
+  "icons": [
+    { "src": "assets/icons/icon-192.png", "type": "image/png", "sizes": "192x192", "purpose": "any" },
+    { "src": "assets/icons/icon-512.png", "type": "image/png", "sizes": "512x512", "purpose": "any" },
+    { "src": "assets/icons/icon-192-maskable.png", "type": "image/png", "sizes": "192x192", "purpose": "maskable" },
+    { "src": "assets/icons/icon-512-maskable.png", "type": "image/png", "sizes": "512x512", "purpose": "maskable" },
+    { "src": "assets/icon.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any" }
+  ]
+}
