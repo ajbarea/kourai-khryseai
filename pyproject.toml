@@ -22,7 +22,7 @@ aletheia-v2 = [
 [dependency-groups]
 dev = [
     "pytest>=9.0.3",
-    "pytest-asyncio>=0.24",
+    "pytest-asyncio>=1.4.0",
     "pytest-cov>=6.0.0",
     "pytest-xdist>=3.6.1",
     "pytest-recording>=0.13",
@@ -145,6 +145,7 @@ exclude_also = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 addopts = "--record-mode=none --dist loadgroup"
 log_level = "INFO"
 log_cli = true
