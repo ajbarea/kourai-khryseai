@@ -169,6 +169,25 @@ def _build_vn_command() -> list[str]:
     return [exe, _adapt_path_for_renpy(exe, project)]
 
 
+def _web_open_command() -> list[str]:
+    """Open the web GUI (Host B) in the default browser, cross-platform.
+
+    WSL opens the Windows browser via cmd.exe; macOS uses ``open``; other Unixes
+    use ``xdg-open``. Assumes the gateway is up on :10010 (the ``dev-web``
+    composite runs ``up`` first).
+    """
+    url = "http://localhost:10010/"
+    try:
+        is_wsl = "microsoft" in Path("/proc/version").read_text().lower()
+    except OSError:
+        is_wsl = False
+    if is_wsl:
+        return ["cmd.exe", "/c", "start", "", url]
+    if sys.platform == "darwin":
+        return ["open", url]
+    return ["xdg-open", url]
+
+
 def configure_stdio() -> None:
     """Prefer UTF-8 console output across shells."""
     for stream in (sys.stdout, sys.stderr):
@@ -339,6 +358,14 @@ TASK_GROUPS: tuple[tuple[str, tuple[tuple[str, Task], ...]], ...] = (
                     tee=False,
                 ),
             ),
+            (
+                "dev-web",
+                Task(
+                    description="Start the stack + open the web GUI (Host B) in your browser",
+                    command_factory=list,
+                    tee=False,
+                ),
+            ),
         ),
     ),
     (
@@ -371,6 +398,15 @@ TASK_GROUPS: tuple[tuple[str, tuple[tuple[str, Task], ...]], ...] = (
                 Task(
                     description="Launch Ren'Py Visual Novel GUI (runs on host machine)",
                     command_factory=_build_vn_command,
+                    tee=False,
+                ),
+            ),
+            (
+                "web",
+                Task(
+                    description="Open the web GUI (Host B) in your browser (stack must be up; or use dev-web)",
+                    command_factory=_web_open_command,
+                    timed=False,
                     tee=False,
                 ),
             ),
@@ -569,6 +605,7 @@ COMPOSITE_TASKS: dict[str, list[str]] = {
     "restart": ["down", "up"],
     "dev": ["down", "up", "gui"],
     "dev-vn": ["down", "up", "vn"],
+    "dev-web": ["up", "web"],
     "rebuild": [],  # handled specially
 }
 
