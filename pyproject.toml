@@ -145,7 +145,7 @@ exclude_also = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-addopts = "--record-mode=none"
+addopts = "--record-mode=none --dist loadgroup"
 log_level = "INFO"
 log_cli = true
 log_cli_level = "WARNING"
@@ -153,6 +153,7 @@ markers = [
     "integration: mark test as requiring real external boundaries (containers/network/protocols)",
     "slow: mark test as slow / heavyweight (Kokoro inference, etc.) — skipped on the push/PR fast lane and run only by the nightly workflow",
     "nightly: real-API or heavy-cassette tests skipped on the push/PR fast lane; nightly workflow runs them",
+    "xdist_group: pin a module's tests to one xdist worker when they share a machine-global resource (tmux session, /tmp state file)",
 ]
 filterwarnings = [
     "ignore::UserWarning:torch.nn.modules.rnn",
