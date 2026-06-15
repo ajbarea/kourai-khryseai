@@ -264,7 +264,7 @@ class KkApp extends Light {
     this.contextId = (globalThis.crypto?.randomUUID?.() || String(Date.now()));
     this._originalRequest = ""; this._taskId = null; this._projectRoot = null; this._counter = 0;
   }
-  connectedCallback() { super.connectedCallback(); this._checkHealth(); this._loadProjects(); }
+  connectedCallback() { super.connectedCallback(); this._checkHealth(); this._loadProjects(); this._loadAffinities(); }
   async _checkHealth() {
     const h = await getHealth();
     this.conn = h.agents ? "ok" : h.ok ? "degraded" : "down";
@@ -325,8 +325,16 @@ class KkApp extends Light {
     this.railStates = s;
   }
   _finishRail() { const s = { ...this.railStates }; for (const p of PIPELINE) if (s[p] === "active") s[p] = "done"; this.railStates = s; }
-  _bump(id, n) { if (!AGENTS[id]) return; this.affinity = { ...this.affinity, [id]: Math.min(100, (this.affinity[id] || 0) + n) }; }
   _setAffinity(id, v) { if (!AGENTS[id]) return; this.affinity = { ...this.affinity, [id]: Math.max(0, Math.min(100, v)) }; }
+  // Real per-agent affinity from the backend ([-1,1] -> HUD 0..100), matching the
+  // CLI/GUI/VN hosts. The HUD shows actual standing, not a per-message counter.
+  async _loadAffinities() {
+    const r = await action("affinities");
+    if (r.action !== "affinities_result" || !r.affinities) return;
+    const next = {};
+    for (const id in r.affinities) { if (AGENTS[id]) next[id] = Math.max(0, Math.min(100, Math.round(r.affinities[id] * 100))); }
+    this.affinity = next;
+  }
   _affinityFractions() { const o = {}; for (const k in this.affinity) o[k] = this.affinity[k] / 100; return o; }
 
   _handle(ev) {
@@ -336,7 +344,6 @@ class KkApp extends Light {
       if (ev.agent === "system") { this._push({ kind: "system", text: ev.message }); return; }
       this._activate(ev.agent);
       if (ev.message && ev.message.trim()) { this._push({ kind: "agent", agent: ev.agent, text: ev.message }); speak(speakable(ev.message), ev.agent); }
-      this._bump(ev.agent, 6);
     }
   }
 
@@ -363,6 +370,7 @@ class KkApp extends Light {
       this.conn = "down";
     } finally {
       this.busy = false;
+      this._loadAffinities();
     }
     if (pending) {
       this._taskId = pending.task_id || this._taskId;

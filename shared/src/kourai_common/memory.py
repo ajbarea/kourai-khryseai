@@ -7,13 +7,35 @@
 import contextlib
 import json
 import logging
+import os
 import sqlite3
+import tempfile
 from pathlib import Path
 from typing import Any, TypedDict
 
 log = logging.getLogger(__name__)
 
-DB_PATH = Path(".cache/agent_memory.db")
+
+def _resolve_db_path() -> Path:
+    """Writable path for the agent-memory DB, independent of the runtime UID.
+
+    Honors ``XDG_CACHE_HOME``; otherwise uses a repo-local ``.cache`` when the
+    working directory is writable (host CLI/GUI dev), falling back to the system
+    temp dir when it is not -- e.g. a container running as a non-owner UID where
+    ``/app`` is read-only.
+    """
+    xdg = os.environ.get("XDG_CACHE_HOME")
+    if xdg:
+        return Path(xdg) / "kourai-khryseai" / "agent_memory.db"
+    local = Path(".cache")
+    try:
+        local.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return Path(tempfile.gettempdir()) / "kourai-khryseai" / "agent_memory.db"
+    return local / "agent_memory.db"
+
+
+DB_PATH = _resolve_db_path()
 _conn = None
 
 
