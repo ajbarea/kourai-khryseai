@@ -5,6 +5,7 @@ import { LitElement, html, nothing } from "lit";
 import { repeat } from "lit/directives/repeat.js";
 import { AGENTS, PIPELINE, agentFromText } from "./agents.js";
 import { streamMessage, getHealth, action } from "./gateway.js";
+import { speak, setVoice, unlockAudio, stopVoice, onSpeaking } from "./audio.js";
 
 const TEMPLATES = ["empty", "python", "node", "backend", "frontend"];
 
@@ -37,11 +38,11 @@ function messageRow(m) {
 }
 
 class KkRail extends Light {
-  static properties = { states: { type: Object } };
-  constructor() { super(); this.states = {}; }
+  static properties = { states: { type: Object }, speaking: { type: String } };
+  constructor() { super(); this.states = {}; this.speaking = null; }
   _node(id) {
     const a = AGENTS[id];
-    return html`<div class="node" data-state=${this.states[id] || "idle"} style="--accent:${a.color}">
+    return html`<div class="node" data-state=${this.states[id] || "idle"} ?data-speaking=${this.speaking === id} style="--accent:${a.color}">
       ${avatar(id)}<span class="nm">${a.name}</span>
     </div>`;
   }
@@ -153,8 +154,8 @@ class KkSessionTray extends Light {
 customElements.define("kk-session-tray", KkSessionTray);
 
 class KkPrompt extends Light {
-  static properties = { busy: { type: Boolean }, yolo: { type: Boolean }, autoReads: { type: Boolean } };
-  constructor() { super(); this.busy = false; this.yolo = false; this.autoReads = false; }
+  static properties = { busy: { type: Boolean }, yolo: { type: Boolean }, autoReads: { type: Boolean }, voice: { type: Boolean } };
+  constructor() { super(); this.busy = false; this.yolo = false; this.autoReads = false; this.voice = false; }
   _send() {
     const inp = this.querySelector("input.text");
     const text = (inp.value || "").trim();
@@ -170,6 +171,9 @@ class KkPrompt extends Light {
         <input class="text" type="text" autocomplete="off"
           placeholder=${this.busy ? "forging…" : "add user authentication"}
           ?disabled=${this.busy} @keydown=${this._key} />
+        <label class="perm" title="The maidens speak their lines aloud (neural TTS).">
+          <input type="checkbox" .checked=${this.voice} @change=${(e) => this._perm("voice", e.target.checked)} /> 🔊
+        </label>
         <label class="perm" title="Auto-approve read-only tool calls (file reads, listings).">
           <input type="checkbox" .checked=${this.autoReads} @change=${(e) => this._perm("autoReads", e.target.checked)} /> reads
         </label>
@@ -212,14 +216,17 @@ class KkApp extends Light {
   static properties = {
     transcript: { type: Array }, railStates: { type: Object }, affinity: { type: Object },
     busy: { type: Boolean }, conn: { type: String }, decision: { type: Object },
-    yolo: { type: Boolean }, autoReads: { type: Boolean },
+    yolo: { type: Boolean }, autoReads: { type: Boolean }, voice: { type: Boolean }, speakingAgent: { type: String },
     projects: { type: Array }, activeProjectId: { type: String }, projectErr: { type: String }, sessions: { type: Array },
   };
   constructor() {
     super();
     this.transcript = []; this.railStates = {}; this.affinity = {};
     this.busy = false; this.conn = "checking"; this.decision = null;
-    this.yolo = this._loadPerm("yolo"); this.autoReads = this._loadPerm("autoReads");
+    this.yolo = this._loadPerm("yolo"); this.autoReads = this._loadPerm("autoReads"); this.voice = this._loadPerm("voice");
+    this.speakingAgent = null;
+    setVoice(this.voice);
+    onSpeaking((id) => { this.speakingAgent = id; });
     this.projects = []; this.sessions = []; this.projectErr = "";
     this.activeProjectId = this._loadStr("kk-active-project") || null;
     this.contextId = (globalThis.crypto?.randomUUID?.() || String(Date.now()));
@@ -234,7 +241,7 @@ class KkApp extends Light {
   _loadStr(k) { try { return localStorage.getItem(k); } catch { return null; } }
   _saveStr(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch { /* ignore */ } }
   _loadPerm(k) { return this._loadStr("kk-perm-" + k) === "1"; }
-  _setPerm(k, v) { this[k] = v; this._saveStr("kk-perm-" + k, v ? "1" : "0"); }
+  _setPerm(k, v) { this[k] = v; this._saveStr("kk-perm-" + k, v ? "1" : "0"); if (k === "voice") setVoice(v); }
 
   // ── projects + sessions ──
   async _loadProjects() {
@@ -296,7 +303,7 @@ class KkApp extends Light {
     if (ev.agent) {
       if (ev.agent === "system") { this._push({ kind: "system", text: ev.message }); return; }
       this._activate(ev.agent);
-      if (ev.message && ev.message.trim()) this._push({ kind: "agent", agent: ev.agent, text: ev.message });
+      if (ev.message && ev.message.trim()) { this._push({ kind: "agent", agent: ev.agent, text: ev.message }); speak(ev.message, ev.agent); }
       this._bump(ev.agent, 6);
     }
   }
@@ -338,6 +345,7 @@ class KkApp extends Light {
   async _send(e) {
     const text = e.detail.text;
     if (!text || this.busy) return;
+    unlockAudio(); stopVoice();
     this._originalRequest = text;
     this._taskId = null;
     this._projectRoot = null;
@@ -346,6 +354,7 @@ class KkApp extends Light {
   }
   async _decide(e) {
     const answer = e.detail.answer;
+    unlockAudio();
     this.decision = null;
     this._push({ kind: "user", text: answer });
     await this._runStream(answer, { resume: true });
@@ -367,9 +376,9 @@ class KkApp extends Light {
       </header>
       <kk-projects .projects=${this.projects} .activeId=${this.activeProjectId} .err=${this.projectErr} .busy=${this.busy}
         @use-project=${this._useProject} @new-project=${this._newProject}></kk-projects>
-      <kk-rail .states=${this.railStates}></kk-rail>
+      <kk-rail .states=${this.railStates} .speaking=${this.speakingAgent}></kk-rail>
       <kk-terminal .transcript=${this.transcript} .busy=${this.busy}></kk-terminal>
-      <kk-prompt .busy=${this.busy} .yolo=${this.yolo} .autoReads=${this.autoReads}
+      <kk-prompt .busy=${this.busy} .yolo=${this.yolo} .autoReads=${this.autoReads} .voice=${this.voice}
         @send=${this._send} @perm=${(e) => this._setPerm(e.detail.key, e.detail.value)}></kk-prompt>
       <kk-session-tray .sessions=${this.sessions} .busy=${this.busy}
         @accept-session=${this._acceptSession} @discard-session=${this._discardSession}></kk-session-tray>

@@ -82,6 +82,13 @@ header.app { display: flex; align-items: center; justify-content: space-between;
 .node[data-state="active"] .nm, .node[data-state="done"] .nm { color: var(--ink-dim); }
 .arrow { color: var(--ink-faint); font-size: .8rem; opacity: .6; }
 @keyframes pulse { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+/* speaking — the maiden whose TTS line is playing right now */
+.node[data-speaking] .av {
+  filter: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 38%, transparent), 0 0 28px color-mix(in srgb, var(--gold) 75%, transparent);
+  animation: speak 0.66s ease-in-out infinite;
+}
+@keyframes speak { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.09); } }
 
 /* terminal — fixed height, only the body scrolls */
 kk-terminal { display: block; }
