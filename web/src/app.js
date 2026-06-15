@@ -23,6 +23,38 @@ function avatar(id) {
   </span>`;
 }
 
+// Render an agent body: fenced ```code``` becomes a monospace block, inline `code`
+// becomes <code>, prose stays text (the bubble keeps white-space: pre-wrap).
+function renderBody(text) {
+  const out = [];
+  const fence = /```[ \t]*([\w.+-]*)\n?([\s\S]*?)```/g;
+  let last = 0;
+  let m;
+  while ((m = fence.exec(text))) {
+    if (m.index > last) out.push(...renderInline(text.slice(last, m.index)));
+    out.push(
+      html`<pre class="codeblock">${m[1] ? html`<span class="lang">${m[1]}</span>` : nothing}<code>${m[2].replace(/\n$/, "")}</code></pre>`,
+    );
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) out.push(...renderInline(text.slice(last)));
+  return out.length ? out : [text];
+}
+function renderInline(text) {
+  return text.split(/(`[^`\n]+`)/g).map((s) =>
+    s.length > 1 && s.startsWith("`") && s.endsWith("`")
+      ? html`<code class="inline">${s.slice(1, -1)}</code>`
+      : s,
+  );
+}
+// What the maidens actually say — prose only, so Kokoro never reads code aloud.
+function speakable(text) {
+  return text
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/`([^`\n]+)`/g, "$1")
+    .trim();
+}
+
 function messageRow(m) {
   if (m.kind === "user") return html`<div class="urow"><span class="ubub">You ❯ ${m.text}</span></div>`;
   if (m.kind === "status") return html`<div class="srow">${m.text}</div>`;
@@ -32,7 +64,7 @@ function messageRow(m) {
     ${avatar(m.agent)}
     <div class="body">
       <div class="who"><span class="name">${a.name}</span><span class="role">${a.role}</span></div>
-      <div class="text">${m.text}</div>
+      <div class="text">${renderBody(m.text)}</div>
     </div>
   </div>`;
 }
@@ -303,7 +335,7 @@ class KkApp extends Light {
     if (ev.agent) {
       if (ev.agent === "system") { this._push({ kind: "system", text: ev.message }); return; }
       this._activate(ev.agent);
-      if (ev.message && ev.message.trim()) { this._push({ kind: "agent", agent: ev.agent, text: ev.message }); speak(ev.message, ev.agent); }
+      if (ev.message && ev.message.trim()) { this._push({ kind: "agent", agent: ev.agent, text: ev.message }); speak(speakable(ev.message), ev.agent); }
       this._bump(ev.agent, 6);
     }
   }
