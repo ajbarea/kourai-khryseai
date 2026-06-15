@@ -336,6 +336,17 @@ async def handle_action(request: Request) -> JSONResponse:
             set_active_profile(pid)
         return JSONResponse({"action": "ok"})
 
+    if action == "affinities":
+        from kourai_common.player import PlayerProfile
+        from kourai_common.player_affinity import get_all_affinities
+
+        prof = PlayerProfile.load()
+        scores: dict = {}
+        if prof:
+            for agent_name, aff in get_all_affinities(prof.player_id).items():
+                scores[agent_name] = aff.get("affinity_score", 0.0)
+        return JSONResponse({"action": "affinities_result", "affinities": scores})
+
     if action == "get_virtue_context":
         from kourai_common.facts import get_relevant_facts_for_enrichment
         from kourai_common.player_affinity import get_all_affinities
@@ -531,16 +542,20 @@ async def handle_message(request: Request) -> StreamingResponse:
                         continue
                     if final_state == TaskState.TASK_STATE_INPUT_REQUIRED:
                         input_prompt = status_msg
-                    lower = status_msg.lower()
-                    for name in AGENT_NAMES:
-                        if name in lower:
-                            tracker.handoff(name)
-                            break
-                    log.info(f"Status ({tracker.current_agent}): {status_msg[:100]}")
                     # Strict M18 routing: only KIND_DIALOGUE goes to the
                     # VN dialogue layer.
                     kind = get_content_kind(event.status.message)
                     is_dialogue = kind == KIND_DIALOGUE
+                    # Handoff only on genuine routing status, never on dialogue: an
+                    # agent naming another maiden in its own speech (e.g. Hephaestus
+                    # introducing the pipeline) must not reassign the speaker.
+                    if not is_dialogue:
+                        lower = status_msg.lower()
+                        for name in AGENT_NAMES:
+                            if name in lower:
+                                tracker.handoff(name)
+                                break
+                    log.info(f"Status ({tracker.current_agent}): {status_msg[:100]}")
 
                     if is_dialogue:
                         # Defensive strip before yielding to Ren'Py — no
