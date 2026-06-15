@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Kourai Khryseai — The Forge (maskable)">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="40%" r="75%">
+      <stop offset="0%" stop-color="#2a2014"/>
+      <stop offset="100%" stop-color="#15110d"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f0c869"/>
+      <stop offset="55%" stop-color="#e9b949"/>
+      <stop offset="100%" stop-color="#b8862a"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" fill="url(#bg)"/>
+
+  <circle cx="300" cy="156" r="9" fill="#e2562b"/>
+  <circle cx="334" cy="186" r="6" fill="#f0c869"/>
+  <circle cx="276" cy="146" r="5" fill="#f0c869"/>
+
+  <g fill="url(#gold)">
+    <path d="M150 214 H372 a10 10 0 0 1 10 10 v22 a10 10 0 0 1 -10 10 H150 l-44 -16 a6 6 0 0 1 0 -10 Z"/>
+    <path d="M196 256 H326 L300 318 H222 Z"/>
+    <rect x="176" y="318" width="160" height="42" rx="10"/>
+  </g>
+</svg>

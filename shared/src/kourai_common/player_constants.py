@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 
-PLAYER_DIR = Path.home() / ".kourai_khryseai"
+# Profile/project store location. Defaults to ~/.kourai_khryseai (the host CLI's
+# path); override with KOURAI_PLAYER_HOME so a container can point at the
+# bind-mounted host dir — the bridge runs with HOME=/app where nothing is mounted.
+_player_home = os.environ.get("KOURAI_PLAYER_HOME")
+PLAYER_DIR = Path(_player_home) if _player_home else Path.home() / ".kourai_khryseai"
 PROFILES_DIR = PLAYER_DIR / "profiles"
 ACTIVE_PROFILE_FILE = PLAYER_DIR / "active_profile.txt"
 # Legacy single-profile path (for migration)

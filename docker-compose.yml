@@ -664,12 +664,23 @@ services:
       PORT: "10010"
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
       KOURAI_LOG_LEVEL: ${KOURAI_LOG_LEVEL:-INFO}
+      # Host B (web GUI): serve the bundle same-origin from the gateway.
+      KOURAI_WEB_DIR: /app/web
+      KOURAI_AVATARS_DIR: /app/avatars
+      # Player profile/project store: PLAYER_DIR defaults to $HOME/.kourai_khryseai
+      # (=/app/... in-container, unmounted). Point it at the bind-mounted host dir,
+      # host-absolute so ForgeSession worktree git pointers stay consistent with the
+      # specialists' second mount (see Kallos's volume block).
+      KOURAI_PLAYER_HOME: ${HOME:-/root}/.kourai_khryseai
+      KOURAI_WEB_ORIGINS: ${KOURAI_WEB_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
     ports:
       - "127.0.0.1:10010:10010"
     volumes:
       - ./agents/vn_bridge:/app/agents/vn_bridge
       - ./shared:/app/shared
       - ./logs:/app/logs
+      - ./web:/app/web:ro
+      - ./docs/assets/avatars:/app/avatars:ro
       - ~/.kourai_khryseai:/home/kourai/.kourai_khryseai
       # See Kallos's mount block above for the rationale on the second
       # host-absolute-path mount that lets git worktree pointers resolve.

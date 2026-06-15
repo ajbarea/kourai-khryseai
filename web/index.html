@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en" data-theme="forge">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Kourai Khryseai — Web GUI</title>
+<meta name="description" content="The Kourai Khryseai web GUI: watch the Golden Maidens forge in real time, served same-origin by the host gateway." />
+<meta name="theme-color" content="#15110d" />
+<meta name="color-scheme" content="dark" />
+<link rel="icon" href="/avatars/hephaestus_neutral.png" />
+<link rel="stylesheet" href="styles.css" />
+<script type="importmap">
+{
+  "imports": {
+    "lit": "https://esm.sh/lit@3.2.1",
+    "lit/": "https://esm.sh/lit@3.2.1/"
+  }
+}
+</script>
+</head>
+<body>
+  <div class="wrap">
+    <kk-app></kk-app>
+    <noscript>The web GUI needs JavaScript. The CLI (<code>uv run kourai-dev cli</code>) doesn't.</noscript>
+  </div>
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>

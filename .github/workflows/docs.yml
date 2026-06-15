@@ -7,6 +7,7 @@ on:
     paths:
       - "docs/**"
       - "overrides/**"
+      - "app/**"
       - "zensical.toml"
       - "pyproject.toml"
       - "uv.lock"
@@ -44,6 +45,19 @@ jobs:
 
       - name: Build Documentation
         run: uv run zensical build --clean
+
+      - name: Render PWA icons
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends librsvg2-bin
+          bash app/scripts/gen-icons.sh
+
+      - name: Stage web app at /app
+        run: |
+          rm -rf site/app
+          mkdir -p site/app
+          cp -r app/. site/app/
+          mkdir -p site/app/assets/avatars
+          cp docs/assets/avatars/*_neutral.png site/app/assets/avatars/
 
       - name: Configure Pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
