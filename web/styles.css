@@ -114,6 +114,13 @@ kk-terminal { display: block; }
 .msg .who .name { color: var(--accent); font-weight: 700; font-size: .92rem; }
 .msg .who .role { color: var(--ink-faint); font-size: .72rem; text-transform: uppercase; letter-spacing: .6px; }
 .msg .text { color: var(--ink); font-size: .98rem; white-space: pre-wrap; word-break: break-word; }
+.msg .codeblock {
+  position: relative; background: #100c07; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  padding: 11px 13px; margin: 8px 0; overflow-x: auto;
+}
+.msg .codeblock code { font-family: var(--mono); font-size: .84rem; line-height: 1.5; color: var(--ink); white-space: pre; display: block; }
+.msg .codeblock .lang { position: absolute; top: 5px; right: 10px; font-family: var(--mono); font-size: .62rem; color: var(--ink-faint); text-transform: uppercase; letter-spacing: .6px; }
+.msg code.inline { font-family: var(--mono); font-size: .88em; background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; color: var(--gold-soft); white-space: pre-wrap; }
 .urow { text-align: right; margin: 12px 0; }
 .ubub { display: inline-block; background: linear-gradient(180deg, var(--gold-soft), var(--gold)); color: #2a1d05; padding: 6px 12px; border-radius: 999px; font-weight: 700; font-size: .9rem; }
 .srow { color: var(--ink-dim); font-size: .85rem; margin: 8px 0; font-style: italic; }
