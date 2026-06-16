@@ -1671,9 +1671,9 @@ dev = [
     { name = "pytest-cov", specifier = ">=6.0.0" },
     { name = "pytest-recording", specifier = ">=0.13" },
     { name = "pytest-xdist", specifier = ">=3.6.1" },
-    { name = "ruff", specifier = ">=0.15.15" },
+    { name = "ruff", specifier = ">=0.15.16" },
     { name = "testcontainers", specifier = ">=4.9.1" },
-    { name = "ty", specifier = ">=0.0.42,<0.1" },
+    { name = "ty", specifier = ">=0.0.44,<0.1" },
     { name = "zensical", specifier = ">=0.0.24" },
 ]
 
