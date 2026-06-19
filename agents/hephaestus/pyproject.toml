@@ -2,7 +2,7 @@
 name = "kourai-hephaestus"
 version = "0.1.0"
 description = "Orchestrator agent — routes requests and manages pipelines"
-requires-python = ">=3.12,<3.14"
+requires-python = ">=3.12,<3.15"
 dependencies = [
     "kourai-common",
 ]

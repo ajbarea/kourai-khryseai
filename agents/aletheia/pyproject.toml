@@ -2,7 +2,7 @@
 name = "kourai-aletheia"
 version = "0.1.0"
 description = "Aletheia — research validator, citation enforcer"
-requires-python = ">=3.12,<3.14"
+requires-python = ">=3.12,<3.15"
 dependencies = ["kourai-common"]
 
 [build-system]

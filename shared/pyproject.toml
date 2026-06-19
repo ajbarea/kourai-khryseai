@@ -2,7 +2,7 @@
 name = "kourai-common"
 version = "0.1.0"
 description = "Shared utilities for Kourai Khryseai agents"
-requires-python = ">=3.12,<3.14"
+requires-python = ">=3.12,<3.15"
 dependencies = [
     # a2a-sdk 1.0 landed via M7 (six phases, all six shipped 2026-04-30):
     # Part construction in kourai_common.messaging, server build in

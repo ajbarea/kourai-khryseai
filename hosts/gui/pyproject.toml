@@ -2,7 +2,7 @@
 name = "kourai-gui"
 version = "0.1.0"
 description = "Pygame GUI client for Kourai Khryseai — visual novel style agent conversations"
-requires-python = ">=3.12,<3.14"
+requires-python = ">=3.12,<3.15"
 dependencies = [
     "kourai-common",
     "a2a-sdk>=1.0,<2.0",  # M7 Phase 3 landed; see shared/pyproject.toml.

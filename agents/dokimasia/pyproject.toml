@@ -2,7 +2,7 @@
 name = "kourai-dokimasia"
 version = "0.1.0"
 description = "Testing agent — writes and runs pytest suites"
-requires-python = ">=3.12,<3.14"
+requires-python = ">=3.12,<3.15"
 dependencies = [
     "kourai-common",
     "pytest>=8.0",

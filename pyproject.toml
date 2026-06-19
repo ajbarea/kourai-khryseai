@@ -2,7 +2,7 @@
 name = "kourai-khryseai"
 version = "0.1.0"
 description = "Multi-agent A2A development system — Golden Maidens of Hephaestus"
-requires-python = ">=3.12,<3.14"
+requires-python = ">=3.12,<3.15"
 dependencies = []
 
 [project.optional-dependencies]

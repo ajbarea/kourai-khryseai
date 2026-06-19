@@ -2,7 +2,7 @@
 name = "kourai-chatterbox-service"
 version = "0.1.0"
 description = "Isolated Chatterbox TTS HTTP service (torch 2.6) for kourai M6 expressive voice"
-requires-python = ">=3.12,<3.14"
+requires-python = ">=3.12,<3.15"
 dependencies = [
     # chatterbox-tts hard-pins torch==2.6.0; the linux default wheel is the
     # +cu124 CUDA build (verified GPU on an RTX 3060 Ti), so no explicit index

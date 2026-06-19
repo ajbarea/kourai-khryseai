@@ -2,7 +2,7 @@
 name = "kourai-vn-bridge"
 version = "0.1.0"
 description = "VN Bridge HTTP service — proxies Ren'Py to A2A agents and synthesizes WAV bytes for Ren'Py audio"
-requires-python = ">=3.12,<3.14"
+requires-python = ">=3.12,<3.15"
 dependencies = [
     "kourai-common",
     # M19 Phase 3: synthesis is via RealtimeTTSEngine.synthesize_to_wav,

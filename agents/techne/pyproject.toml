@@ -2,7 +2,7 @@
 name = "kourai-techne"
 version = "0.1.0"
 description = "Coding agent — implements code from specs"
-requires-python = ">=3.12,<3.14"
+requires-python = ">=3.12,<3.15"
 dependencies = ["kourai-common"]
 
 [build-system]

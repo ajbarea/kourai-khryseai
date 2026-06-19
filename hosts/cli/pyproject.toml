@@ -2,7 +2,7 @@
 name = "kourai-cli"
 version = "0.1.0"
 description = "CLI client for Kourai Khryseai"
-requires-python = ">=3.12,<3.14"
+requires-python = ">=3.12,<3.15"
 dependencies = [
     "kourai-common",
     "a2a-sdk>=1.0,<2.0",  # M7 Phase 3 landed; see shared/pyproject.toml.
