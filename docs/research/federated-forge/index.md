@@ -1,8 +1,10 @@
 # Federated Forge — Personalized Multi-Agent FL with Player-Anchored Privacy
 
-**Status:** Design spec · early draft, under active iteration
+**Status:** Design spec · under active iteration
 **Author:** AJ Barea, Rochester Institute of Technology (`ajb6289@rit.edu`)
-**First draft:** 2026-04-25
+**First draft:** 2026-04-25 · **Revised:** 2026-07-06 (aggregation ablation
+family, gauge-fixed Byzantine defense, silent-failure evaluation axis,
+mid-2026 prior art)
 
 A research direction and engineering design for connecting Kourai Khryseai
 (multi-agent software development with three player-facing interfaces) to
@@ -22,9 +24,15 @@ configuration.
 - Each specialist agent has two LoRA adapters: a **council adapter** that
   federates across forges and a **bond adapter** that never leaves the
   player's machine. Cupid and Puck are bond-only by construction.
-- The vFL server uses **LoRA-FAIR** correction-term aggregation (vanilla
-  FedAvg on stacked LoRA matrices is provably wrong — ICCV 2025) plus
-  **Bulyan / MultiKrum** for Byzantine defense against adversarial forges.
+- The vFL server uses corrected LoRA aggregation — vanilla FedAvg on
+  stacked LoRA matrices is provably wrong (avg of products ≠ product of
+  avgs). Which correction wins is an early ablation: **FedEx-LoRA**
+  (exact, via frozen-weight residual — ACL 2025) vs. **LoRA-FAIR**
+  (approximate correction term — ICCV 2025) vs. share-A-only
+  (FedSA-style). Byzantine defense (**Bulyan / MultiKrum**) runs
+  **gauge-fixed** — distances computed on the composed update ΔW = BA,
+  never on raw LoRA factors, which are non-unique under
+  (A, B) → (AR, R⁻¹B).
 - The data layer is rebuilt: passive OpenTelemetry tracing is no longer the
   training source. The **Forge Memoir** is — a structured record where every
   entry is simultaneously a *narrative beat* the visual novel can replay and
@@ -87,6 +95,10 @@ That is the problem this design answers.
 | FedSA-LoRA-DP [MDPI 2025](https://www.mdpi.com/2076-3417/15/24/13102) | 2025 | DP applied only to the shared LoRA A matrix | Single-model, no multi-agent, no narrative split |
 | ODPO with fast-slow LoRA [arXiv 2406.05534](https://arxiv.org/html/2406.05534v1) | 2024 | Online DPO with fast/slow LoRA adapter pair | Single-model, no federation, no human-on-loop scenes |
 | SPRInG [arXiv 2601.09974](https://www.arxiv.org/pdf/2601.09974) | 2026 | Continual LLM personalization via selective parametric updates | Single-model, no federation |
+| SDFLoRA [arXiv 2601.11219](https://arxiv.org/pdf/2601.11219) | 2026 | Selective decoupled federated LoRA — clients share some LoRA components, keep others local | Closest on split mechanics, but the split is parameter-level, not semantic; single-model, no human-on-loop labels |
+| FedAgent / FedAgentGym [ICLR 2026](https://openreview.net/forum?id=lZ2C7WcWce) | 2026 | Federated reinforcement learning benchmark for LLM agents across decentralized clients | No personalization split, no human-on-the-loop labels |
+| Agentic-FL [arXiv 2604.04895](https://arxiv.org/abs/2604.04895) | 2026 | LLM agents autonomously orchestrate FL training | The inverse direction — agents run the federation; nothing federates the agents' own weights |
+| EdgeAgentX [arXiv 2505.18457](https://arxiv.org/html/2505.18457v1) | 2025 | FL coordination + multi-agent RL for edge agent fleets (military comms) | Network-control agents, not LLM specialists; no personalization split, no consent surface |
 
 None combine all four axes Federated Forge does:
 
@@ -201,8 +213,8 @@ pattern. The actual diff is not.
 
 ```
 ┌──────────────────────────── vFL aggregation server ────────────────────────────┐
-│  LoRA-FAIR correction-term aggregation                                          │
-│  Bulyan / MultiKrum Byzantine defense                                           │
+│  Corrected LoRA aggregation (FedEx-LoRA / LoRA-FAIR / share-A — ablated)        │
+│  Gauge-fixed Bulyan / MultiKrum Byzantine defense (distances on ΔW = BA)        │
 │  Per-forge trust score (PID / EMA-based, vFL roadmap)                           │
 │  Differential-privacy budget tracking per forge                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
@@ -400,9 +412,36 @@ spec.
 
 ### New in vFL
 
-- **LoRA-FAIR aggregation strategy** — server-side correction term that
-  fixes vanilla FedAvg's known divergence on stacked LoRA matrices
-  (ICCV 2025; vanilla FedAvg is provably wrong here)
+- **A corrected-LoRA aggregation family, not a single strategy.** Vanilla
+  FedAvg on stacked LoRA matrices is provably wrong (the average of
+  products BA is not the product of averages). Three candidate fixes
+  enter as `velocity.strategy` entries and get ablated against each
+  other: **FedEx-LoRA** ([ACL 2025](https://aclanthology.org/2025.acl-long.67/)),
+  which achieves *exact* aggregation by pushing the residual error into
+  the frozen base weights; **LoRA-FAIR**
+  ([ICCV 2025](https://arxiv.org/abs/2411.14961)), an approximate
+  server-side correction term; and **share-A-only** (FedSA-style), which
+  sidesteps the product problem by federating only the A matrices. The
+  2026 literature ([RB-LoRA, EACL 2026](https://aclanthology.org/2026.findings-eacl.88/);
+  [scaling-factor stabilization](https://arxiv.org/pdf/2603.08058)) says
+  rank/scale handling decides stability at realistic client counts, so
+  the ablation is load-bearing, not ceremony.
+- **Gauge-fixed Byzantine defense.** LoRA factorizations are non-unique:
+  (A, B) and (AR, R⁻¹B) encode the same update ΔW = BA, so
+  distance-based defenses (Krum, MultiKrum, Bulyan) computed on raw
+  stacked factors can assign different distances to identical updates —
+  an honest forge can look like an outlier for free. Defenses therefore
+  operate on the composed per-layer ΔW (or an equivalent gauge-fixed
+  representation), following
+  [gauge-aware server representations (2026)](https://arxiv.org/pdf/2605.06733),
+  which shows the same intrinsic update admits infinitely many
+  gauge-equivalent factorizations. Decomposition-based aggregation work
+  ([FedRPCA](https://www.arxiv.org/pdf/2506.01194)) reinforces the same
+  lesson from the heterogeneity side: servers should not operate on raw
+  stacked factors.
+  This costs one rank-r matmul per layer per client on the server — cheap
+  at LoRA sizes — and makes vFL's existing distance-based kernels correct
+  for LoRA without touching their internals.
 - **Multi-tensor named-parameter aggregation** — current vFL assumes flat
   `layer_shapes`; FL needs nested `{agent_name: {layer_name: tensor}}`
 - **`experiments/federated_forge.toml`** — multi-client simulation matching
@@ -486,6 +525,13 @@ A persistent, player-visible UI element showing:
 DP gradient clipping happens silently on the council deltas using
 **Opacus's RDP-based accountant** for tight composition bounds across many
 rounds (avoids the loose union bounds of standard (ε, δ)-DP composition).
+The clipping + Gaussian-noise mechanism on LoRA matrices follows
+**DP-FedLoRA** ([arXiv 2509.09097](https://arxiv.org/abs/2509.09097)),
+which gives the calibration theory for exactly this setting (per-client
+LoRA fine-tuning on-device, noised deltas aggregated centrally). The
+2026 empirical consensus — strict ε ≈ 1 costs real utility, moderate
+ε ≈ 8–10 is workable — is why the evaluation's ε grid brackets that
+range rather than assuming a single budget.
 The Whisper Limit visualizes the cumulative privacy loss Hephaestus has
 spent; when the budget runs low, agents skip or delay their council
 contribution rather than blow the budget. Adaptive per-round clipping
@@ -515,9 +561,9 @@ in the references section.
 | Brutal tutorial walls kill the funnel | Foldit (32 intro puzzles) | Bond adapter learns from session 1, before any tutorial completion |
 | In-game rewards drive participation | EVE Project Discovery (ISK + SKINs, 41M COVID submissions) | Federation participation grants affinity bonuses, dialogue unlocks, narrative scenes |
 | Privacy-by-design + granular opt-out | Sea Hero Quest (4M players, Munich anonymized data center) | Sovereignty Moment + Whisper Limit + per-agent opt-out |
-| Loyalty mechanics with material consequences, not badges | ME2 (loyalty unlocks 4th power, determines suicide-mission survival) | Bonded status materially changes behavior and persists across version bumps |
+| Loyalty mechanics with material consequences, not badges | ME2 (loyalty determines suicide-mission survival) | Bonded status materially changes behavior and persists across version bumps |
 | Skills interrupt unprompted; system *is* story | Disco Elysium | The interrupt channel itself |
-| Consent must be ongoing | Pistilli & Trevelin 2025 | Sovereignty Moment is re-decidable; Whisper Limit shows current state always |
+| One-shot consent cannot be meaningfully withdrawn once data is trained into weights | Pistilli & Trevelin 2025 | Instances never federate (nothing to un-train); only pattern-level sharing leaves, and it is re-decidable via the Sovereignty Moment |
 | Opt-in personalization at prediction time | Joren et al 2023 | Player can flip "lean federated" vs "lean personal" per task type |
 | Mutual benefit in feedback ecosystems | Don-Yehiya et al 2024 | Federation is a commons — shared improvements flow to all forges, including solo |
 
@@ -541,6 +587,13 @@ in the references section.
   Uni-DPO vs. vanilla iterative DPO on the bond adapter
 - **Loyalty arc effect size** — measurable behavior delta in a bonded
   agent's outputs vs. a non-bonded agent's outputs
+- **Silent-failure detection** — behavioral evaluation of the
+  personalized (bond+council) agents, not just task metrics. Federated
+  personalization can amplify bias and erode alignment in ways that
+  system-level FL benchmarks never surface
+  ([Oh & Bui 2026](https://arxiv.org/abs/2606.00947)); we replay a fixed
+  probe suite against each forge's personalized agents every N rounds
+  and track behavioral drift alongside task quality
 
 ### Player metrics
 
@@ -587,12 +640,15 @@ Task-by-task implementation plans for the first phases:
    diverging (federation-relevant), Cupid is bond-only (control). Lets us
    contrast bonded behavior against the council baseline once federation
    ships.
-5. **vFL: LoRA-FAIR strategy.** Added to `python/velocity/strategy.py`
-   and `vfl-core/src/strategy.rs`. Ported from the official reference
-   implementation at [github.com/jmbian/LoRA-FAIR](https://github.com/jmbian/LoRA-FAIR)
-   rather than reimplemented from the paper. Tested against the
-   reference repo's behavior on a fixture, then translated to a Rust
-   kernel for the hot path.
+5. **vFL: corrected-LoRA aggregation family.** FedEx-LoRA, LoRA-FAIR,
+   and share-A-only added to `python/velocity/strategy.py` and
+   `vfl-core/src/strategy.rs` as an ablation family. LoRA-FAIR ported
+   from the official reference implementation at
+   [github.com/jmbian/LoRA-FAIR](https://github.com/jmbian/LoRA-FAIR)
+   rather than reimplemented from the paper; FedEx-LoRA validated
+   against the paper's exactness property (aggregate-then-compose equals
+   compose-then-aggregate up to the residual). Tested on fixtures, then
+   translated to Rust kernels for the hot path.
 6. **vFL: multi-tensor named aggregation.** Extend `VelocityServer`
    layer-shapes to handle nested per-agent named tensors.
 7. **Federation client.** `kourai_common/federation/client.py` registers
@@ -604,6 +660,8 @@ Task-by-task implementation plans for the first phases:
    clipping + budget accounting. Whisper Limit UI in all three hosts.
 10. **Byzantine simulation harness.** Compose vFL's existing attack
     suite with the Stoa Falls narrative. Trust-score-based forge exile.
+    Defenses run gauge-fixed (distances on composed ΔW, not raw LoRA
+    factors — see the vFL bridge section).
 11. **Interrupt channel wiring.** `interrupts.py` arbiter, agent gossip
     via existing `gossip_models.py`, Memoir `interrupt` entry type.
     Inter-agent disagreement training signal.
@@ -622,9 +680,13 @@ deliverable. No phase has a calendar attached.
 - **What's the right LoRA layer-targeting per specialist?** Different
   agents may need different ranks and target modules. First-pass: target
   `q_proj` and `v_proj`, rank 16, but this is a tunable.
-- **Does LoRA-FAIR's correction term remain correct under heterogeneous
-  per-forge bond adapters?** Almost certainly yes (only council aggregates),
-  but verify with a controlled experiment before wider claims.
+- **Do the aggregation corrections (FedEx-LoRA's residual, LoRA-FAIR's
+  correction term) remain correct under heterogeneous per-forge bond
+  adapters?** Almost certainly yes (only council aggregates), but verify
+  with a controlled experiment before wider claims. FedEx-LoRA has a
+  second wrinkle: its residual folds into the *frozen base weights*,
+  which must not collide with per-forge bond adapters layered on the
+  same modules.
 - **How do we prevent the bond adapter from overfitting to a small
   player corpus?** Low-rank constraint, replay buffer of Memoir entries,
   early-stopping on validation loss against held-out player turns.
@@ -662,13 +724,22 @@ deliverable. No phase has a calendar attached.
 - [LoRA-FAIR official reference implementation](https://github.com/jmbian/LoRA-FAIR)
 - [FedSA-LoRA-DP — Selective LoRA + DP for federated learning (MDPI 2025)](https://www.mdpi.com/2076-3417/15/24/13102)
 - [DP-FedPUAC — Adaptive gradient clipping for federated DP (ScienceDirect 2025)](https://www.sciencedirect.com/science/article/abs/pii/S0020025525011181)
+- [RB-LoRA — Rank-Balanced Aggregation for Federated LoRA (EACL 2026 Findings)](https://aclanthology.org/2026.findings-eacl.88/)
+- [SDFLoRA — Selective Decoupled Federated LoRA (arXiv 2601.11219)](https://arxiv.org/pdf/2601.11219)
+- [Stabilized Fine-Tuning with LoRA in FL — scaling-factor analysis (arXiv 2603.08058)](https://arxiv.org/pdf/2603.08058)
+- [Gauge-Aware Low-Rank Server Representations for Federated LoRA (arXiv 2605.06733)](https://arxiv.org/pdf/2605.06733)
+- [Enhancing Federated LoRA Aggregation Using Robust PCA (arXiv 2506.01194)](https://www.arxiv.org/pdf/2506.01194)
+- [Silent Failures in Federated Personalization of Foundation Models (Oh & Bui, arXiv 2606.00947)](https://arxiv.org/abs/2606.00947)
 
 ### Multi-agent LLM systems
 
 - [MasRouter — Learning to Route LLMs for Multi-Agent Systems (Yue et al, Feb 2025)](https://hf.co/papers/2502.11133)
-- [Symphony-Coord — Emergent Coordination in Decentralized Agent Systems (Guan et al, Feb 2026)](https://hf.co/papers/2602.00966)
+- [Symphony-Coord — Adaptive Routing for Multi-Agent LLM Systems (Guan et al, Feb 2026)](https://hf.co/papers/2602.00966)
 - [AutoGen — Enabling Next-Gen LLM Applications via Multi-Agent Conversation (Wu et al, 2023)](https://arxiv.org/abs/2308.08155)
 - [AutoGen vs LangGraph — 2026 framework comparison (MyEngineeringPath)](https://myengineeringpath.dev/tools/autogen-vs-langgraph/)
+- [FedAgent — Federated Agent Reinforcement Learning (ICLR 2026)](https://openreview.net/forum?id=lZ2C7WcWce)
+- [Agentic Federated Learning — LLM agents orchestrating distributed training (arXiv 2604.04895)](https://arxiv.org/abs/2604.04895)
+- [EdgeAgentX — Agentic AI at the Edge in Military Communication Networks (arXiv 2505.18457)](https://arxiv.org/html/2505.18457v1)
 - [From Persona to Personalization — Survey on Role-Playing Language Agents (Chen et al, Apr 2024)](https://hf.co/papers/2404.18231)
 - [Static vs Agentic Game Master AI for Solo RPG (Jørgensen et al, Feb 2025)](https://hf.co/papers/2502.19519)
 
@@ -676,8 +747,8 @@ deliverable. No phase has a calendar attached.
 
 - [Direct Preference Optimization (Rafailov et al, 2023)](https://arxiv.org/abs/2305.18290)
 - [Online DPO with Fast-Slow Chasing (arXiv 2406.05534)](https://arxiv.org/html/2406.05534v1)
-- [Uni-DPO — A Unified Paradigm for Dynamic Preference Optimization (arXiv 2506.10054)](https://arxiv.org/abs/2506.10054)
-- [SPRInG — Continual LLM Personalization via Selective Parametric (arXiv 2601.09974)](https://www.arxiv.org/pdf/2601.09974)
+- [Uni-DPO — A Unified Paradigm for Dynamic Preference Optimization of LLMs (arXiv 2506.10054, ICLR 2026)](https://arxiv.org/abs/2506.10054)
+- [SPRInG — Continual LLM Personalization via Selective Parametric Adaptation and Retrieval-Interpolated Generation (arXiv 2601.09974)](https://www.arxiv.org/pdf/2601.09974)
 - [Personalizing RLHF with Variational Preference Learning (Poddar et al, Aug 2024)](https://hf.co/papers/2408.10075)
 - [The State of LLMs 2025 (Raschka)](https://magazine.sebastianraschka.com/p/state-of-llms-2025)
 
@@ -691,7 +762,7 @@ deliverable. No phase has a calendar attached.
 
 ### Consent, privacy, and feedback ecosystems
 
-- [Can AI be Consentful? (Pistilli & Trevelin, Jun 2025)](https://hf.co/papers/2507.01051)
+- [Can AI be Consensual? (Pistilli & Trevelin, Jun 2025)](https://hf.co/papers/2507.01051)
 - [Participatory Personalization in Classification (Joren et al, Feb 2023)](https://hf.co/papers/2302.03874)
 - [The Future of Open Human Feedback (Don-Yehiya et al, Aug 2024)](https://hf.co/papers/2408.16961)
 
@@ -700,7 +771,9 @@ deliverable. No phase has a calendar attached.
 - [Curtis 2015 — Motivation to Participate in Foldit](https://journals.sagepub.com/doi/abs/10.1177/1075547015609322)
 - [Foldit Drug Design Usability Study (SIGGRAPH MIG 2020)](https://dl.acm.org/doi/10.1145/3424636.3426899)
 - [EVE Online Project Discovery — Ars Electronica EU Citizen Science Prize](https://ars.electronica.art/citizenscience/en/eve-onlines-project-discovery/)
+- [EVE Online players submitted over 41M COVID classifications (Massively Overpowered, 2020)](https://massivelyop.com/2020/09/22/eve-online-players-submitted-over-41m-classifications-to-fight-covid-for-ccps-latest-project-discovery-initiative/)
 - [Sea Hero Quest — Alzheimer's Research UK](https://www.alzheimersresearchuk.org/research/for-researchers/resources-and-information/sea-hero-quest/)
+- [Sea Hero Quest — anonymized data, high-security Munich data center (Deutsche Telekom)](https://www.telekom.com/en/company/digital-responsibility/details/fighting-dementia-with-a-game-480416)
 - [Gamified Engagement for Data Crowdsourcing (MDPI 2025)](https://www.mdpi.com/2075-4698/15/3/54)
 
 ### Game-design analysis
