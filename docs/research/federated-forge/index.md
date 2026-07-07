@@ -2,9 +2,9 @@
 
 **Status:** Design spec · under active iteration
 **Author:** AJ Barea, Rochester Institute of Technology (`ajb6289@rit.edu`)
-**First draft:** 2026-04-25 · **Revised:** 2026-07-06 (aggregation ablation
+**First draft:** 2026-04-25 · **Revised:** 2026-07-07 (aggregation ablation
 family, gauge-fixed Byzantine defense, silent-failure evaluation axis,
-mid-2026 prior art)
+mid-2026 prior art, InteFL relationship)
 
 A research direction and engineering design for connecting Kourai Khryseai
 (multi-agent software development with three player-facing interfaces) to
@@ -99,6 +99,7 @@ That is the problem this design answers.
 | FedAgent / FedAgentGym [ICLR 2026](https://openreview.net/forum?id=lZ2C7WcWce) | 2026 | Federated reinforcement learning benchmark for LLM agents across decentralized clients | No personalization split, no human-on-the-loop labels |
 | Agentic-FL [arXiv 2604.04895](https://arxiv.org/abs/2604.04895) | 2026 | LLM agents autonomously orchestrate FL training | The inverse direction — agents run the federation; nothing federates the agents' own weights |
 | EdgeAgentX [arXiv 2505.18457](https://arxiv.org/html/2505.18457v1) | 2025 | FL coordination + multi-agent RL for edge agent fleets (military comms) | Network-control agents, not LLM specialists; no personalization split, no consent surface |
+| InteFL [IEEE MIS 2026](https://doi.org/10.1109/MIS.2026.3658072) | 2026 | In-lab prior work (LDQIS): Flower/Ray FL experimentation platform with federated LoRA fine-tuning and PID / trust-based client removal | Single-model, no multi-agent, no personalization split, no human-on-the-loop labels |
 
 None combine all four axes Federated Forge does:
 
@@ -458,6 +459,41 @@ This work composes with the existing vFL roadmap:
   the box. Federated Forge adds **style-poisoning** as a new attack class
   in `velocity.attacks` because it's specific to Aidos's training signal.
 
+### Relationship to InteFL (in-lab prior work)
+
+**InteFL** ([Korobeinikov, Zatsarenko, Chuprov, Barea & Reznik, IEEE
+Intelligent Systems 2026](https://doi.org/10.1109/MIS.2026.3658072);
+[github.com/dmitrykoro/fl-execution-framework](https://github.com/dmitrykoro/fl-execution-framework))
+is the LDQIS lab's published FL experimentation platform: Flower/Ray-based,
+with a JSON parameter-sweep harness, federated LoRA fine-tuning of language
+models (GPT-2/BERT via peft), and a deep client-removal strategy zoo
+spanning PID-based, trust/reputation-based, and Byzantine-geometric
+families. Federated Forge deliberately does **not** build on it, and the
+reasons are structural, not preference:
+
+- FF's core changes — nested `{agent: {layer: tensor}}` aggregation,
+  gauge-fixed defenses, the corrected-LoRA ablation family — are invasive
+  aggregation-core surgery, prototyped faster in a codebase this project
+  controls (vFL) than in a shared team platform.
+- A forge is a game deployment; it needs a lean client + fast kernels, not
+  Flower/Ray simulation actors, a PostgreSQL experiment database, or a web
+  frontend.
+
+InteFL still earns three explicit roles in this plan:
+
+1. **Reference implementation for the removal strategies.** vFL's planned
+   PID / trust-based forge-exile mechanics (Phasing item 10) are ports of
+   strategies InteFL already ships; port fidelity is validated against
+   InteFL's implementations on shared fixtures.
+2. **Independent replication harness.** The aggregation ablation (Phasing
+   item 5) is replicated in InteFL's sweep harness where its single-model
+   LoRA path allows, so headline numbers rest on two independent
+   implementations rather than one.
+3. **Published precedent.** Federated LoRA fine-tuning with robust client
+   removal is demonstrated, peer-reviewed lab capability — the delta FF
+   claims is the multi-agent, semantically-split, human-on-the-loop layer,
+   not federated LoRA per se.
+
 ### New in Kourai
 
 In `shared/src/kourai_common/federation/`:
@@ -648,7 +684,9 @@ Task-by-task implementation plans for the first phases:
    rather than reimplemented from the paper; FedEx-LoRA validated
    against the paper's exactness property (aggregate-then-compose equals
    compose-then-aggregate up to the residual). Tested on fixtures, then
-   translated to Rust kernels for the hot path.
+   translated to Rust kernels for the hot path. Headline ablation numbers
+   replicated in InteFL's sweep harness where its single-model LoRA path
+   allows (see Relationship to InteFL).
 6. **vFL: multi-tensor named aggregation.** Extend `VelocityServer`
    layer-shapes to handle nested per-agent named tensors.
 7. **Federation client.** `kourai_common/federation/client.py` registers
@@ -659,9 +697,10 @@ Task-by-task implementation plans for the first phases:
 9. **Differential privacy on council deltas.** `privacy.py` with gradient
    clipping + budget accounting. Whisper Limit UI in all three hosts.
 10. **Byzantine simulation harness.** Compose vFL's existing attack
-    suite with the Stoa Falls narrative. Trust-score-based forge exile.
-    Defenses run gauge-fixed (distances on composed ΔW, not raw LoRA
-    factors — see the vFL bridge section).
+    suite with the Stoa Falls narrative. Trust-score-based forge exile,
+    ported with fidelity checks against InteFL's PID / trust-removal
+    reference implementations. Defenses run gauge-fixed (distances on
+    composed ΔW, not raw LoRA factors — see the vFL bridge section).
 11. **Interrupt channel wiring.** `interrupts.py` arbiter, agent gossip
     via existing `gossip_models.py`, Memoir `interrupt` entry type.
     Inter-agent disagreement training signal.
@@ -722,6 +761,7 @@ deliverable. No phase has a calendar attached.
 - [FedEx-LoRA — Exact Aggregation for Federated and Efficient Fine-Tuning (ACL 2025)](https://aclanthology.org/2025.acl-long.67/)
 - [FICAL — Federated In-Context LLM Agent Learning (arXiv 2412.08054)](https://arxiv.org/html/2412.08054v1)
 - [LoRA-FAIR official reference implementation](https://github.com/jmbian/LoRA-FAIR)
+- [InteFL Framework — Optimizing Federated Learning with Metacognition (Korobeinikov et al, IEEE Intelligent Systems 2026)](https://doi.org/10.1109/MIS.2026.3658072)
 - [FedSA-LoRA-DP — Selective LoRA + DP for federated learning (MDPI 2025)](https://www.mdpi.com/2076-3417/15/24/13102)
 - [DP-FedPUAC — Adaptive gradient clipping for federated DP (ScienceDirect 2025)](https://www.sciencedirect.com/science/article/abs/pii/S0020025525011181)
 - [RB-LoRA — Rank-Balanced Aggregation for Federated LoRA (EACL 2026 Findings)](https://aclanthology.org/2026.findings-eacl.88/)
