@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Install uv
-        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        uses: astral-sh/setup-uv@d31148d669074a8d0a63714ba94f3201e7020bc3 # v8.3.0
         with:
           version: "latest"
           enable-cache: true
@@ -68,7 +68,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Install uv
-        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        uses: astral-sh/setup-uv@d31148d669074a8d0a63714ba94f3201e7020bc3 # v8.3.0
         with:
           version: "latest"
           enable-cache: true
@@ -137,7 +137,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Install uv
-        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        uses: astral-sh/setup-uv@d31148d669074a8d0a63714ba94f3201e7020bc3 # v8.3.0
         with:
           version: "latest"
           enable-cache: true
@@ -170,13 +170,13 @@ jobs:
 
       - name: Set up Docker Buildx
         # Required for GHA layer caching (cache-from/cache-to type=gha).
-        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
 
       - name: Build context7-mcp sidecar image
         # mode=max caches intermediate layers — matters here because the
         # npm install is its own layer and we want it back across runs.
         # load=true makes the image visible to the integration tests below.
-        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
           file: docker/context7-mcp.Dockerfile
@@ -186,7 +186,7 @@ jobs:
           load: true
 
       - name: Build memory-mcp sidecar image
-        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
           file: docker/memory-mcp.Dockerfile
@@ -246,7 +246,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Install uv
-        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        uses: astral-sh/setup-uv@d31148d669074a8d0a63714ba94f3201e7020bc3 # v8.3.0
         with:
           version: "latest"
           enable-cache: true
