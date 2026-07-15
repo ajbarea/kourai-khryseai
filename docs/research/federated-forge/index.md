@@ -26,6 +26,12 @@ the analyst** rather than buried in configuration.
 > proposing, building, and evaluating for LAS — is the analyst-fleet
 > system described here.
 
+**How to read this page.** In 2 minutes: the TL;DR and the FAQ just
+below it. In 15 minutes: add *Why two adapters*, *The shared / personal
+split*, *Architecture*, and *Evaluation*. Everything after that is depth
+for whoever wants it — aggregation math, threat model, phasing,
+references.
+
 ---
 
 ## TL;DR
@@ -72,6 +78,69 @@ the analyst** rather than buried in configuration.
   accountant, and a **round debrief** summarizing what left the machine.
 - Central priority updates flow down the same shared-adapter channel,
   keeping distributed agents synchronized with mission needs.
+
+---
+
+## FAQ — questions we expect
+
+**Is this a conversion of Kourai Khryseai?** No. The analyst fleet is a
+new application; the game is a separate project and stays one. What
+carries over is the host-agnostic federation library and the
+orchestration ideas. See *Relationship to Kourai Khryseai*.
+
+**Why two adapters instead of one federated model?** Privacy by
+construction (no federation path for the personal side), documented
+gradient-leakage risk, non-IID personalization (the FL literature uses
+dual adapters for this even without privacy), and the semantic split is
+itself the research contribution. Full argument: *Why two adapters*.
+
+**Can you LoRA-tune Claude or GPT?** No — and nothing here needs to.
+Trainable specialists run laptop-scale open-weight models; API models
+may serve non-learned reasoning steps. See *Goals and non-goals*.
+
+**Doesn't the shared adapter still leak what analysts work on?** The
+sharpest objection, answered in three layers (rule-table exclusion by
+construction, DP-bounded gradients, per-round membership-inference
+audits) — and the residual boundary is research question 1, with
+graceful degradation if the answer is unfavorable. See *The strongest
+objection, answered*.
+
+**Why not build this on InteFL?** Structural reasons, not preference —
+and InteFL keeps three explicit roles (removal-strategy reference,
+replication harness, published precedent). See *Relationship to
+InteFL*.
+
+**Where does the training data come from?** The analyst's routine
+accept / revise / reject decisions, captured as auditable training
+tuples with zero annotation burden — plus denser mid-task signal from
+the interrupt channel. For experiments, simulated analysts are explicit
+and reproducible: see *Simulated analysts* under Evaluation.
+
+**How is this different from FDLoRA / SDFLoRA / Fed-SE?** They split
+parameters randomly or structurally in single-model settings; this
+splits **semantically** (instance vs. craft, decided per training
+tuple), across a **multi-agent** fleet, with **human-on-the-loop**
+labels and an analyst-visible consent surface. See *Position against
+prior art*.
+
+**Where is the lab's anomaly-detection strength in this?** In two
+places, wearing federation clothes: trust-based client removal is
+anomaly detection over model updates (which clients are poisoning the
+fleet), and the silent-failure probe suite is anomaly detection over
+behavioral profiles (which personalized agents are drifting). Both run
+gauge-fixed so LoRA's non-unique factorizations cannot fool the
+distance metrics.
+
+**What does collaboration with LAS look like?** Evaluation task suites
+co-developed with LAS technical staff, and makesense — built with LAS
+during SCADS 2026 — as a natural candidate host for the specialist
+fleet. See *The surrounding systems*.
+
+**What actually gets built in 2027?** The phasing list is the answer,
+dependency-ordered; the deliverables are an open-source federated
+personalization layer for commercial agentic harnesses, a robustness
+evaluation report, and a paper on the personal/shared split. See
+*Phasing*.
 
 ---
 
@@ -292,15 +361,13 @@ LLM weights, shared adapter, and personal adapter. The personal adapter
 dominates near the analyst's own patterns; the shared adapter encodes
 broad craft.
 
-This decomposition is essentially the **fast-slow LoRA pair** from Online
-DPO ([arXiv 2406.05534](https://arxiv.org/html/2406.05534v1)) re-cast for
-multi-agent and federated settings — the personal adapter is the fast,
-high-plasticity head adapting to new analyst feedback session-to-session;
-the shared adapter is the slow head consolidating craft across
-deployments. The split's privacy semantics align with **FedSA-LoRA-DP**
-([MDPI 2025](https://www.mdpi.com/2076-3417/15/24/13102)), which applies
-differential privacy exclusively to the shared LoRA matrix and leaves
-local matrices unperturbed — directly the contract this design needs.
+In the literature's terms: the personal adapter is the fast,
+high-plasticity head and the shared adapter the slow consolidating one
+(the **fast-slow LoRA pair** of
+[Online DPO](https://arxiv.org/html/2406.05534v1), re-cast multi-agent
+and federated), and the privacy contract — DP on the shared matrix only,
+local matrices untouched — is exactly
+**[FedSA-LoRA-DP](https://www.mdpi.com/2076-3417/15/24/13102)**'s.
 
 ### What goes in which set
 
@@ -466,22 +533,11 @@ non-blocking message keyed to:
 The orchestrator arbitrates whether an interrupt is shown to the analyst,
 escalated to alter the pipeline, or used to inform the next handoff.
 
-The interrupt channel borrows pattern from two well-tested designs:
-
-- **LangGraph's `interrupt()`** — pause-at-node, persist via
-  checkpointer, return control to caller. Used here for analyst-mediated
-  interrupts that want a decision: "the review agent wants to flag this —
-  accept the note?"
-- **AutoGen's GroupChatManager** — LLM-driven speaker selection produces
-  organic conversation patterns. Used here for the agent-to-agent channel
-  where non-determinism is desirable.
-
-We are not adopting either framework wholesale. We are reusing
-already-validated semantic shapes. The Python implementation rides
-**`asyncio.TaskGroup`** (PEP 654 ExceptionGroups, Python 3.11+) since the
-stack is asyncio-based via the a2a-sdk; nursery-style isolation,
-cancellation, and ghost-task prevention come from there without pulling
-Trio into the dependency tree.
+The channel reuses validated shapes rather than adopting a framework:
+LangGraph-style pause-and-resume for analyst-mediated decisions ("the
+review agent wants to flag this — accept the note?"), AutoGen-style
+speaker selection for the agent-to-agent side, implemented on
+`asyncio.TaskGroup` since the stack is already asyncio-based.
 
 ### Why interrupts matter for FL
 
@@ -667,19 +723,14 @@ A persistent, analyst-visible UI element showing:
 - What is about to leave the machine in the next round
 - Per-agent contribution magnitude
 
-DP gradient clipping happens on the shared deltas using **Opacus's
-RDP-based accountant** for tight composition bounds across many rounds
-(avoids the loose union bounds of standard (ε, δ)-DP composition). The
-clipping + Gaussian-noise mechanism on LoRA matrices follows
-**DP-FedLoRA** ([arXiv 2509.09097](https://arxiv.org/abs/2509.09097)),
-which gives the calibration theory for exactly this setting (per-client
-LoRA fine-tuning on-device, noised deltas aggregated centrally). The 2026
-empirical consensus — strict ε ≈ 1 costs real utility, moderate ε ≈ 8–10
-is workable — is why the evaluation's ε grid brackets that range rather
-than assuming a single budget. When the budget runs low, agents skip or
-delay their shared contribution rather than exceed it. Adaptive per-round
-clipping (DP-FedPUAC-style) is an open question — fixed clipping ships
-first.
+Clipping + Gaussian noise on the shared deltas follows **DP-FedLoRA**
+([arXiv 2509.09097](https://arxiv.org/abs/2509.09097)), the calibration
+theory for exactly this setting, with **Opacus's RDP accountant** for
+tight composition across rounds. The 2026 empirical consensus — strict
+ε ≈ 1 costs real utility, moderate ε ≈ 8–10 is workable — is why the
+evaluation's ε grid brackets that range. When the budget runs low, agents
+skip or delay their shared contribution rather than exceed it; fixed
+clipping ships first, adaptive clipping is an open question.
 
 ### The round debrief and client exile
 
@@ -910,76 +961,9 @@ adapter.
   entries, early-stopping on validation loss against held-out turns.
 - **What's the unit of "task type" for the routing head?** Task taxonomy
   needs design before the routing head can be cleanly trained.
-- **How do interrupts play with the OTel trace-context propagation that
-  already runs in `kourai_common/tracing.py`?** Need a clean story for
-  causality — an interrupt is not a child span of the interrupted turn,
-  it's a sibling.
 - **What happens to personal adapters across a version bump that changes
   the LLM provider or the base prompt?** Personalization persistence is
   a promise; it needs an explicit migration story.
-
----
-
-## FAQ — questions we expect
-
-**Is this a conversion of Kourai Khryseai?** No. The analyst fleet is a
-new application; the game is a separate project and stays one. What
-carries over is the host-agnostic federation library and the
-orchestration ideas. See *Relationship to Kourai Khryseai*.
-
-**Why two adapters instead of one federated model?** Privacy by
-construction (no federation path for the personal side), documented
-gradient-leakage risk, non-IID personalization (the FL literature uses
-dual adapters for this even without privacy), and the semantic split is
-itself the research contribution. Full argument: *Why two adapters*.
-
-**Can you LoRA-tune Claude or GPT?** No — and nothing here needs to.
-Trainable specialists run laptop-scale open-weight models; API models
-may serve non-learned reasoning steps. See *Goals and non-goals*.
-
-**Doesn't the shared adapter still leak what analysts work on?** The
-sharpest objection, answered in three layers (rule-table exclusion by
-construction, DP-bounded gradients, per-round membership-inference
-audits) — and the residual boundary is research question 1, with
-graceful degradation if the answer is unfavorable. See *The strongest
-objection, answered*.
-
-**Why not build this on InteFL?** Structural reasons, not preference —
-and InteFL keeps three explicit roles (removal-strategy reference,
-replication harness, published precedent). See *Relationship to
-InteFL*.
-
-**Where does the training data come from?** The analyst's routine
-accept / revise / reject decisions, captured as auditable training
-tuples with zero annotation burden — plus denser mid-task signal from
-the interrupt channel. For experiments, simulated analysts are explicit
-and reproducible: see *Simulated analysts* under Evaluation.
-
-**How is this different from FDLoRA / SDFLoRA / Fed-SE?** They split
-parameters randomly or structurally in single-model settings; this
-splits **semantically** (instance vs. craft, decided per training
-tuple), across a **multi-agent** fleet, with **human-on-the-loop**
-labels and an analyst-visible consent surface. See *Position against
-prior art*.
-
-**Where is the lab's anomaly-detection strength in this?** In two
-places, wearing federation clothes: trust-based client removal is
-anomaly detection over model updates (which clients are poisoning the
-fleet), and the silent-failure probe suite is anomaly detection over
-behavioral profiles (which personalized agents are drifting). Both run
-gauge-fixed so LoRA's non-unique factorizations cannot fool the
-distance metrics.
-
-**What does collaboration with LAS look like?** Evaluation task suites
-co-developed with LAS technical staff, and makesense — built with LAS
-during SCADS 2026 — as a natural candidate host for the specialist
-fleet. See *The surrounding systems*.
-
-**What actually gets built in 2027?** The phasing list is the answer,
-dependency-ordered; the deliverables are an open-source federated
-personalization layer for commercial agentic harnesses, a robustness
-evaluation report, and a paper on the personal/shared split. See
-*Phasing*.
 
 ---
 
