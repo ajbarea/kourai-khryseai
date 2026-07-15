@@ -817,6 +817,47 @@ deliverable. No phase has a calendar attached.
 
 ---
 
+## The surrounding systems — what each one lends
+
+The design deliberately steals proven ideas from systems the team already
+built or works with, rather than inventing from scratch:
+
+- **InteFL** ([IEEE MIS 2026](https://doi.org/10.1109/MIS.2026.3658072))
+  — the lab's published FL platform. Lends: federated LoRA precedent,
+  the PID / trust-based client-removal strategy zoo (ported with
+  fidelity checks), and an independent replication harness for the
+  aggregation ablation. See *Relationship to InteFL* above.
+- **Velocity-FL** — this project's aggregation server. Lends:
+  Byzantine-robust kernels, the attack-simulation suite, and the home
+  for the corrected-LoRA ablation family and gauge-fixed defenses.
+- **Phalanx** ([github.com/ajbarea/phalanx-fl](https://github.com/ajbarea/phalanx-fl))
+  — a Flower-based FL testbed that already does the client-side shape
+  this design needs: federated **LoRA fine-tuning where only the
+  adapters cross the wire** (frozen backbone stays local), non-IID
+  partitioning, and an attack/defense strategy zoo — all with
+  **OpenTelemetry-native observability** (a span per round, per client
+  train/evaluate). Lends: the adapters-only payload pattern, a second
+  independent FL implementation for cross-checking results, and the
+  observability discipline for debugging federation rounds.
+- **makesense** ([github.com/ncstate-las/makesense](https://github.com/ncstate-las/makesense))
+  — the analyst-facing orchestration tool built with LAS during SCADS
+  2026: agents compose validated queries over governed data connectors,
+  with analyst approval gates for sensitive operations and verbatim
+  provenance on every result. Lends three design precedents and one
+  opportunity: the **approval-gate UX** (precedent for the consent
+  surface and privacy budget), the **provenance discipline** (every
+  claim tied to an auditable record — the Memoir applies the same rule
+  to training data), the **playbook distillation** idea (turning
+  successful sessions into reusable, reviewable craft — the symbolic
+  counterpart of what the shared adapter learns in weight space), and —
+  as the opportunity — a natural **candidate host**: makesense's
+  connector workflows are exactly the triage / retrieval /
+  summarization surface the specialist fleet is designed to sit behind,
+  which is what evaluation "co-developed with LAS technical staff"
+  looks like concretely.
+
+---
+
 ## Relationship to Kourai Khryseai (the game)
 
 Kourai Khryseai is — and remains — its own project: a game with
@@ -867,6 +908,69 @@ adapter.
 - **What happens to personal adapters across a version bump that changes
   the LLM provider or the base prompt?** Personalization persistence is
   a promise; it needs an explicit migration story.
+
+---
+
+## FAQ — questions we expect
+
+**Is this a conversion of Kourai Khryseai?** No. The analyst fleet is a
+new application; the game is a separate project and stays one. What
+carries over is the host-agnostic federation library and the
+orchestration ideas. See *Relationship to Kourai Khryseai*.
+
+**Why two adapters instead of one federated model?** Privacy by
+construction (no federation path for the personal side), documented
+gradient-leakage risk, non-IID personalization (the FL literature uses
+dual adapters for this even without privacy), and the semantic split is
+itself the research contribution. Full argument: *Why two adapters*.
+
+**Can you LoRA-tune Claude or GPT?** No — and nothing here needs to.
+Trainable specialists run laptop-scale open-weight models; API models
+may serve non-learned reasoning steps. See *Goals and non-goals*.
+
+**Doesn't the shared adapter still leak what analysts work on?** The
+sharpest objection, answered in three layers (rule-table exclusion by
+construction, DP-bounded gradients, per-round membership-inference
+audits) — and the residual boundary is research question 1, with
+graceful degradation if the answer is unfavorable. See *The strongest
+objection, answered*.
+
+**Why not build this on InteFL?** Structural reasons, not preference —
+and InteFL keeps three explicit roles (removal-strategy reference,
+replication harness, published precedent). See *Relationship to
+InteFL*.
+
+**Where does the training data come from?** The analyst's routine
+accept / revise / reject decisions, captured as auditable training
+tuples with zero annotation burden — plus denser mid-task signal from
+the interrupt channel. For experiments, simulated analysts are explicit
+and reproducible: see *Simulated analysts* under Evaluation.
+
+**How is this different from FDLoRA / SDFLoRA / Fed-SE?** They split
+parameters randomly or structurally in single-model settings; this
+splits **semantically** (instance vs. craft, decided per training
+tuple), across a **multi-agent** fleet, with **human-on-the-loop**
+labels and an analyst-visible consent surface. See *Position against
+prior art*.
+
+**Where is the lab's anomaly-detection strength in this?** In two
+places, wearing federation clothes: trust-based client removal is
+anomaly detection over model updates (which clients are poisoning the
+fleet), and the silent-failure probe suite is anomaly detection over
+behavioral profiles (which personalized agents are drifting). Both run
+gauge-fixed so LoRA's non-unique factorizations cannot fool the
+distance metrics.
+
+**What does collaboration with LAS look like?** Evaluation task suites
+co-developed with LAS technical staff, and makesense — built with LAS
+during SCADS 2026 — as a natural candidate host for the specialist
+fleet. See *The surrounding systems*.
+
+**What actually gets built in 2027?** The phasing list is the answer,
+dependency-ordered; the deliverables are an open-source federated
+personalization layer for commercial agentic harnesses, a robustness
+evaluation report, and a paper on the personal/shared split. See
+*Phasing*.
 
 ---
 
