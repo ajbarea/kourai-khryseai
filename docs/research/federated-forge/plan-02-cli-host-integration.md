@@ -1,5 +1,12 @@
 # Federated Forge — Sub-Plan 02: CLI Host Integration
 
+> **Terminology note (2026-07-15).** This plan predates the spec's
+> analyst-fleet reframing and uses the retired game vocabulary. Read it
+> with the mapping from the [design spec](./index.md): player → analyst ·
+> forge → deployment · council adapter → shared adapter · bond adapter →
+> personal adapter. Code identifiers (`shared_eligible`, `PlayerResponse`,
+> etc.) are unchanged.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Wire the kourai-khryseai CLI host so every successful Forge run writes one `MemoirEntry` to disk. Bond and council adapter training in later sub-plans will consume these entries; this plan ships the producer for the simplest case (one entry per pipeline run, capturing the final agent's output).

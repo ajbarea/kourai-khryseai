@@ -1,5 +1,12 @@
 # Federated Forge — Sub-Plan 01: Memoir Foundation
 
+> **Terminology note (2026-07-15).** This plan predates the spec's
+> analyst-fleet reframing and uses the retired game vocabulary. Read it
+> with the mapping from the [design spec](./index.md): player → analyst ·
+> forge → deployment · council adapter → shared adapter · bond adapter →
+> personal adapter. Code identifiers (`shared_eligible`, `PlayerResponse`,
+> etc.) are unchanged.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build the Forge Memoir library — a typed, append-only JSONL data layer where every entry is simultaneously a narrative beat for the visual novel and a labeled training tuple for the federated learning pipeline. This sub-plan ships the library only; host integration ships in plan-02.
