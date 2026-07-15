@@ -18,11 +18,13 @@ knowledge belongs to the fleet and some belongs only to one analyst and one
 machine, and where that split is **enforced by construction and visible to
 the analyst** rather than buried in configuration.
 
-> Historical note: earlier revisions of this spec presented the design
-> through Kourai Khryseai's game layer. That framing is retired. The game
-> host remains a running testbed (see *Testbed lineage* below), but the
-> design of record — what we are proposing, building, and evaluating — is
-> the analyst-fleet system described here.
+> Scope note: the analyst-fleet system is a **new application** that
+> reuses ideas and library code from Kourai Khryseai; the game itself is
+> a separate project and is not being converted (see *Relationship to
+> Kourai Khryseai* below). Earlier revisions of this spec presented the
+> design through the game's framing; the design of record — what we are
+> proposing, building, and evaluating for LAS — is the analyst-fleet
+> system described here.
 
 ---
 
@@ -754,10 +756,12 @@ Task-by-task implementation plans for the first phases:
     type. Inter-agent disagreement training signal for the routing head.
 11. **Online preference learning ablation.** First cut: COPO vs. DICE
     vs. Uni-DPO vs. vanilla iterative DPO on the personal adapter.
-12. **Analyst-workflow specialist retargeting.** Re-skin the testbed's
-    specialists to the analyst workflow stages (triage, retrieval,
-    summarization, drafting): prompts, tool surfaces, and evaluation
-    tasks change; the federation architecture does not.
+12. **Analyst-fleet application.** Build the analyst-workflow specialist
+    fleet (triage, retrieval, summarization, drafting) as a **new
+    application** — a new host consuming the same `kourai_common`
+    federation library and vFL client. Kourai Khryseai's game hosts are
+    not modified for this; they remain a second, deliberately dissimilar
+    client population for heterogeneity experiments.
 13. **Evaluation pipeline + dashboard.** Research and analyst-facing
     metrics, paper-grade ablations, replay infrastructure for
     postmortems.
@@ -767,22 +771,25 @@ deliverable. No phase has a calendar attached.
 
 ---
 
-## Testbed lineage
+## Relationship to Kourai Khryseai (the game)
 
-Kourai Khryseai began as a multi-agent software-development system with
-game-styled hosts, and its running code still reflects that: the current
-specialists are software-lifecycle agents with Greek names, and a few
-schema fields (`player_response`, `narrative_beat`, `affinity_delta`)
-carry the old vocabulary. None of that is load-bearing for this design.
-What the testbed contributes is exactly what the abstract claims: a
-working multi-agent A2A harness, three hosts that capture human
-feedback in routine use, and a landed data layer that records every
-agent turn as a training tuple with its shared-or-private decision.
-Phasing item 12 retargets the specialist roster to analyst workflow
-stages; a future schema rev renames the legacy fields. Anyone reading
-older revisions of this spec (or the sub-plans, which predate the
-reframing) should map: player → analyst · forge → deployment · council
-adapter → shared adapter · bond adapter → personal adapter.
+Kourai Khryseai is — and remains — its own project: a game with
+software-lifecycle specialist agents, built to learn multi-agent
+orchestration, with game-styled hosts. **The analyst-fleet system
+described in this spec is a new application that borrows its ideas and
+its library, not a conversion of the game.** What carries over is
+host-agnostic by construction: the A2A orchestration patterns, the
+`kourai_common.federation` library (Memoir data layer, split decision,
+and — as later phases land — adapters, local trainer, privacy, client),
+and the design lessons from running three feedback-capturing hosts. The
+game continues as a testbed and, once federation ships, as a second,
+deliberately dissimilar client population. A few schema fields
+(`player_response`, `narrative_beat`, `affinity_delta`) carry the game
+vocabulary and are retained as-is; none are load-bearing for this
+design. Anyone reading older revisions of this spec (or the sub-plans,
+which predate the reframing) should map: player → analyst · forge →
+deployment · council adapter → shared adapter · bond adapter → personal
+adapter.
 
 ---
 
