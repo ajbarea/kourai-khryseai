@@ -43,9 +43,9 @@ the analyst** rather than buried in configuration.
   Specialist agents cover analyst workflow stages: **data triage,
   retrieval, summarization, report drafting**, coordinated by an
   orchestrator with a learned routing head.
-- Each specialist carries two LoRA adapters: a **shared adapter** that
-  federates across deployments and a **personal adapter** that never
-  leaves the analyst's machine. The split is semantic — decided per
+- Each specialist runs a laptop-scale open-weight model carrying two
+  LoRA adapters: a **shared adapter** that federates across deployments
+  and a **personal adapter** that never leaves the analyst's machine. The split is semantic — decided per
   training tuple by what the data *is* — and enforced by construction:
   the personal side has no federation path at all.
 - The vFL server uses corrected LoRA aggregation — vanilla FedAvg on
@@ -144,6 +144,32 @@ The one-line rule: **patterns leave the enclave; instances do not.** A
 label that "the analyst tightened this summary toward shorter sentences"
 is a pattern. The summary is not.
 
+### The strongest objection, answered
+
+*"Your 'shared-eligible' proposals contain instances: an agent's proposed
+summary is conditioned on the document it summarized, so pattern-level
+text still carries instance content."* Correct — which is why the defense
+is layered, and why "by construction" refers to the split's routing, not
+to a claim that shared-eligible text is content-free:
+
+1. The rule table removes the highest-risk categories (analyst text,
+   document content, queries, transcripts) from the shared training
+   corpus **entirely** — no filter to fail open, no federation code path.
+2. What remains never leaves as text at all: only DP-clipped, noised
+   gradient updates leave, with per-round memorization bounded formally
+   by the DP-FedLoRA calibration (see *Privacy surfaces*).
+3. The bound is audited empirically: membership-inference and
+   extraction probes against the aggregated shared adapter are part of
+   the evaluation, not an afterthought.
+
+Whether the residual boundary is clean — whether craft can be shared
+without instances being recoverable at workable ε — is research
+question 1. That is the question this project exists to answer, and the
+architecture is built so that a negative answer degrades gracefully:
+tighten the rule table (it is per-deployment configuration) or spend
+less budget, and the fleet falls back toward personal-only learning
+rather than leaking.
+
 ---
 
 ## Research questions
@@ -223,10 +249,12 @@ None combine all four axes Federated Forge does:
 - Replacing the existing rule-based orchestration pipeline. The pipeline
   stays as the A2A backbone; the learned routing head augments it, the
   interrupt channel runs alongside it.
-- Replacing the deployment's chosen LLM provider with a federated
-  foundation model. Federation operates on per-agent LoRA adapters
-  layered on top of whatever provider the deployment is configured with.
-  LiteLLM remains the abstraction.
+- Federating a frontier API model. LoRA adapters need local weights, so
+  **trainable specialists run laptop-scale open-weight models** — which
+  is also what edge deployment demands. The harness may still route
+  non-learned reasoning steps to an API provider (LiteLLM remains the
+  abstraction), but federation touches only the local adapters. Nothing
+  in this design fine-tunes, or depends on fine-tuning, a hosted model.
 - Cross-deployment ranking or scoring of analysts. The federation is a
   commons: improvements flow back to all deployments, including
   disconnected ones on rejoin, and no leaderboard exists.
@@ -698,6 +726,24 @@ notified — robust aggregation made visible rather than silent.
   rate
 - Real-task replay from accumulated Memoir corpora (as deployments
   produce them) for personalization metrics
+
+### Simulated analysts
+
+Simulated fleets need accept/revise/reject streams, so the analyst side
+of every experiment is explicit and reproducible: **scripted analyst
+policies** (deterministic accept/revise/reject rules over task features)
+for ablations that need exact repeatability, and **persona-conditioned
+LLM judges** (fixed seeds, fixed rubrics, personas varying style,
+format conventions, and priorities) where graded revision behavior is
+required. Varying personas across clients is also how the controlled
+non-IID populations are constructed — the heterogeneity the
+personalization claims are tested against is designed, not incidental.
+
+### Privacy audit
+
+- **Membership-inference and extraction probes** against the aggregated
+  shared adapter at each ε, run per federation round — the empirical
+  check on the DP bound and on research question 1's boundary claim
 
 ---
 
