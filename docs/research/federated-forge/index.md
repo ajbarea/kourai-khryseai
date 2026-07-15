@@ -2,9 +2,17 @@
 
 **Status:** Design spec · under active iteration
 **Author:** AJ Barea, Rochester Institute of Technology (`ajb6289@rit.edu`)
-**First draft:** 2026-04-25 · **Revised:** 2026-07-07 (aggregation ablation
-family, gauge-fixed Byzantine defense, silent-failure evaluation axis,
-mid-2026 prior art, InteFL relationship)
+**First draft:** 2026-04-25 · **Revised:** 2026-07-15 (LAS analyst-fleets
+companion note; prior revision 2026-07-07: aggregation ablation family,
+gauge-fixed Byzantine defense, silent-failure evaluation axis, mid-2026
+prior art, InteFL relationship)
+
+> **Reading this for the LAS 2027 abstract?** This spec presents the design
+> in Kourai Khryseai's game framing (players, forges, bond scenes). The
+> [LAS analyst-fleets note](./las-2027-analyst-fleets.md) retells it for the
+> intelligence-analysis setting — same architecture, with a term-for-term
+> translation table and the argument for the dual-adapter split when the
+> private category is classified analyst material rather than bond content.
 
 A research direction and engineering design for connecting Kourai Khryseai
 (multi-agent software development with three player-facing interfaces) to
