@@ -1,4 +1,4 @@
-# Federated Forge — Federated Personalization for Analyst Agent Fleets
+# Federated Analyst Fleets — Federated Personalization for Analyst Agents
 
 **Status:** Design spec · design of record for the LAS 2027 abstract
 **Author:** AJ Barea, Rochester Institute of Technology (`ajb6289@rit.edu`)
@@ -39,7 +39,7 @@ the analyst** rather than buried in configuration.
   learning on one machine or shares it and leaks what the analyst was
   working on. Current practice picks stranded: no fleet-level learning,
   every deployment a cold start.
-- Each deployment (a **forge** — one analyst's machine) is a vFL client.
+- Each deployment — one analyst's machine — is a vFL client.
   Specialist agents cover analyst workflow stages: **data triage,
   retrieval, summarization, report drafting**, coordinated by an
   orchestrator with a learned routing head.
@@ -57,7 +57,8 @@ the analyst** rather than buried in configuration.
   **gauge-fixed** — distances computed on the composed update ΔW = BA,
   never on raw LoRA factors, which are non-unique under
   (A, B) → (AR, R⁻¹B).
-- The data layer is the **Memoir**: an append-only, auditable record where
+- The data layer is the **interaction ledger**: an append-only,
+  auditable record where
   every agent turn becomes a training tuple carrying its shared-or-private
   decision at capture time. No annotation burden; the analyst's routine
   interactions are the labels.
@@ -76,7 +77,8 @@ the analyst** rather than buried in configuration.
 
 ## Why this design exists
 
-Kourai today has no learned routing policy and no learned specialist
+The Kourai Khryseai testbed today has no learned routing policy and no
+learned specialist
 behavior beyond what the LLM brings. The orchestrator is rule-based, and
 every interaction with its human is a one-off. The telemetry already
 emitted for every agent hop describes a rich `(features, action, outcome)`
@@ -212,7 +214,7 @@ rather than leaking.
 | EdgeAgentX [arXiv 2505.18457](https://arxiv.org/html/2505.18457v1) | 2025 | FL coordination + multi-agent RL for edge agent fleets (military comms) | Network-control agents, not LLM specialists; no personalization split, no consent surface |
 | InteFL [IEEE MIS 2026](https://doi.org/10.1109/MIS.2026.3658072) | 2026 | In-lab prior work (LDQIS): Flower/Ray FL experimentation platform with federated LoRA fine-tuning and PID / trust-based client removal | Single-model, no multi-agent, no personalization split, no human-on-the-loop labels |
 
-None combine all four axes Federated Forge does:
+None combine all four axes Federated Analyst Fleets does:
 
 1. **Multi-agent** specialists, each with their own training signal
 2. **Personalized FL** with a semantic shared/private split (not random)
@@ -270,9 +272,9 @@ summarization, report drafting), two LoRA adapters are trained over the
 same set of layers:
 
 - `shared_adapter[A]` — federates across deployments. Trained only on
-  Memoir entries where `split.shared_eligible == true`. Aggregated by the
+  ledger entries where `split.shared_eligible == true`. Aggregated by the
   vFL server every federation round.
-- `personal_adapter[A]` — local-only. Trained on every Memoir entry the
+- `personal_adapter[A]` — local-only. Trained on every ledger entry the
   analyst generates, including those marked `private_only`. Never leaves
   the machine.
 
@@ -298,7 +300,7 @@ the shared adapter is the slow head consolidating craft across
 deployments. The split's privacy semantics align with **FedSA-LoRA-DP**
 ([MDPI 2025](https://www.mdpi.com/2076-3417/15/24/13102)), which applies
 differential privacy exclusively to the shared LoRA matrix and leaves
-local matrices unperturbed — directly the contract Federated Forge needs.
+local matrices unperturbed — directly the contract this design needs.
 
 ### What goes in which set
 
@@ -307,7 +309,7 @@ not by heuristics, not by post-hoc filtering. In schema terms
 (`SplitDecision` in `memoir_schema.py`): `shared_eligible` and
 `private_only` are mutually exclusive by validator.
 
-| Memoir entry source | `shared_eligible` |
+| Ledger entry source | `shared_eligible` |
 |---|---|
 | Specialist's proposed output (triage decision, retrieval strategy, summary structure, draft skeleton) | Yes — pattern level |
 | Analyst's revised version of that output (the diff) | No — contains the analyst's words |
@@ -347,7 +349,7 @@ The principle: **patterns leave the enclave; instances do not.**
    │  Orchestrator: shared + personal routing heads                     │
    │                                                                    │
    │  ╔══════════════════════════════════════════════════════════════╗ │
-   │  ║  Memoir — canonical, auditable record; every agent turn is a  ║ │
+   │  ║  Interaction ledger — auditable record; every agent turn is a ║ │
    │  ║  training tuple carrying its shared-or-private decision       ║ │
    │  ╚══════════════════════════════════════════════════════════════╝ │
    │                                                                    │
@@ -378,16 +380,15 @@ Nothing else moves over the wire.
 
 ---
 
-## Memoir — the data layer
+## The interaction ledger — the data layer
 
-The Memoir is the canonical record of everything that happens in a
-deployment (implemented in `kourai_common.federation`: `memoir.py`,
-`memoir_schema.py`, `host_helpers.py`). Each entry is simultaneously an
+The interaction ledger is the canonical, append-only record of
+everything that happens in a deployment. Each entry is simultaneously an
 auditable interaction record and a training tuple:
 
 ```jsonl
 {
-  "scene_id": "session-12.turn-7",
+  "entry_id": "session-12.turn-7",
   "agent": "summarization",
   "context": {
     "task_type": "summary_review",
@@ -395,7 +396,7 @@ auditable interaction record and a training tuple:
     "preceding_agents": ["retrieval"]
   },
   "agent_proposed": "...proposed summary...",
-  "player_response": {
+  "analyst_response": {
     "kind": "modified",
     "delta": "...analyst edits...",
     "felt": "right"
@@ -417,31 +418,33 @@ auditable interaction record and a training tuple:
 
 The `split` field is decided by the rule table above at capture time. The
 `training_label` is what the local trainer consumes; entries marked
-`private_only` never reach the federation code path at all. (Field names
-follow the landed schema; `player_response` — the analyst's
-accept/modify/reject/defer plus an optional calibration signal — and the
-testbed-specific fields `narrative_beat` / `affinity_delta` date from the
-game-host era and are retained for compatibility until the schema's next
-major rev.)
+`private_only` never reach the federation code path at all.
+`analyst_response` records accept / modify / reject / defer plus an
+optional calibration signal. (Compatibility note: the landed testbed
+implementation in `kourai_common.federation` — `memoir.py`,
+`memoir_schema.py`, `host_helpers.py` — uses legacy field names
+`scene_id`, `player_response`, `narrative_beat`, `affinity_delta`; the
+standalone library extraction renames them to the vocabulary shown
+here.)
 
-OpenTelemetry continues to emit spans for monitoring, but the Memoir is
+OpenTelemetry continues to emit spans for monitoring, but the ledger is
 the source of truth for training. They are produced by the same agent
 code paths but consumed by different downstream systems. Where possible,
-OTel spans emitted alongside Memoir entries follow **OpenInference**
+OTel spans emitted alongside ledger entries follow **OpenInference**
 semantic conventions
 ([Arize-ai/openinference](https://github.com/Arize-ai/openinference)) for
 `agent.name`, `llm.input_messages`, `llm.output_messages`, and tool spans
 — keeping the monitoring surface portable across observability backends
 without coupling the training pipeline to any particular vendor.
 
-### Memoir entry types
+### Ledger entry types
 
 - `pipeline_turn` — a specialist completes a sequential-pipeline turn
 - `interrupt` — an agent breaks in mid-task with a correction,
   disagreement, or safety flag
-- `council_event` — a federation lifecycle event (enrollment consent,
-  round completion, client exile); schema name retained from the landed
-  code
+- `federation_event` — a federation lifecycle event (enrollment
+  consent, round completion, client exile); the landed schema calls
+  this `council_event`
 
 ---
 
@@ -454,9 +457,9 @@ non-blocking message keyed to:
 
 - `interrupting_agent` — who broke in
 - `target_agent` — who they are addressing
-- `target_turn` — which Memoir entry they are responding to
-- `reason_class` — `correction`, `disagreement`, `safety`, or `gossip`
-  (agent-to-agent state sharing)
+- `target_turn` — which ledger entry they are responding to
+- `reason_class` — `correction`, `disagreement`, `safety`, or
+  `coordination` (agent-to-agent state sharing)
 - `visibility` — `public` (other agents and the analyst), `private`
   (analyst only), `silent` (logged but not shown)
 
@@ -558,7 +561,7 @@ commitment in this spec.
 - **Multi-tensor named-parameter aggregation** — current vFL assumes flat
   `layer_shapes`; this design needs nested `{agent_name: {layer_name:
   tensor}}`
-- **`experiments/federated_forge.toml`** — multi-client simulation
+- **`experiments/analyst_fleet.toml`** — multi-client simulation
   matching the specialist fleet, with Byzantine-attack variants
 
 This work composes with the existing vFL roadmap:
@@ -568,7 +571,7 @@ This work composes with the existing vFL roadmap:
   been pushing corrupting updates into the fleet.
 - vFL's existing attack-simulation suite (model_poisoning, sybil_nodes,
   gaussian_noise, label_flipping) covers most of the threat model out of
-  the box. Federated Forge adds **style-poisoning** as a new attack class
+  the box. Federated Analyst Fleets adds **style-poisoning** as a new attack class
   in `velocity.attacks` — an attacker that targets the review agent's
   training signal to degrade what the fleet learns to flag.
 
@@ -581,7 +584,7 @@ is the LDQIS lab's published FL experimentation platform: Flower/Ray-based,
 with a JSON parameter-sweep harness, federated LoRA fine-tuning of language
 models (GPT-2/BERT via peft), and a deep client-removal strategy zoo
 spanning PID-based, trust/reputation-based, and Byzantine-geometric
-families. Federated Forge deliberately does **not** build on it, and the
+families. Federated Analyst Fleets deliberately does **not** build on it, and the
 reasons are structural, not preference:
 
 - FF's core changes — nested `{agent: {layer: tensor}}` aggregation,
@@ -607,18 +610,19 @@ InteFL still earns three explicit roles in this plan:
    claims is the multi-agent, semantically-split, human-on-the-loop
    layer, not federated LoRA per se.
 
-### New in Kourai
+### The federation library
 
-In `shared/src/kourai_common/federation/`:
+Host-agnostic, in `shared/src/kourai_common/federation/` today; extracted
+as a standalone package as the analyst-fleet application lands:
 
-- ✓ `memoir.py` — Memoir reader/writer with the dual-face contract
+- ✓ `memoir.py` — ledger reader/writer (append-only JSONL)
   *(landed alongside `memoir_schema.py` and `host_helpers.py`; Phase 1
   in progress)*
 - `client.py` — vFL client wrapper: registers a deployment with the
   server, handles round-trip flow
 - `adapters.py` — per-agent shared/personal LoRA management,
   freeze/unfreeze logic, layer-targeting per specialist
-- `local_trainer.py` — consumes Memoir entries, computes per-agent loss,
+- `local_trainer.py` — consumes ledger entries, computes per-agent loss,
   updates LoRA. Personal-only loop runs every session; shared loop runs
   only on federation rounds.
 - `privacy.py` — DP gradient clipping on shared deltas, privacy budget
@@ -628,12 +632,13 @@ In `shared/src/kourai_common/federation/`:
 - `interrupts.py` — interrupt channel arbiter, `gossip_models.py` /
   `gossip_chemistry.py` integration
 
-### Host changes
+### Client applications
 
-All hosts write Memoir entries and render three analyst-facing surfaces:
-the enrollment consent flow, the persistent privacy budget indicator, and
-the round debrief. The CLI host is the reference implementation; the GUI
-host follows.
+Every client application writes ledger entries and renders three
+analyst-facing surfaces: the enrollment consent flow, the persistent
+privacy budget indicator, and the round debrief. A reference CLI client
+ships first; the analyst-fleet application (Phasing item 12) is the
+deliverable surface.
 
 ---
 
@@ -724,7 +729,7 @@ notified — robust aggregation made visible rather than silent.
   triage precision/recall on labeled corpora, retrieval nDCG,
   summarization quality (reference-based + rubric), draft acceptance
   rate
-- Real-task replay from accumulated Memoir corpora (as deployments
+- Real-task replay from accumulated ledger corpora (as deployments
   produce them) for personalization metrics
 
 ### Simulated analysts
@@ -758,9 +763,10 @@ Task-by-task implementation plans for the first phases:
 - [Sub-Plan 01 — Memoir Foundation](plan-01-memoir-foundation.md) (the
   `kourai_common.federation` library; Phase 1)
 - [Sub-Plan 02 — CLI Host Integration](plan-02-cli-host-integration.md)
-  (CLI write paths into the Memoir; Phase 1 → 2)
+  (CLI write paths into the ledger; Phase 1 → 2)
 
-1. ⏳ **Memoir replaces passive tracing as training source.** Schema
+1. ⏳ **Interaction ledger replaces passive tracing as training
+   source.** Schema
    landed in `shared/src/kourai_common/federation/memoir.py` +
    `memoir_schema.py` + `host_helpers.py`. Still pending: host write
    paths, replay tooling for inspection. OTel stays for monitoring.
@@ -768,7 +774,7 @@ Task-by-task implementation plans for the first phases:
    wired into each agent's LLM call via LiteLLM plumbing.
    Freeze/unfreeze semantics for inference. Layer-targeting per
    specialist.
-3. **Local trainer (personal only).** Consumes Memoir, computes
+3. **Local trainer (personal only).** Consumes ledger, computes
    per-agent loss, updates personal adapters. Runs every session. Proves
    the personalization story standalone — no federation yet.
 4. **vFL: corrected-LoRA aggregation family.** FedEx-LoRA, LoRA-FAIR,
@@ -787,10 +793,12 @@ Task-by-task implementation plans for the first phases:
 6. **Federation client.** `kourai_common/federation/client.py` registers
    the deployment, runs the enrollment consent flow, completes first
    round of shared-adapter aggregation against vFL.
-7. **Round debrief.** Analyst-facing round summaries in the hosts.
-   Memoir entries of type `council_event`.
+7. **Round debrief.** Analyst-facing round summaries in the client
+   applications.
+   Ledger entries of type `federation_event`.
 8. **Differential privacy on shared deltas.** `privacy.py` with gradient
-   clipping + budget accounting. Budget indicator in the hosts.
+   clipping + budget accounting. Budget indicator in the client
+   applications.
 9. **Byzantine simulation harness.** Compose vFL's existing attack suite
    with trust-score-based client exile, ported with fidelity checks
    against InteFL's PID / trust-removal reference implementations.
@@ -798,7 +806,7 @@ Task-by-task implementation plans for the first phases:
    factors — see the vFL bridge section). Style-poisoning added as a new
    attack class.
 10. **Interrupt channel wiring.** `interrupts.py` arbiter, agent
-    messaging via existing `gossip_models.py`, Memoir `interrupt` entry
+    messaging via existing `gossip_models.py`, ledger `interrupt` entry
     type. Inter-agent disagreement training signal for the routing head.
 11. **Online preference learning ablation.** First cut: COPO vs. DICE
     vs. Uni-DPO vs. vanilla iterative DPO on the personal adapter.
@@ -846,7 +854,7 @@ built or works with, rather than inventing from scratch:
   provenance on every result. Lends three design precedents and one
   opportunity: the **approval-gate UX** (precedent for the consent
   surface and privacy budget), the **provenance discipline** (every
-  claim tied to an auditable record — the Memoir applies the same rule
+  claim tied to an auditable record — the ledger applies the same rule
   to training data), the **playbook distillation** idea (turning
   successful sessions into reusable, reviewable craft — the symbolic
   counterpart of what the shared adapter learns in weight space), and —
@@ -866,7 +874,8 @@ orchestration, with game-styled hosts. **The analyst-fleet system
 described in this spec is a new application that borrows its ideas and
 its library, not a conversion of the game.** What carries over is
 host-agnostic by construction: the A2A orchestration patterns, the
-`kourai_common.federation` library (Memoir data layer, split decision,
+`kourai_common.federation` library (the interaction-ledger data layer,
+split decision,
 and — as later phases land — adapters, local trainer, privacy, client),
 and the design lessons from running three feedback-capturing hosts. The
 game continues as a testbed and, once federation ships, as a second,
@@ -897,7 +906,7 @@ adapter.
   shared without their instances being recoverable? The DP layer bounds
   this formally; the behavioral probe suite watches it empirically.
 - **How do we prevent the personal adapter from overfitting to a small
-  analyst corpus?** Low-rank constraint, replay buffer of Memoir
+  analyst corpus?** Low-rank constraint, replay buffer of ledger
   entries, early-stopping on validation loss against held-out turns.
 - **What's the unit of "task type" for the routing head?** Task taxonomy
   needs design before the routing head can be cleanly trained.
