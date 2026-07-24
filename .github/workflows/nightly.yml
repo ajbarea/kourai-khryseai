@@ -38,7 +38,7 @@ jobs:
         # PortAudio headers for PyAudio (pulled in by RealtimeTTS via hosts/gui).
         # See tests.yml for the research(2026-05) note on why this is a bare
         # apt-get instead of awalsh128/cache-apt-pkgs-action.
-        run: sudo apt-get install -y portaudio19-dev
+        run: sudo apt-get update && sudo apt-get install -y portaudio19-dev
 
       - name: Install dependencies
         run: uv sync --all-packages --dev --frozen
@@ -102,7 +102,7 @@ jobs:
         # PortAudio headers; ubuntu-latest doesn't ship them.
         # See tests.yml for the research(2026-05) note on why this is a bare
         # apt-get instead of awalsh128/cache-apt-pkgs-action.
-        run: sudo apt-get install -y portaudio19-dev
+        run: sudo apt-get update && sudo apt-get install -y portaudio19-dev
 
       - name: Install dependencies
         run: uv sync --all-packages --dev --frozen
