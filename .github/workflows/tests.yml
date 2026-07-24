@@ -44,7 +44,7 @@ jobs:
         # single 200KB package, install (~5s) is faster than the cache action's
         # restore overhead anyway. Upstream fix sits in awalsh128/cache-apt-
         # pkgs-action#193 + #198, unmerged for 5+ weeks.
-        run: sudo apt-get install -y portaudio19-dev
+        run: sudo apt-get update && sudo apt-get install -y portaudio19-dev
 
       - name: Install dependencies
         run: uv sync --all-packages --dev --frozen
@@ -83,7 +83,7 @@ jobs:
         # PortAudio headers; ubuntu-latest doesn't ship them.
         # See the first usage of this step (line ~37) for the research(2026-05)
         # note on why we don't use awalsh128/cache-apt-pkgs-action.
-        run: sudo apt-get install -y portaudio19-dev
+        run: sudo apt-get update && sudo apt-get install -y portaudio19-dev
 
       - name: Install dependencies
         run: uv sync --all-packages --dev --frozen
@@ -152,7 +152,7 @@ jobs:
         # PortAudio headers; ubuntu-latest doesn't ship them.
         # See the first usage of this step (line ~37) for the research(2026-05)
         # note on why we don't use awalsh128/cache-apt-pkgs-action.
-        run: sudo apt-get install -y portaudio19-dev
+        run: sudo apt-get update && sudo apt-get install -y portaudio19-dev
 
       - name: Install dependencies
         run: uv sync --all-packages --dev --frozen
@@ -260,7 +260,7 @@ jobs:
         # Same PortAudio constraint as the other jobs; see the lint job for
         # the research(2026-05) note on why we shell out to apt-get
         # directly instead of using cache-apt-pkgs-action.
-        run: sudo apt-get install -y portaudio19-dev
+        run: sudo apt-get update && sudo apt-get install -y portaudio19-dev
 
       - name: Install dependencies (with aletheia-v2 extra)
         run: uv sync --all-packages --extra aletheia-v2 --group dev --frozen
