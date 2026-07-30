@@ -282,8 +282,30 @@ rather than leaking.
 | Agentic-FL [arXiv 2604.04895](https://arxiv.org/abs/2604.04895) | 2026 | LLM agents autonomously orchestrate FL training | The inverse direction — agents run the federation; nothing federates the agents' own weights |
 | EdgeAgentX [arXiv 2505.18457](https://arxiv.org/html/2505.18457v1) | 2025 | FL coordination + multi-agent RL for edge agent fleets (military comms) | Network-control agents, not LLM specialists; no personalization split, no consent surface |
 | InteFL [IEEE MIS 2026](https://doi.org/10.1109/MIS.2026.3658072) | 2026 | In-lab prior work (LDQIS): Flower/Ray FL experimentation platform with federated LoRA fine-tuning and PID / trust-based client removal | Single-model, no multi-agent, no personalization split, no human-on-the-loop labels |
+| FDLoRA [arXiv 2406.07925](https://arxiv.org/abs/2406.07925) | 2024 (rev 2026) | Dual LoRA modules per client for personalized vs. global knowledge; only the global module uploads; adaptive fusion at inference | The nearest architectural twin. Which knowledge is personal is decided by optimization and fusion weights, not by a policy over data provenance; single-model, no multi-agent, no labels |
+| Dual-Personalizing Adapter [arXiv 2403.19211](https://arxiv.org/abs/2403.19211) | 2024 | Dual adapter for federated foundation models, global plus local personalization | Same: the split is architectural, not semantic; single-model |
+| PF2LoRA [OpenReview](https://openreview.net/forum?id=X7ITc8NmSv) | 2025 | Two-level LoRA — a common adapter for all clients plus a second level for per-client personalization, with automatic rank learning | Split is parameter-level and learned; contributes the rank-learning idea this design adopts as an ablation |
+| FedDAT [arXiv 2308.12305](https://arxiv.org/abs/2308.12305) | 2023 | Dual-Adapter Teacher: a local adapter regularizes the global adapter to handle heterogeneity | Regularization relationship, not a disclosure boundary; multi-modal, not multi-agent |
+| CA-PFL [WWW 2026](https://dl.acm.org/doi/10.1145/3774904.3792619) | 2026 | Client-adaptive PEFT: per-client LoRA rank assigned from local data distribution via a variational Bayesian prior | Rank adaptation only; no split semantics, no labels, no disclosure boundary |
 
-None combine all four axes Federated Analyst Fleets does:
+**The dual-adapter architecture is not the contribution, and claiming it
+would be indefensible.** FDLoRA, Dual-Personalizing Adapter, PF2LoRA, and
+FedDAT all put a personal and a shared adapter on each client. In every
+one of them, *which knowledge becomes personal is decided by optimization*
+— fusion weights, regularization pressure, learned rank, or gradient
+dynamics. The parameter split is an artifact of training, so nothing about
+it can be promised in advance, and nothing about it is auditable
+afterward.
+
+This design decides the split **before the gradient, from a policy over
+data provenance**, which makes it a disclosure boundary rather than an
+optimization outcome: checkable at capture time, expressible as a
+requirement, and reviewable in an audit log. That is the difference worth
+defending, and it is why the split is described as semantic rather than
+parametric throughout.
+
+Combined with the remaining three axes, no prior work covers what
+Federated Analyst Fleets does:
 
 1. **Multi-agent** specialists, each with their own training signal
 2. **Personalized FL** with a semantic shared/private split (not random)
@@ -371,10 +393,15 @@ local matrices untouched — is exactly
 
 ### What goes in which set
 
-The split is decided per entry by a fixed rule table at capture time —
-not by heuristics, not by post-hoc filtering. In schema terms
-(`SplitDecision` in `memoir_schema.py`): `shared_eligible` and
-`private_only` are mutually exclusive by validator.
+The split is decided per entry at capture time, never by heuristics and
+never by post-hoc filtering. In schema terms (`SplitDecision` in
+`memoir_schema.py`): `shared_eligible` and `private_only` are mutually
+exclusive by validator.
+
+Two things decide it, in order. The **governed label**, where the fleet's
+governance layer produced one, is authoritative. The **source-category
+floor** below binds every entry, and is the whole decision for entries
+that carry no label.
 
 | Ledger entry source | `shared_eligible` |
 |---|---|
@@ -388,6 +415,51 @@ not by heuristics, not by post-hoc filtering. In schema terms
 | Raw session transcript | No — only labeled tuples leave |
 
 The principle: **patterns leave the enclave; instances do not.**
+
+### The governed label
+
+A source-category floor is safe but blunt. It classifies an entry by
+where it came from, so it cannot tell a public roster table from a
+restricted medical record, and it says nothing at all about compartments.
+Read strictly, the "never" rows above forbid federating a pattern derived
+from data that was never sensitive in the first place.
+
+The fleet's own governance layer already knows better, because it decided
+whether the analyst could reach the data at all. That decision is where
+the label comes from: the ledger records the label each object carried,
+and an entry's label is the join (least upper bound) of the labels of
+every object that fed the turn. A shared adapter releasable at level L
+trains only on entries whose join sits at or below L.
+
+This is a correctness argument, not a convenience. A rule table that
+re-derives sensitivity from content categories is a second classifier of
+the same objects, running beside the access decision's own. Two
+classifiers of one object drift, and the one inside the training path is
+the one that fails open. Deriving the label from the access decision keeps
+a single authority, and it stays checkable without inspecting a gradient,
+which is the property the whole by-construction claim rests on.
+
+**The label resolves before the gradient, not before the response.**
+Provenance is captured at the turn, but working out which retrieved
+objects actually fed an output costs real compute: measured at **1.74x the
+turn it explains** for a ten-source summarization turn on a laptop-scale
+open-weight model (qwen2.5:7b-instruct on an 8 GB RTX 3060 Ti; a 5.1 s
+turn against 8.9 s for a 32-pass ContextCite ablation budget, per-pass
+median 273 ms). Inline that is fatal, since a five-second turn becomes
+fourteen. Deferred it is roughly half an hour of background work for a
+two-hundred-turn day on the analyst's own machine.
+
+Deferring costs the design nothing, because the boundary that matters is
+the gradient and not the reply. A ledger entry therefore carries a label
+**state**: an entry whose attribution has not resolved is not
+training-eligible, and the local trainer refuses it rather than assuming
+it. Unresolved falls to `private_only`, failing closed the same way a
+malformed grant does.
+
+The floor still binds underneath. An entry with no governed object behind
+it (the analyst's own free text), an object drawn from a source that
+carries no classification of its own, and any entry whose label cannot be
+resolved all fall through to the table above and to `private_only`.
 
 ---
 
@@ -598,6 +670,18 @@ commitment in this spec.
   [scaling-factor stabilization](https://arxiv.org/pdf/2603.08058)) says
   rank/scale handling decides stability at realistic client counts, so
   the ablation is load-bearing, not ceremony.
+
+  All three arms ship, deliberately. They differ precisely along the axis
+  this design introduces: a per-deployment **personal** adapter on the same
+  modules. FedEx-LoRA's exactness comes from writing a residual into the
+  shared frozen base, which is exactly what a private adapter layered on
+  those modules can collide with; LoRA-FAIR's server-side correction never
+  touches base weights and so sidesteps that collision; share-A-only avoids
+  the product problem by construction rather than correcting it. Selecting
+  one from the literature would be selecting on evidence gathered in a
+  setting with no private adapter present. The three share a harness, so
+  running all of them is cheap relative to converting an open question in
+  this spec into a measured result.
 - **Gauge-fixed Byzantine defense.** LoRA factorizations are non-unique:
   (A, B) and (AR, R⁻¹B) encode the same update ΔW = BA, so
   distance-based defenses (Krum, MultiKrum, Bulyan) computed on raw
@@ -707,6 +791,12 @@ withdrawn once data is trained into weights
 why instances never federate at all (nothing to un-train), and why
 pattern-level sharing is re-decidable at any time.
 
+These three are the analyst's controls. The boundary they sit on top of,
+the gate deciding what may cross at all, is not analyst-facing and is not
+novel: makesense's report layer is the same check on a different object,
+and *The surrounding systems* below records what the fleet borrows from
+it.
+
 ### Enrollment consent
 
 The first time a deployment attempts to join the federation, the analyst
@@ -752,7 +842,15 @@ notified — robust aggregation made visible rather than silent.
   shared-only ablation, vs. personal-only ablation
 - **Semantic-split win** — personal+shared with our rule-table split vs.
   random-LoRA-parameter split (control)
-- **Privacy/utility tradeoff** — task quality at ε ∈ {0.5, 1, 4, 8, ∞}
+- **Privacy/utility tradeoff** — task quality at ε ∈ {0.5, 1, 4, 8, ∞},
+  crossed with adaptation-data distribution overlap rather than swept over
+  ε alone. Practical privacy risk rises the closer adaptation data sits to
+  the pretraining distribution, and theoretical DP guarantees do not
+  translate to empirical protection under that overlap
+  ([Marek et al., ICLR 2026](https://arxiv.org/abs/2606.09401)), so an ε
+  sweep on its own measures the wrong variable. LLM-generated corpora sit
+  at maximum overlap by construction, which is why inserted canaries and
+  not corpus realism carry the extraction claim
 - **Byzantine robustness** — under f% poisoned clients, shared-adapter
   quality degrades by < g% under Bulyan, > h% under FedAvg (h must be
   catastrophic for the result to mean anything)
@@ -776,10 +874,27 @@ notified — robust aggregation made visible rather than silent.
 
 ### Benchmark
 
+Two tiers, so each claim rests on the kind of data that can support it.
+See [Pharos](./pharos-testbed.md) for the full division and its
+justification.
+
+- **Borrowed real data carries the federation mechanism.**
+  [FedLLM-Bench](https://arxiv.org/abs/2406.04845) supplies four datasets
+  split by real user id, 38 to 747 clients, for aggregation correctness,
+  convergence under genuine non-IID, and Byzantine curves comparable to
+  published baselines. It cannot carry the split claims: no dataset in the
+  suite pairs an agent's proposed output with an analyst's revision of it,
+  and Fed-ChatbotPA averages roughly thirteen preference pairs per client,
+  well short of what a personal adapter needs.
+- **Pharos carries everything about the split** — semantic split
+  advantage, personalization win on analyst tasks, the governed label,
+  release gating, and silent-failure probes — because those need
+  classification levels, cross-cutting compartments, four specialist
+  roles, and proposal/revision pairs that no public corpus has.
 - Repeatable analytic task suites for objective specialist metrics:
-  triage precision/recall on labeled corpora, retrieval nDCG,
-  summarization quality (reference-based + rubric), draft acceptance
-  rate
+  triage precision/recall against a plant registry, retrieval recall at
+  k, summarization fact coverage and contradiction rate, draft element
+  presence and citation validity
 - Real-task replay from accumulated ledger corpora (as deployments
   produce them) for personalization metrics
 
@@ -788,18 +903,42 @@ notified — robust aggregation made visible rather than silent.
 Simulated fleets need accept/revise/reject streams, so the analyst side
 of every experiment is explicit and reproducible: **scripted analyst
 policies** (deterministic accept/revise/reject rules over task features)
-for ablations that need exact repeatability, and **persona-conditioned
-LLM judges** (fixed seeds, fixed rubrics, personas varying style,
-format conventions, and priorities) where graded revision behavior is
-required. Varying personas across clients is also how the controlled
-non-IID populations are constructed — the heterogeneity the
-personalization claims are tested against is designed, not incidental.
+for ablations that need exact repeatability, and **evolved persona
+policies** where graded revision behavior is required.
+
+Personas are searched rather than hand-authored. LLM user simulators
+inherit their base model's behavior, cooperative and homogeneous, so
+agents that look strong in simulation fail on the diverse patterns of
+real users ([Chopra et al. 2026](https://arxiv.org/abs/2605.12894)).
+That failure mode is sharper here than for a capability benchmark: the
+personal adapter exists to learn one analyst's idiosyncrasy, so
+homogeneous simulators leave nothing for it to learn and the
+personalization ablation separates noise. Simulators are ensembled, since
+behaviorally complementary ones land closer to real users than any single
+one, and the real-to-simulated divergence is reported as a property of
+the evaluation rather than checked privately
+([Mehri et al. 2026](https://arxiv.org/abs/2605.07847)).
+
+Varying personas across clients is one of two heterogeneity axes; the
+regional data slice is the other, and crossing them is what separates
+adaptation to different data from adaptation to a different analyst. See
+[Pharos](./pharos-testbed.md) for both.
 
 ### Privacy audit
 
 - **Membership-inference and extraction probes** against the aggregated
   shared adapter at each ε, run per federation round — the empirical
   check on the DP bound and on research question 1's boundary claim
+- **Multi-probe reporting, not a single probe.** In a LoRA-tuned testbed a
+  fixed prefix-window memorization probe yields false negatives when the
+  secret sits outside the window, false positives where roughly 99% of the
+  probe's movement lands on non-secret preamble, and ambiguous verdicts
+  ([Fan et al. 2026](https://arxiv.org/abs/2606.31168)). Because this
+  project's whole privacy story runs through LoRA adapters, one probe would
+  let us conclude whatever we hoped, so every audit reports full-span
+  secret NLL, span-localized decomposition, behavioral exact-recall at
+  k >= 4, and decoy probes together. See
+  [Pharos](./pharos-testbed.md) for canary construction
 
 ---
 
@@ -815,6 +954,10 @@ Task-by-task implementation plans for the first phases:
   `kourai_common.federation` library; Phase 1)
 - [Sub-Plan 02 — CLI Host Integration](plan-02-cli-host-integration.md)
   (CLI write paths into the ledger; Phase 1 → 2)
+
+Supporting specs: [Pharos](./pharos-testbed.md) is the labeled testbed the
+split claims are evaluated on, and [deferred scope](./future-work.md)
+records what was carved out of this plan, why, and where it lands.
 
 1. ⏳ **Interaction ledger replaces passive tracing as training
    source.** Schema
@@ -915,6 +1058,41 @@ built or works with, rather than inventing from scratch:
   which is what evaluation "co-developed with LAS technical staff"
   looks like concretely.
 
+### The governance layer this requires
+
+The governed label is only as good as the decision behind it, and that
+decision belongs to the fleet. This design builds its own governance layer
+rather than depending on a host to expose one, which keeps the borrowing
+one-directional: the systems above lend proven shapes, and none of them
+changes to accommodate this project.
+
+The layer is therefore not novel work and not a port. makesense already
+demonstrates every piece of it in an analyst-facing setting: a decision
+point that resolves a principal, a purpose, and a per-resource grant
+before any row is dispatched, and a release layer that withholds
+policy-masked fields, denied queries, and findings asserting a denied
+concept from a deliverable that may reach a lower-clearance reader. That
+withholding boundary is the shared-adapter release gate already working on
+a different object, prose instead of weights.
+
+Three properties make a decision strong enough to carry a training label,
+and each is something this project builds:
+
+1. **One authoritative decision point**, not a check per call site. A
+   label is only as trustworthy as the least careful path that can
+   produce one.
+2. **An object label carried through to the retrieved row.** Knowing which
+   sources a principal may reach does not say how the rows that came back
+   were classified, and the split needs the second thing.
+3. **A principal binding the analyst cannot set for themselves.** A
+   ceiling the analyst can raise is not a ceiling.
+
+Where a source carries no classification of its own, the layer cannot
+invent one, and those entries fall to the source-category floor: still
+safe, and less precise. That degradation is the intended failure mode
+rather than a gap, and its cost belongs in the evaluation as an ablation
+instead of in this section as a promise.
+
 ---
 
 ## Relationship to Kourai Khryseai (the game)
@@ -944,7 +1122,12 @@ adapter.
 
 - **What's the right LoRA layer-targeting per specialist?** Different
   agents may need different ranks and target modules. First-pass: target
-  `q_proj` and `v_proj`, rank 16, but this is a tunable.
+  `q_proj` and `v_proj`, rank 16. A fixed rank across deployments is
+  behind current practice, though: per-client rank assigned from the local
+  data distribution is what PF2LoRA and CA-PFL do, and it matters more
+  here than usual because heterogeneity is deliberate on two axes at once
+  (regional data slice and analyst persona). Adaptive per-deployment rank
+  enters as an ablation arm rather than a fixed choice.
 - **Do the aggregation corrections (FedEx-LoRA's residual, LoRA-FAIR's
   correction term) remain correct under heterogeneous per-deployment
   personal adapters?** Almost certainly yes (only shared aggregates),
@@ -964,6 +1147,21 @@ adapter.
 - **What happens to personal adapters across a version bump that changes
   the LLM provider or the base prompt?** Personalization persistence is
   a promise; it needs an explicit migration story.
+- **Does round participation disclose on its own?** Which deployments
+  contribute in a round reveals that those enclaves hold data relevant to
+  the task, independent of anything inside the update. It is the same
+  channel a governed query layer closes by keeping denials
+  existence-neutral, and the FL literature has no established defense for
+  it. The candidate mitigations (fixed-cadence participation whether or
+  not there is anything to send, a minimum cohort size per round) cost
+  utility, so they need measuring rather than assuming.
+- **How far does the governed label degrade over unlabeled sources?** The
+  label is only as trustworthy as the decision behind it, and a principal
+  an analyst can set for themselves makes a ceiling an analyst can raise.
+  A corpus carrying no classification of its own collapses to the
+  source-category floor, which stays safe but forfeits the precision the
+  split is built on. How much personalization survives that collapse is
+  an ablation worth running, not a guess worth making.
 
 ---
 
