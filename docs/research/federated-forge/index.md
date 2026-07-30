@@ -441,13 +441,16 @@ which is the property the whole by-construction claim rests on.
 
 **The label resolves before the gradient, not before the response.**
 Provenance is captured at the turn, but working out which retrieved
-objects actually fed an output costs real compute: measured at **1.74x the
-turn it explains** for a ten-source summarization turn on a laptop-scale
-open-weight model (qwen2.5:7b-instruct on an 8 GB RTX 3060 Ti; a 5.1 s
-turn against 8.9 s for a 32-pass ContextCite ablation budget, per-pass
-median 273 ms). Inline that is fatal, since a five-second turn becomes
-fourteen. Deferred it is roughly half an hour of background work for a
-two-hundred-turn day on the analyst's own machine.
+objects actually fed an output costs real compute: measured at roughly
+**1.7x the turn it explains** (1.69x and 1.74x across two samples) for a
+ten-source summarization turn on a laptop-scale open-weight model,
+qwen2.5:7b-instruct on an 8 GB RTX 3060 Ti, against a 32-pass ContextCite
+ablation budget. A 5.1 s turn draws about 8.7 s of attribution, per-pass
+median 270 ms and p90 337 ms. Reproduce with
+`uv run python scripts/measure_attribution_cost.py`. Inline that is fatal,
+since a five-second turn becomes fourteen. Deferred it is roughly half an
+hour of background work for a two-hundred-turn day on the analyst's own
+machine.
 
 Deferring costs the design nothing, because the boundary that matters is
 the gradient and not the reply. A ledger entry therefore carries a label
