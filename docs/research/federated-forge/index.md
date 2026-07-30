@@ -353,6 +353,17 @@ Federated Analyst Fleets does:
   disconnected ones on rejoin, and no leaderboard exists.
 - Replacing OpenTelemetry. OTel still exists for monitoring and
   debugging; it just stops being the source of truth for training data.
+- Supplying release authority. Sending a shared adapter to an aggregator
+  at a lower level is a downgrade, and a downgrade is an act of authority
+  rather than a computation: some accountable role decides that this
+  update may cross, and the decision is recorded against them. Nothing
+  here supplies that role, and no accreditor treats an epsilon as a
+  declassification. What this design owes the decision is to make it
+  **decidable** — bound what an update can reveal, name what crossed, and
+  record it — so that release authority is deployment policy resting on a
+  measured mechanism rather than on an assurance. Who signs, at what
+  threshold, and what happens when the bound is exceeded are deliberately
+  outside the mechanism.
 
 ---
 
@@ -439,25 +450,55 @@ the one that fails open. Deriving the label from the access decision keeps
 a single authority, and it stays checkable without inspecting a gradient,
 which is the property the whole by-construction claim rests on.
 
-**The label resolves before the gradient, not before the response.**
-Provenance is captured at the turn, but working out which retrieved
-objects actually fed an output costs real compute: measured at roughly
-**1.7x the turn it explains** (1.69x and 1.74x across two samples) for a
-ten-source summarization turn on a laptop-scale open-weight model,
-qwen2.5:7b-instruct on an 8 GB RTX 3060 Ti, against a 32-pass ContextCite
-ablation budget. A 5.1 s turn draws about 8.7 s of attribution, per-pass
-median 270 ms and p90 337 ms. Reproduce with
-`uv run python scripts/measure_attribution_cost.py`. Inline that is fatal,
-since a five-second turn becomes fourteen. Deferred it is roughly half an
-hour of background work for a two-hundred-turn day on the analyst's own
-machine.
+**How the label is computed, and what does not work.** Both halves of this
+were measured against a labelled testbed
+([Pharos](https://github.com/ajbarea/pharos)) whose source-to-content
+provenance is known by construction, so the mechanism could be scored
+rather than trusted. The first thing tried does not work.
 
-Deferring costs the design nothing, because the boundary that matters is
-the gradient and not the reply. A ledger entry therefore carries a label
-**state**: an entry whose attribution has not resolved is not
-training-eligible, and the local trainer refuses it rather than assuming
-it. Unresolved falls to `private_only`, failing closed the same way a
-malformed grant does.
+*Leave-one-out attribution cannot produce a correct label.* Dropping each
+retrieved source in turn and regenerating, on eight-source summarization
+turns against a laptop-scale open-weight model, recovered only 62% of the
+contributing sources and produced a **wrong label on half of all turns,
+always in the under-restrictive direction**. One turn moved from
+`RESTRICTED[LIAISON,PARTNER,SENSOR]` to `PROTECTED[LEGAL]`, not merely
+laxer but incomparable.
+
+The cause is corroboration. Leave-one-out asks which single source is
+load-bearing, and a fact reported through several channels has no single
+load-bearing source: drop any one copy and the fact survives in the
+others, so none is blamed and none of their labels enters the join.
+Corroboration across channels is not an edge case in this domain, it is
+what channels are for. And leave-one-out is the ceiling that cheaper
+estimators approximate, so no faster method repairs it.
+
+*Content provenance does work, and costs nothing.* Ask a different
+question: given what the output asserts, which sources **could** have
+asserted it? Join their labels. That needs one detection pass over the
+output, no ablation sweep, no surrogate model, and no per-turn model cost
+at all. It is conservative by construction, since a corroborated fact
+pulls in every source carrying it, so the join can only sit at or above
+the truth. The error direction is therefore creep and never leak, which is
+the asymmetry that matters: creep costs federation, leak costs the
+boundary.
+
+It over-restricts when a fact appears in both an open and a restricted
+source and the model in fact read the open one. Separating those would
+need token-level provenance, which nothing available supplies, so the
+conservative reading is the tightest safe one.
+
+**A superseded number, corrected.** An earlier draft of this section cited
+attribution at roughly 1.7x the turn it explains. That figure is real and
+reproducible (`scripts/measure_attribution_cost.py` in this repo) but it
+priced the ablation mechanism, which the measurement above rules out.
+Content-provenance labelling has no comparable cost, so attribution
+latency is no longer a constraint on the design.
+
+**The label still resolves before the gradient, not before the response.**
+A ledger entry carries a label **state**: an entry whose label has not
+resolved is not training-eligible, and the local trainer refuses it rather
+than assuming it. Unresolved falls to `private_only`, failing closed the
+same way a malformed grant does.
 
 The floor still binds underneath. An entry with no governed object behind
 it (the analyst's own free text), an object drawn from a source that
@@ -1123,6 +1164,29 @@ adapter.
 
 ## Open questions and risks
 
+- **May a low-capacity verdict shed the compartments of the sources behind
+  it?** This is now the single question the federated half of the design
+  depends on, and it is a policy ruling rather than an engineering problem.
+
+  Measured on [Pharos](https://github.com/ajbarea/pharos) across three
+  aggregator ceilings and four capacities: turns average 2.88 compartments
+  of 4, and seven of eight already sit at the top of the level ladder,
+  because a summary over eight sources joins nearly everything. Under the
+  fail-closed default, where compartments survive declassification,
+  **eligibility is 0 to 12% at every capacity** and nothing meaningful ever
+  federates. Allow a low-capacity output to shed compartments and it
+  becomes **100% for enum and scalar outputs, 0 to 12% for prose**.
+
+  So the design is not marginally sensitive to this ruling, it is bimodal
+  on it. Either verdict-shaped outputs federate completely and prose never
+  does, or the fleet is a collection of unconnected local learners.
+
+  Note what the second column reproduces: exactly the split table above,
+  derived from measurement rather than asserted. That is reassuring about
+  the design's internal consistency and it does not settle the ruling,
+  because shedding a compartment discloses that the compartment had
+  something to say. It is the same disclosure channel as round
+  participation, and it wants the same answer.
 - **What's the right LoRA layer-targeting per specialist?** Different
   agents may need different ranks and target modules. First-pass: target
   `q_proj` and `v_proj`, rank 16. A fixed rank across deployments is

@@ -24,25 +24,24 @@ explicit.
 elements, and it supplies labeled data so the governed label has variance
 and the split is evaluable rather than merely demonstrable.
 
-The third blocker, attribution cost, has since been measured rather than
-argued: a 32-pass ContextCite ablation budget over a ten-source
-summarization turn costs roughly **1.7x the turn** (1.69x and 1.74x across
-two samples), on qwen2.5:7b-instruct on an 8 GB RTX 3060 Ti, per-pass
-median 270 ms against a 5.1 s turn. The harness is
-`scripts/measure_attribution_cost.py`, so the figure is reproducible rather
-than quoted. That rules out synchronous attribution and permits deferred
-attribution, which is all the design needs, since the label must resolve
-before the gradient rather than before the reply.
+The third blocker, attribution cost, turned out to be the wrong question.
+Measuring it produced a figure (roughly 1.7x the turn, reproducible via
+`scripts/measure_attribution_cost.py`) and then measuring attribution
+*accuracy* ruled the mechanism out entirely: leave-one-out recovers 62% of
+contributing sources and mislabels half of all turns in the
+under-restrictive direction, because corroborated facts have no single
+load-bearing source. Content-provenance labelling replaced it, costs one
+detection pass per turn rather than an ablation sweep, and is conservative
+by construction. Cost is therefore no longer a constraint, and the
+constraint that replaced it is a policy ruling on compartment shedding
+rather than a compute budget. See *Open questions* in the
+[design spec](./index.md).
 
-Three caveats the measurement does not cover. The ablation budget has to
-grow with source count for the linear surrogate to stay identifiable, so a
-forty-source retrieval turn is not simply four times this figure. The
-Jacobian-based alternative was not measured, for want of a local white-box
-stack. And a memory-constrained host stalls: one pass in an early
-sixty-four carried 9.7 s, half that sample's total, which is why the
-harness reports stalls separately instead of averaging them into the
-headline. All three belong in the build order's first step, where the
-generator fixes source counts.
+Two caveats remain on the ablation figure, kept because the harness is
+still the reference for attribution cost should a future mechanism need one:
+the ablation budget must grow with source count for a linear surrogate to
+stay identifiable, and a memory-constrained host stalls, so a reported
+ratio needs a stall count beside it.
 
 ## Two tiers, and an honest division of claims
 
