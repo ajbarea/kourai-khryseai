@@ -1164,6 +1164,36 @@ adapter.
 
 ## Open questions and risks
 
+- **Can the analyst's standard actually be acquired from their decisions?** This is
+  the premise the whole design rests on, and the cheap test of it came back
+  negative-to-inconclusive, which moves the adapter experiment onto the critical
+  path rather than leaving it as later confirmation.
+
+  Measured on [Pharos](https://github.com/ajbarea/pharos) with a triage task whose
+  standard is a three-way conjunction over facts split across separate reports.
+  Stating the standard in the prompt and structuring the check reaches **F1 1.000**,
+  so the task is solvable by a laptop-scale open-weight model and the bottleneck is
+  not capability. Withholding it drops the model to **F1 0.720**, over-escalating at
+  recall 1.000. Supplying labelled examples instead closes **none** of that gap:
+  0.615 to 0.640 across two, four and eight verdict-only examples, and 0.522 to
+  0.706 when each example also carries the officer's stated reason.
+
+  Richer feedback was the obvious rescue because a bare verdict is roughly one bit,
+  a poor teacher for which three of fifteen facts must co-occur. It did not help
+  reliably.
+
+  What this does and does not establish matters. It does establish that rule
+  *acquisition*, not model capability, is the entire question, and that the premise
+  cannot be validated cheaply. It does **not** establish that gradient learning
+  fails: eight in-context examples and a LoRA over thousands of ledger tuples are
+  different mechanisms, twenty evaluation tasks per condition leaves roughly 0.1
+  inside the noise, and long-context dilution is unseparated at eight shots.
+
+  The consequence for sequencing is concrete. Before further work on aggregation,
+  Byzantine robustness, or the analyst surfaces, train one personal adapter on
+  simulated accept/revise/reject for one specialist and measure whether F1 moves
+  from 0.72 toward 1.00 with the standard withheld. That single number decides
+  whether the fleet has anything to federate.
 - **May a low-capacity verdict shed the compartments of the sources behind
   it?** This is now the single question the federated half of the design
   depends on, and it is a policy ruling rather than an engineering problem.
