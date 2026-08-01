@@ -1165,47 +1165,69 @@ adapter.
 ## Open questions and risks
 
 - **Can the analyst's standard actually be acquired from their decisions?** This is
-  the premise the whole design rests on, and the cheap test of it came back
-  negative-to-inconclusive, which moves the adapter experiment onto the critical
-  path rather than leaving it as later confirmation.
+  the premise the whole design rests on. It has now been tested twice, and the
+  answer changed between the two tests.
 
   Measured on [Pharos](https://github.com/ajbarea/pharos) with a triage task whose
   standard is a three-way conjunction over facts split across separate reports.
   Stating the standard in the prompt and structuring the check reaches **F1 1.000**,
   so the task is solvable by a laptop-scale open-weight model and the bottleneck is
-  not capability. Withholding it drops the model to **F1 0.720**, over-escalating at
-  recall 1.000. Supplying labelled examples instead closes **none** of that gap:
-  0.615 to 0.640 across two, four and eight verdict-only examples, and 0.522 to
-  0.706 when each example also carries the officer's stated reason.
+  not capability. Withholding it drops the model to **F1 0.537** plain, or 0.688
+  with brief reasoning, over-escalating at recall 1.000. Labelled examples in the
+  prompt close almost none of that gap: **F1 0.424 at two shots, 0.438 at four,
+  0.571 at eight**, against a zero-shot floor of 0.538.
 
-  Richer feedback was the obvious rescue because a bare verdict is roughly one bit,
-  a poor teacher for which three of fifteen facts must co-occur. It did not help
-  reliably.
+  That over-escalation is not one model's quirk. Across six models in three
+  families from 3B to 14B, recall is **exactly 1.000 for every one of them** at
+  precision 0.395 to 0.500, and none clears the majority-class floor of 0.625.
+  Within a family, 3B outscores 14B, so it is not a capacity problem.
 
-  What this does and does not establish matters. It does establish that rule
-  *acquisition*, not model capability, is the entire question, and that the premise
-  cannot be validated cheaply. It does **not** establish that gradient learning
-  fails: eight in-context examples and a LoRA over thousands of ledger tuples are
-  different mechanisms, twenty evaluation tasks per condition leaves roughly 0.1
-  inside the noise, and long-context dilution is unseparated at eight shots.
+  **Gradient learning does close it.** A LoRA over 1,140 training tuples with the
+  standard withheld reaches **F1 1.000 on 60 held-out tasks**, against a base of
+  0.469 on the same split. Read it as a ceiling rather than a certainty --- zero
+  errors in 60 bounds the true error rate only at 5% by the rule of three --- but
+  the mechanism question is settled, and the earlier "cannot be validated cheaply"
+  framing is superseded. The training signal there is the generator's ground truth,
+  not analyst decisions, so this removes the capability objection and leaves the
+  supervision question, which is the next entry.
 
-  The consequence for sequencing is concrete. Before further work on aggregation,
-  Byzantine robustness, or the analyst surfaces, train one personal adapter on
-  simulated accept/revise/reject for one specialist and measure whether F1 moves
-  from 0.72 toward 1.00 with the standard withheld. That single number decides
-  whether the fleet has anything to federate.
+- **What does a stream of accept/revise/reject decisions actually carry?** Measured
+  rather than assumed, over the verdicts all six models produced, reviewed by eight
+  parameterised decision procedures. Three results bear directly on this design.
+
+  **Scarcity is the wrong worry.** An acceptance is a training target, a revision is
+  one, and an escalation carries one too, so a reviewer who revises only a quarter
+  of the time still supplies a usable target on more than four fifths of decisions.
+  The "free supervision, no annotation burden" premise survives on volume.
+
+  **What review carries is the reviewer's standard, not the model's.** Target
+  accuracy is *identical* across all six models, because a corrected verdict is the
+  reviewer's own call. A reviewer whose threshold is wrong therefore teaches a wrong
+  rule: 0.575 at a two-of-three threshold, 0.425 at one-of-three, both **below the
+  0.625 majority floor**. And a one-of-three reviewer is precisely the
+  over-escalation every model above exhibits, so a fleet learning from such
+  reviewers is confirmed rather than corrected. This is the sharpest risk the
+  premise carries and it is not addressed by more data.
+
+  **The compartment ruling is not settled by review, only routed by it.** No
+  reviewer applying the fail-closed default produces a correction that clears the
+  aggregator ceiling. But every such block is *authorizable* --- see the next entry
+  --- so with an escalation path the whole blocked set is addressed, at a cost of
+  **52.5% of the review stream** landing on whoever rules on compartments. The
+  design needs an authority in the loop, and that authority's load is measurable in
+  advance.
 - **May a low-capacity verdict shed the compartments of the sources behind
   it?** This is now the single question the federated half of the design
   depends on, and it is a policy ruling rather than an engineering problem.
 
   Measured on [Pharos](https://github.com/ajbarea/pharos) across three
-  aggregator ceilings and four capacities: turns average 2.88 compartments
-  of 4, and seven of eight already sit at the top of the level ladder,
+  aggregator ceilings and four capacities at 40 turns: turns average 2.15
+  compartments of 4, and most already sit high on the level ladder,
   because a summary over eight sources joins nearly everything. Under the
   fail-closed default, where compartments survive declassification,
-  **eligibility is 0 to 12% at every capacity** and nothing meaningful ever
+  **eligibility is 0 to 38% at every capacity** and nothing meaningful ever
   federates. Allow a low-capacity output to shed compartments and it
-  becomes **100% for enum and scalar outputs, 0 to 12% for prose**.
+  becomes **100% for enum and scalar outputs, 0 to 38% for prose**.
 
   So the design is not marginally sensitive to this ruling, it is bimodal
   on it. Either verdict-shaped outputs federate completely and prose never
@@ -1217,6 +1239,25 @@ adapter.
   because shedding a compartment discloses that the compartment had
   something to say. It is the same disclosure channel as round
   participation, and it wants the same answer.
+
+  **The bimodality is an artifact of asking a yes/no question.** Framing
+  eligibility as a boolean forces every blocked entry into the same bucket,
+  and that framing is what made the ruling look like a fork with two prongs.
+  Pharos now answers with three dispositions --- release, needs-approval,
+  withhold --- following the same shape as makesense's policy engine
+  (`auto_ok` / `needs_approval` / `blocked`). A compartment shortfall maps to
+  needs-approval precisely *because* this entry calls it a policy ruling
+  rather than an engineering problem: a policy act is what an authority can
+  perform and a rule cannot. A level above the ceiling, or a capacity that
+  can carry an instance verbatim, is not like that and still refuses.
+
+  What this changes for the design is concrete. The fleet does not have to
+  pick a prong up front. It can ship fail-closed, route the blocked set to
+  whoever rules on compartments, and pay a measured toll --- 52.5% of the
+  review stream on the Pharos corpus --- rather than choosing in advance
+  between "nothing federates" and "compartments are shed by default." What
+  the design still owes is the mechanism: an approval queue, an authority
+  of record, and an audit entry per ruling. None of that is built.
 - **What's the right LoRA layer-targeting per specialist?** Different
   agents may need different ranks and target modules. First-pass: target
   `q_proj` and `v_proj`, rank 16. A fixed rank across deployments is
