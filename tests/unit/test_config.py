@@ -15,14 +15,16 @@ class TestGetModel:
         monkeypatch.setattr("kourai_common.config.PROVIDER", "local")
 
         result = config.get_model("techne")
-        assert result == "ollama/llama3.3:70b"
+        assert result == config.AGENT_MODELS_LOCAL["techne"]
+        assert result.startswith("ollama/")
 
     def test_get_model_local_provider_dokimasia(self, monkeypatch):
         """Test local provider returns agent-specific Ollama model."""
         monkeypatch.setattr("kourai_common.config.PROVIDER", "local")
 
         result = config.get_model("dokimasia")
-        assert result == "ollama/qwen2.5-coder:32b"
+        assert result == config.AGENT_MODELS_LOCAL["dokimasia"]
+        assert result.startswith("ollama/")
 
     def test_get_model_anthropic_cheap(self, monkeypatch):
         """Test anthropic provider with cheap tier."""
@@ -200,3 +202,41 @@ class TestGetHostAgentUrl:
             url = config.get_host_agent_url(agent_name)
             assert url.startswith("http://localhost:")
             assert url.endswith("/")
+
+
+class TestModelMapCoverage:
+    """Every provider's model map must cover every agent.
+
+    Bug guard: the local (Ollama) map drifted to models that were never
+    pullable -- ``llama3.3:8b`` does not exist upstream at any size -- so
+    ``KOURAI_PROVIDER=local`` failed on every agent while the suite stayed
+    green. These assert shape, which is all a unit test can prove; that the
+    tags resolve is a live check against ``ollama list``.
+    """
+
+    MAPS = (
+        "MODELS_CHEAP",
+        "MODELS_STANDARD",
+        "MODELS_SMART",
+        "MODELS_CHEAP_GOOGLE",
+        "MODELS_STANDARD_GOOGLE",
+        "MODELS_SMART_GOOGLE",
+        "AGENT_MODELS_LOCAL",
+    )
+
+    def test_every_map_covers_every_agent(self):
+        for name in self.MAPS:
+            models = getattr(config, name)
+            assert set(models) == set(config.AGENT_PORTS), (
+                f"{name} does not cover the same agents as AGENT_PORTS"
+            )
+
+    def test_every_model_id_carries_a_provider_prefix(self):
+        """LiteLLM routes on the ``provider/`` prefix; a bare id silently misroutes."""
+        for name in self.MAPS:
+            for agent, model in getattr(config, name).items():
+                assert "/" in model, f"{name}[{agent}] = {model!r} has no provider prefix"
+
+    def test_local_map_targets_ollama(self):
+        for agent, model in config.AGENT_MODELS_LOCAL.items():
+            assert model.startswith("ollama/"), f"local map {agent} = {model!r}"

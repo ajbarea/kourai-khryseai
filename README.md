@@ -163,9 +163,14 @@ cp .env.example .env
 # Edit .env — add your ANTHROPIC_API_KEY
 ```
 
-**Using Ollama instead (free, local)?**
+**Using Ollama instead (free, local, no API key)?**
 ```bash
-# Install Ollama, pull models, then:
+# Install Ollama (https://ollama.com/), pull the four agent models:
+ollama pull qwen2.5:7b-instruct
+ollama pull llama3.1:8b-instruct-q4_K_M
+ollama pull llama3.2:3b-instruct-q4_K_M
+ollama pull qwen2.5:3b-instruct
+
 KOURAI_PROVIDER=local uv run kourai-dev cli
 ```
 

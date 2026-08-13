@@ -39,9 +39,10 @@ and what to watch out for cost-wise.
 
     | Model | Used by | VRAM |
     |---|---|---|
-    | `llama3.3:70b` | Hephaestus, Metis, Techne, Aletheia | ~40 GB |
-    | `qwen2.5-coder:32b` | Dokimasia | ~20 GB |
-    | `llama3.3:8b` | Kallos, Mneme, Puck, Cupid, Aidos | ~5 GB |
+    | `qwen2.5:7b-instruct` | Metis, Techne, Dokimasia | ~5 GB |
+    | `llama3.1:8b-instruct-q4_K_M` | Hephaestus, Cupid, Aletheia | ~5 GB |
+    | `llama3.2:3b-instruct-q4_K_M` | Kallos, Mneme | ~2 GB |
+    | `qwen2.5:3b-instruct` | Puck, Aidos | ~2 GB |
 
     No per-token charges. You pay electricity and hardware only.
 

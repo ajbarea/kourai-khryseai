@@ -88,18 +88,22 @@ MODELS_SMART_GOOGLE = {
     "aletheia": "gemini/gemini-2.5-pro",
 }
 
-# Local dev models (Ollama) — free, no API key needed
+# Local dev models (Ollama) — free, no API key needed.
+# Sized for a single consumer GPU: 7-8B for the reasoning agents, 3B for the
+# light ones. Tags are exact — Ollama treats `llama3.1:8b` and
+# `llama3.1:8b-instruct-q4_K_M` as different models, so these must match what
+# `ollama pull` fetched. See docs/configuration.md for the pull commands.
 AGENT_MODELS_LOCAL = {
-    "hephaestus": "ollama/llama3.3:70b",
-    "metis": "ollama/llama3.3:70b",
-    "techne": "ollama/llama3.3:70b",
-    "dokimasia": "ollama/qwen2.5-coder:32b",
-    "kallos": "ollama/llama3.3:8b",
-    "mneme": "ollama/llama3.3:8b",
-    "puck": "ollama/llama3.3:8b",
-    "cupid": "ollama/llama3.3:8b",
-    "aidos": "ollama/llama3.3:8b",
-    "aletheia": "ollama/llama3.3:70b",
+    "hephaestus": "ollama/llama3.1:8b-instruct-q4_K_M",
+    "metis": "ollama/qwen2.5:7b-instruct",
+    "techne": "ollama/qwen2.5:7b-instruct",
+    "dokimasia": "ollama/qwen2.5:7b-instruct",
+    "kallos": "ollama/llama3.2:3b-instruct-q4_K_M",
+    "mneme": "ollama/llama3.2:3b-instruct-q4_K_M",
+    "puck": "ollama/qwen2.5:3b-instruct",
+    "cupid": "ollama/llama3.1:8b-instruct-q4_K_M",
+    "aidos": "ollama/qwen2.5:3b-instruct",
+    "aletheia": "ollama/llama3.1:8b-instruct-q4_K_M",
 }
 
 AGENT_PORTS = {

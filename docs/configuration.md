@@ -107,7 +107,7 @@ These variables have sensible defaults in code. You only need to set them if you
 |---|---|---|
 | `OLLAMA_API_BASE` | `http://localhost:11434` | Ollama server URL. Only needed if running Ollama on a non-default address |
 
-When `KOURAI_PROVIDER=local`, `make setup` will check Ollama connectivity and auto-pull required models.
+When `KOURAI_PROVIDER=local`, `make setup` checks Ollama connectivity and reports which models are already pulled. It does not pull them for you — Ollama fetches a missing model on its first call, which stalls that agent behind a multi-GB download, so pre-pull the four listed under [LLM Models](#llm-models).
 
 ### Artifact & Backup Settings
 
@@ -234,9 +234,20 @@ KOURAI_PROVIDER=local
 
     | Agent | Model | VRAM |
     |---|---|---|
-    | 🔥 Hephaestus · 📐 Metis · ⚙️ Techne · 📚 Aletheia | `llama3.3:70b` | ~40 GB |
-    | 🧪 Dokimasia | `qwen2.5-coder:32b` | ~20 GB |
-    | ✨ Kallos · 📜 Mneme · 🎭 Puck · 💘 Cupid · 🪞 Aidos | `llama3.3:8b` | ~5 GB |
+    | 📐 Metis · ⚙️ Techne · 🧪 Dokimasia | `qwen2.5:7b-instruct` | ~5 GB |
+    | 🔥 Hephaestus · 💘 Cupid · 📚 Aletheia | `llama3.1:8b-instruct-q4_K_M` | ~5 GB |
+    | ✨ Kallos · 📜 Mneme | `llama3.2:3b-instruct-q4_K_M` | ~2 GB |
+    | 🎭 Puck · 🪞 Aidos | `qwen2.5:3b-instruct` | ~2 GB |
+
+    Pull all four before the first run — Ollama tags are exact, so a bare
+    `llama3.1:8b` will not satisfy `llama3.1:8b-instruct-q4_K_M`:
+
+    ```bash
+    ollama pull qwen2.5:7b-instruct
+    ollama pull llama3.1:8b-instruct-q4_K_M
+    ollama pull llama3.2:3b-instruct-q4_K_M
+    ollama pull qwen2.5:3b-instruct
+    ```
 
     No per-token charges. You pay electricity and hardware only.
 

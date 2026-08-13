@@ -318,7 +318,7 @@ class TestGetModelPricing:
 
     def test_unknown_model_returns_none(self):
         # Ollama models are local / free; we deliberately don't price them.
-        assert get_model_pricing("ollama/llama3.3:70b") is None
+        assert get_model_pricing("ollama/qwen2.5:7b-instruct") is None
         # An unrecognised provider id returns None — the CLI falls back
         # to the "$—" rendering plus the footer hint.
         assert get_model_pricing("openai/gpt-5") is None
@@ -411,8 +411,8 @@ class TestComputeCost:
         assert cost == pytest.approx(0.25)
 
     def test_unknown_model_returns_none(self):
-        usage = AgentUsage(model="ollama/llama3.3:70b", input_tokens=999_999_999)
-        assert compute_cost("ollama/llama3.3:70b", usage) is None
+        usage = AgentUsage(model="ollama/qwen2.5:7b-instruct", input_tokens=999_999_999)
+        assert compute_cost("ollama/qwen2.5:7b-instruct", usage) is None
 
     def test_zero_usage_is_zero_cost(self):
         usage = AgentUsage(model="anthropic/claude-opus-4-7")
@@ -550,7 +550,7 @@ class TestUsageSlashCommand:
         record_usage(
             "experimental",
             _fake_response(prompt_tokens=500_000, completion_tokens=100_000),
-            model="ollama/llama3.3:70b",
+            model="ollama/qwen2.5:7b-instruct",
         )
 
         captured = self._patch_echo(monkeypatch)

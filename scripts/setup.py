@@ -122,7 +122,7 @@ def _setup_ollama() -> None:
             print(f"  + {model}")
     else:
         print("  i No models pulled yet — Ollama will download them on first use")
-        print("    Tip: pre-pull a small model with: ollama pull llama3.3:8b (~5GB)")
+        print("    Tip: pre-pull the smallest agent model: ollama pull qwen2.5:3b-instruct (~2GB)")
 
 
 def _run_setup() -> int:
