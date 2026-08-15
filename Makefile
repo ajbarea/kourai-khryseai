@@ -16,6 +16,22 @@
 .PHONY: help check-env setup setup-artifacts upgrade yolo dev dev-vn up down restart rebuild status gui gui-demo cli cli-demo vn vn-demo docs observe theoros theoros-down theoros-status fix lint validate test test-unit test-integration test-performance audit deps clean clean-cache clean-tests prune logs logs-tail sandbox-image
 .DEFAULT_GOAL := help
 
+# Pick the venv this platform owns, so `make` works without the shell export
+# that docs/getting-started.md asks for. uv otherwise defaults to `.venv`,
+# which on a WSL host is the Docker-side venv: it lacks the hosts/cli and
+# hosts/gui dependencies, so `make lint` type-checked those sources against an
+# environment missing asyncclick / prompt_toolkit / PIL and failed with 30
+# unresolved-import errors that CI (uv sync --all-packages) never sees.
+# `?=` so an explicit export still wins.
+ifeq ($(OS),Windows_NT)
+UV_PROJECT_ENVIRONMENT ?= .venv-win
+else ifneq ($(WSL_DISTRO_NAME),)
+UV_PROJECT_ENVIRONMENT ?= .venv-wsl
+else
+UV_PROJECT_ENVIRONMENT ?= .venv
+endif
+export UV_PROJECT_ENVIRONMENT
+
 UV_DEV := uv run --no-active --package kourai-common kourai-dev
 
 # ---------------------------------------------------------------------------
