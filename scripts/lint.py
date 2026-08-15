@@ -18,6 +18,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import sys
 
 from kourai_common.dev_log import (
@@ -39,6 +40,31 @@ TY_PATHS = (
     "shared/src",
     "tests",
 )
+
+
+# Third-party modules ty must resolve to type-check hosts/cli and hosts/gui.
+# They only exist in a workspace-wide sync. A venv synced to one package -- or
+# the Docker-side `.venv` that uv picks by default on a WSL host -- lacks them,
+# and ty then emits 30 unresolved-import errors that name the modules but not
+# the cause. CI never hits this: it runs `uv sync --all-packages --dev`.
+TY_ENV_MARKERS = ("asyncclick", "prompt_toolkit", "PIL")
+
+
+def check_ty_environment() -> int:
+    """Fail fast when the active venv can't support a type check. 0 = usable."""
+    missing = [name for name in TY_ENV_MARKERS if importlib.util.find_spec(name) is None]
+    if not missing:
+        return 0
+    print(f"{C_RED}  x ty environment is incomplete{C_RESET}")
+    print(f"    Missing from {sys.prefix}: {', '.join(missing)}")
+    print("    These are hosts/cli + hosts/gui dependencies. Without them ty")
+    print("    reports unresolved-import errors that look like code defects.")
+    print("    Fix:  uv sync --all-packages --dev")
+    print("    If that synced the wrong venv, set UV_PROJECT_ENVIRONMENT for")
+    print("    your platform -- see docs/getting-started.md. `make` does this")
+    print("    for you; a bare `uv run kourai-dev lint` relies on your shell.")
+    LOG.event("ERROR", f"ty environment incomplete: missing {', '.join(missing)}")
+    return 1
 
 
 def fix_pass() -> None:
@@ -68,10 +94,11 @@ def check_pass() -> int:
             run_step(["ruff", "check", "."], label="ruff-check", check=False),
         )
     )
+    env_rc = check_ty_environment()
     rcs.append(
         (
             "ty",
-            run_step(["ty", "check", *TY_PATHS], label="ty-check", check=False),
+            env_rc or run_step(["ty", "check", *TY_PATHS], label="ty-check", check=False),
         )
     )
 
