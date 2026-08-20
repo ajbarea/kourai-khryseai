@@ -5,7 +5,7 @@ A public, living plan for where the forge is heading. Items here are either
 *currently working on* lives in [IMPL.md](./IMPL.md) — when it lands, the
 matching milestone here collapses to a single line under "Shipped".
 
-Last reviewed: 2026-05-30 (M6 engine seam shipped — `KOURAI_TTS_ENGINE` selects Kokoro|Chatterbox; earlier same-day: ROADMAP grounding of M8/M18 upstream + TTS re-survey + MCP/A2A baseline, all re-verified against May-2026 reality).
+Last reviewed: 2026-08-20 (MCP 2026-07-28 spec landed — M8 closed obsolete, protocol baseline re-verified; earlier 2026-05-30: M6 engine seam shipped — `KOURAI_TTS_ENGINE` selects Kokoro|Chatterbox; earlier same-day: ROADMAP grounding of M8/M18 upstream + TTS re-survey + MCP/A2A baseline, all re-verified against May-2026 reality).
 **NE AI Agents Day 2026 poster session shipped 2026-05-10** (NYC, Jane Street; QR-code demo live).
 Polish phase complete. **M6 (per-character voice) is UN-DEFERRED (2026-05-30):**
 the re-survey found local, $0, real-time engines that do per-character emotion, so
@@ -281,9 +281,9 @@ bugs we already know about.
 
 ---
 
-## M8 — MCP session pooling (upstream-blocked)
+## M8 — MCP session pooling (closed: obsolete)
 
-> Status: blocked on upstream SDK fix · Discovered 2026-04-23
+> Status: closed 2026-08-20 — superseded upstream, not fixed · Discovered 2026-04-23
 
 We'd like repeated ``query_context7`` / ``search_memory_nodes`` calls to reuse
 one ``ClientSession`` rather than re-doing TLS + ``initialize()`` per call.
@@ -298,9 +298,8 @@ This is upstream — see
 [#915](https://github.com/modelcontextprotocol/python-sdk/issues/915) and
 [PEP 789](https://peps.python.org/pep-0789/) (async-generators-inside-cancel-scopes).
 
-**When the upstream SDK exposes pool-safe primitives**, revisit pooling.
-Meanwhile OTEL spans around each call give us per-tool latency visibility
-(landed 2026-04-23), which was the other half of the win.
+OTEL spans around each call give us per-tool latency visibility (landed
+2026-04-23), which was the other half of the original win.
 
 **Re-verified 2026-05-30 — still blocked.** #915 stays open (P1, "ready for
 work"; linked PR #2711 unmerged) and the cancel-scope teardown bug is now
@@ -311,28 +310,47 @@ what #915 reports failing, so it isn't yet the unblock. Concrete watch-target:
 `research(2026-05)`: modelcontextprotocol/python-sdk #521 / #577 / #915 / #922
 (open dupes of the same cancel-scope bug).
 
+**Closed 2026-08-20 as obsolete rather than fixed.** The MCP **2026-07-28**
+spec makes the protocol core stateless: protocol-level sessions and the
+`Mcp-Session-Id` header are gone, so any request can be served by any
+instance. There is no session left to pool, and the per-call
+`streamable_http_client` + `initialize()` shape kourai backed into because of
+the cancel-scope bug is the shape the spec now assumes. What remains per call
+is TLS + connection setup, which is a transport concern (connection reuse),
+not a protocol-session one — a different and much smaller problem than the one
+M8 opened. The cancel-scope bug is still open upstream; it just no longer gates
+anything kourai wants. `research(2026-08)`: MCP 2026-07-28 spec + changelog
+(stateless core, MRTR, `Mcp-Session-Id` removal).
+
 ---
 
-## Protocol baseline — MCP + A2A (re-verified 2026-05-30)
+## Protocol baseline — MCP + A2A (re-verified 2026-08-20)
 
-Both wire protocols kourai rides on are current; this pins where they stand and
-what's coming, so the M8 / M18 / M24 assumptions don't silently age.
+A2A is on the current stable; MCP is one revision behind by choice. This pins
+where they stand and what it costs, so the M18 / M24 assumptions don't silently
+age (M8 closed obsolete on this axis).
 
 - **A2A — on the current stable.** kourai runs `a2a-sdk 1.0.3` = **A2A 1.0**
   (Linux Foundation; spec last updated 2026-03-10; 150+ orgs). The M18
   URI-namespaced `Message.metadata` extension pattern is still the 1.0-endorsed
   shape — no migration owed.
-- **MCP — current SDK, one revision of headroom.** kourai runs `mcp 1.27.1`
-  against the **2025-11-25** spec (current stable). The next revision is in
-  release-candidate (final targeted mid-2026) and three of its SEPs touch
-  kourai's scaffolding: **SEP-414** documents **W3C Trace Context in `_meta`**
-  (traceparent / tracestate / baggage) — when it lands, MCP tool-call spans
-  correlate with kourai's OTel `traceparent` natively, folding into **M24**; the
-  **stateless protocol core** is the upstream shape that could eventually relieve
-  the **M8** session-pooling pain (no per-session state left to pool); and
-  **SEP-2133**'s reverse-DNS **extensions framework** mirrors the URI-namespaced
-  pattern M18 already uses on the A2A side. `research(2026-05)`: MCP 2026 roadmap
-  + the 2025-11-25 spec + the 2026-revision RC notes; A2A 1.0 spec (a2a-protocol.org).
+- **MCP — one revision behind, deliberately.** kourai runs `mcp 1.27.1`
+  against the **2025-11-25** spec. The next revision **finalized 2026-07-28**
+  (RC locked 2026-05-21), and the three SEPs that touch kourai's scaffolding
+  landed with it: **SEP-414** documents **W3C Trace Context in `_meta`**
+  (traceparent / tracestate / baggage), so MCP tool-call spans correlate with
+  kourai's OTel `traceparent` natively — folds into **M24**; the **stateless
+  protocol core** removes protocol sessions and the `Mcp-Session-Id` header,
+  which **closed M8 as obsolete** rather than unblocking it; and **SEP-2133**'s
+  reverse-DNS **extensions framework** mirrors the URI-namespaced pattern M18
+  already uses on the A2A side. **No migration is owed today:** every MCP server
+  kourai ships (`mcp_servers/forge`, `mcp_servers/shell`) runs over **stdio**,
+  which the stateless change leaves untouched, and the HTTP client side already
+  opens one session per call. The upgrade that *will* cost work is **SDK v2**,
+  which drops the `mcp.server.fastmcp` import path both servers use; the
+  `mcp>=1.26.0,<2` pin holds that off until someone chooses to do it.
+  `research(2026-08)`: MCP 2026-07-28 spec + changelog; A2A 1.0 spec
+  (a2a-protocol.org).
 
 ---
 

@@ -264,8 +264,9 @@ def build_client_session(
 # raises ``RuntimeError: Attempted to exit cancel scope in a different task``
 # whenever the session is torn down from a different task than it was opened
 # in — e.g., the kind of cross-task teardown a session pool would do.
-# Observed in Python-SDK issue #466 / #915 / #713. Reconsider when the SDK
-# exposes pool-safe primitives.
+# Observed in Python-SDK issue #466 / #915 / #713. No longer a workaround:
+# the MCP 2026-07-28 spec drops protocol-level sessions, so one session per
+# call is the shape the protocol assumes. See ROADMAP M8 (closed obsolete).
 
 _MCP_CALL_TIMEOUT = float(os.getenv("MCP_CALL_TIMEOUT", "15"))
 
