@@ -1,0 +1,118 @@
+name: Weekly
+
+# Scheduled checks that a push cannot catch: live upstream API contracts and
+# the performance suite. The integration + Docker sidecar path is NOT here —
+# `tests.yml` runs it on every push and PR as the required "Integration Tests"
+# check, with the same GHA cache scopes.
+
+on:
+  schedule:
+    - cron: "17 8 * * 1"   # Mondays 08:17 UTC (one hour after the vFL run to avoid runner contention)
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  aletheia-v2-contracts:
+    name: Aletheia v2 API Contracts
+    # Three real-API calls per source (Semantic Scholar / OpenAlex / arXiv) —
+    # surfaces upstream schema drift before it breaks the cassette-replay path.
+    # This is the only job here that no push-triggered run can substitute for.
+    runs-on: ubuntu-latest
+    env:
+      # S2 unauthenticated rate-limits aggressively; the test skips cleanly
+      # when this is unset. Setting the secret turns the S2 contract check on.
+      S2_API_KEY: ${{ secrets.S2_API_KEY }}
+      # OpenAlex requires a key as of 2026 (keyless pool retired); without it
+      # the OpenAlex contract call 4xxes instead of skipping.
+      OPENALEX_API_KEY: ${{ secrets.OPENALEX_API_KEY }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version-file: "pyproject.toml"
+
+      - name: Install dependencies with aletheia-v2 extra
+        # Scoped to the aletheia-v2 slice (kourai-common + academic-search deps),
+        # NOT --all-packages: the latter builds the VN/GUI realtimetts -> pyaudio
+        # stack, which needs portaudio headers this job doesn't install.
+        run: uv sync --extra aletheia-v2 --dev --frozen
+
+      - name: Run API-contract tests
+        # The `nightly` marker keeps its original name; only the cadence changed.
+        run: uv run pytest tests/nightly/test_api_contracts.py -v --tb=short -m nightly
+
+  performance-tests:
+    name: Performance Tests
+    # tests/performance/ runs nowhere else — tests.yml covers tests/unit/
+    # (-m "not slow") and tests/integration/ only.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version-file: "pyproject.toml"
+
+      - name: Install system audio dependencies
+        # PortAudio headers for PyAudio (pulled in by RealtimeTTS via hosts/gui).
+        # See tests.yml for the research(2026-05) note on why this is a bare
+        # apt-get instead of awalsh128/cache-apt-pkgs-action.
+        run: sudo apt-get update && sudo apt-get install -y portaudio19-dev
+
+      - name: Install dependencies
+        run: uv sync --all-packages --dev --frozen
+
+      - name: Create logs directory
+        run: mkdir -p logs
+
+      - name: Run performance tests
+        run: uv run pytest tests/performance/ -v --tb=short --cov=. --cov-report=xml:logs/coverage.xml --cov-report=term-missing --junitxml=logs/junit.xml
+
+      - name: Upload test results as artifacts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: perf-test-results
+          path: logs/
+          retention-days: 30
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: ajbarea/kourai-khryseai
+          files: logs/coverage.xml
+          flags: performance
+          fail_ci_if_error: false
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: ajbarea/kourai-khryseai
+          files: logs/junit.xml
+          flags: performance
+          report_type: test_results
+          fail_ci_if_error: false

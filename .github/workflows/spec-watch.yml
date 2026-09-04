@@ -17,7 +17,7 @@ name: Protocol spec watch
 on:
   schedule:
     # Sunday 13:00 UTC — quiet weekend slot; doesn't compete with the
-    # nightly.yml integration suite (08:17 UTC daily).
+    # weekly.yml run (Mondays 08:17 UTC).
     - cron: "0 13 * * 0"
   workflow_dispatch:
     inputs:

@@ -6,7 +6,7 @@ requires-python = ">=3.12,<3.14"
 dependencies = []
 
 [project.optional-dependencies]
-# Includes kourai-common (where academic_search lives) so the nightly contract
+# Includes kourai-common (where academic_search lives) so the weekly contract
 # job can `uv sync --extra aletheia-v2` for just this slice — skipping the
 # realtimetts -> pyaudio audio stack that `--all-packages` otherwise builds.
 aletheia-v2 = [
@@ -152,8 +152,8 @@ log_cli = true
 log_cli_level = "WARNING"
 markers = [
     "integration: mark test as requiring real external boundaries (containers/network/protocols)",
-    "slow: mark test as slow / heavyweight (Kokoro inference, etc.) — skipped on the push/PR fast lane and run only by the nightly workflow",
-    "nightly: real-API or heavy-cassette tests skipped on the push/PR fast lane; nightly workflow runs them",
+    "slow: mark test as slow / heavyweight (Kokoro inference, etc.); deselected by the push/PR fast lane. No workflow currently selects it and no test carries it — reserve it before adding a runner.",
+    "nightly: real-API or heavy-cassette tests skipped on the push/PR fast lane; the weekly workflow runs them",
     "xdist_group: pin a module's tests to one xdist worker when they share a machine-global resource (tmux session, /tmp state file)",
 ]
 filterwarnings = [

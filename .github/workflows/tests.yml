@@ -92,10 +92,10 @@ jobs:
         run: mkdir -p logs
 
       - name: Run unit tests
-        # -m "not slow" skips the heavyweight Kokoro inference tests on the
-        # push/PR fast lane. They flake intermittently on shared CI runners
-        # with SystemExit:1 (model-load timeout / OOM). The nightly workflow
-        # runs them by inverting the marker.
+        # -m "not slow" guards the fast lane against heavyweight Kokoro
+        # inference tests, which flake on shared runners with SystemExit:1
+        # (model-load timeout / OOM). No test currently carries the marker,
+        # and no workflow inverts it — add a runner before marking one.
         run: uv run pytest -n auto tests/unit/ -m "not slow" -v --tb=short --cov=. --cov-report=xml:logs/coverage.xml --cov-report=term-missing --junitxml=logs/junit.xml
 
       - name: Upload test results as artifacts

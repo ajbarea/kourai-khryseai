@@ -124,7 +124,7 @@ The `ops_command` watches the structured tool event JSONL emitter. This aligns w
 
 - **Pre-push gate is `make lint`** — not file-scoped `uv run ruff check <files>`. The wrapper at `scripts/lint.py` runs `ruff format --check`, `ruff check`, AND `ty check` in sequence; skipping the wrapper skips `ty` entirely, and file-scoped invocations miss repo-wide drift in unrelated files. Always run `make lint` (or `make validate` for lint + unit tests) before `git push`. Both write a SUMMARY block in `logs/dev-<ts>-<cmd>.log` — verify `overall rc : 0` and `steps failed : 0` before pushing.
 - **Both `ruff format --check` AND `ruff check` are separate gates** — `make lint` runs both. Even if I only ran `ruff format` locally, the check pass can still fail and CI will catch it.
-- **Nightly threshold:** any CI suite >5 min belongs in `nightly.yml` (cron-scheduled). The push/PR fast lane stays under that. The nightly job already covers integration tests; new heavy suites should follow the same pattern (see `.github/workflows/nightly.yml`).
+- **Scheduled-suite threshold:** the push/PR fast lane (`tests.yml`) owns lint, unit, integration, and the aletheia-v2 slice — including the Docker sidecar build, which is a required check. `weekly.yml` (Mondays 08:17 UTC) is only for suites a push cannot meaningfully gate: live upstream API contracts and `tests/performance/`. Put a new heavy suite in `tests.yml` unless it calls a live third-party API or takes >5 min; duplicating a fast-lane job onto the schedule just doubles the failure email.
 
 ## design_north_stars
 
