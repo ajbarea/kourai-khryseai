@@ -1,7 +1,7 @@
-"""Nightly: one real API call per source (S2 / OpenAlex / arXiv) to surface
-upstream schema drift before it breaks the cassette-replay path in
-`tests/integration/`. Push/PR lane skips via `pytest.mark.nightly`; only
-`nightly.yml`'s `aletheia-v2-contracts` job runs these."""
+"""One real API call per source (S2 / OpenAlex / arXiv) to surface upstream
+schema drift before it breaks the cassette-replay path in `tests/integration/`.
+Push/PR lane skips via `pytest.mark.nightly`; only `weekly.yml`'s
+`aletheia-v2-contracts` job runs these."""
 
 from __future__ import annotations
 

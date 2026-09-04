@@ -104,9 +104,12 @@ async def test_fetch_paper_pdf_via_docling():
     """Fetch the FLPoison PDF and extract its text via docling.
 
     Marked nightly: the cassette would be ~62MB (full PDF download +
-    rendered Markdown), which is too large for git. The nightly job
-    hits arxiv.org live instead. The default Unit Tests / Integration
-    Tests jobs skip this (`-m "not nightly"` is the default selector).
+    rendered Markdown), which is too large for git.
+
+    No CI job currently runs this. Reaching it needs both the
+    `aletheia-v2` extra (or the module importorskips away) and a selector
+    that admits `nightly`. The integration jobs sync without the extra;
+    `aletheia-v2-tests` has the extra but selects `-m "not nightly"`.
     """
     text = await fetch_paper_pdf_text("https://arxiv.org/pdf/2502.03801")
     assert text is not None
