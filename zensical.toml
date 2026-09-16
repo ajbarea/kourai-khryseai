@@ -93,7 +93,9 @@ accent = "custom"
 # Plugins & Extensions
 # ---------------------------------------------------------------------------
 [project.plugins]
-search = { engine = "disco" } # Enable the 2026 'Disco' search engine
+# zensical 0.0.60 moved search into Rust and removed `engine`; setting it
+# now aborts the build with "unknown search option: engine".
+search = {}
 social = {}
 
 
