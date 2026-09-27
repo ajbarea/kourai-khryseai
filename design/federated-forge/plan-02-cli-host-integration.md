@@ -2,7 +2,7 @@
 
 > **Terminology note (2026-07-15).** This plan predates the spec's
 > analyst-fleet reframing and uses the retired game vocabulary. Read it
-> with the mapping from the [design spec](./index.md): player → analyst ·
+> with the mapping from the [design spec](../../docs/research/federated-forge/index.md): player → analyst ·
 > forge → deployment · council adapter → shared adapter · bond adapter →
 > personal adapter. Code identifiers (`shared_eligible`, `PlayerResponse`,
 > etc.) are unchanged.
@@ -15,7 +15,7 @@
 
 **Tech Stack:** Python 3.12, pydantic v2 (already present from plan-01), pytest 9, the existing `_make_task` mocked-client pattern from `tests/unit/test_cli.py`.
 
-**Spec reference:** [`docs/research/federated-forge/index.md`](./index.md) — Forge Memoir section. **Prior plan:** [`plan-01-memoir-foundation.md`](./plan-01-memoir-foundation.md) shipped the library this plan now wires up.
+**Spec reference:** [`docs/research/federated-forge/index.md`](../../docs/research/federated-forge/index.md) — Forge Memoir section. **Prior plan:** [`plan-01-memoir-foundation.md`](plan-01-memoir-foundation.md) shipped the library this plan now wires up.
 
 **Scope discipline.** Plan-02 ships ONE entry per pipeline run, source `SPECIALIST_PROPOSED`, agent = the last maiden seen by `get_last_seen_agent()`. It does NOT write player-revision entries (no `/accept` / `/discard` integration yet — defers to plan-05 along with replay tooling), does NOT capture intermediate per-agent turns (defers to plan-06's interrupt channel), does NOT touch the GUI or VN hosts (plan-03 / plan-04). Keep the diff focused.
 
