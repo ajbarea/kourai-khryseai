@@ -55,7 +55,7 @@ _STALE_DAYS = 365
 
 def _iter_source_files(root: Path) -> Iterator[Path]:
     """Yield .py / .md / .yml / .yaml files outside vendored, generated, or
-    fixture paths. `architecture/` + `tests/` carry illustrative slugs that
+    fixture paths. `architecture/`, `design/` + `tests/` carry illustrative slugs that
     would false-positive against the live `docs/citations/` directory."""
     exclude_dirs = {
         ".venv",
@@ -67,6 +67,7 @@ def _iter_source_files(root: Path) -> Iterator[Path]:
         "site",
         "tests",
         "architecture",
+        "design",
     }
     for path in root.rglob("*"):
         if not path.is_file():
