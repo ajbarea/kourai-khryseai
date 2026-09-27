@@ -28,7 +28,7 @@
 .landing-section {
   width: 100vw;
   margin-left: calc(-50vw + 50%);
-  padding: 5rem 2rem;
+  padding: 4.5rem 2rem;
   background: var(--obsidian);
   text-align: center;
 }
@@ -36,15 +36,7 @@
   margin-left: auto;
   margin-right: auto;
 }
-.landing-section--intro,
-.landing-section--promise {
-  min-height: 88vh;
-  min-height: 88svh;
-  display: flex;
-  align-items: center;
-}
-.landing-section--intro { padding-bottom: 14vh; }
-.landing-section--promise { padding-top: 14vh; }
+.landing-section--intro { padding-top: 3rem; }
 .landing-section:nth-of-type(even) { background: color-mix(in srgb, var(--gold-mid) 2%, var(--obsidian)); }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -94,19 +86,74 @@
   margin: 0 auto;
 }
 
-/* ---------- Agent cards ---------- */
-.agent-grid {
+.section-kicker {
+  margin: 2.8rem auto 1.4rem !important;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--gold-mid);
+}
+.md-typeset ol.promise-steps {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 1.2rem;
-  margin-top: 2rem;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 0;
+  list-style: none;
+  counter-reset: none;
+}
+.md-typeset ol.promise-steps > li.promise-step {
+  margin: 0;
+  padding: 1.4rem 1.2rem;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  text-align: center;
+}
+.promise-num {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--obsidian);
+  background: var(--gold-gradient);
+  margin-bottom: 0.3rem;
+}
+.promise-step strong { color: var(--gold-light); font-size: 0.95rem; }
+.promise-step span:last-child {
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--gold-light);
+  opacity: 0.7;
+}
+
+/* ---------- Agent cards ---------- */
+/* Ten agents: two rows of five on wide screens, pairs below that. */
+.agent-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1rem;
+  margin: 2rem auto 0;
+  width: min(1120px, calc(100vw - 4rem));
+  position: relative;
+  left: 50%;
+  transform: translateX(-50%);
 }
 .agent-card {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   border-top: 3px solid var(--agent-accent, var(--gold-dark));
   border-radius: 8px;
-  padding: 1.5rem 1.2rem;
+  padding: 1.3rem 0.9rem;
   text-align: center;
   transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
   display: block;
@@ -193,16 +240,16 @@
 }
 .step-emoji { font-size: 2rem; line-height: 1; }
 .step-label {
-  font-size: 0.65rem;
+  font-size: 0.68rem;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  font-weight: 600;
-  opacity: 0.8;
+  font-weight: 700;
+  filter: brightness(1.25);
 }
 .pipeline-caption {
   font-size: 0.82rem;
   color: var(--gold-light);
-  opacity: 0.4;
+  opacity: 0.7;
   font-style: italic;
   margin-top: 1.5rem;
   margin-left: auto;
@@ -235,7 +282,19 @@
   box-shadow: 0 8px 24px color-mix(in srgb, var(--gold-mid) 15%, transparent);
   border-color: var(--gold-dark);
 }
-.experience-icon { font-size: 2.5rem; margin-bottom: 0.8rem; }
+.experience-icon {
+  width: 3.2rem;
+  height: 3.2rem;
+  margin: 0 auto 0.9rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--glass-border);
+  color: var(--gold-mid);
+}
+.experience-icon p { margin: 0; line-height: 0; }
+.experience-icon svg { width: 1.5rem; height: 1.5rem; fill: currentColor; }
+.experience-card:hover .experience-icon { color: var(--gold-light); border-color: var(--gold-dark); }
 .experience-card h3 {
   font-size: 1.1rem;
   font-weight: 700;
@@ -250,15 +309,15 @@
   line-height: 1.6;
 }
 .experience-note {
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   color: var(--gold-light);
-  opacity: 0.4;
+  opacity: 0.65;
   margin-top: 1.5rem;
   font-style: italic;
 }
 
 /* ---------- CTA section ---------- */
-.cta-section { padding: 5rem 2rem !important; }
+.cta-section { padding: 4.5rem 2rem !important; }
 .cta-lead {
   font-size: clamp(0.9rem, 1.5vw, 1.1rem);
   color: var(--gold-light);
@@ -287,22 +346,32 @@
 .landing-footer svg { vertical-align: middle; }
 
 /* Responsive Grid/Flow */
+@media (max-width: 1024px) {
+  .agent-grid { grid-template-columns: repeat(2, 1fr); width: min(640px, calc(100vw - 2.4rem)); }
+}
+
 @media (max-width: 768px) {
-  .agent-grid { grid-template-columns: repeat(2, 1fr); }
   .experience-grid { grid-template-columns: 1fr; max-width: 400px; margin-left: auto; margin-right: auto; }
   .landing-section { padding: 3.5rem 1.2rem; }
-  .landing-section--intro, .landing-section--promise { min-height: 74vh; min-height: 74svh; }
-  .landing-section--intro { padding-bottom: 10vh; }
-  .landing-section--promise { padding-top: 10vh; }
+  .md-typeset ol.promise-steps { grid-template-columns: 1fr; max-width: 400px; gap: 0.8rem; }
+  .md-typeset ol.promise-steps > li.promise-step {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: 0.9rem;
+    row-gap: 0.15rem;
+    padding: 1rem 1.1rem;
+    text-align: left;
+  }
+  .promise-num { grid-row: span 2; margin: 0; align-self: center; }
   .pipeline-flow { gap: 1.5rem; padding: 0 1rem; }
   .pipeline-flow::before { left: 8%; right: 8%; }
 }
 
 @media (max-width: 480px) {
-  .agent-grid { grid-template-columns: 1fr; max-width: 320px; margin-left: auto; margin-right: auto; }
-  .landing-section { padding: 2.5rem 1rem; }
-  .landing-section--intro, .landing-section--promise { min-height: 70vh; min-height: 70svh; }
-  .landing-section--intro, .landing-section--promise { padding-top: 3.5rem; padding-bottom: 3.5rem; }
+  .agent-grid { gap: 0.7rem; width: calc(100vw - 2rem); }
+  .agent-card { padding: 1rem 0.6rem; }
+  .agent-avatar { width: 72px; height: 72px; }
+  .landing-section { padding: 3rem 1rem; }
   .pipeline-flow { gap: 0.8rem; padding: 0 0.5rem; }
   .pipeline-flow::before { left: 5%; right: 5%; }
   .step-emoji { font-size: 1.5rem; }

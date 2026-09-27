@@ -237,3 +237,6 @@ body.hero-page .md-content__inner {
   .md-typeset .hero h1, .hero h1 { font-size: 4.5rem; }
   .hero-subtitle { font-size: 1.3rem; }
 }
+
+/* The hero title is a banner, not a section to link to. */
+.hero h1 .headerlink { display: none; }

@@ -48,6 +48,7 @@ Thumbs.db
 .superpowers/
 # Local git worktrees for isolated subagent-driven development
 .worktrees/
+.claude/worktrees/
 
 # Logs
 logs/

@@ -36,14 +36,25 @@ hide:
 <section class="landing-section landing-section--intro">
   <div class="section-inner">
     <h2 class="section-title">What Is Kourai Khryseai?</h2>
-    <p class="section-lead">Kourai Khryseai is a multi-agent system: ten A2A-protocol agents that plan, code, test, review, and ship — streaming their reasoning so you stay in the loop the whole way.</p>
-  </div>
-</section>
-
-<section class="landing-section landing-section--promise">
-  <div class="section-inner">
-    <h2 class="section-title">You Direct. They Create.</h2>
-    <p class="section-lead">Describe what you need. Specialized agents plan, code, test, review, and document &mdash; streaming their work in real-time. When decisions matter, they ask.<br><strong>Nothing surprises you.</strong></p>
+    <p class="section-lead">A multi-agent system: ten A2A-protocol agents that plan, code, test, review, and ship, streaming their reasoning so you stay in the loop the whole way.</p>
+    <p class="section-kicker">You Direct. They Create.</p>
+    <ol class="promise-steps">
+      <li class="promise-step">
+        <span class="promise-num">1</span>
+        <strong>Describe it</strong>
+        <span>Say what you need, in plain words.</span>
+      </li>
+      <li class="promise-step">
+        <span class="promise-num">2</span>
+        <strong>Watch them work</strong>
+        <span>Specialists plan, code, test, review, and document, streaming as they go.</span>
+      </li>
+      <li class="promise-step">
+        <span class="promise-num">3</span>
+        <strong>Decide what matters</strong>
+        <span>When a choice is yours, they ask. Nothing surprises you.</span>
+      </li>
+    </ol>
   </div>
 </section>
 
@@ -133,17 +144,17 @@ hide:
     <h2 class="section-title">Three Ways to Play</h2>
     <div class="experience-grid">
       <a href="cli/" class="experience-card">
-        <div class="experience-icon">⌨️</div>
+        <div class="experience-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.25 12a.75.75 0 0 1-.22.53l-2.75 2.75a.75.75 0 0 1-1.06-1.06L7.44 12 5.22 9.78a.75.75 0 1 1 1.06-1.06l2.75 2.75c.141.14.22.331.22.53m2 2a.75.75 0 0 0 0 1.5h5a.75.75 0 0 0 0-1.5z"/><path d="M0 4.75C0 3.784.784 3 1.75 3h20.5c.966 0 1.75.784 1.75 1.75v14.5A1.75 1.75 0 0 1 22.25 21H1.75A1.75 1.75 0 0 1 0 19.25Zm1.75-.25a.25.25 0 0 0-.25.25v14.5c0 .138.112.25.25.25h20.5a.25.25 0 0 0 .25-.25V4.75a.25.25 0 0 0-.25-.25Z"/></svg></div>
         <h3>CLI</h3>
-        <p>Fast. Scriptable. Works anywhere &mdash; even over SSH. Real-time agent streaming with emoji progress indicators.</p>
+        <p>Fast. Scriptable. Works anywhere, even over SSH. Real-time agent streaming with emoji progress indicators.</p>
       </a>
       <a href="gui/" class="experience-card">
-        <div class="experience-icon">🖥️</div>
+        <div class="experience-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8.954 17H2.75A1.75 1.75 0 0 1 1 15.25V3.75C1 2.784 1.784 2 2.75 2h18.5c.966 0 1.75.784 1.75 1.75v11.5A1.75 1.75 0 0 1 21.25 17h-6.204c.171 1.375.805 2.652 1.769 3.757A.752.752 0 0 1 16.25 22h-8.5a.75.75 0 0 1-.565-1.243c.964-1.105 1.598-2.382 1.769-3.757M21.5 3.75a.25.25 0 0 0-.25-.25H2.75a.25.25 0 0 0-.25.25v11.5c0 .138.112.25.25.25h18.5a.25.25 0 0 0 .25-.25ZM13.537 17h-3.074c-.126 1.266-.564 2.445-1.223 3.5h5.52c-.659-1.055-1.098-2.234-1.223-3.5"/></svg></div>
         <h3>Pygame GUI</h3>
         <p>Agent portraits with glow effects. Personality-matched neural voices. Golden particles and typewriter dialogue.</p>
       </a>
       <a href="vn/" class="experience-card">
-        <div class="experience-icon">📖</div>
+        <div class="experience-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M0 3.75A.75.75 0 0 1 .75 3h7.497c1.566 0 2.945.8 3.751 2.014A4.5 4.5 0 0 1 15.75 3h7.5a.75.75 0 0 1 .75.75v15.063a.75.75 0 0 1-.755.75l-7.682-.052a3 3 0 0 0-2.142.878l-.89.891a.75.75 0 0 1-1.061 0l-.902-.901a3 3 0 0 0-2.121-.879H.75a.75.75 0 0 1-.75-.75Zm12.75 15.232a4.5 4.5 0 0 1 2.823-.971l6.927.047V4.5h-6.75a3 3 0 0 0-3 3ZM11.247 7.497a3 3 0 0 0-3-2.997H1.5V18h6.947c1.018 0 2.006.346 2.803.98Z"/></svg></div>
         <h3>Ren'Py VN</h3>
         <p>Romance routes, affinity tiers, confession scenes, and companion spirits. A visual novel forged in gold.</p>
       </a>
