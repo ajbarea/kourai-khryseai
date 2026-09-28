@@ -14,7 +14,7 @@ extra_css = [
   "stylesheets/components/lightbox.css",
   "stylesheets/components/figures.css"
 ]
-extra_javascript = ["javascripts/particles.js"]
+extra_javascript = ["javascripts/reveal.js", "javascripts/particles.js"]
 
 # ---------------------------------------------------------------------------
 # Navigation
@@ -109,6 +109,8 @@ social = {}
 # ---------------------------------------------------------------------------
 [project.extra]
 generator = false
+og_image = "assets/kourai-og.png"
+brand_mark = "assets/brand.png"
 
 [[project.extra.social]]
 icon = "fontawesome/brands/github"

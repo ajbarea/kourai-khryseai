@@ -1,10 +1,8 @@
-// Gold particle system — floating flakes behind the hero image.
-// Re-entrant so MkDocs Material instant navigation can rebind cleanly.
+// Gold particle system: floating flakes behind the hero image. The hero-page class
+// and the section reveal come from the shared reveal.js.
+// Re-entrant so instant navigation can rebind cleanly.
 (function () {
   const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  // Signal to CSS that JS is running so progressive-enhancement rules can apply.
-  document.documentElement.classList.add('js-ready');
 
   let teardown = null;
 
@@ -12,40 +10,7 @@
     if (teardown) { teardown(); teardown = null; }
 
     const hero = document.querySelector('.hero');
-    if (!hero) {
-      // Not the landing page — strip any lingering hero-page styling from a prior nav.
-      document.documentElement.classList.remove('hero-page');
-      document.body.classList.remove('hero-page');
-      return;
-    }
-
-    document.documentElement.classList.add('hero-page');
-    document.body.classList.add('hero-page');
-
-    const sections = document.querySelectorAll('.landing-section');
-    let revealObserver = null;
-    if (sections.length) {
-      if (prefersReducedMotion) {
-        sections.forEach(s => s.classList.add('visible'));
-      } else {
-        revealObserver = new IntersectionObserver((entries) => {
-          entries.forEach(entry => {
-            if (entry.isIntersecting) {
-              entry.target.classList.add('visible');
-              revealObserver.unobserve(entry.target);
-            }
-          });
-        }, { threshold: 0.12 });
-        sections.forEach(s => revealObserver.observe(s));
-      }
-    }
-
-    if (prefersReducedMotion) {
-      teardown = () => {
-        if (revealObserver) revealObserver.disconnect();
-      };
-      return;
-    }
+    if (!hero || prefersReducedMotion) return;
 
     const canvas = document.createElement('canvas');
     canvas.classList.add('hero-particles');
@@ -148,7 +113,6 @@
       cancelAnimationFrame(animId);
       animId = null;
       visibilityObserver.disconnect();
-      if (revealObserver) revealObserver.disconnect();
       window.removeEventListener('resize', onResize);
       canvas.remove();
     };
