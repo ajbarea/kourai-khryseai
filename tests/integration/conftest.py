@@ -5,6 +5,7 @@ from __future__ import annotations
 import functools
 import logging
 import os
+import secrets
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -94,6 +95,10 @@ def shared_network() -> Generator[Network, None, None]:
         yield network
 
 
+# LiteLLM refuses to start without a strong master key; agents present the same key.
+PROXY_KEY = f"sk-{secrets.token_hex(32)}"
+
+
 @pytest.fixture(scope="session")
 def litellm_proxy(shared_network: Network) -> Generator[DockerContainer, None, None]:
     """Start LiteLLM Proxy with mock configuration."""
@@ -103,6 +108,7 @@ def litellm_proxy(shared_network: Network) -> Generator[DockerContainer, None, N
         .with_network(shared_network)
         .with_network_aliases("litellm-proxy")
         .with_volume_mapping(config_path, "/app/config.yaml")
+        .with_env("LITELLM_MASTER_KEY", PROXY_KEY)
         .with_command("--config /app/config.yaml")
         .with_exposed_ports(4000) as container
     ):
@@ -141,10 +147,10 @@ def _start_agent_container(image: str, network: Network, alias: str, port: int) 
         .with_exposed_ports(port)
         .with_env("KOURAI_PROVIDER", "openai")
         .with_env("OPENAI_API_BASE", "http://litellm-proxy:4000/v1")
-        .with_env("OPENAI_API_KEY", "sk-test")
+        .with_env("OPENAI_API_KEY", PROXY_KEY)
         # Route anthropic-prefixed models through the proxy too (litellm
         # ignores OPENAI_API_BASE for non-OpenAI providers)
-        .with_env("ANTHROPIC_API_KEY", "sk-test")
+        .with_env("ANTHROPIC_API_KEY", PROXY_KEY)
         .with_env("ANTHROPIC_API_BASE", "http://litellm-proxy:4000")
         .with_env("KOURAI_LOG_LEVEL", "DEBUG")
         .with_env("KOURAI_MODEL_OVERRIDE", "openai/mock-model")
