@@ -24,14 +24,14 @@ body.hero-page .md-content__inner {
   justify-content: flex-end;
   text-align: center;
   background:
-    radial-gradient(ellipse at center, transparent 20%, color-mix(in srgb, var(--obsidian) 20%, transparent) 60%, color-mix(in srgb, var(--obsidian) 60%, transparent) 100%),
+    radial-gradient(ellipse at center, transparent 20%, color-mix(in srgb, var(--ground) 20%, transparent) 60%, color-mix(in srgb, var(--ground) 60%, transparent) 100%),
     linear-gradient(to bottom,
-      color-mix(in srgb, var(--obsidian) 40%, transparent) 0%,
-      color-mix(in srgb, var(--obsidian) 10%, transparent) 40%,
-      color-mix(in srgb, var(--obsidian) 80%, transparent) 80%,
-      var(--obsidian) 100%),
+      color-mix(in srgb, var(--ground) 40%, transparent) 0%,
+      color-mix(in srgb, var(--ground) 10%, transparent) 40%,
+      color-mix(in srgb, var(--ground) 80%, transparent) 80%,
+      var(--ground) 100%),
     var(--hero-bg-image) center 48px / contain no-repeat;
-  color: var(--gold-light);
+  color: var(--ink);
   margin: -1.2rem -0.8rem 0;
   padding: 1rem 2rem 5rem;
   overflow: hidden;
@@ -60,7 +60,7 @@ body.hero-page .md-content__inner {
   padding-top: 0;
   margin-bottom: 0.3rem;
   letter-spacing: -0.04em;
-  background: var(--gold-gradient) !important;
+  background: var(--heading-gradient) !important;
   background-clip: text !important;
   -webkit-background-clip: text !important;
   -webkit-text-fill-color: transparent !important;
@@ -94,8 +94,8 @@ body.hero-page .md-content__inner {
   font-weight: 300;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--gold-light);
-  opacity: 0.8;
+  color: var(--ink);
+  opacity: var(--subtitle-opacity);
   margin-bottom: 1rem;
   text-shadow: 0 0 4px color-mix(in srgb, #000 90%, transparent), 0 0 8px color-mix(in srgb, #000 60%, transparent);
   max-width: 700px;
@@ -134,14 +134,14 @@ body.hero-page .md-content__inner {
 
 .hero .md-button:not(.md-button--primary) {
   border-color: var(--glass-border) !important;
-  color: var(--gold-light) !important;
+  color: var(--ink) !important;
   backdrop-filter: blur(8px);
   transition: all 0.3s ease;
 }
 
 .hero .md-button:not(.md-button--primary):hover {
-  border-color: var(--gold-light) !important;
-  background: color-mix(in srgb, var(--gold-light) 10%, transparent) !important;
+  border-color: var(--ink) !important;
+  background: color-mix(in srgb, var(--ink) 8%, transparent) !important;
 }
 
 .hero-experiences {
@@ -149,33 +149,48 @@ body.hero-page .md-content__inner {
   margin-bottom: 0.5rem;
 }
 
-.hero-modes {
-  font-size: clamp(0.7rem, 1.2vw, 0.85rem);
-  font-weight: 400;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  opacity: 0.7;
-  margin: 0;
+.hero-experiences {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
 }
 
-.hero-modes .twemoji,
-.hero-modes .octicon {
-  vertical-align: -0.1em;
-  margin: 0 0.15em;
+.hero-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.3rem 0.8rem;
+  border: 1px solid var(--glass-border);
+  border-radius: 2rem;
+  background: color-mix(in srgb, var(--ground) 55%, transparent);
+  backdrop-filter: blur(6px);
+  font-size: clamp(0.68rem, 1.1vw, 0.8rem);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.hero-chip .twemoji,
+.hero-chip svg {
+  width: 1.05em;
+  height: 1.05em;
+  fill: currentColor;
 }
 
 @media (max-width: 768px) {
   .hero {
     background:
-      radial-gradient(ellipse at center, transparent 15%, color-mix(in srgb, var(--obsidian) 25%, transparent) 55%, color-mix(in srgb, var(--obsidian) 70%, transparent) 100%),
+      radial-gradient(ellipse at center, transparent 15%, color-mix(in srgb, var(--ground) 25%, transparent) 55%, color-mix(in srgb, var(--ground) 70%, transparent) 100%),
       linear-gradient(to bottom,
-        color-mix(in srgb, var(--obsidian) 50%, transparent) 0%,
-        color-mix(in srgb, var(--obsidian) 15%, transparent) 25%,
-        color-mix(in srgb, var(--obsidian) 60%, transparent) 60%,
-        color-mix(in srgb, var(--obsidian) 90%, transparent) 80%,
-        var(--obsidian) 95%),
+        color-mix(in srgb, var(--ground) 50%, transparent) 0%,
+        color-mix(in srgb, var(--ground) 15%, transparent) 25%,
+        color-mix(in srgb, var(--ground) 60%, transparent) 60%,
+        color-mix(in srgb, var(--ground) 90%, transparent) 80%,
+        var(--ground) 95%),
       var(--hero-bg-image) center 48px / contain no-repeat;
-    padding: 1rem 1.2rem 2rem;
+    padding: 1rem 1.2rem 4rem;
     height: 100vh;
     height: 100dvh;
   }
@@ -207,21 +222,21 @@ body.hero-page .md-content__inner {
     font-size: 0.78rem !important;
   }
   .hero-experiences { margin-top: 0.8rem; }
-  .hero-modes { font-size: 0.65rem; letter-spacing: 0.12em; }
+  .hero-chip { font-size: 0.66rem; letter-spacing: 0.08em; padding: 0.28rem 0.7rem; }
 }
 
 @media (max-width: 480px) {
-  .hero { padding: 0.5rem 0.8rem 1.5rem; }
+  .hero { padding: 0.5rem 0.8rem 3.8rem; }
   .md-typeset .hero h1, .hero h1 { font-size: clamp(1.4rem, 9vw, 2rem); }
   .hero-subtitle { font-size: 0.62rem; margin-bottom: 0.5rem; }
   .hero-buttons .md-button { width: 80%; max-width: 220px; padding: 0.5rem 1rem !important; font-size: 0.72rem !important; }
-  .hero-modes { font-size: 0.58rem; }
+
 }
 
 @media (max-width: 360px) {
-  .hero { padding: 0.3rem 0.6rem 1.2rem; }
+  .hero { padding: 0.3rem 0.6rem 3.5rem; }
   .hero-buttons .md-button { width: 90%; font-size: 0.68rem !important; padding: 0.45rem 0.8rem !important; }
-  .hero-modes { font-size: 0.52rem; letter-spacing: 0.08em; }
+
 }
 
 @media (min-width: 1440px) {
@@ -229,13 +244,25 @@ body.hero-page .md-content__inner {
   .md-typeset .hero h1, .hero h1 { font-size: 4rem; }
   .hero-subtitle { font-size: 1.2rem; max-width: 800px; }
   .hero-buttons .md-button { min-width: 240px; padding: 0.85rem 2.2rem !important; font-size: 0.9rem !important; }
-  .hero-modes { font-size: 0.9rem; }
+  .hero-chip { font-size: 0.85rem; }
 }
 
 @media (min-width: 1920px) {
   .hero { padding-bottom: 8rem; }
   .md-typeset .hero h1, .hero h1 { font-size: 4.5rem; }
   .hero-subtitle { font-size: 1.3rem; }
+}
+
+/* On parchment the black halo reads as dirt: a soft bronze glow instead. */
+[data-md-color-scheme="default"] .hero h1,
+[data-md-color-scheme="default"] .md-typeset .hero h1 {
+  filter: drop-shadow(0 1px 0 color-mix(in srgb, #fff 80%, transparent))
+    drop-shadow(0 2px 10px color-mix(in srgb, var(--gold-mid) 35%, transparent));
+  animation: none;
+}
+[data-md-color-scheme="default"] .hero-subtitle {
+  text-shadow: 0 0 6px var(--ground), 0 0 14px var(--ground);
+  font-weight: 500;
 }
 
 /* The hero title is a banner, not a section to link to. */

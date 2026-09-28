@@ -9,15 +9,73 @@
 
   /* Obsidian & Shadow */
   --obsidian: #010201;
+  --glass-border: color-mix(in srgb, var(--gold-metallic) 20%, transparent);
+}
+
+/* Dark: gold on obsidian. */
+:root,
+[data-md-color-scheme="slate"] {
+  --ground: var(--obsidian);
+  --ground-alt: color-mix(in srgb, var(--gold-mid) 2%, var(--obsidian));
+  --ink: var(--gold-light);
+  --ink-strong: var(--gold-light);
+  --kicker: var(--gold-mid);
+  --link: var(--gold-light);
+  --link-hover: #fff;
+  --code-ink: var(--gold-light);
+  --heading-gradient: var(--gold-gradient);
   --glass-bg: color-mix(in srgb, #fff 3%, transparent);
   --glass-border: color-mix(in srgb, var(--gold-metallic) 20%, transparent);
-
-  /* Assets */
+  /* Agent accents are lifted toward white so the epithets read on obsidian. */
+  --accent-mix: #fff;
+  --accent-weight: 62%;
+  --header-shadow: color-mix(in srgb, #000 50%, transparent);
+  --subtitle-opacity: 0.8;
+  --brand-mark-filter: invert(1);
   --hero-bg-image: url('../../assets/golden-maidens.png');
 
-  /* Zensical Overrides */
   --md-primary-fg-color: var(--gold-light);
   --md-accent-fg-color: var(--gold-light);
+}
+
+/* Light: the same gold on parchment. Text and gradients deepen to bronze for contrast. */
+[data-md-color-scheme="default"] {
+  --ground: #faf3e7;
+  --ground-alt: #f4eada;
+  --ink: #3a2a14;
+  --ink-strong: #6b420f;
+  --kicker: #8a4f10;
+  --link: #8a4f10;
+  --link-hover: #4e2c06;
+  --code-ink: #6b420f;
+  --heading-gradient: linear-gradient(135deg, #7a4c12 0%, #a8742a 45%, #7a4c12 100%);
+  --glass-bg: color-mix(in srgb, #fff 72%, transparent);
+  --glass-border: color-mix(in srgb, var(--gold-dark) 30%, transparent);
+  /* Agent accents are deepened toward bronze-black so the epithets read on parchment. */
+  --accent-mix: #1b1206;
+  --accent-weight: 58%;
+  --header-shadow: color-mix(in srgb, var(--gold-deep) 12%, transparent);
+  --subtitle-opacity: 1;
+  --brand-mark-filter: none;
+  --hero-bg-image: url('../../assets/golden-maidens-light.jpg');
+
+  --md-primary-fg-color: #faf3e7;
+  --md-primary-bg-color: #3a2a14;
+  --md-accent-fg-color: #8a4f10;
+  --md-default-bg-color: #faf3e7;
+  --md-default-fg-color: #3a2a14;
+  --md-default-fg-color--light: #5c4526;
+  --md-default-fg-color--lighter: #8a7454;
+  --md-default-fg-color--lightest: #d9ccb4;
+  --md-typeset-color: #3a2a14;
+  --md-typeset-a-color: #8a4f10;
+  --md-code-bg-color: #f1e6d2;
+  --md-code-fg-color: #3a2a14;
+  --md-footer-bg-color: #f1e6d2;
+  --md-footer-bg-color--dark: #eadcc2;
+  --md-footer-fg-color: #3a2a14;
+  --md-footer-fg-color--light: #5c4526;
+  --md-footer-fg-color--lighter: #6f5838;
 }
 
 /* Color swatches (Art Direction) */
@@ -28,5 +86,5 @@
   border-radius: 2px;
   vertical-align: middle;
   margin-right: 6px;
-  border: 1px solid color-mix(in srgb, #fff 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ink) 20%, transparent);
 }

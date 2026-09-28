@@ -21,10 +21,9 @@ hide:
 </div>
 
 <div class="hero-experiences" markdown>
-
-:octicons-terminal-24: CLI | :octicons-device-desktop-24: Pygame GUI | :octicons-book-24: Ren'Py VN
-{ .hero-modes }
-
+<span class="hero-chip" markdown>:octicons-terminal-24: CLI</span>
+<span class="hero-chip" markdown>:octicons-device-desktop-24: Pygame GUI</span>
+<span class="hero-chip" markdown>:octicons-book-24: Ren'Py VN</span>
 </div>
 
 </div>
@@ -130,10 +129,10 @@ hide:
   <div class="section-inner">
     <h2 class="section-title">A Living Group Chat</h2>
     <div class="pipeline-flow">
-      <div class="pipeline-step"><img src="assets/avatars/hephaestus_neutral.png" class="avatar-mini" alt="Hephaestus" width="44" height="44" loading="lazy" decoding="async"><span class="step-label" style="color:#FF9500">Moderating</span></div>
-      <div class="pipeline-step"><img src="assets/avatars/metis_neutral.png" class="avatar-mini" alt="Metis" width="44" height="44" loading="lazy" decoding="async"><span class="step-label" style="color:#4C6EF5">Listening</span></div>
-      <div class="pipeline-step"><img src="assets/avatars/techne_neutral.png" class="avatar-mini" alt="Techne" width="44" height="44" loading="lazy" decoding="async"><span class="step-label" style="color:#17A2B8">Speaking</span></div>
-      <div class="pipeline-step"><img src="assets/avatars/kallos_neutral.png" class="avatar-mini" alt="Kallos" width="44" height="44" loading="lazy" decoding="async"><span class="step-label" style="color:#D946EF">Listening</span></div>
+      <div class="pipeline-step"><img src="assets/avatars/hephaestus_neutral.png" class="avatar-mini" alt="Hephaestus" width="44" height="44" loading="lazy" decoding="async"><span class="step-label" style="--agent-accent:#FF9500">Moderating</span></div>
+      <div class="pipeline-step"><img src="assets/avatars/metis_neutral.png" class="avatar-mini" alt="Metis" width="44" height="44" loading="lazy" decoding="async"><span class="step-label" style="--agent-accent:#4C6EF5">Listening</span></div>
+      <div class="pipeline-step"><img src="assets/avatars/techne_neutral.png" class="avatar-mini" alt="Techne" width="44" height="44" loading="lazy" decoding="async"><span class="step-label" style="--agent-accent:#17A2B8">Speaking</span></div>
+      <div class="pipeline-step"><img src="assets/avatars/kallos_neutral.png" class="avatar-mini" alt="Kallos" width="44" height="44" loading="lazy" decoding="async"><span class="step-label" style="--agent-accent:#D946EF">Listening</span></div>
     </div>
     <p class="pipeline-caption">Forget isolated hand-offs. The Forge is a shared group chat where every agent receives the full transcript. They listen, they reason together, and they talk to you in real-time.</p>
   </div>

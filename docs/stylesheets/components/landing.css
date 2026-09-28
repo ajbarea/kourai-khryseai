@@ -10,8 +10,8 @@
   display: inline-block;
   width: 16px;
   height: 16px;
-  border-right: 2px solid var(--gold-light);
-  border-bottom: 2px solid var(--gold-light);
+  border-right: 2px solid var(--ink);
+  border-bottom: 2px solid var(--ink);
   transform: rotate(45deg);
   opacity: 0.35;
 }
@@ -29,7 +29,7 @@
   width: 100vw;
   margin-left: calc(-50vw + 50%);
   padding: 4.5rem 2rem;
-  background: var(--obsidian);
+  background: var(--ground);
   text-align: center;
 }
 .landing-section p {
@@ -37,7 +37,7 @@
   margin-right: auto;
 }
 .landing-section--intro { padding-top: 3rem; }
-.landing-section:nth-of-type(even) { background: color-mix(in srgb, var(--gold-mid) 2%, var(--obsidian)); }
+.landing-section:nth-of-type(even) { background: var(--ground-alt); }
 
 @media (prefers-reduced-motion: no-preference) {
   html.js-ready .landing-section {
@@ -70,7 +70,7 @@
 .section-title {
   font-size: clamp(1.4rem, 3vw, 2rem);
   font-weight: 800;
-  background: var(--gold-gradient);
+  background: var(--heading-gradient);
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -79,7 +79,7 @@
 }
 .section-lead {
   font-size: clamp(0.9rem, 1.5vw, 1.08rem);
-  color: var(--gold-light);
+  color: var(--ink);
   opacity: 0.8;
   line-height: 1.8;
   max-width: 600px;
@@ -92,7 +92,7 @@
   font-weight: 700;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--gold-mid);
+  color: var(--kicker);
 }
 .md-typeset ol.promise-steps {
   display: grid;
@@ -128,12 +128,12 @@
   background: var(--gold-gradient);
   margin-bottom: 0.3rem;
 }
-.promise-step strong { color: var(--gold-light); font-size: 0.95rem; }
+.promise-step strong { color: var(--ink); font-size: 0.95rem; }
 .promise-step span:last-child {
   font-size: 0.82rem;
   line-height: 1.55;
-  color: var(--gold-light);
-  opacity: 0.7;
+  color: var(--ink);
+  opacity: 0.82;
 }
 
 /* ---------- Agent cards ---------- */
@@ -184,20 +184,22 @@
 .agent-name {
   font-size: 1rem;
   font-weight: 700;
-  color: var(--gold-light);
+  color: var(--ink);
   margin-bottom: 0.15rem;
+}
+.agent-epithet,
+.step-label {
+  color: color-mix(in srgb, var(--agent-accent, var(--gold-mid)) var(--accent-weight), var(--accent-mix));
 }
 .agent-epithet {
   font-size: 0.75rem;
   font-style: italic;
-  color: var(--agent-accent, var(--gold-mid));
-  opacity: 0.85;
   margin-bottom: 0.6rem;
 }
 .agent-card p {
   font-size: 0.8rem;
-  color: var(--gold-light);
-  opacity: 0.6;
+  color: var(--ink);
+  opacity: 0.78;
   margin: 0;
   line-height: 1.5;
 }
@@ -244,12 +246,11 @@
   text-transform: uppercase;
   letter-spacing: 0.12em;
   font-weight: 700;
-  filter: brightness(1.25);
 }
 .pipeline-caption {
   font-size: 0.82rem;
-  color: var(--gold-light);
-  opacity: 0.7;
+  color: var(--ink);
+  opacity: 0.82;
   font-style: italic;
   margin-top: 1.5rem;
   margin-left: auto;
@@ -294,24 +295,24 @@
 }
 .experience-icon p { margin: 0; line-height: 0; }
 .experience-icon svg { width: 1.5rem; height: 1.5rem; fill: currentColor; }
-.experience-card:hover .experience-icon { color: var(--gold-light); border-color: var(--gold-dark); }
+.experience-card:hover .experience-icon { color: var(--ink); border-color: var(--gold-dark); }
 .experience-card h3 {
   font-size: 1.1rem;
   font-weight: 700;
-  color: var(--gold-light) !important;
+  color: var(--ink) !important;
   margin: 0 0 0.6rem 0;
 }
 .experience-card p {
   font-size: 0.82rem;
-  color: var(--gold-light);
-  opacity: 0.6;
+  color: var(--ink);
+  opacity: 0.82;
   margin: 0;
   line-height: 1.6;
 }
 .experience-note {
   font-size: 0.8rem;
-  color: var(--gold-light);
-  opacity: 0.65;
+  color: var(--ink);
+  opacity: 0.82;
   margin-top: 1.5rem;
   font-style: italic;
 }
@@ -320,8 +321,8 @@
 .cta-section { padding: 4.5rem 2rem !important; }
 .cta-lead {
   font-size: clamp(0.9rem, 1.5vw, 1.1rem);
-  color: var(--gold-light);
-  opacity: 0.65;
+  color: var(--ink);
+  opacity: 0.82;
   margin-bottom: 1.5rem;
 }
 .cta-button { font-size: 0.9rem !important; min-width: 220px; }
@@ -330,7 +331,7 @@
 .landing-footer {
   width: 100vw;
   margin-left: calc(-50vw + 50%);
-  background: var(--obsidian);
+  background: var(--ground);
   border-top: 1px solid var(--glass-border);
   padding: 1.5rem 2rem;
   display: flex;
@@ -338,10 +339,10 @@
   align-items: center;
   gap: 1rem;
   font-size: 0.78rem;
-  color: var(--gold-light);
-  opacity: 0.5;
+  color: var(--ink);
+  opacity: 0.82;
 }
-.landing-footer a { color: var(--gold-light); opacity: 0.7; transition: opacity 0.2s; }
+.landing-footer a { color: var(--ink); opacity: 0.82; transition: opacity 0.2s; }
 .landing-footer a:hover { opacity: 1; }
 .landing-footer svg { vertical-align: middle; }
 
