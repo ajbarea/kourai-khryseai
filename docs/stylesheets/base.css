@@ -1,17 +1,17 @@
-/* Make the entire page background obsidian on the homepage */
+/* Page ground: obsidian in dark, parchment in light (tokens in variables.css). */
 [data-md-color-scheme="slate"] .md-main,
 .md-main {
-  background: var(--obsidian);
+  background: var(--ground);
   background-image: radial-gradient(circle at 50% top, color-mix(in srgb, var(--gold-dark) 5%, transparent), transparent 70%);
 }
 
 /* Navigation */
 .md-header {
-  background-color: color-mix(in srgb, var(--obsidian) 90%, transparent) !important;
+  background-color: color-mix(in srgb, var(--ground) 90%, transparent) !important;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid color-mix(in srgb, var(--gold-metallic) 10%, transparent) !important;
-  box-shadow: 0 1px 20px color-mix(in srgb, #000 50%, transparent);
+  box-shadow: 0 1px 20px var(--header-shadow);
 }
 
 body.hero-page .md-header {
@@ -23,7 +23,7 @@ body.hero-page .md-header {
 }
 
 .md-nav__link--active {
-  color: var(--gold-light) !important;
+  color: var(--link) !important;
   font-weight: 700 !important;
 }
 
@@ -51,7 +51,7 @@ body.hero-page .md-header {
 .md-typeset h1:not(.hero h1),
 .md-typeset h2 {
   font-weight: 800;
-  background: var(--gold-gradient);
+  background: var(--heading-gradient);
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -60,7 +60,7 @@ body.hero-page .md-header {
 }
 
 .md-typeset h3 {
-  color: var(--gold-light);
+  color: var(--ink-strong);
   font-weight: 800;
 }
 
@@ -71,12 +71,12 @@ body.hero-page .md-header {
 }
 
 .md-typeset a {
-  color: var(--gold-light);
+  color: var(--link);
   transition: color 0.2s ease;
 }
 
 .md-typeset a:hover {
-  color: #fff;
+  color: var(--link-hover);
 }
 
 .md-typeset hr {
@@ -96,7 +96,7 @@ body.hero-page .md-header {
 
 .md-typeset table:not([class]) th {
   background: color-mix(in srgb, var(--gold-mid) 12%, transparent);
-  color: var(--gold-light);
+  color: var(--ink-strong);
   font-weight: 700;
   padding: 0.6rem 0.8rem;
   border-bottom: 2px solid var(--gold-dark);
@@ -113,7 +113,7 @@ body.hero-page .md-header {
 
 /* Code blocks */
 .md-typeset code {
-  color: var(--gold-light);
+  color: var(--code-ink);
   background: color-mix(in srgb, var(--gold-mid) 8%, transparent);
   border-radius: 3px;
   padding: 0.1em 0.3em;
@@ -143,16 +143,16 @@ body.hero-page .md-header {
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--obsidian);
+  background: var(--ground);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--gold-light) 30%, transparent);
+  background: color-mix(in srgb, var(--ink) 30%, transparent);
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--gold-light);
+  background: var(--ink);
 }
 
 /* Responsive tables and grid */
@@ -204,5 +204,5 @@ body.hero-page .md-header {
   vertical-align: -0.18em;
   margin: 0 0.15rem;
   opacity: 0.75;
-  filter: invert(1);
+  filter: var(--brand-mark-filter);
 }
