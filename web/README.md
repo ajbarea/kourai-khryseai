@@ -2,7 +2,7 @@
 
 A browser GUI host for Kourai Khryseai, served **same-origin by the host gateway** (the evolved
 `vn_bridge`) so there's no CORS or mixed-content problem at runtime. Full design:
-[`docs/architecture/2026-06-14-web-gui-scope.md`](../docs/architecture/2026-06-14-web-gui-scope.md).
+[`design/2026-06-14-web-gui-scope.md`](../design/2026-06-14-web-gui-scope.md).
 
 ## Status — M4 (projects + worktrees)
 

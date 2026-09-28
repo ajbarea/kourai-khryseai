@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.12, httpx + tenacity (HTTP), rapidfuzz (title fuzzy match), docling (PDF→Markdown, Apache 2.0), pydantic (frontmatter schema), pyyaml (frontmatter parsing), pytest + hypothesis + pytest-recording/vcrpy (testing). Reuses kourai's existing `chat_with_tools` agent loop.
 
-**Spec reference:** [`docs/architecture/2026-05-23-aletheia-v2-citation-verification-design.md`](./2026-05-23-aletheia-v2-citation-verification-design.md)
+**Spec reference:** [`docs/architecture/2026-05-23-aletheia-v2-citation-verification-design.md`](2026-05-23-aletheia-v2-citation-verification-design.md)
 
 ---
 
@@ -3239,7 +3239,7 @@ citations across 53 published papers. The 5 errors caught in vFL PR #36's
 manual audit are the same failure mode at smaller scale.
 
 The full design rationale lives in
-[2026-05-23-aletheia-v2-citation-verification-design.md](../architecture/2026-05-23-aletheia-v2-citation-verification-design.md).
+[2026-05-23-aletheia-v2-citation-verification-design.md](2026-05-23-aletheia-v2-citation-verification-design.md).
 
 ## How to use
 

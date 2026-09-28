@@ -52,9 +52,9 @@ A typical development pipeline runs `hephaestus → metis → techne → dokimas
 
 | Tier | Anthropic | Google (paid) |
 |---|---|---|
-| `cheap` | ~$0.05 | ~$0.005 |
-| `standard` | ~$0.25–$0.40 | ~$0.10–$0.20 |
-| `smart` | ~$0.40–$0.70 | ~$0.10–$0.20 |
+| `cheap` | ~\$0.05 | ~\$0.005 |
+| `standard` | ~\$0.25–\$0.40 | ~\$0.10–\$0.20 |
+| `smart` | ~\$0.40–\$0.70 | ~\$0.10–\$0.20 |
 
 Companion/validator calls add minimal cost — Puck and Aidos use Haiku across all tiers.
 

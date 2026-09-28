@@ -994,9 +994,9 @@ adaptation to different data from adaptation to a different analyst. See
 
 Task-by-task implementation plans for the first phases:
 
-- [Sub-Plan 01 — Memoir Foundation](plan-01-memoir-foundation.md) (the
+- [Sub-Plan 01 — Memoir Foundation](https://github.com/ajbarea/kourai-khryseai/blob/main/design/federated-forge/plan-01-memoir-foundation.md) (the
   `kourai_common.federation` library; Phase 1)
-- [Sub-Plan 02 — CLI Host Integration](plan-02-cli-host-integration.md)
+- [Sub-Plan 02 — CLI Host Integration](https://github.com/ajbarea/kourai-khryseai/blob/main/design/federated-forge/plan-02-cli-host-integration.md)
   (CLI write paths into the ledger; Phase 1 → 2)
 
 Supporting specs: [Pharos](./pharos-testbed.md) is the labeled testbed the

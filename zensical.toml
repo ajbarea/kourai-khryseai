@@ -48,7 +48,11 @@ nav = [
       { "Overview" = "research/index.md" },
       { "CHAI 2026 — Narrative Interfaces" = "research/chai-2026-narrative-interfaces/index.md" },
       { "NE Agents Day 2026" = "research/ne-agents-day-2026/index.md" },
-      { "Federated Analyst Fleets" = "research/federated-forge/index.md" },
+      { "Federated Analyst Fleets" = [
+          { "Overview" = "research/federated-forge/index.md" },
+          { "Pharos testbed" = "research/federated-forge/pharos-testbed.md" },
+          { "Deferred scope" = "research/federated-forge/future-work.md" },
+      ]},
   ]},
 ]
 

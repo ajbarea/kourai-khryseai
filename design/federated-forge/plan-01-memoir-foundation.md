@@ -2,7 +2,7 @@
 
 > **Terminology note (2026-07-15).** This plan predates the spec's
 > analyst-fleet reframing and uses the retired game vocabulary. Read it
-> with the mapping from the [design spec](./index.md): player → analyst ·
+> with the mapping from the [design spec](../../docs/research/federated-forge/index.md): player → analyst ·
 > forge → deployment · council adapter → shared adapter · bond adapter →
 > personal adapter. Code identifiers (`shared_eligible`, `PlayerResponse`,
 > etc.) are unchanged.
@@ -15,7 +15,7 @@
 
 **Tech Stack:** Python 3.12, pydantic v2 (already transitively pulled via a2a-sdk; promoted to explicit dep in this plan), pytest 9, hatchling build backend.
 
-**Spec reference:** [`docs/research/federated-forge/index.md`](./index.md) — see the Forge Memoir section for the schema, the shared/personal split table for the gameplay rules, and Phase 1 of the phasing list for scope.
+**Spec reference:** [`docs/research/federated-forge/index.md`](../../docs/research/federated-forge/index.md) — see the Forge Memoir section for the schema, the shared/personal split table for the gameplay rules, and Phase 1 of the phasing list for scope.
 
 ---
 

@@ -36,7 +36,7 @@ citations across 53 published papers. The 5 errors caught in vFL PR #36's
 manual audit are the same failure mode at smaller scale.
 
 The full design rationale lives in
-[2026-05-23-aletheia-v2-citation-verification-design.md](../architecture/2026-05-23-aletheia-v2-citation-verification-design.md).
+[2026-05-23-aletheia-v2-citation-verification-design.md](https://github.com/ajbarea/kourai-khryseai/blob/main/design/2026-05-23-aletheia-v2-citation-verification-design.md).
 
 ## How to use
 

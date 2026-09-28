@@ -5,8 +5,8 @@ budget for the original session was nearly exhausted; a fresh session
 should pick up from here.
 
 **Companion docs**:
-- Spec: [`2026-05-23-aletheia-v2-citation-verification-design.md`](./2026-05-23-aletheia-v2-citation-verification-design.md)
-- Plan: [`2026-05-23-aletheia-v2-implementation-plan.md`](./2026-05-23-aletheia-v2-implementation-plan.md)
+- Spec: [`2026-05-23-aletheia-v2-citation-verification-design.md`](2026-05-23-aletheia-v2-citation-verification-design.md)
+- Plan: [`2026-05-23-aletheia-v2-implementation-plan.md`](2026-05-23-aletheia-v2-implementation-plan.md)
 
 ---
 
