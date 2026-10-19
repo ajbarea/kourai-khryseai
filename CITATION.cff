@@ -5,7 +5,7 @@ message: >-
 title: "Kourai Khryseai: Transparent Human-on-the-Loop Multi-Agent Software Development"
 type: software
 authors:
-  - given-names: Arnaldo
+  - given-names: AJ
     family-names: Barea
     affiliation: Rochester Institute of Technology
     email: ajb6289@rit.edu
@@ -42,8 +42,9 @@ preferred-citation:
   type: conference-paper
   title: "Kourai Khryseai: Transparent Human-on-the-Loop Multi-Agent Software Development"
   authors:
-    - given-names: Arnaldo
+    - given-names: AJ
       family-names: Barea
+      orcid: "https://orcid.org/0009-0001-7938-2376"
       affiliation: Rochester Institute of Technology
       email: ajb6289@rit.edu
   collection-title: "North-East AI Agents Day 2026"

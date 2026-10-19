@@ -449,7 +449,7 @@ cite the NE AI Agents Day 2026 poster + extended abstract:
 
 ```bibtex
 @inproceedings{barea2026kourai,
-  author    = {Arnaldo Barea},
+  author    = {AJ Barea},
   title     = {Kourai Khryseai: Transparent Human-on-the-Loop Multi-Agent Software Development},
   booktitle = {North-East AI Agents Day 2026},
   address   = {New York, NY, USA},
