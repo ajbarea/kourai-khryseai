@@ -253,16 +253,30 @@ body.hero-page .md-content__inner {
   .hero-subtitle { font-size: 1.3rem; }
 }
 
-/* On parchment the black halo reads as dirt: a soft bronze glow instead. */
-[data-md-color-scheme="default"] .hero h1,
-[data-md-color-scheme="default"] .md-typeset .hero h1 {
-  filter: drop-shadow(0 1px 0 color-mix(in srgb, #fff 80%, transparent))
-    drop-shadow(0 2px 10px color-mix(in srgb, var(--gold-mid) 35%, transparent));
-  animation: none;
+/* The hero carries data-md-color-scheme="slate" (index.md), so in light mode it stays
+   the dark theme's obsidian band: full-bleed, opaque, header and page stay parchment. */
+[data-md-color-scheme="default"] {
+  --page-ground: var(--ground); /* resolved here, so it still names parchment inside the hero */
 }
-[data-md-color-scheme="default"] .hero-subtitle {
-  text-shadow: 0 0 6px var(--ground), 0 0 14px var(--ground);
-  font-weight: 500;
+[data-md-color-scheme="default"] .hero {
+  background-color: var(--ground);
+  /* Full-bleed by painting, not by width, so the hero's own layout is unchanged. */
+  box-shadow: 0 0 0 100vmax var(--ground);
+  clip-path: inset(0 -100vmax 1px); /* 1px: hides the sub-pixel shadow seam under the fade */
+  overflow: visible;
+}
+/* Over the band the translucent header would turn grey. */
+body[data-md-color-scheme="default"].hero-page .md-header {
+  background-color: var(--ground) !important;
+}
+/* The band's bottom edge fades into the parchment page instead of a hard line. */
+[data-md-color-scheme="default"] .hero::after {
+  content: "";
+  position: absolute;
+  inset: auto -100vmax 0;
+  height: clamp(4rem, 12vh, 9rem);
+  background: linear-gradient(to bottom, transparent, var(--page-ground));
+  pointer-events: none;
 }
 
 /* The hero title is a banner, not a section to link to. */
