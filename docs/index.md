@@ -6,7 +6,7 @@ hide:
   - footer
 ---
 
-<div class="hero" markdown>
+<div class="hero" data-md-color-scheme="slate" markdown>
 
 # KOURAI KHRYSEAI
 
