@@ -30,7 +30,8 @@ body.hero-page .md-content__inner {
 }
 
 /* The image and its overlays live on one layer so the mask can fade the image's own
-   edges into the ground; the mask is a square SVG sized and placed like the image. */
+   edges into the ground. The mask is a square SVG sized and placed like the image,
+   so it lines up only while the image stays square. */
 .hero::before {
   content: "";
   position: absolute;
@@ -44,6 +45,7 @@ body.hero-page .md-content__inner {
       color-mix(in srgb, var(--ground) 80%, transparent) 80%,
       var(--ground) 100%),
     var(--hero-bg-image) center 48px / contain no-repeat;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Cdefs%3E%3ClinearGradient id='x'%3E%3Cstop offset='0' stop-opacity='0'/%3E%3Cstop offset='.03' stop-opacity='.25'/%3E%3Cstop offset='.06' stop-opacity='.7'/%3E%3Cstop offset='.09'/%3E%3Cstop offset='.91'/%3E%3Cstop offset='.94' stop-opacity='.7'/%3E%3Cstop offset='.97' stop-opacity='.25'/%3E%3Cstop offset='1' stop-opacity='0'/%3E%3C/linearGradient%3E%3ClinearGradient id='y' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23000'/%3E%3Cstop offset='.06' stop-color='%23fff'/%3E%3Cstop offset='.91' stop-color='%23fff'/%3E%3Cstop offset='1' stop-color='%23000'/%3E%3C/linearGradient%3E%3Cmask id='m'%3E%3Crect width='1' height='1' fill='url(%23y)'/%3E%3C/mask%3E%3C/defs%3E%3Crect width='1' height='1' fill='url(%23x)' mask='url(%23m)'/%3E%3C/svg%3E") center 48px / contain no-repeat;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Cdefs%3E%3ClinearGradient id='x'%3E%3Cstop offset='0' stop-opacity='0'/%3E%3Cstop offset='.03' stop-opacity='.25'/%3E%3Cstop offset='.06' stop-opacity='.7'/%3E%3Cstop offset='.09'/%3E%3Cstop offset='.91'/%3E%3Cstop offset='.94' stop-opacity='.7'/%3E%3Cstop offset='.97' stop-opacity='.25'/%3E%3Cstop offset='1' stop-opacity='0'/%3E%3C/linearGradient%3E%3ClinearGradient id='y' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23000'/%3E%3Cstop offset='.06' stop-color='%23fff'/%3E%3Cstop offset='.91' stop-color='%23fff'/%3E%3Cstop offset='1' stop-color='%23000'/%3E%3C/linearGradient%3E%3Cmask id='m'%3E%3Crect width='1' height='1' fill='url(%23y)'/%3E%3C/mask%3E%3C/defs%3E%3Crect width='1' height='1' fill='url(%23x)' mask='url(%23m)'/%3E%3C/svg%3E") center 48px / contain no-repeat;
 }
 
