@@ -145,6 +145,17 @@ one the same way.
 
 - **Avoid:** a finger to the lips ("shh"), sleepiness, a halo, dark or gloomy styling.
 
+## Athena, Strategist of the Forge
+
+- **Upload with the prompt:** `hephaestus_neutral.png` (framing), `metis_neutral.png`, `mneme_neutral.png` (the golden automaton maidens)
+- **Accent:** olive `#7A8B3C` (the olive tree she gave Athens)
+- **Role:** the orchestrator's other face (klepsydra#222): she and Hephaestus take turns running the fleet. Kept here as generated: 1254 px PNG, chosen 2026-10-30.
+- **Character block:**
+
+> A strikingly beautiful goddess-automaton in her late twenties, one of Hephaestus's golden maidens: smooth burnished-gold skin with fine filigree seams at the jaw, collarbone and wrists, and elegant mechanical joints at the elbows and fingers, like the attached Metis and Mneme. Sharp luminous grey eyes with a smouldering, direct gaze at the viewer, a sly confident half-smile, one brow faintly raised, head tilted slightly. High sculpted cheekbones. Long glossy black hair, half up under a slim gold olive-leaf circlet, the rest falling in loose waves over the near shoulder. A fitted one-shoulder peplos of deep olive (#7A8B3C) silk with gold meander trim, baring the near shoulder and collarbone, a gold cuff on the upper arm, and a cream himation draped low across the back. Athena is the goddess of weaving and strategy: from the fingertips of her raised hand run fine glowing olive threads that weave between three small floating translucent panels, star charts of the forge's plan, like Metis's floating blueprints. A small silver owl perches on a gold perch-ring at her far shoulder. Graceful, poised, in command, a little dangerous.
+
+- **Avoid:** matronly, severe, stern, older, plain human skin, stiff pose, large flat tablet or board, helmet, spear, shield, aegis, armour, battle pose, nudity.
+
 ## After the art exists
 
 1. You drop the eight PNGs (neutral + transparent) somewhere I can read.
