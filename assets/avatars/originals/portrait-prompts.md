@@ -163,7 +163,7 @@ one the same way.
 
 ## Redraws, 2026-11-01
 
-On 2026-11-01 AJ replaced five portraits. The 2026-10-20 originals stay in this folder as `<name>-2026-10-20.jpg`; `<name>.jpg` is the current one. The prompts below name files as they were in AJ's working folder: `<name>_current.jpg` is now `<name>-2026-10-20.jpg`, and `*_neutral.png` are in `../vn/`.
+On 2026-11-01 AJ replaced five portraits. The 2026-10-20 originals stay in this folder as `<name>-2026-10-20.jpg`; `<name>.jpg` is the current one. The prompts below name files as they were in AJ's working folder: `<name>_current.jpg` is now `<name>-2026-10-20.jpg`, and `*_neutral.png` are in `../vn/`. `Gemini_Generated_Image_hoypalhoypalhoyp.jpg` was Hesychia's round 1 and was not kept.
 
 - **Hesychia** was redrawn because she and Elpis read as one face: both briefs said "dark hair loosely bound" and both were made from the same references (Hephaestus, Aletheia, Kallos). The new brief attaches Hephaestus for framing only. AJ picked round 3 from Gemini. Her three prompts follow in order.
 - **Argos, Chronos, Elpis and Hermes** were re-prompted from their own portraits to match the first ten's rendering: plain warm grey background, no gold glow, natural skin. Chronos lost the zodiac ring. Each re-prompt follows.
