@@ -1,0 +1,2632 @@
+{
+ "ajdl-sq": {
+  "video": "takes/ajdl.mp4",
+  "src_size": [
+   1080,
+   1080
+  ],
+  "scored_size": [
+   640,
+   640
+  ],
+  "fps": 30.0,
+  "frames": 182,
+  "duration_s": 6.067,
+  "crop": "608:608:236:236",
+  "registration_mid": {
+   "scale": 1.0,
+   "dy": 0,
+   "dx": 0,
+   "mad": 13.24
+  },
+  "zoom_track": [
+   [
+    0.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    0.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    1.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    1.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    2.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    2.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    3.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    3.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    4.0,
+    1.0,
+    1,
+    0
+   ],
+   [
+    4.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    5.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    5.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    6.0,
+    1.0,
+    0,
+    0
+   ]
+  ],
+  "frame0_vs_portrait_mad": 7.51,
+  "frame0_vs_portrait_ssim": 0.8914,
+  "seam_last_vs_first_mad": 7.94,
+  "d0_minima": [
+   [
+    2.767,
+    6.97
+   ],
+   [
+    2.9,
+    7.84
+   ],
+   [
+    3.2,
+    10.16
+   ],
+   [
+    3.7,
+    7.1
+   ],
+   [
+    4.4,
+    11.45
+   ],
+   [
+    5.2,
+    7.18
+   ]
+  ],
+  "d0_max": 15.66,
+  "best_loop": {
+   "start_s": 2.733,
+   "end_s": 5.133,
+   "period_s": 2.4,
+   "mad": 5.69,
+   "window_mad": 5.73,
+   "start_frame": 82,
+   "end_frame": 154
+  },
+  "centroid_range_pct_w": [
+   1.61,
+   1.38
+  ],
+  "torso_shift_px_range": [
+   14,
+   0
+  ],
+  "torso_shift_pct_w": 2.19,
+  "head_shift_px_range": [
+   12,
+   0
+  ],
+  "face_mad": {
+   "frame0": 12.06,
+   "mean": 18.73,
+   "worst": 36.08
+  },
+  "face_ssim": {
+   "frame0": 0.8282,
+   "mean": 0.6346,
+   "worst": 0.2254
+  },
+  "eye_mad_median": 19.05,
+  "blinks": [
+   {
+    "start_s": 0.667,
+    "frames": 1,
+    "ms": 33,
+    "peak_mad": 32.1
+   },
+   {
+    "start_s": 0.767,
+    "frames": 57,
+    "ms": 1900,
+    "peak_mad": 58.5
+   },
+   {
+    "start_s": 2.7,
+    "frames": 2,
+    "ms": 67,
+    "peak_mad": 31.6
+   }
+  ],
+  "bg_motion_vs_mid": {
+   "mean": 1.72,
+   "max": 2.5
+  },
+  "bg_vs_portrait_max": 5.82
+ },
+ "ajdl-tall": {
+  "video": "takes/ajdl.mp4",
+  "src_size": [
+   1080,
+   1080
+  ],
+  "scored_size": [
+   384,
+   640
+  ],
+  "fps": 30.0,
+  "frames": 182,
+  "duration_s": 6.067,
+  "crop": "365:608:460:236",
+  "registration_mid": {
+   "scale": 1.0,
+   "dy": -2,
+   "dx": 0,
+   "mad": 16.94
+  },
+  "zoom_track": [
+   [
+    0.0,
+    1.0,
+    0,
+    -1
+   ],
+   [
+    0.5,
+    1.01,
+    1,
+    -1
+   ],
+   [
+    1.0,
+    1.02,
+    4,
+    -1
+   ],
+   [
+    1.5,
+    1.02,
+    7,
+    -1
+   ],
+   [
+    2.0,
+    1.02,
+    5,
+    -2
+   ],
+   [
+    2.5,
+    1.01,
+    1,
+    -1
+   ],
+   [
+    3.0,
+    1.0,
+    -2,
+    -1
+   ],
+   [
+    3.5,
+    1.0,
+    -1,
+    -1
+   ],
+   [
+    4.0,
+    1.0,
+    1,
+    -1
+   ],
+   [
+    4.5,
+    1.01,
+    2,
+    -1
+   ],
+   [
+    5.0,
+    1.0,
+    0,
+    -1
+   ],
+   [
+    5.5,
+    1.0,
+    -1,
+    -1
+   ],
+   [
+    6.0,
+    1.0,
+    0,
+    -1
+   ]
+  ],
+  "frame0_vs_portrait_mad": 9.77,
+  "frame0_vs_portrait_ssim": 0.8178,
+  "seam_last_vs_first_mad": 10.99,
+  "d0_minima": [
+   [
+    2.033,
+    17.66
+   ],
+   [
+    2.767,
+    9.94
+   ],
+   [
+    2.9,
+    10.71
+   ],
+   [
+    3.367,
+    13.16
+   ],
+   [
+    3.533,
+    11.41
+   ],
+   [
+    3.733,
+    10.05
+   ],
+   [
+    4.4,
+    14.94
+   ],
+   [
+    4.867,
+    13.0
+   ]
+  ],
+  "d0_max": 18.8,
+  "best_loop": {
+   "start_s": 2.733,
+   "end_s": 5.133,
+   "period_s": 2.4,
+   "mad": 8.24,
+   "window_mad": 8.21,
+   "start_frame": 82,
+   "end_frame": 154
+  },
+  "centroid_range_pct_w": [
+   1.84,
+   2.55
+  ],
+  "torso_shift_px_range": [
+   14,
+   0
+  ],
+  "torso_shift_pct_w": 3.65,
+  "head_shift_px_range": [
+   12,
+   1
+  ],
+  "face_mad": {
+   "frame0": 13.96,
+   "mean": 20.13,
+   "worst": 36.59
+  },
+  "face_ssim": {
+   "frame0": 0.7763,
+   "mean": 0.5951,
+   "worst": 0.2114
+  },
+  "eye_mad_median": 19.81,
+  "blinks": [
+   {
+    "start_s": 0.667,
+    "frames": 1,
+    "ms": 33,
+    "peak_mad": 32.7
+   },
+   {
+    "start_s": 0.767,
+    "frames": 57,
+    "ms": 1900,
+    "peak_mad": 58.3
+   },
+   {
+    "start_s": 2.7,
+    "frames": 2,
+    "ms": 67,
+    "peak_mad": 32.2
+   }
+  ],
+  "bg_motion_vs_mid": {
+   "mean": 3.68,
+   "max": 4.97
+  },
+  "bg_vs_portrait_max": 8.27
+ },
+ "eyes": {
+  "synth": {
+   "blinks": [],
+   "lum_rise_max": 0.2
+  },
+  "take1": {
+   "blinks": [
+    {
+     "start_s": 1.292,
+     "end_s": 2.167,
+     "ms": 875
+    }
+   ],
+   "lum_rise_max": 14.1
+  },
+  "take2": {
+   "blinks": [
+    {
+     "start_s": 1.292,
+     "end_s": 2.167,
+     "ms": 875
+    }
+   ],
+   "lum_rise_max": 12.6
+  },
+  "take3": {
+   "blinks": [],
+   "lum_rise_max": 3.5
+  },
+  "take4": {
+   "blinks": [],
+   "lum_rise_max": 4.9
+  },
+  "take5": {
+   "blinks": [],
+   "lum_rise_max": 2.9
+  },
+  "take6": {
+   "blinks": [],
+   "lum_rise_max": 3.2
+  }
+ },
+ "loop-take1-lit-square": {
+  "video": "out/heph-idle-take1-lit-square.mp4",
+  "src_size": [
+   640,
+   640
+  ],
+  "scored_size": [
+   640,
+   640
+  ],
+  "fps": 24.0,
+  "frames": 62,
+  "duration_s": 2.583,
+  "crop": "640:640:0:0",
+  "registration_mid": {
+   "scale": 1.0,
+   "dy": 0,
+   "dx": 0,
+   "mad": 13.73
+  },
+  "zoom_track": [
+   [
+    0.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    0.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    1.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    1.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    2.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    2.5,
+    1.0,
+    0,
+    0
+   ]
+  ],
+  "frame0_vs_portrait_mad": 11.43,
+  "frame0_vs_portrait_ssim": 0.7866,
+  "seam_last_vs_first_mad": 3.14,
+  "d0_minima": [],
+  "d0_max": 12.54,
+  "best_loop": {
+   "start_s": 0.083,
+   "end_s": 2.458,
+   "period_s": 2.375,
+   "mad": 6.2,
+   "window_mad": 6.15,
+   "start_frame": 2,
+   "end_frame": 59
+  },
+  "centroid_range_pct_w": [
+   0.88,
+   0.73
+  ],
+  "torso_shift_px_range": [
+   4,
+   0
+  ],
+  "torso_shift_pct_w": 0.62,
+  "head_shift_px_range": [
+   6,
+   0
+  ],
+  "face_mad": {
+   "frame0": 11.83,
+   "mean": 13.13,
+   "worst": 17.06
+  },
+  "face_ssim": {
+   "frame0": 0.8264,
+   "mean": 0.7882,
+   "worst": 0.6596
+  },
+  "eye_mad_median": 16.56,
+  "blinks": [],
+  "bg_motion_vs_mid": {
+   "mean": 1.19,
+   "max": 2.09
+  },
+  "bg_vs_portrait_max": 4.21
+ },
+ "loop-take1-square": {
+  "video": "out/heph-idle-take1-square.mp4",
+  "src_size": [
+   640,
+   640
+  ],
+  "scored_size": [
+   640,
+   640
+  ],
+  "fps": 24.0,
+  "frames": 62,
+  "duration_s": 2.583,
+  "crop": "640:640:0:0",
+  "registration_mid": {
+   "scale": 1.0,
+   "dy": 0,
+   "dx": 0,
+   "mad": 13.6
+  },
+  "zoom_track": [
+   [
+    0.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    0.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    1.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    1.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    2.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    2.5,
+    1.0,
+    0,
+    0
+   ]
+  ],
+  "frame0_vs_portrait_mad": 11.67,
+  "frame0_vs_portrait_ssim": 0.7823,
+  "seam_last_vs_first_mad": 3.1,
+  "d0_minima": [],
+  "d0_max": 12.7,
+  "best_loop": {
+   "start_s": 0.083,
+   "end_s": 2.458,
+   "period_s": 2.375,
+   "mad": 6.36,
+   "window_mad": 6.36,
+   "start_frame": 2,
+   "end_frame": 59
+  },
+  "centroid_range_pct_w": [
+   0.68,
+   0.54
+  ],
+  "torso_shift_px_range": [
+   5,
+   0
+  ],
+  "torso_shift_pct_w": 0.78,
+  "head_shift_px_range": [
+   6,
+   0
+  ],
+  "face_mad": {
+   "frame0": 11.67,
+   "mean": 12.96,
+   "worst": 16.99
+  },
+  "face_ssim": {
+   "frame0": 0.8289,
+   "mean": 0.7917,
+   "worst": 0.6614
+  },
+  "eye_mad_median": 16.25,
+  "blinks": [],
+  "bg_motion_vs_mid": {
+   "mean": 1.38,
+   "max": 2.43
+  },
+  "bg_vs_portrait_max": 4.14
+ },
+ "loop-take4-square": {
+  "video": "out/heph-idle-take4-square.mp4",
+  "src_size": [
+   640,
+   640
+  ],
+  "scored_size": [
+   640,
+   640
+  ],
+  "fps": 24.0,
+  "frames": 84,
+  "duration_s": 3.5,
+  "crop": "640:640:0:0",
+  "registration_mid": {
+   "scale": 1.0,
+   "dy": 0,
+   "dx": 0,
+   "mad": 14.95
+  },
+  "zoom_track": [
+   [
+    0.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    0.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    1.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    1.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    2.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    2.5,
+    1.0,
+    0,
+    1
+   ],
+   [
+    3.0,
+    1.0,
+    0,
+    0
+   ]
+  ],
+  "frame0_vs_portrait_mad": 12.09,
+  "frame0_vs_portrait_ssim": 0.744,
+  "seam_last_vs_first_mad": 3.28,
+  "d0_minima": [
+   [
+    1.75,
+    7.59
+   ]
+  ],
+  "d0_max": 14.79,
+  "best_loop": {
+   "start_s": 0.083,
+   "end_s": 3.375,
+   "period_s": 3.292,
+   "mad": 7.22,
+   "window_mad": 7.32,
+   "start_frame": 2,
+   "end_frame": 81
+  },
+  "centroid_range_pct_w": [
+   0.7,
+   0.58
+  ],
+  "torso_shift_px_range": [
+   10,
+   1
+  ],
+  "torso_shift_pct_w": 1.56,
+  "head_shift_px_range": [
+   10,
+   2
+  ],
+  "face_mad": {
+   "frame0": 15.54,
+   "mean": 23.26,
+   "worst": 28.87
+  },
+  "face_ssim": {
+   "frame0": 0.7278,
+   "mean": 0.4768,
+   "worst": 0.3233
+  },
+  "eye_mad_median": 38.08,
+  "blinks": [],
+  "bg_motion_vs_mid": {
+   "mean": 1.6,
+   "max": 2.3
+  },
+  "bg_vs_portrait_max": 3.3
+ },
+ "synth-sq": {
+  "video": "takes/synth.mp4",
+  "src_size": [
+   1920,
+   1080
+  ],
+  "scored_size": [
+   640,
+   640
+  ],
+  "fps": 24.0,
+  "frames": 144,
+  "duration_s": 6.0,
+  "crop": "1080:1080:420:0",
+  "registration_mid": {
+   "scale": 1.0,
+   "dy": -1,
+   "dx": 0,
+   "mad": 2.84
+  },
+  "zoom_track": [
+   [
+    0.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    0.5,
+    1.0,
+    5,
+    0
+   ],
+   [
+    1.0,
+    1.0,
+    5,
+    0
+   ],
+   [
+    1.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    2.0,
+    1.0,
+    -5,
+    0
+   ],
+   [
+    2.5,
+    1.0,
+    -6,
+    0
+   ],
+   [
+    3.0,
+    1.0,
+    -1,
+    0
+   ],
+   [
+    3.5,
+    1.0,
+    5,
+    0
+   ],
+   [
+    4.0,
+    1.0,
+    5,
+    0
+   ],
+   [
+    4.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    5.0,
+    1.0,
+    -5,
+    0
+   ],
+   [
+    5.5,
+    1.0,
+    -6,
+    0
+   ]
+  ],
+  "frame0_vs_portrait_mad": 2.38,
+  "frame0_vs_portrait_ssim": 0.9923,
+  "seam_last_vs_first_mad": 6.14,
+  "d0_minima": [
+   [
+    1.5,
+    0.2
+   ],
+   [
+    2.208,
+    15.04
+   ],
+   [
+    2.333,
+    15.04
+   ],
+   [
+    2.458,
+    15.04
+   ],
+   [
+    2.583,
+    13.77
+   ],
+   [
+    3.083,
+    0.24
+   ],
+   [
+    3.583,
+    14.04
+   ],
+   [
+    3.792,
+    15.36
+   ]
+  ],
+  "d0_max": 15.36,
+  "best_loop": {
+   "start_s": 2.75,
+   "end_s": 5.75,
+   "period_s": 3.0,
+   "mad": 0.07,
+   "window_mad": 0.07,
+   "start_frame": 66,
+   "end_frame": 138
+  },
+  "centroid_range_pct_w": [
+   0.08,
+   1.36
+  ],
+  "torso_shift_px_range": [
+   12,
+   0
+  ],
+  "torso_shift_pct_w": 1.88,
+  "head_shift_px_range": [
+   12,
+   0
+  ],
+  "face_mad": {
+   "frame0": 3.04,
+   "mean": 4.33,
+   "worst": 6.13
+  },
+  "face_ssim": {
+   "frame0": 0.9888,
+   "mean": 0.9741,
+   "worst": 0.9488
+  },
+  "eye_mad_median": 5.57,
+  "blinks": [],
+  "bg_motion_vs_mid": {
+   "mean": 0.13,
+   "max": 0.24
+  },
+  "bg_vs_portrait_max": 1.97
+ },
+ "take1-sq": {
+  "video": "takes/take1.mp4",
+  "src_size": [
+   1920,
+   1080
+  ],
+  "scored_size": [
+   640,
+   640
+  ],
+  "fps": 24.0,
+  "frames": 144,
+  "duration_s": 6.0,
+  "crop": "1080:1080:420:0",
+  "registration_mid": {
+   "scale": 1.0,
+   "dy": 0,
+   "dx": 0,
+   "mad": 12.36
+  },
+  "zoom_track": [
+   [
+    0.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    0.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    1.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    1.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    2.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    2.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    3.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    3.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    4.0,
+    1.0,
+    1,
+    0
+   ],
+   [
+    4.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    5.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    5.5,
+    1.0,
+    0,
+    0
+   ]
+  ],
+  "frame0_vs_portrait_mad": 6.47,
+  "frame0_vs_portrait_ssim": 0.9058,
+  "seam_last_vs_first_mad": 8.12,
+  "d0_minima": [
+   [
+    2.75,
+    6.94
+   ],
+   [
+    3.708,
+    7.1
+   ],
+   [
+    4.375,
+    11.64
+   ],
+   [
+    5.208,
+    7.15
+   ]
+  ],
+  "d0_max": 15.79,
+  "best_loop": {
+   "start_s": 2.75,
+   "end_s": 5.208,
+   "period_s": 2.458,
+   "mad": 5.51,
+   "window_mad": 5.67,
+   "start_frame": 66,
+   "end_frame": 125
+  },
+  "centroid_range_pct_w": [
+   1.65,
+   1.33
+  ],
+  "torso_shift_px_range": [
+   14,
+   0
+  ],
+  "torso_shift_pct_w": 2.19,
+  "head_shift_px_range": [
+   13,
+   0
+  ],
+  "face_mad": {
+   "frame0": 12.17,
+   "mean": 18.88,
+   "worst": 36.17
+  },
+  "face_ssim": {
+   "frame0": 0.8239,
+   "mean": 0.6297,
+   "worst": 0.2252
+  },
+  "eye_mad_median": 19.33,
+  "blinks": [
+   {
+    "start_s": 0.667,
+    "frames": 1,
+    "ms": 42,
+    "peak_mad": 32.0
+   },
+   {
+    "start_s": 0.75,
+    "frames": 46,
+    "ms": 1917,
+    "peak_mad": 58.8
+   },
+   {
+    "start_s": 2.708,
+    "frames": 1,
+    "ms": 42,
+    "peak_mad": 32.0
+   }
+  ],
+  "bg_motion_vs_mid": {
+   "mean": 1.76,
+   "max": 2.49
+  },
+  "bg_vs_portrait_max": 4.08
+ },
+ "take1-tall": {
+  "video": "takes/take1.mp4",
+  "src_size": [
+   1920,
+   1080
+  ],
+  "scored_size": [
+   384,
+   640
+  ],
+  "fps": 24.0,
+  "frames": 144,
+  "duration_s": 6.0,
+  "crop": "648:1080:818:0",
+  "registration_mid": {
+   "scale": 1.0,
+   "dy": -2,
+   "dx": 0,
+   "mad": 15.81
+  },
+  "zoom_track": [
+   [
+    0.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    0.5,
+    1.0,
+    1,
+    0
+   ],
+   [
+    1.0,
+    1.01,
+    4,
+    0
+   ],
+   [
+    1.5,
+    1.02,
+    7,
+    -1
+   ],
+   [
+    2.0,
+    1.02,
+    5,
+    -1
+   ],
+   [
+    2.5,
+    1.01,
+    1,
+    0
+   ],
+   [
+    3.0,
+    1.0,
+    -2,
+    0
+   ],
+   [
+    3.5,
+    1.0,
+    -1,
+    0
+   ],
+   [
+    4.0,
+    1.0,
+    1,
+    0
+   ],
+   [
+    4.5,
+    1.01,
+    2,
+    -1
+   ],
+   [
+    5.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    5.5,
+    1.0,
+    -1,
+    0
+   ]
+  ],
+  "frame0_vs_portrait_mad": 7.59,
+  "frame0_vs_portrait_ssim": 0.8771,
+  "seam_last_vs_first_mad": 11.27,
+  "d0_minima": [
+   [
+    2.75,
+    9.95
+   ],
+   [
+    3.708,
+    10.08
+   ],
+   [
+    4.375,
+    15.15
+   ],
+   [
+    5.208,
+    10.05
+   ]
+  ],
+  "d0_max": 18.95,
+  "best_loop": {
+   "start_s": 2.792,
+   "end_s": 5.208,
+   "period_s": 2.417,
+   "mad": 8.06,
+   "window_mad": 8.1,
+   "start_frame": 67,
+   "end_frame": 125
+  },
+  "centroid_range_pct_w": [
+   1.81,
+   2.48
+  ],
+  "torso_shift_px_range": [
+   14,
+   0
+  ],
+  "torso_shift_pct_w": 3.65,
+  "head_shift_px_range": [
+   12,
+   1
+  ],
+  "face_mad": {
+   "frame0": 12.42,
+   "mean": 19.15,
+   "worst": 36.93
+  },
+  "face_ssim": {
+   "frame0": 0.8169,
+   "mean": 0.6219,
+   "worst": 0.1967
+  },
+  "eye_mad_median": 19.43,
+  "blinks": [
+   {
+    "start_s": 0.667,
+    "frames": 1,
+    "ms": 42,
+    "peak_mad": 32.2
+   },
+   {
+    "start_s": 0.75,
+    "frames": 46,
+    "ms": 1917,
+    "peak_mad": 58.6
+   },
+   {
+    "start_s": 2.708,
+    "frames": 1,
+    "ms": 42,
+    "peak_mad": 32.1
+   }
+  ],
+  "bg_motion_vs_mid": {
+   "mean": 3.65,
+   "max": 5.12
+  },
+  "bg_vs_portrait_max": 7.27
+ },
+ "take2-sq": {
+  "video": "takes/take2.mp4",
+  "src_size": [
+   1920,
+   1080
+  ],
+  "scored_size": [
+   640,
+   640
+  ],
+  "fps": 24.0,
+  "frames": 144,
+  "duration_s": 6.0,
+  "crop": "1080:1080:420:0",
+  "registration_mid": {
+   "scale": 1.0,
+   "dy": 0,
+   "dx": 0,
+   "mad": 7.71
+  },
+  "zoom_track": [
+   [
+    0.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    0.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    1.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    1.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    2.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    2.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    3.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    3.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    4.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    4.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    5.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    5.5,
+    1.0,
+    0,
+    0
+   ]
+  ],
+  "frame0_vs_portrait_mad": 6.14,
+  "frame0_vs_portrait_ssim": 0.9082,
+  "seam_last_vs_first_mad": 9.23,
+  "d0_minima": [
+   [
+    3.042,
+    5.25
+   ],
+   [
+    4.542,
+    6.64
+   ]
+  ],
+  "d0_max": 15.99,
+  "best_loop": {
+   "start_s": 0.25,
+   "end_s": 2.958,
+   "period_s": 2.708,
+   "mad": 3.84,
+   "window_mad": 4.55,
+   "start_frame": 6,
+   "end_frame": 71
+  },
+  "centroid_range_pct_w": [
+   0.98,
+   1.21
+  ],
+  "torso_shift_px_range": [
+   13,
+   0
+  ],
+  "torso_shift_pct_w": 2.03,
+  "head_shift_px_range": [
+   14,
+   0
+  ],
+  "face_mad": {
+   "frame0": 11.99,
+   "mean": 18.34,
+   "worst": 33.17
+  },
+  "face_ssim": {
+   "frame0": 0.8251,
+   "mean": 0.641,
+   "worst": 0.2594
+  },
+  "eye_mad_median": 19.52,
+  "blinks": [
+   {
+    "start_s": 0.667,
+    "frames": 55,
+    "ms": 2292,
+    "peak_mad": 53.0
+   },
+   {
+    "start_s": 3.0,
+    "frames": 1,
+    "ms": 42,
+    "peak_mad": 31.8
+   }
+  ],
+  "bg_motion_vs_mid": {
+   "mean": 0.78,
+   "max": 1.27
+  },
+  "bg_vs_portrait_max": 1.7
+ },
+ "take2-tall": {
+  "video": "takes/take2.mp4",
+  "src_size": [
+   1920,
+   1080
+  ],
+  "scored_size": [
+   384,
+   640
+  ],
+  "fps": 24.0,
+  "frames": 144,
+  "duration_s": 6.0,
+  "crop": "648:1080:818:0",
+  "registration_mid": {
+   "scale": 1.0,
+   "dy": 0,
+   "dx": 0,
+   "mad": 10.04
+  },
+  "zoom_track": [
+   [
+    0.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    0.5,
+    1.0,
+    2,
+    0
+   ],
+   [
+    1.0,
+    1.01,
+    6,
+    -1
+   ],
+   [
+    1.5,
+    1.03,
+    6,
+    -1
+   ],
+   [
+    2.0,
+    1.01,
+    7,
+    -1
+   ],
+   [
+    2.5,
+    1.01,
+    3,
+    -1
+   ],
+   [
+    3.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    3.5,
+    1.0,
+    -2,
+    0
+   ],
+   [
+    4.0,
+    1.0,
+    -2,
+    0
+   ],
+   [
+    4.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    5.0,
+    1.0,
+    1,
+    0
+   ],
+   [
+    5.5,
+    1.0,
+    1,
+    0
+   ]
+  ],
+  "frame0_vs_portrait_mad": 7.32,
+  "frame0_vs_portrait_ssim": 0.8793,
+  "seam_last_vs_first_mad": 12.41,
+  "d0_minima": [
+   [
+    1.667,
+    19.01
+   ],
+   [
+    1.75,
+    18.97
+   ],
+   [
+    3.042,
+    7.2
+   ],
+   [
+    4.583,
+    9.36
+   ]
+  ],
+  "d0_max": 19.04,
+  "best_loop": {
+   "start_s": 0.25,
+   "end_s": 2.958,
+   "period_s": 2.708,
+   "mad": 5.01,
+   "window_mad": 5.86,
+   "start_frame": 6,
+   "end_frame": 71
+  },
+  "centroid_range_pct_w": [
+   1.52,
+   2.51
+  ],
+  "torso_shift_px_range": [
+   13,
+   0
+  ],
+  "torso_shift_pct_w": 3.39,
+  "head_shift_px_range": [
+   14,
+   0
+  ],
+  "face_mad": {
+   "frame0": 12.28,
+   "mean": 18.51,
+   "worst": 33.35
+  },
+  "face_ssim": {
+   "frame0": 0.8174,
+   "mean": 0.636,
+   "worst": 0.253
+  },
+  "eye_mad_median": 19.5,
+  "blinks": [
+   {
+    "start_s": 0.667,
+    "frames": 55,
+    "ms": 2292,
+    "peak_mad": 53.1
+   },
+   {
+    "start_s": 3.0,
+    "frames": 1,
+    "ms": 42,
+    "peak_mad": 31.8
+   }
+  ],
+  "bg_motion_vs_mid": {
+   "mean": 1.17,
+   "max": 2.15
+  },
+  "bg_vs_portrait_max": 2.68
+ },
+ "take3-sq": {
+  "video": "takes/take3.mp4",
+  "src_size": [
+   1920,
+   1080
+  ],
+  "scored_size": [
+   640,
+   640
+  ],
+  "fps": 24.0,
+  "frames": 144,
+  "duration_s": 6.0,
+  "crop": "1080:1080:420:0",
+  "registration_mid": {
+   "scale": 1.0,
+   "dy": 0,
+   "dx": 0,
+   "mad": 15.61
+  },
+  "zoom_track": [
+   [
+    0.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    0.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    1.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    1.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    2.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    2.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    3.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    3.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    4.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    4.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    5.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    5.5,
+    1.0,
+    0,
+    0
+   ]
+  ],
+  "frame0_vs_portrait_mad": 6.39,
+  "frame0_vs_portrait_ssim": 0.9016,
+  "seam_last_vs_first_mad": 13.77,
+  "d0_minima": [
+   [
+    2.25,
+    15.38
+   ],
+   [
+    3.708,
+    8.48
+   ],
+   [
+    4.875,
+    7.58
+   ]
+  ],
+  "d0_max": 15.42,
+  "best_loop": {
+   "start_s": 0.958,
+   "end_s": 3.208,
+   "period_s": 2.25,
+   "mad": 7.73,
+   "window_mad": 7.94,
+   "start_frame": 23,
+   "end_frame": 77
+  },
+  "centroid_range_pct_w": [
+   1.5,
+   1.97
+  ],
+  "torso_shift_px_range": [
+   10,
+   0
+  ],
+  "torso_shift_pct_w": 1.56,
+  "head_shift_px_range": [
+   10,
+   0
+  ],
+  "face_mad": {
+   "frame0": 12.33,
+   "mean": 20.49,
+   "worst": 32.37
+  },
+  "face_ssim": {
+   "frame0": 0.8194,
+   "mean": 0.5847,
+   "worst": 0.2564
+  },
+  "eye_mad_median": 26.65,
+  "blinks": [
+   {
+    "start_s": 1.667,
+    "frames": 36,
+    "ms": 1500,
+    "peak_mad": 49.4
+   },
+   {
+    "start_s": 3.208,
+    "frames": 1,
+    "ms": 42,
+    "peak_mad": 44.1
+   }
+  ],
+  "bg_motion_vs_mid": {
+   "mean": 3.23,
+   "max": 4.49
+  },
+  "bg_vs_portrait_max": 4.42
+ },
+ "take3-tall": {
+  "video": "takes/take3.mp4",
+  "src_size": [
+   1920,
+   1080
+  ],
+  "scored_size": [
+   384,
+   640
+  ],
+  "fps": 24.0,
+  "frames": 144,
+  "duration_s": 6.0,
+  "crop": "648:1080:818:0",
+  "registration_mid": {
+   "scale": 1.01,
+   "dy": 3,
+   "dx": -1,
+   "mad": 19.0
+  },
+  "zoom_track": [
+   [
+    0.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    0.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    1.0,
+    1.01,
+    2,
+    -1
+   ],
+   [
+    1.5,
+    1.02,
+    4,
+    -1
+   ],
+   [
+    2.0,
+    1.03,
+    5,
+    -1
+   ],
+   [
+    2.5,
+    1.02,
+    5,
+    -1
+   ],
+   [
+    3.0,
+    1.01,
+    3,
+    -1
+   ],
+   [
+    3.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    4.0,
+    1.0,
+    -1,
+    0
+   ],
+   [
+    4.5,
+    1.0,
+    -1,
+    0
+   ],
+   [
+    5.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    5.5,
+    1.01,
+    2,
+    -1
+   ]
+  ],
+  "frame0_vs_portrait_mad": 7.6,
+  "frame0_vs_portrait_ssim": 0.8721,
+  "seam_last_vs_first_mad": 16.85,
+  "d0_minima": [
+   [
+    2.167,
+    19.08
+   ],
+   [
+    2.25,
+    19.08
+   ],
+   [
+    3.708,
+    12.16
+   ],
+   [
+    4.875,
+    10.9
+   ],
+   [
+    5.667,
+    16.24
+   ]
+  ],
+  "d0_max": 19.15,
+  "best_loop": {
+   "start_s": 0.958,
+   "end_s": 3.208,
+   "period_s": 2.25,
+   "mad": 11.0,
+   "window_mad": 11.2,
+   "start_frame": 23,
+   "end_frame": 77
+  },
+  "centroid_range_pct_w": [
+   2.2,
+   3.74
+  ],
+  "torso_shift_px_range": [
+   10,
+   0
+  ],
+  "torso_shift_pct_w": 2.6,
+  "head_shift_px_range": [
+   11,
+   0
+  ],
+  "face_mad": {
+   "frame0": 14.73,
+   "mean": 20.29,
+   "worst": 30.21
+  },
+  "face_ssim": {
+   "frame0": 0.7448,
+   "mean": 0.5867,
+   "worst": 0.2994
+  },
+  "eye_mad_median": 23.18,
+  "blinks": [
+   {
+    "start_s": 1.667,
+    "frames": 33,
+    "ms": 1375,
+    "peak_mad": 46.9
+   },
+   {
+    "start_s": 3.083,
+    "frames": 2,
+    "ms": 83,
+    "peak_mad": 40.1
+   },
+   {
+    "start_s": 3.208,
+    "frames": 1,
+    "ms": 42,
+    "peak_mad": 39.6
+   }
+  ],
+  "bg_motion_vs_mid": {
+   "mean": 6.45,
+   "max": 8.59
+  },
+  "bg_vs_portrait_max": 8.48
+ },
+ "take4-sq": {
+  "video": "takes/take4.mp4",
+  "src_size": [
+   1920,
+   1080
+  ],
+  "scored_size": [
+   640,
+   640
+  ],
+  "fps": 24.0,
+  "frames": 144,
+  "duration_s": 6.0,
+  "crop": "1080:1080:420:0",
+  "registration_mid": {
+   "scale": 1.0,
+   "dy": 0,
+   "dx": 0,
+   "mad": 12.46
+  },
+  "zoom_track": [
+   [
+    0.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    0.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    1.0,
+    1.0,
+    0,
+    -1
+   ],
+   [
+    1.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    2.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    2.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    3.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    3.5,
+    1.0,
+    0,
+    1
+   ],
+   [
+    4.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    4.5,
+    1.0,
+    0,
+    -1
+   ],
+   [
+    5.0,
+    1.0,
+    0,
+    -1
+   ],
+   [
+    5.5,
+    1.0,
+    0,
+    0
+   ]
+  ],
+  "frame0_vs_portrait_mad": 6.3,
+  "frame0_vs_portrait_ssim": 0.902,
+  "seam_last_vs_first_mad": 9.92,
+  "d0_minima": [
+   [
+    2.833,
+    7.69
+   ],
+   [
+    3.917,
+    7.01
+   ],
+   [
+    5.458,
+    5.86
+   ]
+  ],
+  "d0_max": 15.72,
+  "best_loop": {
+   "start_s": 2.667,
+   "end_s": 5.208,
+   "period_s": 2.542,
+   "mad": 6.91,
+   "window_mad": 6.97,
+   "start_frame": 64,
+   "end_frame": 125
+  },
+  "centroid_range_pct_w": [
+   0.4,
+   0.87
+  ],
+  "torso_shift_px_range": [
+   10,
+   2
+  ],
+  "torso_shift_pct_w": 1.56,
+  "head_shift_px_range": [
+   10,
+   2
+  ],
+  "face_mad": {
+   "frame0": 12.04,
+   "mean": 21.46,
+   "worst": 29.04
+  },
+  "face_ssim": {
+   "frame0": 0.8253,
+   "mean": 0.5319,
+   "worst": 0.3212
+  },
+  "eye_mad_median": 35.91,
+  "blinks": [],
+  "bg_motion_vs_mid": {
+   "mean": 1.81,
+   "max": 2.29
+  },
+  "bg_vs_portrait_max": 3.05
+ },
+ "take4-tall": {
+  "video": "takes/take4.mp4",
+  "src_size": [
+   1920,
+   1080
+  ],
+  "scored_size": [
+   384,
+   640
+  ],
+  "fps": 24.0,
+  "frames": 144,
+  "duration_s": 6.0,
+  "crop": "648:1080:818:0",
+  "registration_mid": {
+   "scale": 1.0,
+   "dy": 0,
+   "dx": 0,
+   "mad": 16.04
+  },
+  "zoom_track": [
+   [
+    0.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    0.5,
+    1.0,
+    1,
+    0
+   ],
+   [
+    1.0,
+    1.01,
+    3,
+    -1
+   ],
+   [
+    1.5,
+    1.01,
+    6,
+    -2
+   ],
+   [
+    2.0,
+    1.02,
+    4,
+    -1
+   ],
+   [
+    2.5,
+    1.01,
+    2,
+    -1
+   ],
+   [
+    3.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    3.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    4.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    4.5,
+    1.01,
+    2,
+    -2
+   ],
+   [
+    5.0,
+    1.01,
+    1,
+    -1
+   ],
+   [
+    5.5,
+    1.0,
+    0,
+    0
+   ]
+  ],
+  "frame0_vs_portrait_mad": 7.46,
+  "frame0_vs_portrait_ssim": 0.8739,
+  "seam_last_vs_first_mad": 11.79,
+  "d0_minima": [
+   [
+    2.833,
+    11.09
+   ],
+   [
+    3.917,
+    10.02
+   ],
+   [
+    5.417,
+    7.54
+   ]
+  ],
+  "d0_max": 18.59,
+  "best_loop": {
+   "start_s": 2.708,
+   "end_s": 5.208,
+   "period_s": 2.5,
+   "mad": 10.0,
+   "window_mad": 10.0,
+   "start_frame": 65,
+   "end_frame": 125
+  },
+  "centroid_range_pct_w": [
+   0.64,
+   1.45
+  ],
+  "torso_shift_px_range": [
+   10,
+   2
+  ],
+  "torso_shift_pct_w": 2.6,
+  "head_shift_px_range": [
+   10,
+   2
+  ],
+  "face_mad": {
+   "frame0": 12.3,
+   "mean": 21.41,
+   "worst": 28.8
+  },
+  "face_ssim": {
+   "frame0": 0.8188,
+   "mean": 0.5335,
+   "worst": 0.3258
+  },
+  "eye_mad_median": 35.66,
+  "blinks": [],
+  "bg_motion_vs_mid": {
+   "mean": 2.83,
+   "max": 3.28
+  },
+  "bg_vs_portrait_max": 3.91
+ },
+ "take5-tall": {
+  "video": "takes/take5.mp4",
+  "src_size": [
+   1080,
+   1920
+  ],
+  "scored_size": [
+   384,
+   640
+  ],
+  "fps": 24.0,
+  "frames": 144,
+  "duration_s": 6.0,
+  "crop": "1080:1799:0:121",
+  "registration_mid": {
+   "scale": 1.0,
+   "dy": -1,
+   "dx": 0,
+   "mad": 15.49
+  },
+  "zoom_track": [
+   [
+    0.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    0.5,
+    1.01,
+    1,
+    -1
+   ],
+   [
+    1.0,
+    1.02,
+    4,
+    -1
+   ],
+   [
+    1.5,
+    1.03,
+    5,
+    -1
+   ],
+   [
+    2.0,
+    1.02,
+    4,
+    -1
+   ],
+   [
+    2.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    3.0,
+    1.0,
+    -1,
+    0
+   ],
+   [
+    3.5,
+    1.0,
+    -1,
+    0
+   ],
+   [
+    4.0,
+    1.01,
+    1,
+    0
+   ],
+   [
+    4.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    5.0,
+    1.0,
+    -3,
+    0
+   ],
+   [
+    5.5,
+    1.0,
+    -1,
+    0
+   ]
+  ],
+  "frame0_vs_portrait_mad": 6.7,
+  "frame0_vs_portrait_ssim": 0.9,
+  "seam_last_vs_first_mad": 14.98,
+  "d0_minima": [
+   [
+    1.625,
+    18.08
+   ],
+   [
+    2.542,
+    10.78
+   ],
+   [
+    2.875,
+    12.79
+   ],
+   [
+    3.625,
+    10.01
+   ],
+   [
+    4.583,
+    8.75
+   ],
+   [
+    5.542,
+    8.91
+   ]
+  ],
+  "d0_max": 18.45,
+  "best_loop": {
+   "start_s": 0.375,
+   "end_s": 3.792,
+   "period_s": 3.417,
+   "mad": 9.45,
+   "window_mad": 9.53,
+   "start_frame": 9,
+   "end_frame": 91
+  },
+  "centroid_range_pct_w": [
+   1.43,
+   2.02
+  ],
+  "torso_shift_px_range": [
+   13,
+   0
+  ],
+  "torso_shift_pct_w": 3.39,
+  "head_shift_px_range": [
+   17,
+   0
+  ],
+  "face_mad": {
+   "frame0": 8.79,
+   "mean": 18.36,
+   "worst": 31.11
+  },
+  "face_ssim": {
+   "frame0": 0.9049,
+   "mean": 0.6069,
+   "worst": 0.2673
+  },
+  "eye_mad_median": 30.23,
+  "blinks": [
+   {
+    "start_s": 2.0,
+    "frames": 1,
+    "ms": 42,
+    "peak_mad": 49.0
+   },
+   {
+    "start_s": 2.083,
+    "frames": 2,
+    "ms": 83,
+    "peak_mad": 49.7
+   },
+   {
+    "start_s": 2.208,
+    "frames": 1,
+    "ms": 42,
+    "peak_mad": 49.1
+   },
+   {
+    "start_s": 2.292,
+    "frames": 1,
+    "ms": 42,
+    "peak_mad": 49.1
+   },
+   {
+    "start_s": 2.375,
+    "frames": 1,
+    "ms": 42,
+    "peak_mad": 48.8
+   },
+   {
+    "start_s": 2.458,
+    "frames": 1,
+    "ms": 42,
+    "peak_mad": 48.4
+   }
+  ],
+  "bg_motion_vs_mid": {
+   "mean": 4.67,
+   "max": 5.68
+  },
+  "bg_vs_portrait_max": 5.07
+ },
+ "take6-tall": {
+  "video": "takes/take6.mp4",
+  "src_size": [
+   1080,
+   1920
+  ],
+  "scored_size": [
+   384,
+   640
+  ],
+  "fps": 24.0,
+  "frames": 144,
+  "duration_s": 6.0,
+  "crop": "1080:1799:0:121",
+  "registration_mid": {
+   "scale": 1.01,
+   "dy": 2,
+   "dx": -1,
+   "mad": 16.75
+  },
+  "zoom_track": [
+   [
+    0.0,
+    1.0,
+    0,
+    0
+   ],
+   [
+    0.5,
+    1.0,
+    1,
+    0
+   ],
+   [
+    1.0,
+    1.01,
+    3,
+    -1
+   ],
+   [
+    1.5,
+    1.03,
+    4,
+    -1
+   ],
+   [
+    2.0,
+    1.03,
+    5,
+    -1
+   ],
+   [
+    2.5,
+    1.02,
+    4,
+    -1
+   ],
+   [
+    3.0,
+    1.01,
+    2,
+    -1
+   ],
+   [
+    3.5,
+    1.0,
+    0,
+    0
+   ],
+   [
+    4.0,
+    1.0,
+    -1,
+    0
+   ],
+   [
+    4.5,
+    1.0,
+    -2,
+    0
+   ],
+   [
+    5.0,
+    1.0,
+    -1,
+    0
+   ],
+   [
+    5.5,
+    1.01,
+    1,
+    -1
+   ]
+  ],
+  "frame0_vs_portrait_mad": 6.66,
+  "frame0_vs_portrait_ssim": 0.9028,
+  "seam_last_vs_first_mad": 15.23,
+  "d0_minima": [
+   [
+    2.5,
+    16.29
+   ],
+   [
+    3.667,
+    9.85
+   ],
+   [
+    4.417,
+    12.88
+   ],
+   [
+    5.125,
+    8.41
+   ]
+  ],
+  "d0_max": 17.61,
+  "best_loop": {
+   "start_s": 0.875,
+   "end_s": 3.0,
+   "period_s": 2.125,
+   "mad": 9.39,
+   "window_mad": 9.71,
+   "start_frame": 21,
+   "end_frame": 72
+  },
+  "centroid_range_pct_w": [
+   0.68,
+   2.22
+  ],
+  "torso_shift_px_range": [
+   11,
+   1
+  ],
+  "torso_shift_pct_w": 2.86,
+  "head_shift_px_range": [
+   11,
+   0
+  ],
+  "face_mad": {
+   "frame0": 11.48,
+   "mean": 17.04,
+   "worst": 27.1
+  },
+  "face_ssim": {
+   "frame0": 0.8304,
+   "mean": 0.6562,
+   "worst": 0.3631
+  },
+  "eye_mad_median": 19.13,
+  "blinks": [
+   {
+    "start_s": 1.292,
+    "frames": 2,
+    "ms": 83,
+    "peak_mad": 34.1
+   },
+   {
+    "start_s": 1.417,
+    "frames": 47,
+    "ms": 1958,
+    "peak_mad": 45.5
+   },
+   {
+    "start_s": 3.458,
+    "frames": 1,
+    "ms": 42,
+    "peak_mad": 32.3
+   },
+   {
+    "start_s": 5.917,
+    "frames": 1,
+    "ms": 42,
+    "peak_mad": 30.8
+   }
+  ],
+  "bg_motion_vs_mid": {
+   "mean": 4.45,
+   "max": 5.94
+  },
+  "bg_vs_portrait_max": 6.23
+ }
+}

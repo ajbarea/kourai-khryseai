@@ -84,6 +84,8 @@ exclude = [
     ".ruff_cache",
     ".hypothesis",
     "node_modules",
+    # Measurement scripts kept beside the art they scored (a spike's record, not app code).
+    "assets/avatars/*/idle/*/tools",
 ]
 
 [tool.ruff.lint]
